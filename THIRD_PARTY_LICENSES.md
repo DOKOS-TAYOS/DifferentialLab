@@ -1,6 +1,6 @@
 ### Third-Party Licenses for DifferentialLab
 
-DifferentialLab (`differential-lab`) is distributed under the **MIT** license (see `license.md` in the project root).
+DifferentialLab (`DifferentialLab`) is distributed under the **MIT** license (see `license.md` in the project root).
 
 This document lists the third-party libraries used and their licenses, to facilitate compliance
 with their terms when redistributing DifferentialLab (as source code, installable package, binary,

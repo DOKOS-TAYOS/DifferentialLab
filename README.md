@@ -40,8 +40,8 @@ chmod +x install.sh
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/DOKOS-TAYOS/differential-lab.git
-cd differential-lab
+git clone https://github.com/DOKOS-TAYOS/DifferentialLab.git
+cd DifferentialLab
 ```
 
 2. Run setup:
