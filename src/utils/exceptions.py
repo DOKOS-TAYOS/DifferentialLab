@@ -1,21 +1,21 @@
-"""Custom exception hierarchy for ODE Solver."""
+"""Custom exception hierarchy for DifferentialLab."""
 
 
-class ODESolverError(Exception):
-    """Base exception for all ODE Solver errors."""
+class DifferentialLabError(Exception):
+    """Base exception for all DifferentialLab errors."""
 
 
-class ValidationError(ODESolverError):
+class ValidationError(DifferentialLabError):
     """Raised when user input fails validation."""
 
 
-class EquationParseError(ODESolverError):
+class EquationParseError(DifferentialLabError):
     """Raised when an ODE expression cannot be parsed or evaluated."""
 
 
-class ConfigurationError(ODESolverError):
+class ConfigurationError(DifferentialLabError):
     """Raised when application configuration is invalid."""
 
 
-class SolverFailedError(ODESolverError):
+class SolverFailedError(DifferentialLabError):
     """Raised when the numerical solver fails to converge."""

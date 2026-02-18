@@ -1,1 +1,1 @@
-"""UI dialog modules for ODE Solver."""
+"""UI dialog modules for DifferentialLab."""

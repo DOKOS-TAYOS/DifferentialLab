@@ -1,4 +1,4 @@
-"""Main menu window for ODE Solver (Tkinter/ttk)."""
+"""Main menu window for DifferentialLab (Tkinter/ttk)."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ class MainMenu:
 
         ttk.Label(
             title_frame,
-            text=f"v{APP_VERSION} — Numerical ODE Solver",
+            text=f"v{APP_VERSION} — DifferentialLab",
             style="Small.TLabel",
         ).pack(pady=(4, 0))
 

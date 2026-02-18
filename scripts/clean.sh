@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# ODE Solver - Clean temporary files (Unix/Mac)
+# DifferentialLab - Clean temporary files (Unix/Mac)
 # Removes __pycache__, .pyc, .pyo, .log, and other temp files.
 # Skips the .venv directory.
 # ============================================================================

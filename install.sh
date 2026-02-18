@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================================
-# ODE Solver - Installation Script for Unix/Mac
+# DifferentialLab - Installation Script for Unix/Mac
 # ============================================================================
 
 set -e
 
 echo ""
 echo "===================================="
-echo " ODE Solver Installation"
+echo " DifferentialLab Installation"
 echo "===================================="
 echo ""
 
@@ -23,8 +23,8 @@ fi
 echo "[1/3] Git found:"
 git --version
 
-REPO_URL="https://github.com/DOKOS-TAYOS/ode-solver.git"
-REPO_NAME="ode_solver"
+REPO_URL="https://github.com/DOKOS-TAYOS/differential-lab.git"
+REPO_NAME="differential_lab"
 
 if [ -d "$REPO_NAME" ]; then
     echo ""
@@ -38,6 +38,25 @@ if [ -d "$REPO_NAME" ]; then
         cd "$REPO_NAME"
         chmod +x bin/setup.sh
         ./bin/setup.sh
+        PROJECT_DIR="$(pwd)"
+        DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+        SHORTCUT="$DESKTOP/DifferentialLab.desktop"
+        if [ -d "$DESKTOP" ]; then
+            cat > "$SHORTCUT" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DifferentialLab
+Comment=Launch DifferentialLab
+Exec=$PROJECT_DIR/bin/run.sh
+Path=$PROJECT_DIR
+Icon=utilities-terminal
+Terminal=false
+EOF
+            chmod +x "$SHORTCUT"
+            echo ""
+            echo "Desktop shortcut created: $SHORTCUT"
+        fi
         exit 0
     fi
 fi
@@ -58,17 +77,43 @@ cd "$REPO_NAME" || {
 }
 
 echo ""
-echo "[3/3] Running setup..."
+echo "[3/4] Running setup..."
 echo ""
 
 chmod +x bin/setup.sh
 ./bin/setup.sh
 
 echo ""
+echo "[4/4] Creating desktop shortcut..."
+
+PROJECT_DIR="$(pwd)"
+DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+SHORTCUT="$DESKTOP/DifferentialLab.desktop"
+
+if [ -d "$DESKTOP" ]; then
+    cat > "$SHORTCUT" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DifferentialLab
+Comment=Launch DifferentialLab
+Exec=$PROJECT_DIR/bin/run.sh
+Path=$PROJECT_DIR
+Icon=utilities-terminal
+Terminal=false
+EOF
+    chmod +x "$SHORTCUT"
+    echo "       Desktop shortcut created: $SHORTCUT"
+else
+    echo "       WARNING: Desktop directory not found, skipping shortcut"
+fi
+
+echo ""
 echo "===================================="
 echo " Installation Complete!"
 echo "===================================="
 echo ""
-echo "The ODE Solver has been cloned and set up."
-echo "You can now run the application from: $(pwd)"
+echo "DifferentialLab has been cloned and set up."
+echo "You can now run the application from: $PROJECT_DIR"
+echo "Desktop shortcut: $SHORTCUT"
 echo ""

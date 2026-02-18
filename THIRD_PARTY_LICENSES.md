@@ -1,9 +1,9 @@
-### Third-Party Licenses for ODE Solver
+### Third-Party Licenses for DifferentialLab
 
-ODE Solver (`ode-solver`) is distributed under the **MIT** license (see `license.md` in the project root).
+DifferentialLab (`differential-lab`) is distributed under the **MIT** license (see `license.md` in the project root).
 
 This document lists the third-party libraries used and their licenses, to facilitate compliance
-with their terms when redistributing ODE Solver (as source code, installable package, binary,
+with their terms when redistributing DifferentialLab (as source code, installable package, binary,
 or installer).
 
 > Note: This list is based on the dependencies declared in `pyproject.toml` (and the matching

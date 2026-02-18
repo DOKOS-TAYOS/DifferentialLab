@@ -1,4 +1,4 @@
-"""Plotting module for ODE Solver."""
+"""Plotting module for DifferentialLab."""
 
 from plotting.plot_utils import (
     create_phase_plot,

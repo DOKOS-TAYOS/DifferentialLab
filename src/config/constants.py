@@ -1,8 +1,8 @@
-"""Application constants for ODE Solver."""
+"""Application constants for DifferentialLab."""
 
 from typing import Final
 
-APP_NAME: Final[str] = "ODE Solver"
+APP_NAME: Final[str] = "DifferentialLab"
 APP_VERSION: Final[str] = "0.1.0"
 
 SOLVER_METHODS: Final[tuple[str, ...]] = (

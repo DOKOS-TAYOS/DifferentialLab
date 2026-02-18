@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# ODE Solver - Setup Script for Unix/Mac
+# DifferentialLab - Setup Script for Unix/Mac
 # ============================================================================
 
 set -e
@@ -12,6 +12,41 @@ is_linux_with_pkg_manager() {
     [ "$(uname -s)" = "Linux" ] || return 1
     command -v apt-get &> /dev/null || command -v dnf &> /dev/null || \
     command -v pacman &> /dev/null
+}
+
+install_python() {
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y python3 python3-pip
+    elif command -v pacman &> /dev/null; then
+        sudo pacman -S --noconfirm python python-pip
+    elif command -v brew &> /dev/null; then
+        brew install python3
+    else
+        return 1
+    fi
+}
+
+ask_install_python() {
+    echo "Python 3 is not installed."
+    echo ""
+    read -p "Do you want to install Python 3 now? [y/N] " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if install_python; then
+            hash -r 2>/dev/null || true
+            echo "       Python installed successfully"
+            return 0
+        else
+            echo "ERROR: Could not install Python automatically."
+            echo "Please install Python 3.12 or higher manually."
+            return 1
+        fi
+    else
+        echo "Please install Python 3.12 or higher and run setup again."
+        return 1
+    fi
 }
 
 install_tkinter_linux() {
@@ -29,14 +64,14 @@ install_tkinter_linux() {
 
 echo ""
 echo "===================================="
-echo " ODE Solver Setup (Unix/Mac)"
+echo " DifferentialLab Setup (Unix/Mac)"
 echo "===================================="
 echo ""
 
 if ! command -v python3 &> /dev/null; then
-    echo "ERROR: Python 3 is not installed"
-    echo "Please install Python 3.12 or higher"
-    exit 1
+    if ! ask_install_python; then
+        exit 1
+    fi
 fi
 
 echo "[1/7] Checking Python version..."
@@ -107,7 +142,7 @@ echo "===================================="
 echo " Setup Complete!"
 echo "===================================="
 echo ""
-echo "To run ODE Solver:"
+echo "To run DifferentialLab:"
 echo "  ./bin/run.sh"
 echo ""
 echo "To configure the application:"

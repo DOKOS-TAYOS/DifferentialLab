@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ode-solver"
+name = "differential-lab"
 version = "0.1.0"
-description = "Numerical ODE solver with Tkinter GUI, predefined equations, and professional visualizations"
+description = "DifferentialLab — Numerical ODE solver with Tkinter GUI, predefined equations, and professional visualizations"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
@@ -47,7 +47,7 @@ docs = [
 ]
 
 [project.scripts]
-ode-solver = "main_program:main"
+differential-lab = "main_program:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM ODE Solver - Setup Script for Windows
+REM DifferentialLab - Setup Script for Windows
 REM ============================================================================
 
 REM Change to project root directory (parent of bin)
@@ -8,7 +8,7 @@ cd /d "%~dp0.."
 
 echo.
 echo ====================================
-echo  ODE Solver Setup (Windows)
+echo  DifferentialLab Setup (Windows)
 echo ====================================
 echo.
 
@@ -72,7 +72,7 @@ echo ====================================
 echo  Setup Complete!
 echo ====================================
 echo.
-echo To run ODE Solver:
+echo To run DifferentialLab:
 echo   bin\run.bat
 echo.
 echo To configure the application:

@@ -1,4 +1,4 @@
-"""Frontend module for ODE Solver."""
+"""Frontend module for DifferentialLab."""
 
 from frontend.ui_main_menu import MainMenu
 

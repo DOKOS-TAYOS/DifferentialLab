@@ -1,9 +1,9 @@
-"""Utility modules for ODE Solver."""
+"""Utility modules for DifferentialLab."""
 
 from utils.exceptions import (
     ConfigurationError,
     EquationParseError,
-    ODESolverError,
+    DifferentialLabError,
     SolverFailedError,
     ValidationError,
 )
@@ -12,7 +12,7 @@ from utils.logger import get_logger
 __all__ = [
     "ConfigurationError",
     "EquationParseError",
-    "ODESolverError",
+    "DifferentialLabError",
     "SolverFailedError",
     "ValidationError",
     "get_logger",

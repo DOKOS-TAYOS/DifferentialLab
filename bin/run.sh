@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# ODE Solver - Quick Launch Script for Unix/Mac
+# DifferentialLab - Quick Launch Script for Unix/Mac
 # ============================================================================
 
 set -e

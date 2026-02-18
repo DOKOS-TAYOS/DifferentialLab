@@ -8,7 +8,7 @@ _CONFIGURED = False
 
 
 def _setup_root_logger() -> None:
-    """Configure the root ``ode_solver`` logger once from env settings."""
+    """Configure the root ``differential_lab`` logger once from env settings."""
     global _CONFIGURED
     if _CONFIGURED:
         return
@@ -22,7 +22,7 @@ def _setup_root_logger() -> None:
 
     level = getattr(logging, level_name.upper(), logging.INFO)
 
-    root = logging.getLogger("ode_solver")
+    root = logging.getLogger("differential_lab")
     root.setLevel(level)
 
     fmt = logging.Formatter(
@@ -45,7 +45,7 @@ def _setup_root_logger() -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Return a child logger under the ``ode_solver`` namespace.
+    """Return a child logger under the ``differential_lab`` namespace.
 
     Args:
         name: Module name (typically ``__name__``).
@@ -54,6 +54,6 @@ def get_logger(name: str) -> logging.Logger:
         A ``logging.Logger`` instance.
     """
     _setup_root_logger()
-    if name.startswith("ode_solver."):
+    if name.startswith("differential_lab."):
         return logging.getLogger(name)
-    return logging.getLogger(f"ode_solver.{name}")
+    return logging.getLogger(f"differential_lab.{name}")

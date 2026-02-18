@@ -1,4 +1,4 @@
-"""Input validation for ODE solver parameters."""
+"""Input validation for DifferentialLab solver parameters."""
 
 from __future__ import annotations
 

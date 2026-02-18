@@ -19,7 +19,7 @@ from solver.equation_parser import parse_expression
 from solver.ode_solver import solve_ode
 from solver.statistics import compute_statistics
 from solver.validators import validate_all_inputs
-from utils.exceptions import EquationParseError, ODESolverError
+from utils.exceptions import DifferentialLabError, EquationParseError
 from utils.export import export_all_results
 from utils.logger import get_logger
 
@@ -239,7 +239,7 @@ class ParametersDialog:
         try:
             solution = solve_ode(ode_func, (x_min, x_max), y0,
                                  method=method, t_eval=t_eval)
-        except ODESolverError as exc:
+        except DifferentialLabError as exc:
             messagebox.showerror("Solver Error", str(exc), parent=self.win)
             return
 

@@ -1,1 +1,1 @@
-"""ODE Solver — numerical ODE solving application."""
+"""DifferentialLab — numerical ODE solving application."""

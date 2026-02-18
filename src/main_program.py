@@ -1,4 +1,4 @@
-"""ODE Solver — application entry point."""
+"""DifferentialLab — application entry point."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def main() -> None:
 
     initialize_and_validate_config()
     logger = get_logger(__name__)
-    logger.info("ODE Solver starting")
+    logger.info("DifferentialLab starting")
 
     get_output_dir()
 
@@ -35,7 +35,7 @@ def main() -> None:
         logger.critical("Unhandled exception", exc_info=True)
         raise
     finally:
-        logger.info("ODE Solver shutting down")
+        logger.info("DifferentialLab shutting down")
 
 
 if __name__ == "__main__":

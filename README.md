@@ -1,4 +1,4 @@
-# ODE Solver
+# DifferentialLab
 
 **Numerical ODE solver with a graphical interface for scientists, engineers, and students.**
 
@@ -40,8 +40,8 @@ chmod +x install.sh
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/DOKOS-TAYOS/ode-solver.git
-cd ode-solver
+git clone https://github.com/DOKOS-TAYOS/differential-lab.git
+cd differential-lab
 ```
 
 2. Run setup:

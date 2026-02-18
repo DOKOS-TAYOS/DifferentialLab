@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM ODE Solver - Clean temporary files (Windows)
+REM DifferentialLab - Clean temporary files (Windows)
 REM Removes __pycache__, .pyc, .pyo, .log, and other temp files.
 REM Skips the .venv directory.
 REM ============================================================================

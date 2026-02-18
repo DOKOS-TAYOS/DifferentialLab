@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM ODE Solver - Quick Launch Script for Windows
+REM DifferentialLab - Quick Launch Script for Windows
 REM ============================================================================
 
 REM Change to project root directory (parent of bin)

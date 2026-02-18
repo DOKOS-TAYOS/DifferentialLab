@@ -23,5 +23,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform install/run scripts** (`install.bat`/`install.sh`, `bin/setup.bat`/`bin/setup.sh`, `bin/run.bat`/`bin/run.sh`).
 - **Tooltip widgets** for improved UX in the GUI.
 
-[Unreleased]: https://github.com/DOKOS-TAYOS/ode-solver/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/DOKOS-TAYOS/ode-solver/releases/tag/v0.1.0
+[Unreleased]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/DOKOS-TAYOS/DifferentialLab/releases/tag/v0.1.0

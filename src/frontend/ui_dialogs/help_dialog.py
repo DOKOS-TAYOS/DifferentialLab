@@ -16,7 +16,7 @@ _HELP_TEXT = f"""\
 {APP_NAME} v{APP_VERSION}
 {'=' * 40}
 
-A numerical ODE solver with a graphical interface.
+DifferentialLab — numerical ODE solver with a graphical interface.
 
 WHAT DOES IT SOLVE?
 -------------------

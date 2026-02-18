@@ -1,4 +1,4 @@
-"""Configuration module for ODE Solver."""
+"""Configuration module for DifferentialLab."""
 
 from config.constants import APP_NAME, APP_VERSION
 from config.env import (
