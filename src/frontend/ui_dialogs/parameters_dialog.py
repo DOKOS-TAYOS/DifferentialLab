@@ -137,8 +137,17 @@ class ParametersDialog:
         row_n.pack(fill=tk.X, pady=(pad, 0))
         ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
         self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
-        ttk.Spinbox(row_n, from_=10, to=1000000, width=10,
-                     textvariable=self.npoints_var).pack(side=tk.LEFT, padx=pad)
+        
+        npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10)
+        npoints_entry.pack(side=tk.LEFT, padx=pad)
+        
+        btn_decrease = ttk.Button(row_n, text="−", width=3, 
+                                  command=lambda: self._change_npoints(0.1))
+        btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
+        
+        btn_increase = ttk.Button(row_n, text="+", width=3,
+                                  command=lambda: self._change_npoints(10))
+        btn_increase.pack(side=tk.LEFT)
 
         # Initial conditions
         ic_frame = ttk.LabelFrame(scroll_frame, text="Initial Conditions", padding=pad)
@@ -191,6 +200,20 @@ class ParametersDialog:
             primes = "'" * i
             labels.append(f"y{primes}(x0)")
         return labels
+
+    def _change_npoints(self, factor: float) -> None:
+        """Change evaluation points by an order of magnitude.
+        
+        Args:
+            factor: Multiplication factor (10 to increase, 0.1 to decrease).
+        """
+        try:
+            current = int(self.npoints_var.get())
+            new_value = max(10, int(current * factor))
+            self.npoints_var.set(str(new_value))
+        except ValueError:
+            # If invalid, reset to default
+            self.npoints_var.set(str(get_env_from_schema("SOLVER_NUM_POINTS")))
 
     def _on_method_change(self, _event: Any) -> None:
         method = self.method_var.get()
