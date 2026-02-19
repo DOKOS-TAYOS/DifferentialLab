@@ -24,7 +24,6 @@ from config.paths import (
     get_json_path,
     get_output_dir,
     get_plot_path,
-    get_project_root,
 )
 from config.theme import configure_ttk_styles, get_font, get_select_colors
 
@@ -51,7 +50,6 @@ __all__ = [
     "get_json_path",
     "get_output_dir",
     "get_plot_path",
-    "get_project_root",
     # theme
     "configure_ttk_styles",
     "get_font",

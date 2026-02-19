@@ -76,30 +76,3 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
     logger.info("Loaded %d predefined equations", len(equations))
     return equations
 
-
-def build_ode_function(
-    equation: PredefinedEquation,
-    param_values: dict[str, float] | None = None,
-) -> Callable[[float, np.ndarray], np.ndarray]:
-    """Build a callable ODE function from a predefined equation.
-
-    Args:
-        equation: A :class:`PredefinedEquation` instance.
-        param_values: Parameter values to use. Missing keys fall back to
-            the defaults defined in the equation.
-
-    Returns:
-        Callable ``f(x, y)`` suitable for ``solve_ivp``.
-    """
-    defaults = {
-        name: info["default"]
-        for name, info in equation.parameters.items()
-    }
-    params = {**defaults, **(param_values or {})}
-
-    logger.debug(
-        "Building ODE function for '%s' with params=%s",
-        equation.key, params,
-    )
-
-    return parse_expression(equation.expression, equation.order, params)

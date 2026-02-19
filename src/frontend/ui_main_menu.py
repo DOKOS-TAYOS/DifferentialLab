@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from config import APP_NAME, APP_VERSION, configure_ttk_styles, get_env_from_schema, get_font
-from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs import setup_arrow_enter_navigation
 from frontend.window_utils import center_window
 from utils import get_logger
 
@@ -141,14 +141,14 @@ class MainMenu:
     def _on_solve(self) -> None:
         """Open the equation selection dialog."""
         logger.info("User clicked Solve")
-        from frontend.ui_dialogs.equation_dialog import EquationDialog
+        from frontend.ui_dialogs import EquationDialog
 
         EquationDialog(self.root)
 
     def _on_config(self) -> None:
         """Open the configuration dialog; restart the app if saved."""
         logger.info("User clicked Configuration")
-        from frontend.ui_dialogs.config_dialog import ConfigDialog
+        from frontend.ui_dialogs import ConfigDialog
 
         dlg = ConfigDialog(self.root)
         self.root.wait_window(dlg.win)
@@ -161,6 +161,6 @@ class MainMenu:
     def _on_info(self) -> None:
         """Open the information / help dialog."""
         logger.info("User clicked Information")
-        from frontend.ui_dialogs.help_dialog import HelpDialog
+        from frontend.ui_dialogs import HelpDialog
 
         HelpDialog(self.root)

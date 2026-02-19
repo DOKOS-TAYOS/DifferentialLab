@@ -19,16 +19,6 @@ def get_output_dir() -> Path:
     out.mkdir(parents=True, exist_ok=True)
     return out
 
-
-def get_project_root() -> Path:
-    """Return the project root directory.
-
-    Returns:
-        Absolute path to the project root.
-    """
-    return _PROJECT_ROOT
-
-
 def generate_output_basename(prefix: str = "solution") -> str:
     """Generate a timestamped base filename.
 
