@@ -62,10 +62,16 @@ class ResultDialog:
                        csv_path, json_path, plot_path)
 
         self.win.update_idletasks()
+        req_width = self.win.winfo_reqwidth()
+        req_height = self.win.winfo_reqheight()
+        
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        win_w = min(int(screen_w * 0.92), max(1400, _LEFT_MIN_WIDTH + 700))
-        win_h = min(int(screen_h * 0.88), 900)
+        
+        min_width = _LEFT_MIN_WIDTH + 700
+        win_w = min(max(req_width + 40, min_width, 1200), int(screen_w * 0.92))
+        win_h = min(max(req_height + 40, 700), int(screen_h * 0.88))
+        
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")

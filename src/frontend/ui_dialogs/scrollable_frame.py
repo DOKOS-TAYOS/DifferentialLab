@@ -5,6 +5,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+_REFRESH_DELAY_MS = 50
+
 
 class ScrollableFrame(ttk.Frame):
     """A frame that wraps a Canvas + Scrollbar + inner Frame.
@@ -54,7 +56,7 @@ class ScrollableFrame(ttk.Frame):
         """Coalesce multiple layout events into a single deferred update."""
         if not self._pending_refresh:
             self._pending_refresh = True
-            self._canvas.after_idle(self._do_refresh)
+            self._canvas.after(_REFRESH_DELAY_MS, self._do_refresh)
 
     def _do_refresh(self) -> None:
         self._pending_refresh = False
@@ -68,6 +70,7 @@ class ScrollableFrame(ttk.Frame):
 
     def _on_canvas_configure(self, event: tk.Event) -> None:  # type: ignore[type-arg]
         self._canvas.itemconfig(self._canvas_window, width=event.width)
+        self._schedule_refresh()
 
     def _on_mousewheel(self, event: tk.Event) -> str:  # type: ignore[type-arg]
         if self._canvas.winfo_exists():

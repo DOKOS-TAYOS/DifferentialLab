@@ -62,7 +62,17 @@ class ParametersDialog:
 
         self._build_ui(default_y0, default_domain)
 
-        center_window(self.win, 740, 700)
+        self.win.update_idletasks()
+        req_width = self.win.winfo_reqwidth()
+        req_height = self.win.winfo_reqheight()
+        
+        screen_w = self.win.winfo_screenwidth()
+        screen_h = self.win.winfo_screenheight()
+        
+        win_w = min(max(req_width + 40, 740), int(screen_w * 0.9))
+        win_h = min(max(req_height + 40, 700), int(screen_h * 0.9))
+        
+        center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
