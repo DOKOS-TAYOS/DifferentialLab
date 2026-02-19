@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from config import SOLVER_METHODS
 from solver.equation_parser import validate_expression
 from utils import get_logger
@@ -148,8 +150,8 @@ def validate_all_inputs(
 
 
 def _is_finite(value: float) -> bool:
-    """Return ``True`` if *value* is a finite number."""
+    """Return ``True`` if *value* is a finite number (not NaN, not ±inf)."""
     try:
-        return float(value) == float(value) and abs(float(value)) != float("inf")
+        return math.isfinite(float(value))
     except (TypeError, ValueError):
         return False

@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable, Sequence
-from typing import Any, Optional
+from typing import Any
 
 
 def setup_arrow_enter_navigation(
     widgets_grid: Sequence[Sequence[Any]],
-    on_enter: Optional[Callable[[Any, tk.Event], bool]] = None,  # type: ignore[type-arg]
+    on_enter: Callable[[Any, tk.Event], bool] | None = None,  # type: ignore[type-arg]
 ) -> None:
     """Set up arrow-key and Enter navigation on a 2-D grid of widgets.
 

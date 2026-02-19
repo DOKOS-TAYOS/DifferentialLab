@@ -42,12 +42,11 @@ def _export_csv(
         headers = ["x"] + [f"y{i}" if n_vars > 1 else "y" for i in range(n_vars)]
 
     filepath.parent.mkdir(parents=True, exist_ok=True)
+    data = np.column_stack([x] + [y_2d[i] for i in range(n_vars)])
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
-        for j in range(len(x)):
-            row = [x[j]] + [y_2d[i, j] for i in range(n_vars)]
-            writer.writerow(row)
+        writer.writerows(data.tolist())
 
     logger.info("CSV exported: %s", filepath)
     return filepath

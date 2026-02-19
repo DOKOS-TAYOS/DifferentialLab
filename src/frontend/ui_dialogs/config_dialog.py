@@ -13,15 +13,13 @@ from config import (
     get_env_path,
     write_env_file,
 )
+from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
 from utils import get_logger
 
 logger = get_logger(__name__)
-
-_COLLAPSED = "\u25b6"
-_EXPANDED = "\u25bc"
 
 _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ("ui_theme", "UI Theme", [
@@ -161,48 +159,16 @@ class ConfigDialog:
         expanded: bool = False,
     ) -> None:
         """Add a complete collapsible section with its fields."""
-        arrow_var = tk.StringVar(value=_EXPANDED if expanded else _COLLAPSED)
-
-        wrapper = ttk.Frame(parent)
-        wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
-
-        header = ttk.Frame(wrapper, style="SectionHeader.TFrame")
-        header.configure(cursor="hand2")
-        header.pack(fill=tk.X)
-
-        arrow_lbl = ttk.Label(header, textvariable=arrow_var,
-                              style="SectionHeader.TLabel")
-        arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
-
-        title_lbl = ttk.Label(header, text=title,
-                              style="SectionHeader.TLabel")
-        title_lbl.pack(side=tk.LEFT, pady=8)
-
-        content = ttk.Frame(wrapper, padding=(16, 4, 4, 4))
+        section = CollapsibleSection(
+            parent, self._scroll, title, expanded=expanded, pad=pad,
+        )
+        section.content.configure(padding=(16, 4, 4, 4))
 
         for key in keys:
             item = _SCHEMA_BY_KEY.get(key)
             if item is None:
                 continue
-            self._add_field(content, item, current, pad)
-
-        if expanded:
-            content.pack(fill=tk.X)
-
-        scroll_ref = self._scroll
-
-        def toggle(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            if content.winfo_manager():
-                content.pack_forget()
-                arrow_var.set(_COLLAPSED)
-            else:
-                content.pack(fill=tk.X)
-                arrow_var.set(_EXPANDED)
-                scroll_ref.bind_new_children()
-            wrapper.after(50, scroll_ref.refresh_scroll_region)
-
-        for w in (header, arrow_lbl, title_lbl):
-            w.bind("<Button-1>", toggle)
+            self._add_field(section.content, item, current, pad)
 
     def _add_field(
         self,

@@ -31,6 +31,7 @@ class EquationDialog:
         self.win.configure(bg=bg)
 
         self.equations = load_predefined_equations()
+        self._equation_keys: list[str] = list(self.equations.keys())
         self._selected_key: str | None = None
         self._param_vars: dict[str, tk.StringVar] = {}
 
@@ -185,7 +186,7 @@ class EquationDialog:
         if not sel:
             return
         idx = sel[0]
-        key = list(self.equations.keys())[idx]
+        key = self._equation_keys[idx]
         eq = self.equations[key]
         self._selected_key = key
 

@@ -45,12 +45,16 @@ def _color_to_rgb(color: str) -> tuple[int, int, int] | None:
             pass
         return None
 
-    # Use tkinter for named colors (handles Tk color names)
+    # Use tkinter for named colors — reuse existing root when available
     try:
-        root = tk.Tk()
-        root.withdraw()
-        r, g, b = root.winfo_rgb(color)
-        root.destroy()
+        existing_root = tk._default_root  # type: ignore[attr-defined]
+        if existing_root is not None and existing_root.winfo_exists():
+            r, g, b = existing_root.winfo_rgb(color)
+            return (r // 256, g // 256, b // 256)
+        tmp = tk.Tk()
+        tmp.withdraw()
+        r, g, b = tmp.winfo_rgb(color)
+        tmp.destroy()
         return (r // 256, g // 256, b // 256)
     except (tk.TclError, Exception):
         pass

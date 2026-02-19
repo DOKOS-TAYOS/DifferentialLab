@@ -12,6 +12,7 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _EQUATIONS_PATH = Path(__file__).resolve().parent.parent / "config" / "equations.yaml"
+_cache: dict[str, PredefinedEquation] | None = None
 
 
 @dataclass
@@ -42,12 +43,19 @@ class PredefinedEquation:
 def load_predefined_equations() -> dict[str, PredefinedEquation]:
     """Load all predefined equations from the YAML file.
 
+    Results are cached after the first successful load to avoid redundant
+    disk I/O on repeated calls.
+
     Returns:
         Ordered dict mapping equation key to :class:`PredefinedEquation`.
 
     Raises:
         FileNotFoundError: If the YAML file is missing.
     """
+    global _cache
+    if _cache is not None:
+        return _cache
+
     if not _EQUATIONS_PATH.exists():
         logger.error("Equations YAML not found: %s", _EQUATIONS_PATH)
         raise FileNotFoundError(f"Equations file not found: {_EQUATIONS_PATH}")
@@ -71,5 +79,6 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
         logger.debug("Loaded predefined equation: %s", key)
 
     logger.info("Loaded %d predefined equations", len(equations))
+    _cache = equations
     return equations
 

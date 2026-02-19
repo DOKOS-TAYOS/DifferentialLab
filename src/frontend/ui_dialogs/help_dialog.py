@@ -13,15 +13,13 @@ from config import (
     SOLVER_METHOD_DESCRIPTIONS,
     get_env_from_schema,
 )
+from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
 from utils import get_logger
 
 logger = get_logger(__name__)
-
-_COLLAPSED = "\u25b6"
-_EXPANDED = "\u25bc"
 
 # ── Section content (human-readable) ─────────────────────────────────
 
@@ -197,47 +195,11 @@ class HelpDialog:
     ) -> None:
         """Add a collapsible section (header + body) wrapped in a container."""
         pad: int = get_env_from_schema("UI_PADDING")
-        arrow_var = tk.StringVar(value=_EXPANDED if expanded else _COLLAPSED)
-
-        wrapper = ttk.Frame(parent)
-        wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
-
-        header = ttk.Frame(wrapper, style="SectionHeader.TFrame")
-        header.configure(cursor="hand2")
-        header.pack(fill=tk.X)
-
-        arrow_lbl = ttk.Label(
-            header, textvariable=arrow_var, style="SectionHeader.TLabel",
+        section = CollapsibleSection(
+            parent, self._scroll, title, expanded=expanded, pad=pad,
         )
-        arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
-
-        title_lbl = ttk.Label(
-            header, text=title, style="SectionHeader.TLabel",
-        )
-        title_lbl.pack(side=tk.LEFT, pady=8)
-
-        content = ttk.Frame(wrapper, padding=(16, 4, 4, 8))
-
         body_lbl = ttk.Label(
-            content, text=body, justify=tk.LEFT, wraplength=620,
+            section.content, text=body, justify=tk.LEFT, wraplength=620,
         )
         body_lbl.pack(anchor=tk.W, fill=tk.X)
         self._body_labels.append(body_lbl)
-
-        if expanded:
-            content.pack(fill=tk.X)
-
-        scroll_ref = self._scroll
-
-        def toggle(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            if content.winfo_manager():
-                content.pack_forget()
-                arrow_var.set(_COLLAPSED)
-            else:
-                content.pack(fill=tk.X)
-                arrow_var.set(_EXPANDED)
-                scroll_ref.bind_new_children()
-            wrapper.after(50, scroll_ref.refresh_scroll_region)
-
-        for w in (header, arrow_lbl, title_lbl):
-            w.bind("<Button-1>", toggle)

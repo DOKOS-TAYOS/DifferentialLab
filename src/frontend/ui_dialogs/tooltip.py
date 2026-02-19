@@ -22,6 +22,7 @@ class ToolTip:
         self._id_after: str | None = None
         widget.bind("<Enter>", self._on_enter)
         widget.bind("<Leave>", self._on_leave)
+        widget.bind("<Destroy>", self._on_destroy)
 
     def _on_enter(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         self._id_after = self.widget.after(self.delay, self._show)
@@ -55,6 +56,15 @@ class ToolTip:
         )
         label.pack()
         self._tipwindow = tw
+
+    def _on_destroy(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+        if self._id_after:
+            try:
+                self.widget.after_cancel(self._id_after)
+            except tk.TclError:
+                pass
+            self._id_after = None
+        self._hide()
 
     def _hide(self) -> None:
         if self._tipwindow:
