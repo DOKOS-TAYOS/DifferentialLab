@@ -61,8 +61,6 @@ ENV_SCHEMA: list[dict[str, Any]] = [
     {"key": "UI_BUTTON_FG_ACCENT2", "default": "yellow", "cast_type": str,
      "description": "Text colour for secondary accent buttons (Config, Info)."},
     # --- ui: text / inputs ---
-    {"key": "UI_TEXT_SELECT_BG", "default": "steel blue", "cast_type": str,
-     "description": "Highlight colour for selected text and focused controls."},
     {"key": "UI_FONT_SIZE", "default": 16, "cast_type": int,
      "description": "Base font size in points used across the UI."},
     {"key": "UI_FONT_FAMILY", "default": "Bahnschrift", "cast_type": str,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from config import get_env_from_schema, get_font
+from config import get_env_from_schema, get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
@@ -87,13 +87,17 @@ class EquationDialog:
         list_frame.pack(fill=tk.BOTH, expand=True)
 
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL)
+        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        fg: str = get_env_from_schema("UI_FOREGROUND")
+        select_bg, select_fg = get_select_colors(element_bg=btn_bg, text_fg=fg)
         self.eq_listbox = tk.Listbox(
             list_frame,
             width=28,
             height=18,
-            bg=get_env_from_schema("UI_BUTTON_BG"),
-            fg=get_env_from_schema("UI_FOREGROUND"),
-            selectbackground=get_env_from_schema("UI_TEXT_SELECT_BG"),
+            bg=btn_bg,
+            fg=fg,
+            selectbackground=select_bg,
+            selectforeground=select_fg,
             font=get_font(),
             yscrollcommand=scrollbar.set,
             exportselection=False,

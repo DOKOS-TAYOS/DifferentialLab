@@ -27,7 +27,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ("ui_theme", "UI Theme", [
         "UI_BACKGROUND", "UI_FOREGROUND", "UI_BUTTON_BG", "UI_BUTTON_WIDTH",
         "UI_BUTTON_FG", "UI_BUTTON_FG_CANCEL", "UI_BUTTON_FG_ACCENT2",
-        "UI_TEXT_SELECT_BG", "UI_FONT_SIZE", "UI_FONT_FAMILY",
+        "UI_FONT_SIZE", "UI_FONT_FAMILY",
         "UI_PADDING", "UI_ENTRY_WIDTH",
     ]),
     ("plot_style", "Plot Style", [
