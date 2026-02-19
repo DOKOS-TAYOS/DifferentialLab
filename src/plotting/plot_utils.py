@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from typing import Any
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,6 +16,7 @@ from utils import get_logger
 
 logger = get_logger(__name__)
 
+_MAX_ELEMENTS_PLOT = 50
 
 def _apply_plot_style() -> None:
     """Configure matplotlib rcParams from environment variables."""
@@ -80,7 +80,7 @@ def create_solution_plot(
             msize: int = get_env_from_schema("PLOT_MARKER_SIZE")
             mfc: str = get_env_from_schema("PLOT_MARKER_FACE_COLOR")
             mec: str = get_env_from_schema("PLOT_MARKER_EDGE_COLOR")
-            step = max(1, len(x) // 50)
+            step = max(1, len(x) // _MAX_ELEMENTS_PLOT)
             ax.plot(x[::step], y_2d[i, ::step], marker=marker, markersize=msize,
                     markerfacecolor=mfc, markeredgecolor=mec, linestyle="none")
 

@@ -9,7 +9,7 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 
-def validate_domain(x_min: float, x_max: float) -> list[str]:
+def _validate_domain(x_min: float, x_max: float) -> list[str]:
     """Validate the integration domain.
 
     Args:
@@ -27,7 +27,7 @@ def validate_domain(x_min: float, x_max: float) -> list[str]:
     return errors
 
 
-def validate_initial_conditions(y0: list[float], expected_order: int) -> list[str]:
+def _validate_initial_conditions(y0: list[float], expected_order: int) -> list[str]:
     """Validate the initial conditions vector.
 
     Args:
@@ -50,7 +50,7 @@ def validate_initial_conditions(y0: list[float], expected_order: int) -> list[st
     return errors
 
 
-def validate_grid(num_points: int) -> list[str]:
+def _validate_grid(num_points: int) -> list[str]:
     """Validate the number of evaluation points.
 
     Args:
@@ -67,7 +67,7 @@ def validate_grid(num_points: int) -> list[str]:
     return errors
 
 
-def validate_method(method: str) -> list[str]:
+def _validate_method(method: str) -> list[str]:
     """Validate the solver method name.
 
     Args:
@@ -81,7 +81,7 @@ def validate_method(method: str) -> list[str]:
     return []
 
 
-def validate_ode_expression(expression: str) -> list[str]:
+def _validate_ode_expression(expression: str) -> list[str]:
     """Validate a custom ODE expression string.
 
     Args:
@@ -93,7 +93,7 @@ def validate_ode_expression(expression: str) -> list[str]:
     return validate_expression(expression)
 
 
-def validate_parameters(params: dict[str, float]) -> list[str]:
+def _validate_parameters(params: dict[str, float]) -> list[str]:
     """Validate parameter values.
 
     Args:
@@ -135,13 +135,13 @@ def validate_all_inputs(
         List of all error messages (empty if everything is valid).
     """
     errors: list[str] = []
-    errors.extend(validate_ode_expression(expression))
-    errors.extend(validate_domain(x_min, x_max))
-    errors.extend(validate_initial_conditions(y0, order))
-    errors.extend(validate_grid(num_points))
-    errors.extend(validate_method(method))
+    errors.extend(_validate_ode_expression(expression))
+    errors.extend(_validate_domain(x_min, x_max))
+    errors.extend(_validate_initial_conditions(y0, order))
+    errors.extend(_validate_grid(num_points))
+    errors.extend(_validate_method(method))
     if params:
-        errors.extend(validate_parameters(params))
+        errors.extend(_validate_parameters(params))
     if errors:
         logger.warning("Validation errors: %s", errors)
     return errors

@@ -22,8 +22,8 @@ if errorlevel 1 (
 echo [1/4] Git found:
 git --version
 
-set "REPO_URL=https://github.com/DOKOS-TAYOS/differential-lab.git"
-set "REPO_NAME=differential_lab"
+set "REPO_URL=https://github.com/DOKOS-TAYOS/DifferentialLab.git"
+set "REPO_NAME=DifferentialLab"
 
 if exist "%REPO_NAME%" (
     echo.

@@ -14,7 +14,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def export_csv(
+def _export_csv(
     x: np.ndarray,
     y: np.ndarray,
     filepath: Path,
@@ -53,7 +53,7 @@ def export_csv(
     return filepath
 
 
-def export_json(
+def _export_json(
     statistics: dict[str, Any],
     metadata: dict[str, Any],
     filepath: Path,
@@ -125,6 +125,6 @@ def export_all_results(
     Returns:
         Tuple of ``(csv_path, json_path)`` that were written.
     """
-    csv_out = export_csv(x, y, csv_path)
-    json_out = export_json(statistics, metadata, json_path)
+    csv_out = _export_csv(x, y, csv_path)
+    json_out = _export_json(statistics, metadata, json_path)
     return csv_out, json_out

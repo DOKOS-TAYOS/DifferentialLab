@@ -4,12 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
-
-import numpy as np
+from typing import Any
 import yaml
 
-from solver.equation_parser import parse_expression
 from utils import get_logger
 
 logger = get_logger(__name__)

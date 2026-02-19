@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import numpy as np
-from scipy.integrate import solve_bvp, solve_ivp
+from scipy.integrate import solve_ivp
 
 from config import get_env_from_schema
 from utils import get_logger, SolverFailedError

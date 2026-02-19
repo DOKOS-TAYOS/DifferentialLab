@@ -269,7 +269,7 @@ def get_env_from_schema(key: str) -> Any:
     return get_env(key, item["default"], item["cast_type"])
 
 
-def validate_all_env_values() -> dict[str, tuple[Any, bool]]:
+def _validate_all_env_values() -> dict[str, tuple[Any, bool]]:
     """Validate all environment values and report corrections.
 
     Returns:
@@ -349,7 +349,7 @@ def initialize_and_validate_config() -> None:
     except ImportError:
         logger = None  # type: ignore[assignment]
 
-    results = validate_all_env_values()
+    results = _validate_all_env_values()
     corrected = [k for k, (_, was) in results.items() if was]
 
     if corrected and logger:

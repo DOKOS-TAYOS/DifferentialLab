@@ -23,8 +23,8 @@ fi
 echo "[1/3] Git found:"
 git --version
 
-REPO_URL="https://github.com/DOKOS-TAYOS/differential-lab.git"
-REPO_NAME="differential_lab"
+REPO_URL="https://github.com/DOKOS-TAYOS/DifferentialLab.git"
+REPO_NAME="DifferentialLab"
 
 if [ -d "$REPO_NAME" ]; then
     echo ""

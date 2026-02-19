@@ -62,12 +62,3 @@ def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
     dialog.transient(parent)
     dialog.grab_set()
     dialog.focus_force()
-
-
-def on_close_destroy(window: tk.Tk | tk.Toplevel) -> None:
-    """Bind the window-close event to destroy the window.
-
-    Args:
-        window: The window to configure.
-    """
-    window.protocol("WM_DELETE_WINDOW", window.destroy)
