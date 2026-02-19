@@ -345,7 +345,7 @@ def initialize_and_validate_config() -> None:
     Invalid values are silently corrected to defaults with a log warning.
     """
     try:
-        from utils.logger import get_logger
+        from utils import get_logger
 
         logger = get_logger(__name__)
     except ImportError:

@@ -5,18 +5,18 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from config.constants import (
+from config import (
     APP_NAME,
     APP_VERSION,
     AVAILABLE_STATISTICS,
     SOLVER_METHODS,
     SOLVER_METHOD_DESCRIPTIONS,
+    get_env_from_schema,
 )
-from config.env import get_env_from_schema
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from utils.logger import get_logger
+from utils import get_logger
 
 logger = get_logger(__name__)
 

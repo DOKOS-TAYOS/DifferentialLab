@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from config.constants import SOLVER_METHODS
+from config import SOLVER_METHODS
 from solver.equation_parser import validate_expression
-from utils.logger import get_logger
+from utils import get_logger
 
 logger = get_logger(__name__)
 

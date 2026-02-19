@@ -8,9 +8,8 @@ from typing import Any, Callable
 import numpy as np
 from scipy.integrate import solve_bvp, solve_ivp
 
-from config.env import get_env_from_schema
-from utils.exceptions import SolverFailedError
-from utils.logger import get_logger
+from config import get_env_from_schema
+from utils import get_logger, SolverFailedError
 
 logger = get_logger(__name__)
 

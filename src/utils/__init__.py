@@ -7,6 +7,7 @@ from utils.exceptions import (
     SolverFailedError,
     ValidationError,
 )
+from utils.export import export_all_results
 from utils.logger import get_logger
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "DifferentialLabError",
     "SolverFailedError",
     "ValidationError",
+    "export_all_results",
     "get_logger",
 ]

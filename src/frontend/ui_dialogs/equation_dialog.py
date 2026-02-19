@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Any
 
-from config.env import get_env_from_schema
-from config.theme import get_font
+from config import get_env_from_schema, get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
-from solver.predefined import PredefinedEquation, load_predefined_equations
-from utils.logger import get_logger
+from solver import load_predefined_equations
+from utils import get_logger
 
 logger = get_logger(__name__)
 

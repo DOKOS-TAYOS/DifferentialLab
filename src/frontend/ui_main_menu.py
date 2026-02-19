@@ -7,12 +7,10 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-from config.constants import APP_NAME, APP_VERSION
-from config.theme import configure_ttk_styles, get_font
-from config.env import get_env_from_schema
+from config import APP_NAME, APP_VERSION, configure_ttk_styles, get_env_from_schema, get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.window_utils import center_window
-from utils.logger import get_logger
+from utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -36,6 +34,7 @@ class MainMenu:
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.root.configure(bg=bg)
 
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._build_ui()
         logger.info("Main menu created")
 
@@ -117,7 +116,7 @@ class MainMenu:
             text="Quit",
             width=btn_width,
             style="Cancel.TButton",
-            command=self.root.destroy,
+            command=self._on_close,
         )
         self.btn_quit.pack(side=tk.BOTTOM, pady=(padding, 0))
 
@@ -128,6 +127,12 @@ class MainMenu:
             [self.btn_quit],
         ])
         self.btn_solve.focus_set()
+
+    def _on_close(self) -> None:
+        """Handle window close: stop mainloop and destroy the root window."""
+        logger.info("User closed the main window")
+        self.root.quit()
+        self.root.destroy()
 
     # ------------------------------------------------------------------
     # Button callbacks

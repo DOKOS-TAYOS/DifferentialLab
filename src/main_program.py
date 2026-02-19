@@ -14,9 +14,8 @@ if str(_src_dir) not in sys.path:
 
 def main() -> None:
     """Initialize configuration, logging, and launch the main menu."""
-    from config.env import initialize_and_validate_config
-    from config.paths import get_output_dir
-    from utils.logger import get_logger
+    from config import initialize_and_validate_config, get_output_dir
+    from utils import get_logger
 
     initialize_and_validate_config()
     logger = get_logger(__name__)
@@ -27,7 +26,7 @@ def main() -> None:
     try:
         root = tk.Tk()
 
-        from frontend.ui_main_menu import MainMenu
+        from frontend import MainMenu
 
         _app = MainMenu(root)
         root.mainloop()
@@ -35,7 +34,10 @@ def main() -> None:
         logger.critical("Unhandled exception", exc_info=True)
         raise
     finally:
+        import matplotlib.pyplot as _plt
+        _plt.close("all")
         logger.info("DifferentialLab shutting down")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

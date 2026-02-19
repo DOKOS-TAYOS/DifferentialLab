@@ -9,13 +9,12 @@ from typing import Any
 
 from matplotlib.figure import Figure
 
-from config.env import get_env_from_schema
-from config.theme import get_font
+from config import get_env_from_schema
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from plotting.plot_utils import embed_plot_in_tk
-from utils.logger import get_logger
+from plotting import embed_plot_in_tk
+from utils import get_logger
 
 logger = get_logger(__name__)
 

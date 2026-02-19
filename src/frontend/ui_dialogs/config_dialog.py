@@ -6,13 +6,17 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any
 
-from config.env import ENV_SCHEMA, get_current_env_values, write_env_file
-from config.paths import get_env_path
-from config.env import get_env_from_schema
+from config import (
+    ENV_SCHEMA,
+    get_current_env_values,
+    get_env_from_schema,
+    get_env_path,
+    write_env_file,
+)
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from utils.logger import get_logger
+from utils import get_logger
 
 logger = get_logger(__name__)
 

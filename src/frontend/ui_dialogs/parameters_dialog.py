@@ -8,22 +8,24 @@ from typing import Any
 
 import numpy as np
 
-from config.constants import AVAILABLE_STATISTICS, SOLVER_METHODS, SOLVER_METHOD_DESCRIPTIONS
-from config.env import get_env_from_schema
-from config.paths import generate_output_basename, get_csv_path, get_json_path, get_plot_path
-from config.theme import get_font
+from config import (
+    AVAILABLE_STATISTICS,
+    SOLVER_METHODS,
+    SOLVER_METHOD_DESCRIPTIONS,
+    generate_output_basename,
+    get_csv_path,
+    get_env_from_schema,
+    get_json_path,
+    get_plot_path,
+    get_font,
+)
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
-from plotting.plot_utils import create_phase_plot, create_solution_plot, save_plot
-from solver.equation_parser import parse_expression
-from solver.ode_solver import solve_ode
-from solver.statistics import compute_statistics
-from solver.validators import validate_all_inputs
-from utils.exceptions import DifferentialLabError, EquationParseError
-from utils.export import export_all_results
-from utils.logger import get_logger
+from plotting import create_phase_plot, create_solution_plot, save_plot
+from solver import parse_expression, solve_ode, compute_statistics, validate_all_inputs
+from utils import DifferentialLabError, EquationParseError, export_all_results, get_logger
 
 logger = get_logger(__name__)
 

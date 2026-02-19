@@ -14,7 +14,7 @@ def _setup_root_logger() -> None:
         return
     _CONFIGURED = True
 
-    from config.env import get_env, DEFAULT_LOG_LEVEL, DEFAULT_LOG_FILE
+    from config import DEFAULT_LOG_FILE, DEFAULT_LOG_LEVEL, get_env
 
     level_name: str = get_env("LOG_LEVEL", DEFAULT_LOG_LEVEL, str)
     log_file: str = get_env("LOG_FILE", DEFAULT_LOG_FILE, str)

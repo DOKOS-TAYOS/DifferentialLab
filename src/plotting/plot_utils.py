@@ -12,8 +12,8 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
-from config.env import get_env_from_schema
-from utils.logger import get_logger
+from config import get_env_from_schema
+from utils import get_logger
 
 logger = get_logger(__name__)
 

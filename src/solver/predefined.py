@@ -10,7 +10,7 @@ import numpy as np
 import yaml
 
 from solver.equation_parser import parse_expression
-from utils.logger import get_logger
+from utils import get_logger
 
 logger = get_logger(__name__)
 

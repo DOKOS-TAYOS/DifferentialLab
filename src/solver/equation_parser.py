@@ -8,8 +8,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from utils.exceptions import EquationParseError
-from utils.logger import get_logger
+from utils import EquationParseError, get_logger
 
 logger = get_logger(__name__)
 
