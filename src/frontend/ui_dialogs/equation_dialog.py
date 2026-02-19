@@ -8,6 +8,7 @@ from typing import Any
 
 from config.env import get_env_from_schema
 from config.theme import get_font
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
 from solver.predefined import PredefinedEquation, load_predefined_equations
@@ -27,8 +28,6 @@ class EquationDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Select Equation")
-        center_window(self.win, 780, 620)
-        make_modal(self.win, parent)
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -39,6 +38,9 @@ class EquationDialog:
 
         self._build_ui()
 
+        center_window(self.win, 820, 650)
+        make_modal(self.win, parent)
+
     # ------------------------------------------------------------------
     # UI construction
     # ------------------------------------------------------------------
@@ -46,12 +48,37 @@ class EquationDialog:
     def _build_ui(self) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
 
-        notebook = ttk.Notebook(self.win)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
+        # ── Fixed bottom button bar ──
+        btn_frame = ttk.Frame(self.win)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
+
+        btn_inner = ttk.Frame(btn_frame)
+        btn_inner.pack()
+
+        self._btn_next = ttk.Button(
+            btn_inner, text="Next \u2192", command=self._on_next,
+        )
+        self._btn_next.pack(side=tk.LEFT, padx=pad)
+
+        btn_cancel = ttk.Button(
+            btn_inner, text="Cancel", style="Cancel.TButton",
+            command=self.win.destroy,
+        )
+        btn_cancel.pack(side=tk.LEFT, padx=pad)
+
+        setup_arrow_enter_navigation([[self._btn_next, btn_cancel]])
+
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
+            side=tk.BOTTOM, fill=tk.X,
+        )
+
+        # ── Notebook ──
+        self._notebook = ttk.Notebook(self.win)
+        self._notebook.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
 
         # --- Tab 1: Predefined ---
-        predef_frame = ttk.Frame(notebook, padding=pad)
-        notebook.add(predef_frame, text="  Predefined  ")
+        predef_frame = ttk.Frame(self._notebook, padding=pad)
+        self._notebook.add(predef_frame, text="  Predefined  ")
 
         left = ttk.Frame(predef_frame)
         left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, pad))
@@ -96,12 +123,9 @@ class EquationDialog:
                                          wraplength=380, justify=tk.LEFT)
         self.defaults_label.pack(anchor=tk.W)
 
-        btn_predef = ttk.Button(right, text="Next →", command=self._on_next_predefined)
-        btn_predef.pack(anchor=tk.E, pady=(pad, 0))
-
         # --- Tab 2: Custom ---
-        custom_frame = ttk.Frame(notebook, padding=pad)
-        notebook.add(custom_frame, text="  Custom  ")
+        custom_frame = ttk.Frame(self._notebook, padding=pad)
+        self._notebook.add(custom_frame, text="  Custom  ")
 
         ttk.Label(
             custom_frame,
@@ -112,7 +136,7 @@ class EquationDialog:
         hint = (
             "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
             "Use x for the independent variable.\n"
-            "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, …\n"
+            "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
             "Example (harmonic oscillator):  -omega**2 * y[0]"
         )
         ttk.Label(custom_frame, text=hint, style="Small.TLabel",
@@ -140,19 +164,21 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: omega=1.0, gamma=0.1")
 
-        btn_custom = ttk.Button(custom_frame, text="Next →", command=self._on_next_custom)
-        btn_custom.pack(anchor=tk.E, pady=(pad, 0))
-
-        # Bottom: cancel
-        ttk.Button(self.win, text="Cancel", style="Cancel.TButton",
-                   command=self.win.destroy).pack(side=tk.BOTTOM, pady=pad)
+        self.eq_listbox.focus_set()
 
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
+    def _on_next(self) -> None:
+        """Route to predefined or custom handler based on active tab."""
+        idx = self._notebook.index(self._notebook.select())
+        if idx == 0:
+            self._on_next_predefined()
+        else:
+            self._on_next_custom()
+
     def _on_select_equation(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
-        """Update the description and parameter fields for the selected equation."""
         sel = self.eq_listbox.curselection()
         if not sel:
             return
@@ -183,7 +209,6 @@ class EquationDialog:
         self.defaults_label.config(text=f"{ic_text}\n{domain_text}")
 
     def _on_next_predefined(self) -> None:
-        """Proceed to parameters dialog with a predefined equation."""
         if self._selected_key is None:
             messagebox.showwarning("No Selection", "Please select an equation.",
                                    parent=self.win)
@@ -216,7 +241,6 @@ class EquationDialog:
         )
 
     def _on_next_custom(self) -> None:
-        """Proceed to parameters dialog with a custom expression."""
         expr = self.custom_expr.get("1.0", tk.END).strip()
         if not expr:
             messagebox.showwarning("Empty Expression",

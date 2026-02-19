@@ -12,6 +12,8 @@ from config.constants import AVAILABLE_STATISTICS, SOLVER_METHODS, SOLVER_METHOD
 from config.env import get_env_from_schema
 from config.paths import generate_output_basename, get_csv_path, get_json_path, get_plot_path
 from config.theme import get_font
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
 from plotting.plot_utils import create_phase_plot, create_solution_plot, save_plot
@@ -57,8 +59,6 @@ class ParametersDialog:
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Parameters — {equation_name}")
-        center_window(self.win, 700, 680)
-        make_modal(self.win, parent)
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -68,32 +68,45 @@ class ParametersDialog:
 
         self._build_ui(default_y0, default_domain)
 
+        center_window(self.win, 740, 700)
+        make_modal(self.win, parent)
+
     # ------------------------------------------------------------------
     # UI
     # ------------------------------------------------------------------
 
     def _build_ui(self, default_y0: list[float], default_domain: list[float]) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
-        ew: int = get_env_from_schema("UI_ENTRY_WIDTH")
 
-        canvas = tk.Canvas(self.win, bg=get_env_from_schema("UI_BACKGROUND"),
-                           highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self.win, orient=tk.VERTICAL, command=canvas.yview)
-        scroll_frame = ttk.Frame(canvas, padding=pad)
+        # ── Fixed bottom button bar ──
+        btn_frame = ttk.Frame(self.win)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
-        scroll_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        btn_inner = ttk.Frame(btn_frame)
+        btn_inner.pack()
+
+        btn_solve = ttk.Button(btn_inner, text="Solve", command=self._on_solve)
+        btn_solve.pack(side=tk.LEFT, padx=pad)
+
+        btn_cancel = ttk.Button(
+            btn_inner, text="Cancel", style="Cancel.TButton",
+            command=self.win.destroy,
         )
-        canvas.create_window((0, 0), window=scroll_frame, anchor=tk.NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        btn_cancel.pack(side=tk.LEFT, padx=pad)
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        setup_arrow_enter_navigation([[btn_solve, btn_cancel]])
 
-        def _on_mousewheel(event: tk.Event) -> None:  # type: ignore[type-arg]
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
+            side=tk.BOTTOM, fill=tk.X,
+        )
+
+        # ── Scrollable content ──
+        scroll = ScrollableFrame(self.win)
+        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
+        scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        scroll_frame = scroll.inner
+        scroll_frame.configure(padding=pad)
 
         # Equation summary
         ttk.Label(scroll_frame, text=f"Equation: {self.equation_name}",
@@ -159,12 +172,8 @@ class ParametersDialog:
             ToolTip(cb, desc)
             self._stat_vars[key] = var
 
-        # Buttons
-        btn_row = ttk.Frame(scroll_frame)
-        btn_row.pack(fill=tk.X, pady=(pad, 0))
-        ttk.Button(btn_row, text="Solve", command=self._on_solve).pack(side=tk.RIGHT, padx=pad)
-        ttk.Button(btn_row, text="Cancel", style="Cancel.TButton",
-                   command=self.win.destroy).pack(side=tk.RIGHT)
+        scroll.bind_new_children()
+        btn_solve.focus_set()
 
     # ------------------------------------------------------------------
     # Helpers

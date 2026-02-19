@@ -1,114 +1,123 @@
-"""Help / Information dialog."""
+"""Help / Information dialog with collapsible sections."""
 
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
 
-from config.constants import APP_NAME, APP_VERSION, SOLVER_METHODS, SOLVER_METHOD_DESCRIPTIONS
+from config.constants import (
+    APP_NAME,
+    APP_VERSION,
+    AVAILABLE_STATISTICS,
+    SOLVER_METHODS,
+    SOLVER_METHOD_DESCRIPTIONS,
+)
 from config.env import get_env_from_schema
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_HELP_TEXT = f"""\
-{APP_NAME} v{APP_VERSION}
-{'=' * 40}
+_COLLAPSED = "\u25b6"
+_EXPANDED = "\u25bc"
 
-DifferentialLab — numerical ODE solver with a graphical interface.
+# ── Section content (human-readable) ─────────────────────────────────
 
-WHAT DOES IT SOLVE?
--------------------
-This application solves ordinary differential equations (ODEs) of the form:
+_ABOUT = (
+    f"Welcome to {APP_NAME} v{APP_VERSION}!\n\n"
+    f"{APP_NAME} is a graphical tool for solving ordinary differential "
+    "equations (ODEs) numerically. Whether you are studying physics, "
+    "engineering or mathematics, it lets you explore how systems evolve "
+    "over time — from simple exponential growth to complex oscillators.\n\n"
+    "Under the hood it uses SciPy's robust integration engine (solve_ivp) "
+    "and supports equations of any order."
+)
 
-  y'   = f(x, y)          (first order)
-  y''  = f(x, y, y')      (second order)
-  y^(n) = f(x, y, y', …)  (n-th order)
+_HOW_TO_USE = (
+    "1.  Click  Solve  in the main menu.\n"
+    "2.  Pick a predefined equation (and tweak its parameters) or switch to "
+    "the Custom tab and write your own expression.\n"
+    "3.  Set the domain [x_min, x_max], initial conditions, number of "
+    "evaluation points, solver method, and which statistics to compute.\n"
+    "4.  Press  Solve  to run the computation.\n"
+    "5.  A results window will appear with the solution plot, phase portrait "
+    "(for 2nd-order+ equations), statistics, and links to the exported files."
+)
 
-It converts higher-order ODEs into first-order systems and uses SciPy's
-robust integrators (solve_ivp) to compute the solution numerically.
+_CUSTOM_EXPRESSIONS = (
+    "Use Python / NumPy syntax. The independent variable is  x .\n"
+    "The state vector is  y :\n"
+    "    y[0] = y        (the function itself)\n"
+    "    y[1] = y'       (first derivative)\n"
+    "    y[2] = y''      (second derivative)  ...\n\n"
+    "Available math functions:\n"
+    "    sin, cos, tan, exp, log, log10, sqrt, abs,\n"
+    "    sinh, cosh, tanh, arcsin, arccos, arctan,\n"
+    "    floor, ceil, sign, heaviside, pi, e\n\n"
+    "Example — damped oscillator (order 2):\n"
+    "    Expression:   -2*gamma*y[1] - omega**2*y[0]\n"
+    "    Parameters:   omega=1.0, gamma=0.1"
+)
 
+_PREDEFINED_EQUATIONS = (
+    "\u2022 Simple Harmonic Oscillator — classic undamped oscillation\n"
+    "\u2022 Damped Oscillator — oscillation with energy loss\n"
+    "\u2022 Exponential Growth / Decay — constant-rate change\n"
+    "\u2022 Logistic Equation — growth with carrying capacity\n"
+    "\u2022 Van der Pol Oscillator — nonlinear self-sustained oscillation\n"
+    "\u2022 Simple Pendulum — large-angle pendulum motion\n"
+    "\u2022 RC Circuit (Discharge) — capacitor voltage over time\n"
+    "\u2022 Free Fall with Drag — motion against air resistance"
+)
 
-HOW TO USE
-----------
-1. Click "Solve" in the main menu.
-2. Choose a predefined equation (and adjust its parameters) or write
-   a custom expression in the "Custom" tab.
-3. Set the domain [x_min, x_max], initial conditions, grid resolution,
-   solver method, and which statistics to compute.
-4. Click "Solve" to run the computation.
-5. View the plot and statistics in the result window.
-   Output files (CSV, JSON, plot image) are saved to the output/ folder.
+_OUTPUT_FILES = (
+    "Every time you solve an equation three files are created inside the "
+    "output/ folder (configurable):\n\n"
+    "\u2022 CSV  — tabular x, y data columns ready for spreadsheets.\n"
+    "\u2022 JSON — full metadata and all computed statistics.\n"
+    "\u2022 Plot — image of the solution curve (PNG, JPG or PDF per your "
+    "configuration)."
+)
 
-
-WRITING CUSTOM EXPRESSIONS
---------------------------
-Use Python/NumPy syntax. The independent variable is "x".
-The state vector is "y":
-  y[0] = y        (the function itself)
-  y[1] = y'       (first derivative)
-  y[2] = y''      (second derivative)
-  ...
-
-Available math functions:
-  sin, cos, tan, exp, log, log10, sqrt, abs,
-  sinh, cosh, tanh, arcsin, arccos, arctan,
-  floor, ceil, sign, heaviside, pi, e
-
-Example — damped oscillator:
-  Order: 2
-  Expression: -2*gamma*y[1] - omega**2*y[0]
-  Parameters: omega=1.0, gamma=0.1
-
-
-PREDEFINED EQUATIONS
---------------------
-- Simple Harmonic Oscillator
-- Damped Oscillator
-- Exponential Growth / Decay
-- Logistic Equation
-- Van der Pol Oscillator
-- Simple Pendulum
-- RC Circuit (Discharge)
-- Free Fall with Drag
-
-
-AVAILABLE STATISTICS
---------------------
-- Mean value               - RMS (root mean square)
-- Standard deviation       - Maximum (value + location)
-- Minimum (value + loc.)   - Integral (area under curve)
-- Zero crossings count     - Period estimate
-- Amplitude estimate       - Energy estimate (2nd order)
-
-
-SOLVER METHODS
---------------
-"""
-
-for _m in SOLVER_METHODS:
-    _HELP_TEXT += f"  {_m:10s}  {SOLVER_METHOD_DESCRIPTIONS[_m]}\n"
-
-_HELP_TEXT += """
-
-OUTPUT FILES
-------------
-Each solve generates three files in output/:
-  - CSV  — x, y data columns
-  - JSON — metadata + all computed statistics
-  - Plot — image (PNG/JPG/PDF per configuration)
+_CONFIGURATION = (
+    "You can customise almost every visual and numerical aspect of "
+    f"{APP_NAME}. Open  Configuration  from the main menu or edit the "
+    ".env  file directly.\n\n"
+    "Changes are saved to the  .env  file and the application restarts "
+    "automatically so they take effect immediately."
+)
 
 
-CONFIGURATION
--------------
-Edit settings via the "Configuration" button or directly in the .env file.
-Changes take effect on the next application launch.
-"""
+def _solver_methods_text() -> str:
+    lines: list[str] = []
+    for m in SOLVER_METHODS:
+        lines.append(f"\u2022 {m}  —  {SOLVER_METHOD_DESCRIPTIONS[m]}")
+    return "\n".join(lines)
+
+
+def _statistics_text() -> str:
+    lines: list[str] = []
+    for key, desc in AVAILABLE_STATISTICS.items():
+        lines.append(f"\u2022 {key}  —  {desc}")
+    return "\n".join(lines)
+
+
+_SECTIONS: list[tuple[str, str]] = [
+    ("About", _ABOUT),
+    ("How to Use", _HOW_TO_USE),
+    ("Writing Custom Expressions", _CUSTOM_EXPRESSIONS),
+    ("Predefined Equations", _PREDEFINED_EQUATIONS),
+    ("Available Statistics", _statistics_text()),
+    ("Solver Methods", _solver_methods_text()),
+    ("Output Files", _OUTPUT_FILES),
+    ("Configuration", _CONFIGURATION),
+]
 
 
 class HelpDialog:
-    """Scrollable help/information window.
+    """Information window with collapsible sections.
 
     Args:
         parent: Parent window.
@@ -117,38 +126,118 @@ class HelpDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.win = tk.Toplevel(parent)
         self.win.title(f"{APP_NAME} — Information")
-        center_window(self.win, 680, 580)
-        make_modal(self.win, parent)
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
         self.win.configure(bg=bg)
 
+        self._body_labels: list[ttk.Label] = []
+        self._build_ui()
+
+        center_window(self.win, 740, 620)
+        make_modal(self.win, parent)
+
+    def _build_ui(self) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
+        bg: str = get_env_from_schema("UI_BACKGROUND")
 
-        frame = ttk.Frame(self.win, padding=pad)
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Fixed bottom button bar
+        btn_frame = ttk.Frame(self.win)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
-        text = tk.Text(
-            frame,
-            wrap=tk.WORD,
-            bg=get_env_from_schema("UI_BUTTON_BG"),
-            fg=fg,
-            font=(get_env_from_schema("UI_FONT_FAMILY"), max(10, get_env_from_schema("UI_FONT_SIZE") - 4)),
-            padx=12,
-            pady=12,
-            insertbackground=fg,
-            selectbackground=get_env_from_schema("UI_TEXT_SELECT_BG"),
-            relief=tk.FLAT,
+        btn_close = ttk.Button(
+            btn_frame, text="Close", style="Cancel.TButton",
+            command=self.win.destroy,
         )
-        text.insert("1.0", _HELP_TEXT)
-        text.configure(state=tk.DISABLED)
+        btn_close.pack()
 
-        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=text.yview)
-        text.configure(yscrollcommand=scrollbar.set)
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
+            side=tk.BOTTOM, fill=tk.X,
+        )
 
-        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        setup_arrow_enter_navigation([[btn_close]])
+        btn_close.focus_set()
 
-        ttk.Button(self.win, text="Close", style="Cancel.TButton",
-                   command=self.win.destroy).pack(pady=pad)
+        # Scrollable content
+        self._scroll = ScrollableFrame(self.win)
+        self._scroll.apply_bg(bg)
+        self._scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        inner = self._scroll.inner
+        inner.configure(padding=pad)
+
+        ttk.Label(
+            inner,
+            text=f"{APP_NAME} — Information",
+            style="Title.TLabel",
+        ).pack(anchor=tk.W, pady=(0, pad))
+
+        first = True
+        for title, body in _SECTIONS:
+            self._add_section(inner, title, body, expanded=first)
+            first = False
+
+        self._scroll.bind_new_children()
+
+        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = inner.winfo_width()
+            if w > 100:
+                wrap = max(200, w - 48)
+                for lbl in self._body_labels:
+                    lbl.configure(wraplength=wrap)
+
+        inner.bind("<Configure>", _update_wraplength)
+
+    def _add_section(
+        self,
+        parent: ttk.Frame,
+        title: str,
+        body: str,
+        *,
+        expanded: bool = False,
+    ) -> None:
+        """Add a collapsible section (header + body) wrapped in a container."""
+        pad: int = get_env_from_schema("UI_PADDING")
+        arrow_var = tk.StringVar(value=_EXPANDED if expanded else _COLLAPSED)
+
+        wrapper = ttk.Frame(parent)
+        wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
+
+        header = ttk.Frame(wrapper, style="SectionHeader.TFrame")
+        header.configure(cursor="hand2")
+        header.pack(fill=tk.X)
+
+        arrow_lbl = ttk.Label(
+            header, textvariable=arrow_var, style="SectionHeader.TLabel",
+        )
+        arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
+
+        title_lbl = ttk.Label(
+            header, text=title, style="SectionHeader.TLabel",
+        )
+        title_lbl.pack(side=tk.LEFT, pady=8)
+
+        content = ttk.Frame(wrapper, padding=(16, 4, 4, 8))
+
+        body_lbl = ttk.Label(
+            content, text=body, justify=tk.LEFT, wraplength=620,
+        )
+        body_lbl.pack(anchor=tk.W, fill=tk.X)
+        self._body_labels.append(body_lbl)
+
+        if expanded:
+            content.pack(fill=tk.X)
+
+        scroll_ref = self._scroll
+
+        def toggle(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            if content.winfo_manager():
+                content.pack_forget()
+                arrow_var.set(_COLLAPSED)
+            else:
+                content.pack(fill=tk.X)
+                arrow_var.set(_EXPANDED)
+                scroll_ref.bind_new_children()
+            wrapper.after(50, scroll_ref.refresh_scroll_region)
+
+        for w in (header, arrow_lbl, title_lbl):
+            w.bind("<Button-1>", toggle)

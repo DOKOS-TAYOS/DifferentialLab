@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import tkinter as tk
 from tkinter import ttk
 
 from config.constants import APP_NAME, APP_VERSION
 from config.theme import configure_ttk_styles, get_font
 from config.env import get_env_from_schema
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.window_utils import center_window
 from utils.logger import get_logger
 
@@ -26,7 +29,6 @@ class MainMenu:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
-        self.root.resizable(True, True)
 
         configure_ttk_styles(self.root)
         center_window(self.root, 520, 480)
@@ -119,6 +121,14 @@ class MainMenu:
         )
         self.btn_quit.pack(side=tk.BOTTOM, pady=(padding, 0))
 
+        setup_arrow_enter_navigation([
+            [self.btn_solve],
+            [self.btn_config],
+            [self.btn_info],
+            [self.btn_quit],
+        ])
+        self.btn_solve.focus_set()
+
     # ------------------------------------------------------------------
     # Button callbacks
     # ------------------------------------------------------------------
@@ -131,11 +141,17 @@ class MainMenu:
         EquationDialog(self.root)
 
     def _on_config(self) -> None:
-        """Open the configuration dialog."""
+        """Open the configuration dialog; restart the app if saved."""
         logger.info("User clicked Configuration")
         from frontend.ui_dialogs.config_dialog import ConfigDialog
 
-        ConfigDialog(self.root)
+        dlg = ConfigDialog(self.root)
+        self.root.wait_window(dlg.win)
+
+        if dlg.accepted:
+            logger.info("Configuration saved — restarting application")
+            self.root.destroy()
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _on_info(self) -> None:
         """Open the information / help dialog."""

@@ -1,4 +1,4 @@
-"""Configuration dialog — edit .env variables with a scrollable form."""
+"""Configuration dialog — edit .env variables with collapsible sections."""
 
 from __future__ import annotations
 
@@ -9,24 +9,55 @@ from typing import Any
 from config.env import ENV_SCHEMA, get_current_env_values, write_env_file
 from config.paths import get_env_path
 from config.env import get_env_from_schema
-from frontend.ui_dialogs.tooltip import ToolTip
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_SECTION_HEADERS: dict[str, str] = {
-    "UI_BACKGROUND": "UI Theme",
-    "PLOT_FIGSIZE_WIDTH": "Plot Style",
-    "FONT_FAMILY": "Plot Fonts",
-    "SOLVER_DEFAULT_METHOD": "Solver Defaults",
-    "FILE_OUTPUT_DIR": "File Paths",
-    "LOG_LEVEL": "Logging",
-}
+_COLLAPSED = "\u25b6"
+_EXPANDED = "\u25bc"
+
+_SECTION_ORDER: list[tuple[str, str, list[str]]] = [
+    ("ui_theme", "UI Theme", [
+        "UI_BACKGROUND", "UI_FOREGROUND", "UI_BUTTON_BG", "UI_BUTTON_WIDTH",
+        "UI_BUTTON_FG", "UI_BUTTON_FG_CANCEL", "UI_BUTTON_FG_ACCENT2",
+        "UI_TEXT_SELECT_BG", "UI_FONT_SIZE", "UI_FONT_FAMILY",
+        "UI_PADDING", "UI_ENTRY_WIDTH",
+    ]),
+    ("plot_style", "Plot Style", [
+        "PLOT_FIGSIZE_WIDTH", "PLOT_FIGSIZE_HEIGHT", "DPI",
+        "PLOT_SHOW_TITLE", "PLOT_SHOW_GRID",
+        "PLOT_LINE_COLOR", "PLOT_LINE_WIDTH", "PLOT_LINE_STYLE",
+    ]),
+    ("plot_markers", "Plot Markers", [
+        "PLOT_MARKER_FORMAT", "PLOT_MARKER_SIZE",
+        "PLOT_MARKER_FACE_COLOR", "PLOT_MARKER_EDGE_COLOR",
+    ]),
+    ("plot_fonts", "Plot Fonts", [
+        "FONT_FAMILY", "FONT_TITLE_SIZE", "FONT_TITLE_WEIGHT",
+        "FONT_AXIS_SIZE", "FONT_AXIS_STYLE", "FONT_TICK_SIZE",
+    ]),
+    ("solver", "Solver Defaults", [
+        "SOLVER_DEFAULT_METHOD", "SOLVER_MAX_STEP",
+        "SOLVER_RTOL", "SOLVER_ATOL", "SOLVER_NUM_POINTS",
+    ]),
+    ("files", "File Paths", [
+        "FILE_OUTPUT_DIR", "FILE_PLOT_FORMAT",
+    ]),
+    ("logging", "Logging", [
+        "LOG_LEVEL", "LOG_FILE", "LOG_CONSOLE",
+    ]),
+]
+
+_SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
 
 
 class ConfigDialog:
     """Scrollable form to edit all ``.env`` configuration values.
+
+    After calling, inspect ``self.accepted`` to know if the user saved.
 
     Args:
         parent: Parent window.
@@ -34,98 +65,186 @@ class ConfigDialog:
 
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.parent = parent
+        self.accepted = False
         self.win = tk.Toplevel(parent)
         self.win.title("Configuration")
-        center_window(self.win, 640, 600)
-        make_modal(self.win, parent)
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
 
         self._vars: dict[str, tk.StringVar | tk.BooleanVar] = {}
+        self._desc_labels: list[ttk.Label] = []
         self._build_ui()
+
+        center_window(self.win, 800, 700)
+        make_modal(self.win, parent)
 
     def _build_ui(self) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
+        bg: str = get_env_from_schema("UI_BACKGROUND")
         current = get_current_env_values()
 
-        # Scrollable canvas
-        canvas = tk.Canvas(self.win, bg=get_env_from_schema("UI_BACKGROUND"),
-                           highlightthickness=0)
-        scrollbar = ttk.Scrollbar(self.win, orient=tk.VERTICAL, command=canvas.yview)
-        form_frame = ttk.Frame(canvas, padding=pad)
+        # --- Fixed bottom button bar (packed FIRST so it stays at bottom) ---
+        btn_frame = ttk.Frame(self.win)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
-        form_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        hint = ttk.Label(
+            btn_frame,
+            text="The application will restart after saving.",
+            style="Small.TLabel",
+            anchor=tk.CENTER,
         )
-        canvas.create_window((0, 0), window=form_frame, anchor=tk.NW)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        hint.pack(fill=tk.X, pady=(0, pad // 2))
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        btn_inner = ttk.Frame(btn_frame)
+        btn_inner.pack()
 
-        def _on_mousewheel(event: tk.Event) -> None:  # type: ignore[type-arg]
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        btn_save = ttk.Button(btn_inner, text="Save", command=self._on_save)
+        btn_save.pack(side=tk.LEFT, padx=pad)
 
-        ttk.Label(form_frame, text="Configuration", style="Title.TLabel").pack(
+        btn_cancel = ttk.Button(
+            btn_inner, text="Cancel", style="Cancel.TButton",
+            command=self.win.destroy,
+        )
+        btn_cancel.pack(side=tk.LEFT, padx=pad)
+
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
+            side=tk.BOTTOM, fill=tk.X,
+        )
+
+        setup_arrow_enter_navigation([[btn_save, btn_cancel]])
+
+        # --- Scrollable area ---
+        self._scroll = ScrollableFrame(self.win)
+        self._scroll.apply_bg(bg)
+        self._scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        form = self._scroll.inner
+        form.configure(padding=pad)
+
+        ttk.Label(form, text="Configuration", style="Title.TLabel").pack(
             anchor=tk.W, pady=(0, pad),
         )
-        ttk.Label(
-            form_frame,
-            text="Changes are saved to the .env file and take effect on next launch.",
-            style="Small.TLabel",
-        ).pack(anchor=tk.W, pady=(0, pad * 2))
 
-        for item in ENV_SCHEMA:
-            key = item["key"]
-            cast_type = item["cast_type"]
+        # --- Collapsible sections ---
+        first_section = True
+        for _section_id, section_title, keys in _SECTION_ORDER:
+            self._add_section(form, section_title, keys, current, pad,
+                              expanded=first_section)
+            first_section = False
 
-            if key in _SECTION_HEADERS:
-                ttk.Separator(form_frame, orient=tk.HORIZONTAL).pack(
-                    fill=tk.X, pady=pad,
-                )
-                ttk.Label(form_frame, text=_SECTION_HEADERS[key],
-                          style="Subtitle.TLabel").pack(anchor=tk.W, pady=(0, pad // 2))
+        self._scroll.bind_new_children()
 
-            row = ttk.Frame(form_frame)
-            row.pack(fill=tk.X, pady=2)
+        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = form.winfo_width()
+            if w > 100:
+                wrap = max(200, w - 60)
+                for lbl in self._desc_labels:
+                    lbl.configure(wraplength=wrap)
 
-            ttk.Label(row, text=key, width=28, anchor=tk.W).pack(side=tk.LEFT)
+        form.bind("<Configure>", _update_wraplength)
 
-            val = current.get(key, str(item["default"]))
+        btn_save.focus_set()
 
-            if cast_type is bool:
-                bvar = tk.BooleanVar(value=val.lower() in ("true", "1", "yes"))
-                cb = ttk.Checkbutton(row, variable=bvar)
-                cb.pack(side=tk.LEFT)
-                self._vars[key] = bvar
-            elif "options" in item:
-                svar = tk.StringVar(value=val)
-                combo = ttk.Combobox(row, textvariable=svar,
-                                      values=list(item["options"]),
-                                      state="readonly", width=20)
-                combo.pack(side=tk.LEFT)
-                self._vars[key] = svar
+    def _add_section(
+        self,
+        parent: ttk.Frame,
+        title: str,
+        keys: list[str],
+        current: dict[str, str],
+        pad: int,
+        *,
+        expanded: bool = False,
+    ) -> None:
+        """Add a complete collapsible section with its fields."""
+        arrow_var = tk.StringVar(value=_EXPANDED if expanded else _COLLAPSED)
+
+        wrapper = ttk.Frame(parent)
+        wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
+
+        header = ttk.Frame(wrapper, style="SectionHeader.TFrame")
+        header.configure(cursor="hand2")
+        header.pack(fill=tk.X)
+
+        arrow_lbl = ttk.Label(header, textvariable=arrow_var,
+                              style="SectionHeader.TLabel")
+        arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
+
+        title_lbl = ttk.Label(header, text=title,
+                              style="SectionHeader.TLabel")
+        title_lbl.pack(side=tk.LEFT, pady=8)
+
+        content = ttk.Frame(wrapper, padding=(16, 4, 4, 4))
+
+        for key in keys:
+            item = _SCHEMA_BY_KEY.get(key)
+            if item is None:
+                continue
+            self._add_field(content, item, current, pad)
+
+        if expanded:
+            content.pack(fill=tk.X)
+
+        scroll_ref = self._scroll
+
+        def toggle(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            if content.winfo_manager():
+                content.pack_forget()
+                arrow_var.set(_COLLAPSED)
             else:
-                svar = tk.StringVar(value=val)
-                entry = ttk.Entry(row, textvariable=svar, width=24)
-                entry.pack(side=tk.LEFT)
-                self._vars[key] = svar
+                content.pack(fill=tk.X)
+                arrow_var.set(_EXPANDED)
+                scroll_ref.bind_new_children()
+            wrapper.after(50, scroll_ref.refresh_scroll_region)
 
-        # Buttons
-        btn_frame = ttk.Frame(self.win)
-        btn_frame.pack(fill=tk.X, padx=pad, pady=pad)
+        for w in (header, arrow_lbl, title_lbl):
+            w.bind("<Button-1>", toggle)
 
-        ttk.Button(btn_frame, text="Save", command=self._on_save).pack(
-            side=tk.RIGHT, padx=pad,
-        )
-        ttk.Button(btn_frame, text="Cancel", style="Cancel.TButton",
-                   command=self.win.destroy).pack(side=tk.RIGHT)
+    def _add_field(
+        self,
+        parent: ttk.Frame,
+        item: dict[str, Any],
+        current: dict[str, str],
+        pad: int,
+    ) -> None:
+        key = item["key"]
+        cast_type = item["cast_type"]
+        val = current.get(key, str(item["default"]))
+        desc_text = item.get("description", "")
+
+        row = ttk.Frame(parent)
+        row.pack(fill=tk.X, pady=2)
+
+        ttk.Label(row, text=key, width=28, anchor=tk.W).pack(side=tk.LEFT)
+
+        if cast_type is bool:
+            bvar = tk.BooleanVar(value=val.lower() in ("true", "1", "yes"))
+            cb = ttk.Checkbutton(row, variable=bvar)
+            cb.pack(side=tk.LEFT)
+            self._vars[key] = bvar
+        elif "options" in item:
+            svar = tk.StringVar(value=val)
+            combo = ttk.Combobox(
+                row, textvariable=svar,
+                values=list(item["options"]),
+                state="readonly", width=22,
+            )
+            combo.pack(side=tk.LEFT)
+            self._vars[key] = svar
+        else:
+            svar = tk.StringVar(value=val)
+            entry = ttk.Entry(row, textvariable=svar, width=30)
+            entry.pack(side=tk.LEFT)
+            self._vars[key] = svar
+
+        if desc_text:
+            desc = ttk.Label(parent, text=desc_text, style="ConfigDesc.TLabel",
+                             wraplength=600, justify=tk.LEFT)
+            desc.pack(anchor=tk.W, padx=(12, 0), pady=(0, 4))
+            self._desc_labels.append(desc)
 
     def _on_save(self) -> None:
-        """Write the edited values to ``.env``."""
+        """Write the edited values to ``.env`` and flag accepted."""
         values: dict[str, str] = {}
         for item in ENV_SCHEMA:
             key = item["key"]
@@ -140,9 +259,7 @@ class ConfigDialog:
         try:
             write_env_file(get_env_path(), values)
             logger.info("Configuration saved to .env")
-            messagebox.showinfo("Saved",
-                                "Configuration saved. Restart to apply changes.",
-                                parent=self.win)
+            self.accepted = True
             self.win.destroy()
         except Exception as exc:
             logger.error("Failed to save .env: %s", exc)
