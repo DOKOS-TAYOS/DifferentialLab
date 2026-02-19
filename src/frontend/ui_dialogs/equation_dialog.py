@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+from typing import Any
 
 from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
@@ -35,6 +36,7 @@ class EquationDialog:
         self._equation_keys: list[str] = list(self.equations.keys())
         self._selected_key: str | None = None
         self._param_vars: dict[str, tk.StringVar] = {}
+        self._derivative_vars: list[tk.BooleanVar] = []
 
         self._build_ui()
 
@@ -133,6 +135,9 @@ class EquationDialog:
         self.params_frame = ttk.LabelFrame(right, text="Parameters", padding=pad)
         self.params_frame.pack(fill=tk.X, pady=(0, pad))
 
+        self.derivatives_frame = ttk.LabelFrame(right, text="Derivatives to Plot", padding=pad)
+        self.derivatives_frame.pack(fill=tk.X, pady=(0, pad))
+
         self.defaults_label = ttk.Label(right, text="", style="Small.TLabel",
                                          wraplength=380, justify=tk.LEFT)
         self.defaults_label.pack(anchor=tk.W)
@@ -178,11 +183,35 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: omega=1.0, gamma=0.1")
 
+        self.custom_derivatives_frame = ttk.LabelFrame(custom_frame, text="Derivatives to Plot", padding=pad)
+        self.custom_derivatives_frame.pack(fill=tk.X, pady=(pad, 0))
+        self._custom_derivative_vars: list[tk.BooleanVar] = []
+        self.custom_order_var.trace_add("write", self._update_custom_derivatives)
+        self._update_custom_derivatives()
+
         self.eq_listbox.focus_set()
 
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
+
+    def _update_custom_derivatives(self, *_args: Any) -> None:
+        """Update derivative checkboxes when order changes in custom tab."""
+        try:
+            order = int(self.custom_order_var.get())
+        except ValueError:
+            order = 1
+
+        for child in self.custom_derivatives_frame.winfo_children():
+            child.destroy()
+        self._custom_derivative_vars.clear()
+
+        derivative_labels = ["y"] if order == 1 else [f"y[{i}]" for i in range(order)]
+        for label in derivative_labels:
+            var = tk.BooleanVar(value=True)
+            cb = ttk.Checkbutton(self.custom_derivatives_frame, text=label, variable=var)
+            cb.pack(anchor=tk.W)
+            self._custom_derivative_vars.append(var)
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
@@ -218,6 +247,17 @@ class EquationDialog:
             self._param_vars[pname] = var
             ToolTip(entry, pinfo.get("description", ""))
 
+        for child in self.derivatives_frame.winfo_children():
+            child.destroy()
+        self._derivative_vars.clear()
+
+        derivative_labels = ["y"] if eq.order == 1 else [f"y[{i}]" for i in range(eq.order)]
+        for i, label in enumerate(derivative_labels):
+            var = tk.BooleanVar(value=True)
+            cb = ttk.Checkbutton(self.derivatives_frame, text=label, variable=var)
+            cb.pack(anchor=tk.W)
+            self._derivative_vars.append(var)
+
         ic_text = f"Default ICs: {eq.default_initial_conditions}"
         domain_text = f"Default domain: [{eq.default_domain[0]}, {eq.default_domain[1]}]"
         self.defaults_label.config(text=f"{ic_text}\n{domain_text}")
@@ -241,6 +281,13 @@ class EquationDialog:
                 )
                 return
 
+        selected_derivatives = [i for i, var in enumerate(self._derivative_vars) if var.get()]
+        if not selected_derivatives:
+            messagebox.showwarning("No Derivatives Selected",
+                                   "Please select at least one derivative to plot.",
+                                   parent=self.win)
+            return
+
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
@@ -252,6 +299,7 @@ class EquationDialog:
             equation_name=eq.name,
             default_y0=eq.default_initial_conditions,
             default_domain=eq.default_domain,
+            selected_derivatives=selected_derivatives,
         )
 
     def _on_next_custom(self) -> None:
@@ -293,6 +341,13 @@ class EquationDialog:
                     )
                     return
 
+        selected_derivatives = [i for i, var in enumerate(self._custom_derivative_vars) if var.get()]
+        if not selected_derivatives:
+            messagebox.showwarning("No Derivatives Selected",
+                                   "Please select at least one derivative to plot.",
+                                   parent=self.win)
+            return
+
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
@@ -304,4 +359,5 @@ class EquationDialog:
             equation_name="Custom ODE",
             default_y0=[0.0] * order,
             default_domain=[0.0, 10.0],
+            selected_derivatives=selected_derivatives,
         )

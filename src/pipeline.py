@@ -43,6 +43,7 @@ def run_solver_pipeline(
     n_points: int,
     method: str,
     selected_stats: set[str],
+    selected_derivatives: list[int] | None = None,
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
@@ -88,6 +89,7 @@ def run_solver_pipeline(
     fig = create_solution_plot(
         solution.x, solution.y,
         title=equation_name, xlabel="x", ylabel="y",
+        selected_derivatives=selected_derivatives,
     )
     save_plot(fig, plot_path)
 

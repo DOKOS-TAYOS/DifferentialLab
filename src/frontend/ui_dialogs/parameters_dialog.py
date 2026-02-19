@@ -44,12 +44,14 @@ class ParametersDialog:
         equation_name: str,
         default_y0: list[float],
         default_domain: list[float],
+        selected_derivatives: list[int] | None = None,
     ) -> None:
         self.parent = parent
         self.expression = expression
         self.order = order
         self.parameters = parameters
         self.equation_name = equation_name
+        self.selected_derivatives = selected_derivatives if selected_derivatives else list(range(order))
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Parameters — {equation_name}")
@@ -245,6 +247,7 @@ class ParametersDialog:
                 n_points=n_points,
                 method=method,
                 selected_stats=selected_stats,
+                selected_derivatives=self.selected_derivatives,
             )
         except DifferentialLabError as exc:
             messagebox.showerror("Error", str(exc), parent=self.win)

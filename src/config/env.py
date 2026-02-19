@@ -82,11 +82,13 @@ ENV_SCHEMA: list[dict[str, Any]] = [
      "description": "Draw a background grid on the solution plot."},
     # --- plot: line ---
     {"key": "PLOT_LINE_COLOR", "default": "royalblue", "cast_type": str,
-     "description": "Colour of the main solution curve."},
+     "description": "Colour of the main solution curve (first derivative or y)."},
     {"key": "PLOT_LINE_WIDTH", "default": 1.5, "cast_type": float,
      "description": "Thickness of the solution curve line in points."},
     {"key": "PLOT_LINE_STYLE", "default": "-", "cast_type": str, "options": LINE_STYLES,
      "description": "Line style: solid (-), dashed (--), dash-dot (-.), dotted (:)."},
+    {"key": "PLOT_COLOR_SCHEME", "default": "Set1", "cast_type": str,
+     "description": "Matplotlib colormap for additional derivatives (Set1, Set2, tab10, Paired, etc.)."},
     # --- plot: markers ---
     {"key": "PLOT_MARKER_FORMAT", "default": "o", "cast_type": str, "options": MARKER_FORMATS,
      "description": "Shape of data-point markers on the plot."},

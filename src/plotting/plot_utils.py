@@ -35,6 +35,7 @@ def create_solution_plot(
     xlabel: str = "x",
     ylabel: str = "y",
     show_markers: bool = False,
+    selected_derivatives: list[int] | None = None,
 ) -> Figure:
     """Create a publication-ready plot of the ODE solution.
 
@@ -60,26 +61,41 @@ def create_solution_plot(
     line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
     line_style: str = get_env_from_schema("PLOT_LINE_STYLE")
+    color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
 
     y_2d = np.atleast_2d(y)
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T
 
+    if selected_derivatives is None:
+        selected_derivatives = list(range(y_2d.shape[0]))
+
     labels = ["y"] if y_2d.shape[0] == 1 else [f"y[{i}]" for i in range(y_2d.shape[0])]
-    colors = [line_color] + list(plt.cm.Set1(np.linspace(0, 1, max(1, y_2d.shape[0] - 1))))
+    
+    try:
+        cmap = plt.cm.get_cmap(color_scheme)
+        n_colors = max(1, len(selected_derivatives) - 1)
+        colors = [line_color] + list(cmap(np.linspace(0, 1, n_colors)))
+    except (ValueError, AttributeError):
+        colors = [line_color] + list(plt.cm.Set1(np.linspace(0, 1, max(1, len(selected_derivatives) - 1))))
 
-    for i in range(y_2d.shape[0]):
-        color = colors[i] if i < len(colors) else None
-        ax.plot(x, y_2d[i], color=color, linewidth=line_width,
-                linestyle=line_style, label=labels[i])
+    for plot_idx, deriv_idx in enumerate(selected_derivatives):
+        if deriv_idx >= y_2d.shape[0]:
+            continue
+        color = colors[plot_idx] if plot_idx < len(colors) else None
+        ax.plot(x, y_2d[deriv_idx], color=color, linewidth=line_width,
+                linestyle=line_style, label=labels[deriv_idx])
 
-        if show_markers:
-            marker: str = get_env_from_schema("PLOT_MARKER_FORMAT")
-            msize: int = get_env_from_schema("PLOT_MARKER_SIZE")
-            mfc: str = get_env_from_schema("PLOT_MARKER_FACE_COLOR")
-            mec: str = get_env_from_schema("PLOT_MARKER_EDGE_COLOR")
-            step = max(1, len(x) // _MAX_ELEMENTS_PLOT)
-            ax.plot(x[::step], y_2d[i, ::step], marker=marker, markersize=msize,
+    if show_markers:
+        marker: str = get_env_from_schema("PLOT_MARKER_FORMAT")
+        msize: int = get_env_from_schema("PLOT_MARKER_SIZE")
+        mfc: str = get_env_from_schema("PLOT_MARKER_FACE_COLOR")
+        mec: str = get_env_from_schema("PLOT_MARKER_EDGE_COLOR")
+        step = max(1, len(x) // _MAX_ELEMENTS_PLOT)
+        for plot_idx, deriv_idx in enumerate(selected_derivatives):
+            if deriv_idx >= y_2d.shape[0]:
+                continue
+            ax.plot(x[::step], y_2d[deriv_idx, ::step], marker=marker, markersize=msize,
                     markerfacecolor=mfc, markeredgecolor=mec, linestyle="none")
 
     show_title: bool = get_env_from_schema("PLOT_SHOW_TITLE")
@@ -91,7 +107,7 @@ def create_solution_plot(
     ax.set_ylabel(ylabel)
     if show_grid:
         ax.grid(True, alpha=0.3)
-    if y_2d.shape[0] > 1:
+    if len(selected_derivatives) > 1:
         ax.legend()
 
     fig.tight_layout()
