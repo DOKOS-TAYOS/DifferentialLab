@@ -5,7 +5,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from config import get_env_from_schema, get_font, get_select_colors
+from config import get_env_from_schema
+from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal

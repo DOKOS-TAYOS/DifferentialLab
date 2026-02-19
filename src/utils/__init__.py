@@ -1,17 +1,19 @@
 """Utility modules for DifferentialLab."""
 
 from utils.exceptions import (
-    EquationParseError,
     DifferentialLabError,
+    EquationParseError,
     SolverFailedError,
+    ValidationError,
 )
 from utils.export import export_all_results
 from utils.logger import get_logger
 
 __all__ = [
-    "EquationParseError",
     "DifferentialLabError",
+    "EquationParseError",
     "SolverFailedError",
+    "ValidationError",
     "export_all_results",
     "get_logger",
 ]

@@ -7,7 +7,8 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-from config import APP_NAME, APP_VERSION, configure_ttk_styles, get_env_from_schema, get_font
+from config import APP_NAME, APP_VERSION, get_env_from_schema
+from frontend.theme import configure_ttk_styles, get_font
 from frontend.ui_dialogs import setup_arrow_enter_navigation
 from frontend.window_utils import center_window
 from utils import get_logger

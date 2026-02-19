@@ -6,26 +6,18 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any
 
-import numpy as np
-
 from config import (
     AVAILABLE_STATISTICS,
     SOLVER_METHODS,
     SOLVER_METHOD_DESCRIPTIONS,
-    generate_output_basename,
-    get_csv_path,
     get_env_from_schema,
-    get_json_path,
-    get_plot_path,
-    get_font,
 )
+
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
-from plotting import create_phase_plot, create_solution_plot, save_plot
-from solver import parse_expression, solve_ode, compute_statistics, validate_all_inputs
-from utils import DifferentialLabError, EquationParseError, export_all_results, get_logger
+from utils import DifferentialLabError, get_logger
 
 logger = get_logger(__name__)
 
@@ -198,7 +190,7 @@ class ParametersDialog:
     # ------------------------------------------------------------------
 
     def _on_solve(self) -> None:
-        """Parse inputs, run the solver, and open the result dialog."""
+        """Parse inputs, run the solver pipeline, and open the result dialog."""
         try:
             x_min = float(self.xmin_var.get())
             x_max = float(self.xmax_var.get())
@@ -227,66 +219,26 @@ class ParametersDialog:
                 return
 
         method = self.method_var.get()
-
-        errors = validate_all_inputs(
-            self.expression, self.order, x_min, x_max,
-            y0, n_points, method, self.parameters,
-        )
-        if errors:
-            messagebox.showerror("Validation Error",
-                                 "\n".join(errors), parent=self.win)
-            return
-
         selected_stats = {k for k, v in self._stat_vars.items() if v.get()}
 
         try:
-            ode_func = parse_expression(self.expression, self.order, self.parameters)
-        except EquationParseError as exc:
-            messagebox.showerror("Parse Error", str(exc), parent=self.win)
-            return
+            from pipeline import run_solver_pipeline
 
-        t_eval = np.linspace(x_min, x_max, n_points)
-
-        try:
-            solution = solve_ode(ode_func, (x_min, x_max), y0,
-                                 method=method, t_eval=t_eval)
+            result = run_solver_pipeline(
+                expression=self.expression,
+                order=self.order,
+                parameters=self.parameters,
+                equation_name=self.equation_name,
+                x_min=x_min,
+                x_max=x_max,
+                y0=y0,
+                n_points=n_points,
+                method=method,
+                selected_stats=selected_stats,
+            )
         except DifferentialLabError as exc:
-            messagebox.showerror("Solver Error", str(exc), parent=self.win)
+            messagebox.showerror("Error", str(exc), parent=self.win)
             return
-
-        stats = compute_statistics(solution.x, solution.y, selected_stats)
-
-        basename = generate_output_basename()
-        csv_path = get_csv_path(basename)
-        json_path = get_json_path(basename)
-        plot_path = get_plot_path(basename)
-
-        metadata = {
-            "equation_name": self.equation_name,
-            "expression": self.expression,
-            "order": self.order,
-            "parameters": self.parameters,
-            "domain": [x_min, x_max],
-            "initial_conditions": y0,
-            "method": method,
-            "num_points": n_points,
-            "solver_success": solution.success,
-            "solver_message": solution.message,
-            "n_evaluations": solution.n_eval,
-        }
-
-        fig = create_solution_plot(
-            solution.x, solution.y,
-            title=self.equation_name,
-            xlabel="x", ylabel="y",
-        )
-        save_plot(fig, plot_path)
-
-        phase_fig = None
-        if self.order >= 2:
-            phase_fig = create_phase_plot(solution.y, title=f"{self.equation_name} — Phase")
-
-        export_all_results(solution.x, solution.y, stats, metadata, csv_path, json_path)
 
         self.win.destroy()
 
@@ -294,11 +246,11 @@ class ParametersDialog:
 
         ResultDialog(
             self.parent,
-            fig=fig,
-            phase_fig=phase_fig,
-            statistics=stats,
-            metadata=metadata,
-            csv_path=csv_path,
-            json_path=json_path,
-            plot_path=plot_path,
+            fig=result.fig,
+            phase_fig=result.phase_fig,
+            statistics=result.statistics,
+            metadata=result.metadata,
+            csv_path=result.csv_path,
+            json_path=result.json_path,
+            plot_path=result.plot_path,
         )

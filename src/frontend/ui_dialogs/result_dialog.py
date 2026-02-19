@@ -13,7 +13,7 @@ from config import get_env_from_schema
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from plotting import embed_plot_in_tk
+from frontend.plot_embed import embed_plot_in_tk
 from utils import get_logger
 
 logger = get_logger(__name__)

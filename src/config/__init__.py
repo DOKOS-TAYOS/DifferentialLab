@@ -25,7 +25,6 @@ from config.paths import (
     get_output_dir,
     get_plot_path,
 )
-from config.theme import configure_ttk_styles, get_font, get_select_colors
 
 __all__ = [
     # constants
@@ -50,8 +49,4 @@ __all__ = [
     "get_json_path",
     "get_output_dir",
     "get_plot_path",
-    # theme
-    "configure_ttk_styles",
-    "get_font",
-    "get_select_colors",
 ]
