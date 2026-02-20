@@ -37,6 +37,9 @@ output/*.pdf
 # Logs
 *.log
 
+# Docs build
+docs/_build/
+
 # Testing
 .pytest_cache/
 .coverage

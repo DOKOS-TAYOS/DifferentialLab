@@ -87,8 +87,30 @@ Available configuration sections:
 | Matplotlib     | >= 3.10     | Plotting and visualization  |
 | SciPy          | >= 1.15     | ODE solving engine          |
 | python-dotenv  | >= 1.0      | Environment configuration   |
-| Colorama       | >= 0.4      | Terminal colors             |
 | PyYAML         | >= 6.0      | Equation definitions        |
+
+## Documentation
+
+Full documentation is built with [Sphinx](https://www.sphinx-doc.org/) and
+hosted on Read the Docs.
+
+To build the docs locally:
+
+```bash
+pip install -e ".[docs]"
+cd docs
+make html          # Linux/macOS
+make.bat html      # Windows
+```
+
+The output will be in `docs/_build/html/`.
+
+Documentation contents:
+- **Getting Started** -- installation, setup, first run
+- **User Guide** -- walk-through of the complete workflow
+- **Configuration Reference** -- every `.env` setting explained
+- **Architecture** -- module structure and design decisions
+- **API Reference** -- auto-generated from source docstrings
 
 ## License
 
