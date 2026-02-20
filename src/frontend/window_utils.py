@@ -54,6 +54,47 @@ def center_window(
     window.resizable(resizable, resizable)
 
 
+def fit_and_center(
+    window: tk.Tk | tk.Toplevel,
+    min_width: int = 400,
+    min_height: int = 300,
+    padding: int = 40,
+    *,
+    max_ratio: float = 0.9,
+    **center_kwargs: object,
+) -> None:
+    """Size *window* to fit its content (with minimums) and center it.
+
+    Computes dimensions from the window's requested size, clamps to
+    ``[min_width, screen * max_ratio]``, then delegates to
+    :func:`center_window`.
+
+    Args:
+        window: The Tk or Toplevel window.
+        min_width: Minimum window width in pixels.
+        min_height: Minimum window height in pixels.
+        padding: Extra pixels added to the requested size.
+        max_ratio: Maximum fraction of the screen for each dimension.
+        **center_kwargs: Forwarded to :func:`center_window`.
+    """
+    window.update_idletasks()
+    req_w = window.winfo_reqwidth() + padding
+    req_h = window.winfo_reqheight() + padding
+
+    screen_w = window.winfo_screenwidth()
+    screen_h = window.winfo_screenheight()
+
+    w = min(max(req_w, min_width), int(screen_w * max_ratio))
+    h = min(max(req_h, min_height), int(screen_h * max_ratio))
+
+    center_window(
+        window, w, h,
+        max_width_ratio=max_ratio,
+        max_height_ratio=max_ratio,
+        **center_kwargs,
+    )
+
+
 def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
     """Make a Toplevel dialog modal relative to *parent*.
 

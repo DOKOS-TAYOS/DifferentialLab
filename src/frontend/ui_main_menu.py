@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import tkinter as tk
 from tkinter import ttk
 
 from config import APP_NAME, APP_VERSION, get_env_from_schema
-from frontend.theme import configure_ttk_styles, get_font
+from frontend.theme import configure_ttk_styles
 from frontend.ui_dialogs import ToolTip, setup_arrow_enter_navigation
-from frontend.window_utils import center_window
+from frontend.window_utils import fit_and_center
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -37,23 +35,12 @@ class MainMenu:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._build_ui()
 
-        self.root.update_idletasks()
-        req_width = self.root.winfo_reqwidth()
-        req_height = self.root.winfo_reqheight()
-
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-
-        win_w = min(max(req_width + 40, 520), int(screen_w * 0.9))
-        win_h = min(max(req_height + 40, 480), int(screen_h * 0.9))
-
-        center_window(self.root, win_w, win_h)
+        fit_and_center(self.root, min_width=520, min_height=480)
         logger.info("Main menu created")
 
     def _build_ui(self) -> None:
         """Construct the main menu layout."""
         padding: int = get_env_from_schema("UI_PADDING")
-        font_family, font_size = get_font()
 
         main_frame = ttk.Frame(self.root, padding=padding * 3)
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -170,6 +157,9 @@ class MainMenu:
         self.root.wait_window(dlg.win)
 
         if dlg.accepted:
+            import os
+            import sys
+
             logger.info("Configuration saved — restarting application")
             self.root.destroy()
             os.execv(sys.executable, [sys.executable] + sys.argv)

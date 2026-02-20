@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
+    from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
 from config import get_env_from_schema
@@ -16,9 +17,11 @@ logger = get_logger(__name__)
 
 _MAX_ELEMENTS_PLOT = 50
 
+
 def _apply_plot_style() -> None:
     """Configure matplotlib rcParams from environment variables."""
     import matplotlib
+
     matplotlib.rcParams.update({
         "font.family": get_env_from_schema("FONT_FAMILY"),
         "font.size": get_env_from_schema("FONT_TICK_SIZE"),
@@ -27,6 +30,50 @@ def _apply_plot_style() -> None:
         "axes.labelsize": get_env_from_schema("FONT_AXIS_SIZE"),
         "figure.dpi": get_env_from_schema("DPI"),
     })
+
+
+def _new_figure() -> tuple[Any, Any]:
+    """Create a configured figure and axes from env settings.
+
+    Returns:
+        Tuple of ``(fig, ax)``.
+    """
+    import matplotlib.pyplot as plt
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+    return plt.subplots(figsize=(width, height), dpi=dpi)
+
+
+def _finalize_plot(
+    ax: Axes,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    *,
+    legend: bool = False,
+) -> None:
+    """Apply title, grid, axis labels, and optional legend from env settings.
+
+    Args:
+        ax: Matplotlib axes.
+        title: Plot title (shown only if ``PLOT_SHOW_TITLE`` is enabled).
+        xlabel: Label for x-axis.
+        ylabel: Label for y-axis.
+        legend: Whether to display the legend.
+    """
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    ax.set_xlabel(xlabel, fontstyle=axis_style)
+    ax.set_ylabel(ylabel, fontstyle=axis_style)
+    if get_env_from_schema("PLOT_SHOW_GRID"):
+        ax.grid(True, alpha=0.3)
+    if legend:
+        ax.legend()
 
 
 def create_solution_plot(
@@ -47,6 +94,7 @@ def create_solution_plot(
         xlabel: Label for x-axis.
         ylabel: Label for y-axis.
         show_markers: Whether to overlay data-point markers.
+        selected_derivatives: Indices of solution components to plot.
 
     Returns:
         A matplotlib :class:`Figure`.
@@ -54,13 +102,7 @@ def create_solution_plot(
     import matplotlib.pyplot as plt
     import numpy as np
 
-    _apply_plot_style()
-
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    dpi: int = get_env_from_schema("DPI")
-
-    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi)
+    fig, ax = _new_figure()
 
     line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
@@ -103,18 +145,7 @@ def create_solution_plot(
             ax.plot(x[::step], y_2d[deriv_idx, ::step], marker=marker, markersize=msize,
                     markerfacecolor=mfc, markeredgecolor=mec, linestyle="none")
 
-    show_title: bool = get_env_from_schema("PLOT_SHOW_TITLE")
-    show_grid: bool = get_env_from_schema("PLOT_SHOW_GRID")
-
-    if show_title and title:
-        ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    if show_grid:
-        ax.grid(True, alpha=0.3)
-    if len(selected_derivatives) > 1:
-        ax.legend()
-
+    _finalize_plot(ax, title, xlabel, ylabel, legend=len(selected_derivatives) > 1)
     fig.tight_layout()
     return fig
 
@@ -136,18 +167,12 @@ def create_phase_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
-    import matplotlib.pyplot as plt
     import numpy as np
 
-    _apply_plot_style()
+    fig, ax = _new_figure()
 
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    dpi: int = get_env_from_schema("DPI")
     line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
-
-    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi)
 
     y_2d = np.atleast_2d(y)
     ax.plot(y_2d[0], y_2d[1], color=line_color, linewidth=line_width)
@@ -155,17 +180,7 @@ def create_phase_plot(
     ax.plot(y_2d[0, 0], y_2d[1, 0], "o", color="green", markersize=8, label="Start")
     ax.plot(y_2d[0, -1], y_2d[1, -1], "s", color="red", markersize=8, label="End")
 
-    show_title: bool = get_env_from_schema("PLOT_SHOW_TITLE")
-    show_grid: bool = get_env_from_schema("PLOT_SHOW_GRID")
-
-    if show_title and title:
-        ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    if show_grid:
-        ax.grid(True, alpha=0.3)
-    ax.legend()
-
+    _finalize_plot(ax, title, xlabel, ylabel, legend=True)
     fig.tight_layout()
     return fig
 

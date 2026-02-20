@@ -83,18 +83,6 @@ def _validate_method(method: str) -> list[str]:
     return []
 
 
-def _validate_ode_expression(expression: str) -> list[str]:
-    """Validate a custom ODE expression string.
-
-    Args:
-        expression: Python-syntax ODE expression.
-
-    Returns:
-        List of error messages (empty if valid).
-    """
-    return validate_expression(expression)
-
-
 def _validate_parameters(params: dict[str, float]) -> list[str]:
     """Validate parameter values.
 
@@ -165,7 +153,7 @@ def validate_all_inputs(
         List of all error messages (empty if everything is valid).
     """
     errors: list[str] = []
-    errors.extend(_validate_ode_expression(expression))
+    errors.extend(validate_expression(expression))
     errors.extend(_validate_domain(x_min, x_max))
     errors.extend(_validate_initial_conditions(y0, order))
     errors.extend(_validate_grid(num_points))

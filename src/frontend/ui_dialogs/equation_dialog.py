@@ -11,7 +11,7 @@ from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import fit_and_center, make_modal
 from solver import load_predefined_equations
 from utils import get_logger
 
@@ -41,17 +41,7 @@ class EquationDialog:
 
         self._build_ui()
 
-        self.win.update_idletasks()
-        req_width = self.win.winfo_reqwidth()
-        req_height = self.win.winfo_reqheight()
-
-        screen_w = self.win.winfo_screenwidth()
-        screen_h = self.win.winfo_screenheight()
-
-        win_w = min(max(req_width + 40, 1060), int(screen_w * 0.9))
-        win_h = min(max(req_height + 40, 650), int(screen_h * 0.9))
-
-        center_window(self.win, win_w, win_h)
+        fit_and_center(self.win, min_width=1060, min_height=650)
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------

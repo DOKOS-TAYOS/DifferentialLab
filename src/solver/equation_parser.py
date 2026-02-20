@@ -72,7 +72,6 @@ _ALLOWED_NODE_TYPES = (
     ast.USub,
     ast.UAdd,
     ast.Subscript,
-    ast.Index,
     ast.Attribute,
     ast.FloorDiv,
     ast.Mod,

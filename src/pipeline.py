@@ -11,7 +11,13 @@ from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_csv_path, get_json_path, get_plot_path
 from plotting import create_phase_plot, create_solution_plot, save_plot
-from solver import compute_statistics, parse_expression, solve_multipoint, solve_ode, validate_all_inputs
+from solver import (
+    compute_statistics,
+    parse_expression,
+    solve_multipoint,
+    solve_ode,
+    validate_all_inputs,
+)
 from utils import ValidationError, export_all_results, get_logger
 
 logger = get_logger(__name__)

@@ -34,7 +34,6 @@ _SIZE_FIELDS: frozenset[str] = frozenset({
     "UI_PADDING",
     "UI_BUTTON_WIDTH",
     "UI_FONT_SIZE",
-    "UI_ENTRY_WIDTH",
     "PLOT_FIGSIZE_WIDTH",
     "PLOT_FIGSIZE_HEIGHT",
     "PLOT_MARKER_SIZE",
@@ -67,8 +66,6 @@ ENV_SCHEMA: list[dict[str, Any]] = [
      "description": "Font family for the interface (e.g. Segoe UI, Consolas)."},
     {"key": "UI_PADDING", "default": 8, "cast_type": int,
      "description": "General padding in pixels between UI elements."},
-    {"key": "UI_ENTRY_WIDTH", "default": 25, "cast_type": int,
-     "description": "Default character width for text-entry fields."},
     # --- plot: size ---
     {"key": "PLOT_FIGSIZE_WIDTH", "default": 12, "cast_type": int,
      "description": "Width of generated plots in inches."},
