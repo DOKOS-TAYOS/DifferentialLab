@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from typing import Any, Callable
 
 import numpy as np
@@ -10,6 +11,25 @@ import numpy as np
 from utils import EquationParseError, get_logger
 
 logger = get_logger(__name__)
+
+_UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9A-Fa-f]{4})")
+
+
+def normalize_unicode_escapes(text: str) -> str:
+    """Replace ``\\uXXXX`` escape sequences with their Unicode characters.
+
+    Allows users to enter expressions like ``\\u03C9**2 * y[0]`` and have
+    them treated equivalently to ``ω**2 * y[0]``.
+
+    Args:
+        text: Input string that may contain Unicode escape sequences.
+
+    Returns:
+        String with all ``\\uXXXX`` sequences replaced by the corresponding
+        Unicode character.
+    """
+    return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
+
 
 _SAFE_MATH: dict[str, Any] = {
     "sin": np.sin,
@@ -119,6 +139,7 @@ def parse_expression(
     Raises:
         EquationParseError: If the expression is invalid.
     """
+    expression = normalize_unicode_escapes(expression)
     _validate_ast(expression)
     params = dict(parameters) if parameters else {}
     logger.debug("Parsing expression (order=%d): %s, params=%s", order, expression, params)
@@ -165,7 +186,7 @@ def validate_expression(expression: str) -> list[str]:
         errors.append("Expression is empty")
         return errors
     try:
-        _validate_ast(expression.strip())
+        _validate_ast(normalize_unicode_escapes(expression.strip()))
     except EquationParseError as exc:
         errors.append(str(exc))
     return errors

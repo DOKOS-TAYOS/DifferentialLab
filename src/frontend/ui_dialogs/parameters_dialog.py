@@ -15,7 +15,6 @@ from config import (
 from frontend.theme import get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import center_window, make_modal
 from utils import DifferentialLabError, get_logger
 
@@ -45,12 +44,14 @@ class ParametersDialog:
         default_y0: list[float],
         default_domain: list[float],
         selected_derivatives: list[int] | None = None,
+        display_formula: str | None = None,
     ) -> None:
         self.parent = parent
         self.expression = expression
         self.order = order
         self.parameters = parameters
         self.equation_name = equation_name
+        self.display_formula = display_formula if display_formula is not None else expression
         self.selected_derivatives = (
             selected_derivatives if selected_derivatives else list(range(order))
         )
@@ -62,7 +63,7 @@ class ParametersDialog:
         self.win.configure(bg=bg)
 
         self._y0_vars: list[tk.StringVar] = []
-        self._stat_vars: dict[str, tk.BooleanVar] = {}
+        self._stat_keys: list[str] = []
 
         self._build_ui(default_y0, default_domain)
 
@@ -73,7 +74,7 @@ class ParametersDialog:
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
 
-        win_w = min(max(req_width + 40, 740), int(screen_w * 0.9))
+        win_w = min(max(req_width + 40, 920), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 700), int(screen_h * 0.9))
 
         center_window(self.win, win_w, win_h)
@@ -119,8 +120,10 @@ class ParametersDialog:
         # Equation summary
         ttk.Label(scroll_frame, text=f"Equation: {self.equation_name}",
                   style="Subtitle.TLabel").pack(anchor=tk.W, pady=(0, pad))
-        ttk.Label(scroll_frame, text=f"Expression: {self.expression}",
-                  style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
+        ttk.Label(scroll_frame, text=self.display_formula,
+                  style="Small.TLabel", wraplength=600, justify=tk.LEFT).pack(
+            anchor=tk.W, pady=(0, pad)
+        )
 
         # Domain
         domain_frame = ttk.LabelFrame(scroll_frame, text="Domain", padding=pad)
@@ -163,7 +166,7 @@ class ParametersDialog:
         for i in range(self.order):
             row = ttk.Frame(ic_frame)
             row.pack(fill=tk.X, pady=2)
-            default_val = default_y0[i] if i < len(default_y0) else 0.0
+            default_val = default_y0[i] if i < len(default_y0) else 1.0
             ttk.Label(row, text=f"{ic_labels[i]} =", width=14).pack(side=tk.LEFT)
             var = tk.StringVar(value=str(default_val))
             ttk.Entry(row, textvariable=var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
@@ -177,22 +180,47 @@ class ParametersDialog:
         combo = ttk.Combobox(method_frame, textvariable=self.method_var,
                               values=list(SOLVER_METHODS), state="readonly", width=15,
                               font=get_font())
-        combo.pack(side=tk.LEFT)
-        self.method_desc = ttk.Label(method_frame, text="", style="Small.TLabel")
-        self.method_desc.pack(side=tk.LEFT, padx=(pad, 0))
+        combo.pack(anchor=tk.W)
+        self.method_desc = ttk.Label(method_frame, text="", style="Small.TLabel",
+                                     wraplength=600, justify=tk.LEFT)
+        self.method_desc.pack(anchor=tk.W, pady=(2, 0))
         combo.bind("<<ComboboxSelected>>", self._on_method_change)
         self._on_method_change(None)
 
-        # Statistics checkboxes
+        # Statistics listbox (extended selection)
         stats_frame = ttk.LabelFrame(scroll_frame, text="Statistics & Magnitudes", padding=pad)
         stats_frame.pack(fill=tk.X, pady=(0, pad))
 
-        for key, desc in AVAILABLE_STATISTICS.items():
-            var = tk.BooleanVar(value=True)
-            cb = ttk.Checkbutton(stats_frame, text=key, variable=var)
-            cb.pack(anchor=tk.W)
-            ToolTip(cb, desc)
-            self._stat_vars[key] = var
+        self._stat_keys: list[str] = list(AVAILABLE_STATISTICS.keys())
+
+        stats_list_frame = ttk.Frame(stats_frame)
+        stats_list_frame.pack(fill=tk.X)
+
+        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        fg: str = get_env_from_schema("UI_FOREGROUND")
+        stats_scrollbar = ttk.Scrollbar(stats_list_frame, orient=tk.VERTICAL)
+        self._stats_listbox = tk.Listbox(
+            stats_list_frame,
+            selectmode=tk.EXTENDED,
+            height=min(len(self._stat_keys), 6),
+            bg=btn_bg,
+            fg=fg,
+            font=get_font(),
+            exportselection=False,
+            yscrollcommand=stats_scrollbar.set,
+        )
+        stats_scrollbar.config(command=self._stats_listbox.yview)
+        self._stats_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        stats_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        for key in self._stat_keys:
+            self._stats_listbox.insert(tk.END, key)
+        self._stats_listbox.select_set(0, tk.END)
+
+        self._stats_desc_label = ttk.Label(stats_frame, text="", style="Small.TLabel",
+                                            wraplength=600, justify=tk.LEFT)
+        self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
+        self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
 
         scroll.bind_new_children()
         btn_solve.focus_set()
@@ -226,6 +254,15 @@ class ParametersDialog:
         method = self.method_var.get()
         desc = SOLVER_METHOD_DESCRIPTIONS.get(method, "")
         self.method_desc.config(text=desc)
+
+    def _on_stats_select(self, _event: Any) -> None:
+        indices = self._stats_listbox.curselection()
+        if not indices:
+            self._stats_desc_label.config(text="")
+            return
+        last_key = self._stat_keys[indices[-1]]
+        desc = AVAILABLE_STATISTICS.get(last_key, "")
+        self._stats_desc_label.config(text=desc)
 
     # ------------------------------------------------------------------
     # Solve
@@ -261,7 +298,8 @@ class ParametersDialog:
                 return
 
         method = self.method_var.get()
-        selected_stats = {k for k, v in self._stat_vars.items() if v.get()}
+        selected_indices = self._stats_listbox.curselection()
+        selected_stats = {self._stat_keys[i] for i in selected_indices}
 
         try:
             from pipeline import run_solver_pipeline

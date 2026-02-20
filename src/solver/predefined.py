@@ -23,7 +23,8 @@ class PredefinedEquation:
     Attributes:
         key: Unique identifier (YAML key).
         name: Human-readable name.
-        description: Multi-line description/formula.
+        formula: Compact human-readable equation string (e.g. ``"y'' + ω²y = 0"``).
+        description: Multi-line description with formula and context.
         order: ODE order (1, 2, …).
         parameters: Mapping of param name to ``{default, description}``.
         expression: Python expression for the highest derivative.
@@ -33,6 +34,7 @@ class PredefinedEquation:
 
     key: str
     name: str
+    formula: str
     description: str
     order: int
     parameters: dict[str, dict[str, Any]]
@@ -69,6 +71,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
         eq = PredefinedEquation(
             key=key,
             name=data.get("name", key),
+            formula=data.get("formula", data.get("description", "").split("\n")[0]),
             description=data.get("description", ""),
             order=int(data.get("order", 1)),
             parameters=data.get("parameters", {}),

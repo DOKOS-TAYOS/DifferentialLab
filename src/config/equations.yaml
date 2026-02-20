@@ -1,33 +1,36 @@
 harmonic_oscillator:
   name: "Simple Harmonic Oscillator"
-  description: "y'' + omega^2 * y = 0\nModels a mass on a spring with no friction."
+  formula: "y'' + ω²y = 0"
+  description: "y'' + ω²y = 0\nModels a mass on a spring with no friction."
   order: 2
   parameters:
-    omega:
+    "ω":
       default: 1.0
       description: "Angular frequency (rad/s)"
-  expression: "-omega**2 * y[0]"
+  expression: "-ω**2 * y[0]"
   default_initial_conditions: [1.0, 0.0]
   default_domain: [0.0, 20.0]
 
 damped_oscillator:
   name: "Damped Oscillator"
-  description: "y'' + 2*gamma*y' + omega^2*y = 0\nMass-spring-damper system."
+  formula: "y'' + 2γy' + ω²y = 0"
+  description: "y'' + 2γy' + ω²y = 0\nMass-spring-damper system."
   order: 2
   parameters:
-    omega:
+    "ω":
       default: 1.0
       description: "Natural angular frequency (rad/s)"
-    gamma:
+    "γ":
       default: 0.1
       description: "Damping coefficient"
-  expression: "-2*gamma*y[1] - omega**2*y[0]"
+  expression: "-2*γ*y[1] - ω**2*y[0]"
   default_initial_conditions: [1.0, 0.0]
   default_domain: [0.0, 40.0]
 
 exponential_growth:
   name: "Exponential Growth / Decay"
-  description: "y' = k * y\nGrowth (k>0) or decay (k<0)."
+  formula: "y' = ky"
+  description: "y' = ky\nGrowth (k>0) or decay (k<0)."
   order: 1
   parameters:
     k:
@@ -39,7 +42,8 @@ exponential_growth:
 
 logistic_equation:
   name: "Logistic Equation"
-  description: "y' = r * y * (1 - y/K)\nPopulation growth with carrying capacity."
+  formula: "y' = ry(1 - y/K)"
+  description: "y' = ry(1 - y/K)\nPopulation growth with carrying capacity."
   order: 1
   parameters:
     r:
@@ -54,24 +58,26 @@ logistic_equation:
 
 van_der_pol:
   name: "Van der Pol Oscillator"
-  description: "y'' - mu*(1 - y^2)*y' + y = 0\nNonlinear oscillator with self-sustained oscillations."
+  formula: "y'' - μ(1 - y²)y' + y = 0"
+  description: "y'' - μ(1 - y²)y' + y = 0\nNonlinear oscillator with self-sustained oscillations."
   order: 2
   parameters:
-    mu:
+    "μ":
       default: 1.0
       description: "Nonlinearity parameter"
-  expression: "mu * (1 - y[0]**2) * y[1] - y[0]"
+  expression: "μ * (1 - y[0]**2) * y[1] - y[0]"
   default_initial_conditions: [2.0, 0.0]
   default_domain: [0.0, 30.0]
 
 simple_pendulum:
   name: "Simple Pendulum"
-  description: "y'' + (g/L)*sin(y) = 0\nNonlinear pendulum with gravity."
+  formula: "y'' + (g/L)sin(y) = 0"
+  description: "y'' + (g/L)sin(y) = 0\nNonlinear pendulum with gravity."
   order: 2
   parameters:
     g:
       default: 9.81
-      description: "Gravitational acceleration (m/s^2)"
+      description: "Gravitational acceleration (m/s²)"
     L:
       default: 1.0
       description: "Pendulum length (m)"
@@ -81,12 +87,13 @@ simple_pendulum:
 
 rc_circuit:
   name: "RC Circuit (Discharge)"
-  description: "y' = -y / (R*C)\nCapacitor voltage during discharge."
+  formula: "y' = -y/(RC)"
+  description: "y' = -y/(RC)\nCapacitor voltage during discharge."
   order: 1
   parameters:
     R:
       default: 1000.0
-      description: "Resistance (Ohm)"
+      description: "Resistance (Ω)"
     C:
       default: 0.001
       description: "Capacitance (F)"
@@ -96,12 +103,13 @@ rc_circuit:
 
 free_fall_drag:
   name: "Free Fall with Drag"
-  description: "y'' = g - (b/m)*y'\nFalling object with linear air resistance."
+  formula: "y'' = g - (b/m)y'"
+  description: "y'' = g - (b/m)y'\nFalling object with linear air resistance."
   order: 2
   parameters:
     g:
       default: 9.81
-      description: "Gravitational acceleration (m/s^2)"
+      description: "Gravitational acceleration (m/s²)"
     b:
       default: 0.5
       description: "Drag coefficient (kg/s)"

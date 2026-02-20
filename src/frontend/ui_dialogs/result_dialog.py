@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 _MAGNITUDE_KEYS = {"mean", "rms", "std", "integral"}
 
-_LEFT_MIN_WIDTH = 480
+_LEFT_MIN_WIDTH = 580
 
 
 class ResultDialog:
@@ -131,21 +131,13 @@ class ResultDialog:
             mag_lf = ttk.LabelFrame(left_inner, text="Magnitudes", padding=pad)
             mag_lf.pack(fill=tk.X, pady=(0, pad))
             for key, val in magnitudes.items():
-                row = ttk.Frame(mag_lf)
-                row.pack(fill=tk.X, pady=1)
-                ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
-                ttk.Label(row, text=self._format_stat(val),
-                          style="Small.TLabel").pack(side=tk.LEFT)
+                self._render_stat_entry(mag_lf, key, val, pad)
 
         if other_stats:
             stat_lf = ttk.LabelFrame(left_inner, text="Statistics", padding=pad)
             stat_lf.pack(fill=tk.X, pady=(0, pad))
             for key, val in other_stats.items():
-                row = ttk.Frame(stat_lf)
-                row.pack(fill=tk.X, pady=1)
-                ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
-                ttk.Label(row, text=self._format_stat(val),
-                          style="Small.TLabel").pack(side=tk.LEFT)
+                self._render_stat_entry(stat_lf, key, val, pad)
 
         # Solver info
         info_lf = ttk.LabelFrame(left_inner, text="Solver Info", padding=pad)
@@ -194,9 +186,44 @@ class ResultDialog:
             notebook.add(phase_tab, text="  Phase Portrait  ")
             embed_plot_in_tk(phase_fig, phase_tab)
 
+    def _render_stat_entry(
+        self, parent: tk.Widget, key: str, val: Any, pad: int
+    ) -> None:
+        """Render one statistic inside *parent*.
+
+        Scalar values get a single ``key: value`` row.  Dict values get a
+        header row with the key name followed by one indented sub-row per
+        dict entry so each figure is easy to read.
+
+        Args:
+            parent: Container widget to pack rows into.
+            key: Statistic name.
+            val: Statistic value (scalar or dict).
+            pad: UI padding constant.
+        """
+        if isinstance(val, dict):
+            hdr = ttk.Frame(parent)
+            hdr.pack(fill=tk.X, pady=(2, 0))
+            ttk.Label(hdr, text=f"{key}:", width=16, anchor=tk.W,
+                      style="Small.TLabel").pack(side=tk.LEFT)
+            for sub_key, sub_val in val.items():
+                sub_row = ttk.Frame(parent)
+                sub_row.pack(fill=tk.X, pady=0)
+                ttk.Label(sub_row, text=f"  {sub_key}:", width=22,
+                          anchor=tk.W).pack(side=tk.LEFT)
+                formatted = f"{sub_val:.6g}" if isinstance(sub_val, float) else str(sub_val)
+                ttk.Label(sub_row, text=formatted,
+                          style="Small.TLabel").pack(side=tk.LEFT, padx=(2, 0))
+        else:
+            row = ttk.Frame(parent)
+            row.pack(fill=tk.X, pady=1)
+            ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
+            ttk.Label(row, text=self._format_stat(val),
+                      style="Small.TLabel").pack(side=tk.LEFT)
+
     @staticmethod
     def _format_stat(value: Any) -> str:
-        """Format a statistic value for display."""
+        """Format a scalar statistic value for display."""
         if value is None:
             return "N/A"
         if isinstance(value, dict):
