@@ -226,10 +226,10 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     style.map("TEntry",
               fieldbackground=[("focus", "#2a2a2a")])
 
-    # --- Spinbox ---
+    # --- Spinbox ---    
     style.configure("TSpinbox", fieldbackground=btn_bg, foreground=fg,
                     arrowcolor=fg, insertcolor=fg, selectbackground=select_bg,
-                    selectforeground=select_fg, padding=6, font=font)
+                    selectforeground=select_fg, padding=6, font=font, arrowsize=font[1] + padding*2)
     style.map("TSpinbox",
               fieldbackground=[("focus", "#2a2a2a")])
 

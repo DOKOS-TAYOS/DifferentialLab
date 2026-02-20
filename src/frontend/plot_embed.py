@@ -28,12 +28,26 @@ def embed_plot_in_tk(
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
     canvas = FigureCanvasTkAgg(fig, master=parent)
-    canvas.draw()
-    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     if toolbar:
         tb = NavigationToolbar2Tk(canvas, parent)
         tb.update()
-        tb.pack(fill=tk.X)
+        tb.pack(side=tk.BOTTOM, fill=tk.X)
+
+    widget = canvas.get_tk_widget()
+    # Override the natural size so tkinter can freely size the widget from
+    # available space; FigureCanvasTkAgg redraws at the actual allocated size.
+    widget.config(width=1, height=1)
+    widget.pack(fill=tk.BOTH, expand=True)
+
+    def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
+        try:
+            _fig.tight_layout()  # type: ignore[union-attr]
+            _canvas.draw_idle()  # type: ignore[union-attr]
+        except Exception:
+            pass
+
+    canvas.mpl_connect("resize_event", _on_resize)
+    canvas.draw()
 
     return canvas

@@ -76,7 +76,7 @@ simple_pendulum:
   order: 2
   parameters:
     g:
-      default: 9.81
+      default: -9.81
       description: "Gravitational acceleration (m/s²)"
     L:
       default: 1.0
@@ -108,7 +108,7 @@ free_fall_drag:
   order: 2
   parameters:
     g:
-      default: 9.81
+      default: -9.81
       description: "Gravitational acceleration (m/s²)"
     b:
       default: 0.5

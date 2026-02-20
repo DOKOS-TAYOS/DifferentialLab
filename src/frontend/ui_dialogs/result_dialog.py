@@ -61,18 +61,25 @@ class ResultDialog:
         self._build_ui(fig, phase_fig, statistics, metadata,
                        csv_path, json_path, plot_path)
 
-        self.win.update_idletasks()
-        req_width = self.win.winfo_reqwidth()
-        req_height = self.win.winfo_reqheight()
-
+        pad: int = get_env_from_schema("UI_PADDING")
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
 
-        min_width = _LEFT_MIN_WIDTH + 700
-        win_w = min(max(req_width + 40, min_width, 1200), int(screen_w * 0.92))
-        win_h = min(max(req_height + 40, 700), int(screen_h * 0.88))
+        win_w = int(screen_w * 0.88)
 
-        center_window(self.win, win_w, win_h)
+        # Derive the initial height so the right panel matches the figure's
+        # aspect ratio.  right_w = window - left panel - 3 gap pads (outer ×2
+        # + inter-column); chrome_h accounts for the matplotlib toolbar,
+        # notebook tab strip, the Close button bar, and outer vertical padding.
+        fig_w, fig_h = fig.get_size_inches()
+        aspect: float = fig_w / fig_h if fig_h else 2.0
+        right_w = win_w - _LEFT_MIN_WIDTH - 3 * pad
+        plot_h = int(right_w / aspect)
+        chrome_h = 30 + 26 + 46 + 2 * pad   # toolbar + tab strip + btn bar + padding
+        win_h = min(max(plot_h + chrome_h, 500), int(screen_h * 0.92))
+
+        center_window(self.win, win_w, win_h, max_width_ratio=0.92, resizable=True)
+        self.win.minsize(_LEFT_MIN_WIDTH + 500, 500)
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")
 
@@ -159,13 +166,15 @@ class ResultDialog:
         files_lf = ttk.LabelFrame(left_inner, text="Output Files", padding=pad)
         files_lf.pack(fill=tk.X, pady=(0, pad))
 
-        for label, path in [("CSV", csv_path), ("JSON", json_path), ("Plot", plot_path)]:
+        for label, path in [("Solution", csv_path), ("Metadata", json_path), ("Plot", plot_path)]:
             row = ttk.Frame(files_lf)
             row.pack(fill=tk.X, pady=1)
-            ttk.Label(row, text=f"{label}:", width=6, anchor=tk.W).pack(side=tk.LEFT)
-            ttk.Label(row, text=str(path), style="Small.TLabel",
-                      wraplength=_LEFT_MIN_WIDTH - 80).pack(
-                side=tk.LEFT, fill=tk.X, expand=True,
+            ttk.Label(row, text=f"{label}:", width=8, anchor=tk.W).pack(side=tk.LEFT)
+            path_lbl = ttk.Label(row, text=str(path), style="Small.TLabel", anchor=tk.W)
+            path_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            path_lbl.bind(
+                "<Configure>",
+                lambda e, lbl=path_lbl: lbl.configure(wraplength=max(1, e.width - 4)),
             )
 
         left_scroll.bind_new_children()

@@ -73,8 +73,8 @@ _PREDEFINED_EQUATIONS = (
 _OUTPUT_FILES = (
     "Every time you solve an equation three files are created inside the "
     "output/ folder (configurable):\n\n"
-    "\u2022 CSV  — tabular x, y data columns ready for spreadsheets.\n"
-    "\u2022 JSON — full metadata and all computed statistics.\n"
+    "\u2022 Solution  — tabular x, y data columns ready for spreadsheets.\n"
+    "\u2022 Metadata — full metadata and all computed statistics.\n"
     "\u2022 Plot — image of the solution curve (PNG, JPG or PDF per your "
     "configuration)."
 )

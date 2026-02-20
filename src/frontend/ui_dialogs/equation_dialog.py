@@ -198,8 +198,10 @@ class EquationDialog:
         row_order.pack(fill=tk.X, pady=(pad, pad))
         ttk.Label(row_order, text="ODE Order:").pack(side=tk.LEFT)
         self.custom_order_var = tk.StringVar(value="2")
-        ttk.Spinbox(row_order, from_=1, to=10, width=5,
-                     textvariable=self.custom_order_var).pack(side=tk.LEFT, padx=(pad, 0))
+        _font = get_font()
+        spinbox = ttk.Spinbox(row_order, from_=1, to=10, width=5,
+                     textvariable=self.custom_order_var, font=_font)
+        spinbox.pack(side=tk.LEFT, padx=(pad, 0))
 
         ttk.Label(ci, text="Expression for highest derivative:").pack(anchor=tk.W)
         self.custom_expr = tk.Text(

@@ -13,6 +13,7 @@ def center_window(
     preserve_size: bool = False,
     max_width_ratio: float = 0.85,
     max_height_ratio: float = 0.85,
+    resizable: bool = False,
 ) -> None:
     """Center *window* on the screen.
 
@@ -28,6 +29,7 @@ def center_window(
         preserve_size: Use the widget-requested size instead of explicit dims.
         max_width_ratio: Max fraction of screen width.
         max_height_ratio: Max fraction of screen height.
+        resizable: Whether the window can be resized by the user.
     """
     window.update_idletasks()
     screen_w = window.winfo_screenwidth()
@@ -49,7 +51,7 @@ def center_window(
     x = max(0, (screen_w - w) // 2)
     y = max(0, (screen_h - h) // 2)
     window.geometry(f"{w}x{h}+{x}+{y}")
-    window.resizable(False, False)
+    window.resizable(resizable, resizable)
 
 
 def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
