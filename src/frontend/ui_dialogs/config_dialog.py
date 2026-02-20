@@ -13,6 +13,7 @@ from config import (
     get_env_path,
     write_env_file,
 )
+from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -178,14 +179,13 @@ class ConfigDialog:
             item = _SCHEMA_BY_KEY.get(key)
             if item is None:
                 continue
-            self._add_field(section.content, item, current, pad)
+            self._add_field(section.content, item, current)
 
     def _add_field(
         self,
         parent: ttk.Frame,
         item: dict[str, Any],
-        current: dict[str, str],
-        pad: int,
+        current: dict[str, str]
     ) -> None:
         key = item["key"]
         cast_type = item["cast_type"]
@@ -207,13 +207,13 @@ class ConfigDialog:
             combo = ttk.Combobox(
                 row, textvariable=svar,
                 values=list(item["options"]),
-                state="readonly", width=22,
+                state="readonly", width=22, font=get_font()
             )
             combo.pack(side=tk.LEFT)
             self._vars[key] = svar
         else:
             svar = tk.StringVar(value=val)
-            entry = ttk.Entry(row, textvariable=svar, width=30)
+            entry = ttk.Entry(row, textvariable=svar, width=25, font=get_font())
             entry.pack(side=tk.LEFT)
             self._vars[key] = svar
 

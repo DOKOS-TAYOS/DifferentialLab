@@ -179,7 +179,7 @@ class EquationDialog:
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
         ttk.Label(custom_frame, text="Parameters (name=value, comma-separated):").pack(anchor=tk.W)
-        self.custom_params = ttk.Entry(custom_frame, width=50)
+        self.custom_params = ttk.Entry(custom_frame, width=50, font=get_font())
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: omega=1.0, gamma=0.1")
 
@@ -242,7 +242,7 @@ class EquationDialog:
             row.pack(fill=tk.X, pady=2)
             ttk.Label(row, text=f"{pname}:", width=12).pack(side=tk.LEFT)
             var = tk.StringVar(value=str(pinfo["default"]))
-            entry = ttk.Entry(row, textvariable=var, width=12)
+            entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
             entry.pack(side=tk.LEFT, padx=(pad, 0))
             self._param_vars[pname] = var
             ToolTip(entry, pinfo.get("description", ""))

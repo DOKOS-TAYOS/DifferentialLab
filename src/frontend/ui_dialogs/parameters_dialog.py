@@ -12,6 +12,7 @@ from config import (
     SOLVER_METHOD_DESCRIPTIONS,
     get_env_from_schema,
 )
+from frontend.theme import get_font
 
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -128,24 +129,24 @@ class ParametersDialog:
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text="x_min:").pack(side=tk.LEFT)
         self.xmin_var = tk.StringVar(value=str(default_domain[0]))
-        ttk.Entry(row_d, textvariable=self.xmin_var, width=12).pack(side=tk.LEFT, padx=pad)
+        ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
         ttk.Label(row_d, text="x_max:").pack(side=tk.LEFT)
         self.xmax_var = tk.StringVar(value=str(default_domain[1]))
-        ttk.Entry(row_d, textvariable=self.xmax_var, width=12).pack(side=tk.LEFT, padx=pad)
+        ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
 
         row_n = ttk.Frame(domain_frame)
         row_n.pack(fill=tk.X, pady=(pad, 0))
         ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
         self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
         
-        npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10)
+        npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font())
         npoints_entry.pack(side=tk.LEFT, padx=pad)
         
-        btn_decrease = ttk.Button(row_n, text="−", width=3, 
+        btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
                                   command=lambda: self._change_npoints(0.1))
         btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
         
-        btn_increase = ttk.Button(row_n, text="+", width=3,
+        btn_increase = ttk.Button(row_n, text="+", width=3, style="Small.TButton",
                                   command=lambda: self._change_npoints(10))
         btn_increase.pack(side=tk.LEFT)
 
@@ -160,7 +161,7 @@ class ParametersDialog:
             default_val = default_y0[i] if i < len(default_y0) else 0.0
             ttk.Label(row, text=f"{ic_labels[i]} =", width=14).pack(side=tk.LEFT)
             var = tk.StringVar(value=str(default_val))
-            ttk.Entry(row, textvariable=var, width=12).pack(side=tk.LEFT, padx=pad)
+            ttk.Entry(row, textvariable=var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
             self._y0_vars.append(var)
 
         # Solver method
@@ -169,7 +170,8 @@ class ParametersDialog:
 
         self.method_var = tk.StringVar(value=get_env_from_schema("SOLVER_DEFAULT_METHOD"))
         combo = ttk.Combobox(method_frame, textvariable=self.method_var,
-                              values=list(SOLVER_METHODS), state="readonly", width=15)
+                              values=list(SOLVER_METHODS), state="readonly", width=15,
+                              font=get_font())
         combo.pack(side=tk.LEFT)
         self.method_desc = ttk.Label(method_frame, text="", style="Small.TLabel")
         self.method_desc.pack(side=tk.LEFT, padx=(pad, 0))

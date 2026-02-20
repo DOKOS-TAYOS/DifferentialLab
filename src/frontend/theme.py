@@ -201,6 +201,13 @@ def configure_ttk_styles(root: tk.Tk) -> None:
                           ("active", focus_bg)],
               foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)])
 
+    style.configure("Small.TButton", background=btn_bg, foreground=btn_fg,
+                    font=font, padding=(4, 2), borderwidth=1, relief="raised")
+    style.map("Small.TButton",
+              background=[("pressed", focus_bg), ("focus", focus_bg),
+                          ("active", focus_bg)],
+              foreground=[("active", btn_fg), ("focus", btn_fg)])
+
     # --- Labels ---
     style.configure("Title.TLabel", font=font_large, foreground=btn_fg)
     style.configure("Subtitle.TLabel", font=font_bold, foreground=fg)
