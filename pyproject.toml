@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "differential-lab"
-version = "0.1.2"
+version = "0.2.0"
 description = "DifferentialLab — Numerical ODE solver with Tkinter GUI, predefined equations, and professional visualizations"
 readme = "README.md"
 requires-python = ">=3.12"

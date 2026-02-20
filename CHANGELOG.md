@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-02-20
+
+### Added
+
+- **Sphinx documentation**: full `docs/` tree with Sphinx `conf.py`, `Makefile`, and `make.bat`; builds with `sphinx-build` using the Read the Docs theme.
+- **Narrative docs**: Getting Started, User Guide, Configuration Reference, and Architecture pages written in Markdown (MyST-compatible and valid standalone Markdown).
+- **API reference**: auto-generated RST pages for every module (`config`, `solver`, `plotting`, `pipeline`, `frontend`, `utils`) using `autodoc`, `napoleon`, and `sphinx-autodoc-typehints`.
+- **Intersphinx links**: cross-references to Python, NumPy, SciPy, and Matplotlib documentation.
+
+### Changed
+
+- **README.md**: removed stale Colorama dependency from the table, added a Documentation section with local build instructions.
+- **`.gitignore`**: added `docs/_build/` to ignore Sphinx build output.
+- **Window sizing helper**: extracted `fit_and_center()` in `window_utils.py` to replace repetitive sizing/centering boilerplate across five dialog classes (`ui_main_menu`, `equation_dialog`, `parameters_dialog`, `config_dialog`, `help_dialog`).
+- **Plot helper functions**: extracted `_new_figure()` and `_finalize_plot()` in `plot_utils.py` to centralize figure creation and axis styling, reducing duplication between `create_solution_plot` and `create_phase_plot`.
+- **Applied `FONT_AXIS_STYLE`**: the previously unused env variable now controls axis label font style in all plots.
+- **Inlined trivial wrapper**: merged `_validate_ode_expression()` into `validate_all_inputs()` in `validators.py`.
+- **Lazy imports**: moved `os` and `sys` inside `_on_config()` in `ui_main_menu.py` (only needed on restart).
+- **Linting fixes**: removed trailing whitespace in `theme.py`, reformatted long import line in `pipeline.py`.
+
+### Removed
+
+- **Unused dependency**: removed `colorama` from `requirements.txt` and `pyproject.toml`.
+- **Dead code**: removed `ConfigurationError` exception class (defined but never raised) and its test.
+- **Unused config option**: removed `UI_ENTRY_WIDTH` from `ENV_SCHEMA`, `.env.example`, and the configuration dialog.
+- **Deprecated AST node**: removed `ast.Index` from the expression parser's allowed-nodes list (deprecated since Python 3.9, unused in 3.12+).
+
+## [0.1.3] - 2026-02-20
+
+### Added
+
+- **Unicode mathematical symbols**: predefined equations now display proper mathematical notation (∂, ∫, √, π, θ, ω, etc.) in labels and descriptions throughout the UI.
+
+### Changed
+
+- **Linter configuration**: enhanced Ruff settings in `pyproject.toml` with explicit rule selection for code quality, import sorting, and type checking.
+- **Import optimization**: reorganized imports across multiple modules for better readability and consistency; removed unused imports in `pipeline.py`, `validators.py`, and `theme.py`.
+- **UI refinements**: improved widget spacing and alignment in dialogs; adjusted padding values for better visual consistency across different screen sizes.
+- **Configuration handling**: streamlined environment variable loading and validation in `config_loader.py`; improved error messages for invalid configuration values.
+
+### Fixed
+
+- **Minor UI bugs**: corrected focus behavior in entry widgets when switching between tabs; fixed occasional layout glitches in collapsible sections.
+- **Type hints**: added missing type annotations in several utility functions for better IDE support and static analysis.
+
 ## [0.1.2] - 2026-02-20
 
 ### Added
@@ -65,7 +110,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform install/run scripts** (`install.bat`/`install.sh`, `bin/setup.bat`/`bin/setup.sh`, `bin/run.bat`/`bin/run.sh`).
 - **Tooltip widgets** for improved UX in the GUI.
 
-[Unreleased]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DOKOS-TAYOS/DifferentialLab/releases/tag/v0.1.0

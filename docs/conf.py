@@ -11,8 +11,8 @@ sys.path.insert(0, str(_project_root / "src"))
 project = "DifferentialLab"
 author = "Alejandro Mata Ali"
 copyright = "2026, Alejandro Mata Ali"  # noqa: A001
-release = "0.1.2"
-version = "0.1"
+release = "0.2.0"
+version = "0.2"
 
 # -- General configuration ---------------------------------------------------
 
