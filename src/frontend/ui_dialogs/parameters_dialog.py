@@ -63,6 +63,7 @@ class ParametersDialog:
         self.win.configure(bg=bg)
 
         self._y0_vars: list[tk.StringVar] = []
+        self._x0_vars: list[tk.StringVar] = []
         self._stat_keys: list[str] = []
 
         self._build_ui(default_y0, default_domain)
@@ -162,15 +163,29 @@ class ParametersDialog:
         ic_frame = ttk.LabelFrame(scroll_frame, text="Initial Conditions", padding=pad)
         ic_frame.pack(fill=tk.X, pady=(0, pad))
 
+        _subscripts = "₀₁₂₃₄₅₆₇₈₉"
         ic_labels = self._ic_labels()
+        default_x0_val = str(default_domain[0])
         for i in range(self.order):
             row = ttk.Frame(ic_frame)
             row.pack(fill=tk.X, pady=2)
             default_val = default_y0[i] if i < len(default_y0) else 1.0
+            sub = _subscripts[i] if i < len(_subscripts) else str(i)
+
             ttk.Label(row, text=f"{ic_labels[i]} =", width=14).pack(side=tk.LEFT)
             var = tk.StringVar(value=str(default_val))
-            ttk.Entry(row, textvariable=var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
+            ttk.Entry(row, textvariable=var, width=10, font=get_font()).pack(
+                side=tk.LEFT, padx=(pad, pad * 2),
+            )
+
+            ttk.Label(row, text=f"x{sub} =").pack(side=tk.LEFT)
+            x_var = tk.StringVar(value=default_x0_val)
+            ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
+                side=tk.LEFT, padx=pad,
+            )
+
             self._y0_vars.append(var)
+            self._x0_vars.append(x_var)
 
         # Solver method
         method_frame = ttk.LabelFrame(scroll_frame, text="Solver Method", padding=pad)
@@ -230,10 +245,12 @@ class ParametersDialog:
     # ------------------------------------------------------------------
 
     def _ic_labels(self) -> list[str]:
-        labels = ["y(x0)"]
+        subscripts = "₀₁₂₃₄₅₆₇₈₉"
+        labels = [f"y(x{subscripts[0]})"]
         for i in range(1, self.order):
             primes = "'" * i
-            labels.append(f"y{primes}(x0)")
+            sub = subscripts[i] if i < len(subscripts) else str(i)
+            labels.append(f"y{primes}(x{sub})")
         return labels
 
     def _change_npoints(self, factor: float) -> None:
@@ -287,14 +304,30 @@ class ParametersDialog:
                                  parent=self.win)
             return
 
+        subscripts = "₀₁₂₃₄₅₆₇₈₉"
         y0: list[float] = []
         for i, var in enumerate(self._y0_vars):
             try:
                 y0.append(float(var.get()))
             except ValueError:
-                messagebox.showerror("Invalid IC",
-                                     f"Initial condition {i} must be a number.",
-                                     parent=self.win)
+                messagebox.showerror(
+                    "Invalid IC",
+                    f"Initial condition {i} must be a number.",
+                    parent=self.win,
+                )
+                return
+
+        x0_list: list[float] = []
+        for i, x_var in enumerate(self._x0_vars):
+            sub = subscripts[i] if i < len(subscripts) else str(i)
+            try:
+                x0_list.append(float(x_var.get()))
+            except ValueError:
+                messagebox.showerror(
+                    "Invalid IC Point",
+                    f"x{sub} must be a number.",
+                    parent=self.win,
+                )
                 return
 
         method = self.method_var.get()
@@ -316,6 +349,7 @@ class ParametersDialog:
                 method=method,
                 selected_stats=selected_stats,
                 selected_derivatives=self.selected_derivatives,
+                x0_list=x0_list,
             )
         except DifferentialLabError as exc:
             messagebox.showerror("Error", str(exc), parent=self.win)

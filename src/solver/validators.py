@@ -111,6 +111,32 @@ def _validate_parameters(params: dict[str, float]) -> list[str]:
     return errors
 
 
+def _validate_ic_points(
+    x0_list: list[float], x_min: float, x_max: float,
+) -> list[str]:
+    """Validate per-derivative initial condition points.
+
+    Args:
+        x0_list: x_i value for each derivative condition.
+        x_min: Domain start.
+        x_max: Domain end.
+
+    Returns:
+        List of error messages (empty if valid).
+    """
+    subscripts = "₀₁₂₃₄₅₆₇₈₉"
+    errors: list[str] = []
+    for i, xi in enumerate(x0_list):
+        sub = subscripts[i] if i < len(subscripts) else str(i)
+        if not _is_finite(xi):
+            errors.append(f"x{sub} = {xi} is not a finite number")
+        elif not (x_min <= xi <= x_max):
+            errors.append(
+                f"x{sub} = {xi} must lie within the domain [{x_min}, {x_max}]"
+            )
+    return errors
+
+
 def validate_all_inputs(
     expression: str,
     order: int,
@@ -120,6 +146,7 @@ def validate_all_inputs(
     num_points: int,
     method: str,
     params: dict[str, float] | None = None,
+    x0_list: list[float] | None = None,
 ) -> list[str]:
     """Run all validations and return accumulated errors.
 
@@ -132,6 +159,7 @@ def validate_all_inputs(
         num_points: Grid points.
         method: Solver method.
         params: Named parameters.
+        x0_list: Per-derivative initial condition points.
 
     Returns:
         List of all error messages (empty if everything is valid).
@@ -144,6 +172,8 @@ def validate_all_inputs(
     errors.extend(_validate_method(method))
     if params:
         errors.extend(_validate_parameters(params))
+    if x0_list:
+        errors.extend(_validate_ic_points(x0_list, x_min, x_max))
     if errors:
         logger.warning("Validation errors: %s", errors)
     return errors

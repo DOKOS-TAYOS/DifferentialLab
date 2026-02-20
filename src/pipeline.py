@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_csv_path, get_json_path, get_plot_path
 from plotting import create_phase_plot, create_solution_plot, save_plot
-from solver import compute_statistics, parse_expression, solve_ode, validate_all_inputs
+from solver import compute_statistics, parse_expression, solve_multipoint, solve_ode, validate_all_inputs
 from utils import ValidationError, export_all_results, get_logger
 
 logger = get_logger(__name__)
@@ -44,10 +44,26 @@ def run_solver_pipeline(
     method: str,
     selected_stats: set[str],
     selected_derivatives: list[int] | None = None,
+    x0_list: list[float] | None = None,
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
     Stages: validate → parse → solve → statistics → plot → export.
+
+    Args:
+        expression: ODE expression string.
+        order: ODE order.
+        parameters: Named parameter values.
+        equation_name: Display name for plots/metadata.
+        x_min: Domain start.
+        x_max: Domain end.
+        y0: Initial condition values ``[y(x_0), y'(x_1), …]``.
+        n_points: Number of evaluation points.
+        method: Solver method name.
+        selected_stats: Set of statistic keys to compute.
+        selected_derivatives: Indices of derivatives to plot.
+        x0_list: Per-derivative condition points ``[x_0, x_1, …]``.
+            If ``None`` or all equal to ``x_min``, uses standard IVP.
 
     Raises:
         ValidationError: If inputs fail validation.
@@ -56,6 +72,7 @@ def run_solver_pipeline(
     """
     errors = validate_all_inputs(
         expression, order, x_min, x_max, y0, n_points, method, parameters,
+        x0_list=x0_list,
     )
     if errors:
         raise ValidationError("\n".join(errors))
@@ -63,7 +80,26 @@ def run_solver_pipeline(
     ode_func = parse_expression(expression, order, parameters)
 
     t_eval = np.linspace(x_min, x_max, n_points)
-    solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+
+    use_multipoint = (
+        x0_list is not None
+        and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
+    )
+
+    if use_multipoint:
+        conditions = list(enumerate(zip(x0_list, y0)))  # type: ignore[arg-type]
+        conditions_flat = [(k, xi, ai) for k, (xi, ai) in conditions]
+        solution = solve_multipoint(
+            ode_func,
+            conditions=conditions_flat,
+            order=order,
+            x_min=x_min,
+            x_max=x_max,
+            method=method,
+            t_eval=t_eval,
+        )
+    else:
+        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
 
     stats = compute_statistics(solution.x, solution.y, selected_stats)
 
@@ -79,6 +115,7 @@ def run_solver_pipeline(
         "parameters": parameters,
         "domain": [x_min, x_max],
         "initial_conditions": y0,
+        "ic_points": x0_list if x0_list is not None else [x_min] * order,
         "method": method,
         "num_points": n_points,
         "solver_success": solution.success,
