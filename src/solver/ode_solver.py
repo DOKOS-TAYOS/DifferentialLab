@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import numpy as np
-from scipy.integrate import solve_ivp
 
 from config import get_env_from_schema
 from utils import SolverFailedError, get_logger
@@ -80,6 +79,8 @@ def solve_ode(
         t_eval = np.linspace(t_span[0], t_span[1], n_points)
 
     effective_max_step = np.inf if max_step <= 0 else max_step
+
+    from scipy.integrate import solve_ivp
 
     logger.info(
         "Solving IVP: method=%s, span=%s, y0=%s, rtol=%s, atol=%s",

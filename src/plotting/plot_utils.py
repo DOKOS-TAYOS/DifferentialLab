@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.figure import Figure
+if TYPE_CHECKING:
+    import numpy as np
+    from matplotlib.figure import Figure
 
 from config import get_env_from_schema
 from utils import get_logger
@@ -18,6 +18,7 @@ _MAX_ELEMENTS_PLOT = 50
 
 def _apply_plot_style() -> None:
     """Configure matplotlib rcParams from environment variables."""
+    import matplotlib
     matplotlib.rcParams.update({
         "font.family": get_env_from_schema("FONT_FAMILY"),
         "font.size": get_env_from_schema("FONT_TICK_SIZE"),
@@ -50,6 +51,9 @@ def create_solution_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     _apply_plot_style()
 
     width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
@@ -132,6 +136,9 @@ def create_phase_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     _apply_plot_style()
 
     width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")

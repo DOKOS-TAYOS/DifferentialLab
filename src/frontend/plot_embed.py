@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import tkinter as tk
+from typing import TYPE_CHECKING
 
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.figure import Figure
+if TYPE_CHECKING:
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.figure import Figure
 
 
 def embed_plot_in_tk(
@@ -23,6 +25,8 @@ def embed_plot_in_tk(
     Returns:
         The canvas object.
     """
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
     canvas = FigureCanvasTkAgg(fig, master=parent)
     canvas.draw()
     canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)

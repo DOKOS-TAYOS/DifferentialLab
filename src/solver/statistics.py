@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from scipy.signal import find_peaks
 
 from utils import get_logger
 
@@ -101,6 +100,8 @@ def _estimate_period(x: np.ndarray, y: np.ndarray) -> float | None:
     Returns:
         Estimated period, or ``None`` if fewer than 2 peaks found.
     """
+    from scipy.signal import find_peaks
+
     y_centered = y - np.mean(y)
     peaks, _ = find_peaks(y_centered, distance=max(3, len(y) // 50))
     if len(peaks) < 2:
