@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] - 2026-02-20
+
+### Added
+
+- **Derivative selection**: new "Derivatives to Plot" section in both the Predefined and Custom equation tabs, with checkboxes for each order (y, y′, y″, …); validates that at least one derivative is selected before solving.
+- **Dynamic derivative checkboxes**: in the Custom tab the derivative checkboxes regenerate automatically whenever the ODE order changes.
+- **Quick evaluation-points buttons**: `+` and `−` buttons next to the evaluation-points field in the Parameters dialog multiply or divide the value by 10 (order-of-magnitude steps), with a minimum of 10 points enforced.
+- **Solver method descriptions**: a dynamic label in the Parameters dialog shows a short description of the currently selected solver method, updating on every combobox change.
+
+### Changed
+
+- **Consistent dialog sizing**: all dialogs now follow a unified sizing pattern — requested content size plus padding, clamped between a per-dialog minimum and a screen-ratio cap (90–92 % of screen dimensions). Minimum sizes: Parameters 740 × 700, Equation 820 × 650, Configuration 800 × 700, Information 900 × 750, Results 1200 × 700.
+- **Selected derivatives propagated end-to-end**: the `selected_derivatives` list flows from `EquationDialog` → `ParametersDialog` → `run_solver_pipeline` → plotting functions, so only the chosen derivatives appear in the output plots.
+
 
 ## [0.1.1] - 2026-02-19
 
@@ -52,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-platform install/run scripts** (`install.bat`/`install.sh`, `bin/setup.bat`/`bin/setup.sh`, `bin/run.bat`/`bin/run.sh`).
 - **Tooltip widgets** for improved UX in the GUI.
 
-[Unreleased]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DOKOS-TAYOS/DifferentialLab/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DOKOS-TAYOS/DifferentialLab/releases/tag/v0.1.0
