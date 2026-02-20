@@ -43,13 +43,13 @@ class EquationDialog:
         self.win.update_idletasks()
         req_width = self.win.winfo_reqwidth()
         req_height = self.win.winfo_reqheight()
-        
+
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        
+
         win_w = min(max(req_width + 40, 820), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 650), int(screen_h * 0.9))
-        
+
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
 
@@ -183,7 +183,9 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: omega=1.0, gamma=0.1")
 
-        self.custom_derivatives_frame = ttk.LabelFrame(custom_frame, text="Derivatives to Plot", padding=pad)
+        self.custom_derivatives_frame = ttk.LabelFrame(
+            custom_frame, text="Derivatives to Plot", padding=pad
+        )
         self.custom_derivatives_frame.pack(fill=tk.X, pady=(pad, 0))
         self._custom_derivative_vars: list[tk.BooleanVar] = []
         self.custom_order_var.trace_add("write", self._update_custom_derivatives)
@@ -341,7 +343,9 @@ class EquationDialog:
                     )
                     return
 
-        selected_derivatives = [i for i, var in enumerate(self._custom_derivative_vars) if var.get()]
+        selected_derivatives = [
+            i for i, var in enumerate(self._custom_derivative_vars) if var.get()
+        ]
         if not selected_derivatives:
             messagebox.showwarning("No Derivatives Selected",
                                    "Please select at least one derivative to plot.",

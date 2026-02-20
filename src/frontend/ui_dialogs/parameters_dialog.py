@@ -8,12 +8,11 @@ from typing import Any
 
 from config import (
     AVAILABLE_STATISTICS,
-    SOLVER_METHODS,
     SOLVER_METHOD_DESCRIPTIONS,
+    SOLVER_METHODS,
     get_env_from_schema,
 )
 from frontend.theme import get_font
-
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -52,7 +51,9 @@ class ParametersDialog:
         self.order = order
         self.parameters = parameters
         self.equation_name = equation_name
-        self.selected_derivatives = selected_derivatives if selected_derivatives else list(range(order))
+        self.selected_derivatives = (
+            selected_derivatives if selected_derivatives else list(range(order))
+        )
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Parameters — {equation_name}")
@@ -68,13 +69,13 @@ class ParametersDialog:
         self.win.update_idletasks()
         req_width = self.win.winfo_reqwidth()
         req_height = self.win.winfo_reqheight()
-        
+
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        
+
         win_w = min(max(req_width + 40, 740), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 700), int(screen_h * 0.9))
-        
+
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
 
@@ -129,23 +130,27 @@ class ParametersDialog:
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text="x_min:").pack(side=tk.LEFT)
         self.xmin_var = tk.StringVar(value=str(default_domain[0]))
-        ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
+        ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(
+            side=tk.LEFT, padx=pad
+        )
         ttk.Label(row_d, text="x_max:").pack(side=tk.LEFT)
         self.xmax_var = tk.StringVar(value=str(default_domain[1]))
-        ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(side=tk.LEFT, padx=pad)
+        ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(
+            side=tk.LEFT, padx=pad
+        )
 
         row_n = ttk.Frame(domain_frame)
         row_n.pack(fill=tk.X, pady=(pad, 0))
         ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
         self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
-        
+
         npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font())
         npoints_entry.pack(side=tk.LEFT, padx=pad)
-        
+
         btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
                                   command=lambda: self._change_npoints(0.1))
         btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
-        
+
         btn_increase = ttk.Button(row_n, text="+", width=3, style="Small.TButton",
                                   command=lambda: self._change_npoints(10))
         btn_increase.pack(side=tk.LEFT)
@@ -205,7 +210,7 @@ class ParametersDialog:
 
     def _change_npoints(self, factor: float) -> None:
         """Change evaluation points by an order of magnitude.
-        
+
         Args:
             factor: Multiplication factor (10 to increase, 0.1 to decrease).
         """

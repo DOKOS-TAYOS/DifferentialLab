@@ -88,7 +88,8 @@ ENV_SCHEMA: list[dict[str, Any]] = [
     {"key": "PLOT_LINE_STYLE", "default": "-", "cast_type": str, "options": LINE_STYLES,
      "description": "Line style: solid (-), dashed (--), dash-dot (-.), dotted (:)."},
     {"key": "PLOT_COLOR_SCHEME", "default": "Set1", "cast_type": str,
-     "description": "Matplotlib colormap for additional derivatives (Set1, Set2, tab10, Paired, etc.)."},
+     "description": "Matplotlib colormap for additional derivatives "
+                    "(Set1, Set2, tab10, Paired, etc.)."},
     # --- plot: markers ---
     {"key": "PLOT_MARKER_FORMAT", "default": "o", "cast_type": str, "options": MARKER_FORMATS,
      "description": "Shape of data-point markers on the plot."},

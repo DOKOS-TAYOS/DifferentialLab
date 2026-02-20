@@ -71,13 +71,14 @@ def create_solution_plot(
         selected_derivatives = list(range(y_2d.shape[0]))
 
     labels = ["y"] if y_2d.shape[0] == 1 else [f"y[{i}]" for i in range(y_2d.shape[0])]
-    
+
     try:
         cmap = plt.cm.get_cmap(color_scheme)
         n_colors = max(1, len(selected_derivatives) - 1)
         colors = [line_color] + list(cmap(np.linspace(0, 1, n_colors)))
     except (ValueError, AttributeError):
-        colors = [line_color] + list(plt.cm.Set1(np.linspace(0, 1, max(1, len(selected_derivatives) - 1))))
+        n_fallback = max(1, len(selected_derivatives) - 1)
+        colors = [line_color] + list(plt.cm.Set1(np.linspace(0, 1, n_fallback)))
 
     for plot_idx, deriv_idx in enumerate(selected_derivatives):
         if deriv_idx >= y_2d.shape[0]:

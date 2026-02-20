@@ -4,8 +4,8 @@ from config.constants import (
     APP_NAME,
     APP_VERSION,
     AVAILABLE_STATISTICS,
-    SOLVER_METHODS,
     SOLVER_METHOD_DESCRIPTIONS,
+    SOLVER_METHODS,
 )
 from config.env import (
     DEFAULT_LOG_FILE,

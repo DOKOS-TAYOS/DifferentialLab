@@ -9,7 +9,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from config import get_env_from_schema
-from utils import get_logger, SolverFailedError
+from utils import SolverFailedError, get_logger
 
 logger = get_logger(__name__)
 

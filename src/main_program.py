@@ -14,7 +14,7 @@ if str(_src_dir) not in sys.path:
 
 def main() -> None:
     """Initialize configuration, logging, and launch the main menu."""
-    from config import initialize_and_validate_config, get_output_dir
+    from config import get_output_dir, initialize_and_validate_config
     from utils import get_logger
 
     initialize_and_validate_config()

@@ -9,8 +9,7 @@ from tkinter import ttk
 
 from config import APP_NAME, APP_VERSION, get_env_from_schema
 from frontend.theme import configure_ttk_styles, get_font
-from frontend.ui_dialogs import setup_arrow_enter_navigation
-from frontend.ui_dialogs import ToolTip
+from frontend.ui_dialogs import ToolTip, setup_arrow_enter_navigation
 from frontend.window_utils import center_window
 from utils import get_logger
 
@@ -31,23 +30,23 @@ class MainMenu:
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
 
         configure_ttk_styles(self.root)
-        
+
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.root.configure(bg=bg)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._build_ui()
-        
+
         self.root.update_idletasks()
         req_width = self.root.winfo_reqwidth()
         req_height = self.root.winfo_reqheight()
-        
+
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
-        
+
         win_w = min(max(req_width + 40, 520), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 480), int(screen_h * 0.9))
-        
+
         center_window(self.root, win_w, win_h)
         logger.info("Main menu created")
 

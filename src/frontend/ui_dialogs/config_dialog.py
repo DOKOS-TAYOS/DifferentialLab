@@ -82,13 +82,13 @@ class ConfigDialog:
         self.win.update_idletasks()
         req_width = self.win.winfo_reqwidth()
         req_height = self.win.winfo_reqheight()
-        
+
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        
+
         win_w = min(max(req_width + 40, 800), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 700), int(screen_h * 0.9))
-        
+
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
 

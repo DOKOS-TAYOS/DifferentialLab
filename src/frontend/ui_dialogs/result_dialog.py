@@ -10,10 +10,10 @@ from typing import Any
 from matplotlib.figure import Figure
 
 from config import get_env_from_schema
+from frontend.plot_embed import embed_plot_in_tk
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from frontend.plot_embed import embed_plot_in_tk
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -64,14 +64,14 @@ class ResultDialog:
         self.win.update_idletasks()
         req_width = self.win.winfo_reqwidth()
         req_height = self.win.winfo_reqheight()
-        
+
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        
+
         min_width = _LEFT_MIN_WIDTH + 700
         win_w = min(max(req_width + 40, min_width, 1200), int(screen_w * 0.92))
         win_h = min(max(req_height + 40, 700), int(screen_h * 0.88))
-        
+
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")

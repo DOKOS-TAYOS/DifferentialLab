@@ -9,8 +9,8 @@ from config import (
     APP_NAME,
     APP_VERSION,
     AVAILABLE_STATISTICS,
-    SOLVER_METHODS,
     SOLVER_METHOD_DESCRIPTIONS,
+    SOLVER_METHODS,
     get_env_from_schema,
 )
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
@@ -134,13 +134,13 @@ class HelpDialog:
         self.win.update_idletasks()
         req_width = self.win.winfo_reqwidth()
         req_height = self.win.winfo_reqheight()
-        
+
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        
+
         win_w = min(max(req_width + 40, 900), int(screen_w * 0.9))
         win_h = min(max(req_height + 40, 750), int(screen_h * 0.9))
-        
+
         center_window(self.win, win_w, win_h)
         make_modal(self.win, parent)
 
