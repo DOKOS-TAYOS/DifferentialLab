@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
 from config.env import (
-    ENV_SCHEMA,
     _ENV_SCHEMA_BY_KEY,
+    ENV_SCHEMA,
     _validate_env_value,
+    get_current_env_values,
     get_env,
     get_env_from_schema,
-    get_current_env_values,
     write_env_file,
 )
 

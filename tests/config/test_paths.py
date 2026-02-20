@@ -5,15 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from config.paths import (
     generate_output_basename,
     get_csv_path,
-    get_json_path,
-    get_plot_path,
-    get_output_dir,
     get_env_path,
+    get_json_path,
+    get_output_dir,
+    get_plot_path,
 )
 
 

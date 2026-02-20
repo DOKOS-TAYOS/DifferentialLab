@@ -6,9 +6,9 @@ import pytest
 
 from utils.exceptions import (
     DifferentialLabError,
-    ValidationError,
     EquationParseError,
     SolverFailedError,
+    ValidationError,
 )
 
 

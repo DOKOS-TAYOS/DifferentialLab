@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from pipeline import run_solver_pipeline, SolverResult
+from pipeline import SolverResult, run_solver_pipeline
 from utils import ValidationError
 
 

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-
 from frontend.theme import (
     _color_to_rgb,
-    _lighten_color,
     _darken_color,
+    _lighten_color,
     get_select_colors,
 )
 

@@ -5,12 +5,9 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import numpy as np
-import pytest
 
-from solver.ode_solver import ODESolution, solve_ode, solve_multipoint
 from solver.equation_parser import parse_expression
-from utils import SolverFailedError
-
+from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
 
 # Default env values used when mocking get_env_from_schema
 _SOLVER_ENV = {
