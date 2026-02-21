@@ -369,7 +369,14 @@ class EquationDialog:
             child.destroy()
         self._derivative_vars.clear()
 
-        derivative_labels = ["y"] if eq.order == 1 else [f"y[{i}]" for i in range(eq.order)]
+        is_vector = getattr(eq, "vector_expressions", None) and len(getattr(eq, "vector_expressions", [])) > 0
+        is_vector = is_vector or getattr(eq, "equation_type", "") == "vector_ode"
+        vector_components = getattr(eq, "vector_components", 1)
+        if is_vector and vector_components > 1:
+            subscripts = "₀₁₂₃₄₅₆₇₈₉"
+            derivative_labels = [f"f_{subscripts[i] if i < len(subscripts) else str(i)}" for i in range(vector_components)]
+        else:
+            derivative_labels = ["y"] if eq.order == 1 else [f"y[{i}]" for i in range(eq.order)]
         for i, label in enumerate(derivative_labels):
             var = tk.BooleanVar(value=True)
             cb = ttk.Checkbutton(self.derivatives_frame, text=label, variable=var)
@@ -409,6 +416,8 @@ class EquationDialog:
 
         eq_type: str = getattr(eq, "equation_type", "ode")
         variables: list[str] = getattr(eq, "variables", ["x"])
+        vector_expressions: list[str] | None = getattr(eq, "vector_expressions", None)
+        vector_components: int = getattr(eq, "vector_components", 1)
         ParametersDialog(
             self.parent,
             expression=eq.expression,
@@ -422,6 +431,8 @@ class EquationDialog:
             display_formula=eq.formula,
             equation_type=eq_type,
             variables=variables,
+            vector_expressions=vector_expressions,
+            vector_components=vector_components,
         )
 
     def _on_next_custom(self) -> None:

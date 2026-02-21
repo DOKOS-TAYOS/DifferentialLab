@@ -15,6 +15,8 @@ from plotting import (
     create_phase_plot,
     create_solution_plot,
     create_surface_plot,
+    create_vector_animation_3d,
+    create_vector_animation_plot,
     save_plot,
 )
 from solver import (
@@ -22,6 +24,7 @@ from solver import (
     compute_statistics_2d,
     get_difference_function,
     get_ode_function,
+    get_vector_ode_function,
     is_multivariate,
     parse_pde_rhs_expression,
     solve_difference,
@@ -50,6 +53,11 @@ class SolverResult:
     csv_path: Path
     json_path: Path
     plot_path: Path
+    animation_fig: Figure | None = None
+    animation_3d_fig: Figure | None = None
+    is_vector: bool = False
+    vector_components: int = 1
+    vector_order: int = 1
 
 
 def run_solver_pipeline(
@@ -73,6 +81,8 @@ def run_solver_pipeline(
     y_max: float | None = None,
     n_points_y: int | None = None,
     plot_3d: bool = True,
+    vector_expressions: list[str] | None = None,
+    vector_components: int = 1,
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
@@ -101,10 +111,14 @@ def run_solver_pipeline(
     """
     vars_list = variables if variables else ["x"]
     is_pde = equation_type == "pde" or is_multivariate(vars_list)
+    is_vector = (
+        (vector_expressions is not None and len(vector_expressions) > 0)
+        or equation_type == "vector_ode"
+    )
 
     if not is_pde:
         errors = validate_all_inputs(
-            expression=expression,
+            expression=expression if not is_vector else None,
             function_name=function_name,
             order=order,
             x_min=x_min,
@@ -115,6 +129,8 @@ def run_solver_pipeline(
             params=parameters,
             x0_list=x0_list,
             equation_type=equation_type,
+            vector_expressions=vector_expressions if is_vector else None,
+            vector_components=vector_components if is_vector else 1,
         )
         if errors:
             raise ValidationError("\n".join(errors))
@@ -162,6 +178,24 @@ def run_solver_pipeline(
         solution_success = diff_sol.success
         solution_message = diff_sol.message
         solution_n_eval = 0
+    elif is_vector:
+        vec_exprs = vector_expressions if vector_expressions else None
+        ode_func = get_vector_ode_function(
+            vector_expressions=vec_exprs,
+            function_name=function_name if not vec_exprs else None,
+            order=order,
+            vector_components=vector_components,
+            parameters=parameters,
+        )
+        t_eval = np.linspace(x_min, x_max, n_points)
+        solution = solve_ode(
+            ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval
+        )
+        solution_x = solution.x
+        solution_y = solution.y
+        solution_success = solution.success
+        solution_message = solution.message
+        solution_n_eval = solution.n_eval
     else:
         ode_func = get_ode_function(
             expression=expression,
@@ -241,20 +275,43 @@ def run_solver_pipeline(
                 title=equation_name, xlabel="x", ylabel="y",
             )
         phase_fig = None
+        animation_fig = None
+        animation_3d_fig = None
         export_all_results(
             solution_x, solution_y, stats, metadata, csv_path, json_path,
             y_grid=solution_y_grid,
         )
     else:
+        plot_derivs = selected_derivatives
+        if is_vector and vector_components > 1:
+            plot_derivs = [i * order for i in (selected_derivatives or list(range(vector_components)))
+                          if i < vector_components]
         fig = create_solution_plot(
             solution_x, solution_y,
             title=equation_name, xlabel=xlabel, ylabel="y",
-            selected_derivatives=selected_derivatives,
+            selected_derivatives=plot_derivs,
         )
         phase_fig = None
-        if order >= 2 and not is_pde:
+        animation_fig = None
+        animation_3d_fig = None
+        if order >= 2 and not is_pde and not is_vector:
             phase_fig = create_phase_plot(
                 solution_y, title=f"{equation_name} — Phase",
+            )
+        if is_vector and vector_components > 1:
+            animation_fig = create_vector_animation_plot(
+                solution_x,
+                solution_y,
+                order=order,
+                vector_components=vector_components,
+                title=f"{equation_name} — f_i(x) vs component",
+            )
+            animation_3d_fig = create_vector_animation_3d(
+                solution_x,
+                solution_y,
+                order=order,
+                vector_components=vector_components,
+                title=f"{equation_name} — 3D",
             )
         export_all_results(solution_x, solution_y, stats, metadata, csv_path, json_path)
 
@@ -269,7 +326,12 @@ def run_solver_pipeline(
         metadata=metadata,
         fig=fig,
         phase_fig=phase_fig,
+        animation_fig=animation_fig,
+        animation_3d_fig=animation_3d_fig,
         csv_path=csv_path,
         json_path=json_path,
         plot_path=plot_path,
+        is_vector=is_vector,
+        vector_components=vector_components if is_vector else 1,
+        vector_order=order,
     )

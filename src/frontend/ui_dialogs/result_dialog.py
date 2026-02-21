@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Any
 
 from matplotlib.figure import Figure
 
-from config import get_env_from_schema
-from frontend.plot_embed import embed_plot_in_tk
+from config import generate_output_basename, get_output_dir, get_env_from_schema
+from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
@@ -50,6 +50,9 @@ class ResultDialog:
         csv_path: Path,
         json_path: Path,
         plot_path: Path,
+        animation_fig: Figure | None = None,
+        animation_3d_fig: Figure | None = None,
+        animation_data: dict[str, Any] | None = None,
     ) -> None:
         self.parent = parent
         self.win = tk.Toplevel(parent)
@@ -58,8 +61,10 @@ class ResultDialog:
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
 
+        self._animation_data = animation_data
         self._build_ui(fig, phase_fig, statistics, metadata,
-                       csv_path, json_path, plot_path)
+                       csv_path, json_path, plot_path,
+                       animation_fig, animation_3d_fig)
 
         pad: int = get_env_from_schema("UI_PADDING")
         screen_w = self.win.winfo_screenwidth()
@@ -92,6 +97,8 @@ class ResultDialog:
         csv_path: Path,
         json_path: Path,
         plot_path: Path,
+        animation_fig: Figure | None = None,
+        animation_3d_fig: Figure | None = None,
     ) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
 
@@ -195,6 +202,19 @@ class ResultDialog:
             notebook.add(phase_tab, text="  Phase Portrait  ")
             embed_plot_in_tk(phase_fig, phase_tab)
 
+        if animation_fig is not None:
+            anim_tab = ttk.Frame(notebook)
+            notebook.add(anim_tab, text="  f_i(x) Animation  ")
+            export_cb = self._on_export_animation_mp4 if self._animation_data else None
+            embed_animation_plot_in_tk(
+                animation_fig, anim_tab, on_export_mp4=export_cb
+            )
+
+        if animation_3d_fig is not None:
+            anim3d_tab = ttk.Frame(notebook)
+            notebook.add(anim3d_tab, text="  f_i(x) 3D  ")
+            embed_plot_in_tk(animation_3d_fig, anim3d_tab)
+
     def _render_stat_entry(
         self, parent: tk.Widget, key: str, val: Any, pad: int
     ) -> None:
@@ -229,6 +249,42 @@ class ResultDialog:
             ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
             ttk.Label(row, text=self._format_stat(val),
                       style="Small.TLabel").pack(side=tk.LEFT)
+
+    def _on_export_animation_mp4(self, duration_seconds: float) -> None:
+        """Export the vector animation as MP4 video with given duration."""
+        data = self._animation_data
+        if not data:
+            return
+        try:
+            from plotting import export_animation_to_mp4
+
+            basename = generate_output_basename(prefix="animation")
+            out_dir = get_output_dir()
+            out_dir.mkdir(parents=True, exist_ok=True)
+            filepath = out_dir / f"{basename}.mp4"
+
+            export_animation_to_mp4(
+                data["x"],
+                data["y"],
+                data["order"],
+                data["vector_components"],
+                filepath,
+                title=data.get("title", "f_i(x) vs component"),
+                duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Export Complete",
+                f"Animation saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            messagebox.showerror(
+                "Export Failed",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            messagebox.showerror("Export Failed", str(exc), parent=self.win)
 
     @staticmethod
     def _format_stat(value: Any) -> str:

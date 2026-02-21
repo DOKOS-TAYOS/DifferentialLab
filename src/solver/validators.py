@@ -138,6 +138,8 @@ def validate_all_inputs(
     params: dict[str, float] | None = None,
     x0_list: list[float] | None = None,
     equation_type: str = "ode",
+    vector_expressions: list[str] | None = None,
+    vector_components: int = 1,
 ) -> list[str]:
     """Run all validations and return accumulated errors.
 
@@ -160,14 +162,28 @@ def validate_all_inputs(
         List of all error messages (empty if everything is valid).
     """
     errors: list[str] = []
-    if expression is not None and function_name is not None:
-        errors.append("Provide either expression or function_name, not both")
-    elif expression is None and function_name is None:
-        errors.append("Provide either expression or function_name")
-    elif expression is not None:
-        errors.extend(validate_expression(expression))
+    is_vector = vector_expressions is not None and len(vector_expressions) > 0
+    expected_order = order * vector_components if is_vector else order
+
+    if is_vector:
+        if vector_expressions and function_name:
+            errors.append("Provide either vector_expressions or function_name, not both")
+        elif not vector_expressions and not function_name:
+            errors.append("Vector ODE requires vector_expressions or function_name")
+        elif vector_expressions:
+            for i, expr in enumerate(vector_expressions):
+                errors.extend(
+                    f"Vector expression {i}: {e}" for e in validate_expression(expr)
+                )
+    else:
+        if expression is not None and function_name is not None:
+            errors.append("Provide either expression or function_name, not both")
+        elif expression is None and function_name is None:
+            errors.append("Provide either expression or function_name")
+        elif expression is not None:
+            errors.extend(validate_expression(expression))
     errors.extend(_validate_domain(x_min, x_max))
-    errors.extend(_validate_initial_conditions(y0, order))
+    errors.extend(_validate_initial_conditions(y0, expected_order))
 
     if equation_type == "difference":
         n_min, n_max = int(x_min), int(x_max)

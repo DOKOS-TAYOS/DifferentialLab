@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Vector ODE support**: equations can now be vector-valued [f₀(x), f₁(x), …] with f_i'' = h_i(x, f₀, f₁, …, f₀', f₁'). The system detects vector mode via `vector_expressions` or `equation_type: vector_ode`. Scalar ODEs and PDEs behave unchanged.
+- **`parse_vector_expression` and `get_vector_ode_function`**: parse lists of expressions into vector ODE callables. State layout: [f₀, f₀', f₁, f₁', …].
+- **Animation tab**: for vector ODEs, a new "f_i(x) Animation" tab with a Tkinter Scale to vary x and see f_i(x) vs component index i. Export MP4 button to save the animation as video (requires ffmpeg).
+- **3D vector tab**: "f_i(x) 3D" tab showing x (independent), component index i, and f_i(x) as a surface.
+- **Predefined vector equations**: Coupled Harmonic Oscillators, Double Pendulum (Linearized), Three Coupled Oscillators, Damped Coupled System in `equations.yaml`.
 - **PDE (multivariate) support**: equations can now have multiple independent variables (e.g. f(x,y)). Select "PDE (multivariate)" in the equation dialog. For f(x,y), the output is a 3D surface plot by default; the user can choose 2D contour instead. Domain and grid size are configurable per dimension.
 - **`solver/pde_solver.py`**: finite-difference solver for 2D elliptic PDEs (-u_xx - u_yy = f). Uses 5-point stencil and zero Dirichlet boundary conditions.
 - **`parse_pde_rhs_expression`**: parses RHS expressions for PDEs using variable names (x, y, …) and parameters.

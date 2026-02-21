@@ -264,6 +264,138 @@ bloch_equations:
   default_initial_conditions: [0.0, 0.0, 1.0]
   default_domain: [0.0, 10.0]
 
+# --- Vector ODEs ([f_0, f_1, ...] with f_i'' = h_i) ---
+
+coupled_harmonic_oscillators:
+  name: "Coupled Harmonic Oscillators"
+  formula: "f₀'' = -ω²f₀ + k(f₁-f₀), f₁'' = -ω²f₁ + k(f₀-f₁)"
+  description: |
+    Two masses connected by springs. f₀, f₁ are positions.
+    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
+  equation_type: ode
+  order: 2
+  vector_expressions:
+    - "-ω**2 * y[0] + k * (y[2] - y[0])"
+    - "-ω**2 * y[2] + k * (y[0] - y[2])"
+  vector_components: 2
+  parameters:
+    "ω":
+      default: 1.0
+      description: "Natural frequency"
+    k:
+      default: 0.5
+      description: "Coupling strength"
+  default_initial_conditions: [1.0, 0.0, 0.5, 0.0]
+  default_domain: [0.0, 30.0]
+
+double_pendulum_linearized:
+  name: "Double Pendulum (Linearized)"
+  formula: "f₀'' = -2ω²f₀ + ω²f₁, f₁'' = 2ω²f₀ - 2ω²f₁"
+  description: |
+    Linearized double pendulum. f₀, f₁ are small angles.
+    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
+  equation_type: ode
+  order: 2
+  vector_expressions:
+    - "-2*ω**2*y[0] + ω**2*y[2]"
+    - "2*ω**2*y[0] - 2*ω**2*y[2]"
+  vector_components: 2
+  parameters:
+    "ω":
+      default: 1.0
+      description: "Frequency scale"
+  default_initial_conditions: [0.1, 0.0, 0.2, 0.0]
+  default_domain: [0.0, 20.0]
+
+three_coupled_oscillators:
+  name: "Three Coupled Oscillators"
+  formula: "f_i'' = -ω²f_i + k(f_{i+1} + f_{i-1} - 2f_i)"
+  description: |
+    Chain of three masses with nearest-neighbor coupling.
+    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁', y[4]=f₂, y[5]=f₂'.
+    Boundary: f_{-1}=f₃=0.
+  equation_type: ode
+  order: 2
+  vector_expressions:
+    - "-ω**2*y[0] + k*(y[2] - 2*y[0])"
+    - "-ω**2*y[2] + k*(y[0] + y[4] - 2*y[2])"
+    - "-ω**2*y[4] + k*(y[2] - 2*y[4])"
+  vector_components: 3
+  parameters:
+    "ω":
+      default: 1.0
+      description: "Natural frequency"
+    k:
+      default: 0.3
+      description: "Coupling"
+  default_initial_conditions: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  default_domain: [0.0, 25.0]
+
+twenty_coupled_oscillators:
+  name: "20 Coupled Harmonic Oscillators"
+  formula: "f_i'' = -ω²f_i + k(f_{i+1} + f_{i-1} - 2f_i)"
+  description: |
+    Linear chain of 20 masses with nearest-neighbor coupling.
+    y[2i]=f_i, y[2i+1]=f_i'. Boundary: f_{-1}=f₂₀=0.
+  equation_type: ode
+  order: 2
+  vector_expressions:
+    - "-ω**2*y[0] + k*(y[2] - 2*y[0])"
+    - "-ω**2*y[2] + k*(y[0] + y[4] - 2*y[2])"
+    - "-ω**2*y[4] + k*(y[2] + y[6] - 2*y[4])"
+    - "-ω**2*y[6] + k*(y[4] + y[8] - 2*y[6])"
+    - "-ω**2*y[8] + k*(y[6] + y[10] - 2*y[8])"
+    - "-ω**2*y[10] + k*(y[8] + y[12] - 2*y[10])"
+    - "-ω**2*y[12] + k*(y[10] + y[14] - 2*y[12])"
+    - "-ω**2*y[14] + k*(y[12] + y[16] - 2*y[14])"
+    - "-ω**2*y[16] + k*(y[14] + y[18] - 2*y[16])"
+    - "-ω**2*y[18] + k*(y[16] + y[20] - 2*y[18])"
+    - "-ω**2*y[20] + k*(y[18] + y[22] - 2*y[20])"
+    - "-ω**2*y[22] + k*(y[20] + y[24] - 2*y[22])"
+    - "-ω**2*y[24] + k*(y[22] + y[26] - 2*y[24])"
+    - "-ω**2*y[26] + k*(y[24] + y[28] - 2*y[26])"
+    - "-ω**2*y[28] + k*(y[26] + y[30] - 2*y[28])"
+    - "-ω**2*y[30] + k*(y[28] + y[32] - 2*y[30])"
+    - "-ω**2*y[32] + k*(y[30] + y[34] - 2*y[32])"
+    - "-ω**2*y[34] + k*(y[32] + y[36] - 2*y[34])"
+    - "-ω**2*y[36] + k*(y[34] + y[38] - 2*y[36])"
+    - "-ω**2*y[38] + k*(y[36] - 2*y[38])"
+  vector_components: 20
+  parameters:
+    "ω":
+      default: 1.0
+      description: "Natural frequency"
+    k:
+      default: 0.3
+      description: "Coupling"
+  default_initial_conditions: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  default_domain: [0.0, 30.0]
+
+damped_coupled_system:
+  name: "Damped Coupled System"
+  formula: "f₀'' = -γf₀' - ω²f₀ + cf₁, f₁'' = -γf₁' - ω²f₁ + cf₀"
+  description: |
+    Two damped oscillators with linear coupling.
+    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
+  equation_type: ode
+  order: 2
+  vector_expressions:
+    - "-γ*y[1] - ω**2*y[0] + c*y[2]"
+    - "-γ*y[3] - ω**2*y[2] + c*y[0]"
+  vector_components: 2
+  parameters:
+    "ω":
+      default: 1.0
+      description: "Frequency"
+    "γ":
+      default: 0.2
+      description: "Damping"
+    c:
+      default: 0.3
+      description: "Coupling"
+  default_initial_conditions: [1.0, 0.0, 0.0, 0.0]
+  default_domain: [0.0, 40.0]
+
 # --- Difference equations (recurrence relations) ---
 
 geometric_growth_diff:

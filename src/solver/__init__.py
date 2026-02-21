@@ -4,20 +4,23 @@ from solver.difference_solver import solve_difference
 from solver.equation_parser import (
     get_difference_function,
     get_ode_function,
+    get_vector_ode_function,
     parse_difference_expression,
     parse_expression,
     parse_pde_rhs_expression,
 )
 from solver.ode_solver import solve_multipoint, solve_ode
 from solver.pde_solver import solve_pde_2d
-from solver.predefined import is_multivariate, load_predefined_equations
+from solver.predefined import is_multivariate, is_vector_ode, load_predefined_equations
 from solver.statistics import compute_statistics, compute_statistics_2d
 from solver.validators import validate_all_inputs
 
 __all__ = [
     "get_difference_function",
     "get_ode_function",
+    "get_vector_ode_function",
     "is_multivariate",
+    "is_vector_ode",
     "parse_difference_expression",
     "parse_expression",
     "parse_pde_rhs_expression",

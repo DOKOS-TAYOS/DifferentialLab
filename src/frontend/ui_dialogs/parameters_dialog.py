@@ -50,6 +50,8 @@ class ParametersDialog:
         display_formula: str | None = None,
         equation_type: str = "ode",
         variables: list[str] | None = None,
+        vector_expressions: list[str] | None = None,
+        vector_components: int = 1,
     ) -> None:
         self.parent = parent
         self.expression = expression
@@ -67,6 +69,12 @@ class ParametersDialog:
         )
         self.equation_type = equation_type
         self.variables = variables if variables else ["x"]
+        self.vector_expressions = vector_expressions
+        self.vector_components = vector_components
+        self.is_vector = (
+            (vector_expressions is not None and len(vector_expressions) > 0)
+            or equation_type == "vector_ode"
+        )
         self.is_pde = equation_type == "pde" or len(self.variables) > 1
 
         self.win = tk.Toplevel(parent)
@@ -210,8 +218,9 @@ class ParametersDialog:
 
             _subscripts = "₀₁₂₃₄₅₆₇₈₉"
             ic_labels = self._ic_labels()
+            n_ic = self.order * self.vector_components if self.is_vector else self.order
             default_x0_val = str(int(default_domain[0]) if self.equation_type == "difference" else default_domain[0])
-            for i in range(self.order):
+            for i in range(n_ic):
                 row = ttk.Frame(ic_frame)
                 row.pack(fill=tk.X, pady=2)
                 default_val = default_y0[i] if i < len(default_y0) else 1.0
@@ -298,6 +307,17 @@ class ParametersDialog:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
         if self.equation_type == "difference":
             return [f"y{subscripts[i] if i < len(subscripts) else str(i)}" for i in range(self.order)]
+        if self.is_vector:
+            labels: list[str] = []
+            for c in range(self.vector_components):
+                comp_sub = subscripts[c] if c < len(subscripts) else str(c)
+                for k in range(self.order):
+                    if k == 0:
+                        labels.append(f"f_{comp_sub}")
+                    else:
+                        primes = "'" * k
+                        labels.append(f"f_{comp_sub}{primes}")
+            return labels
         labels = [f"y(x{subscripts[0]})"]
         for i in range(1, self.order):
             primes = "'" * i
@@ -456,6 +476,8 @@ class ParametersDialog:
                 y_max=y_max,
                 n_points_y=n_points_y,
                 plot_3d=plot_3d,
+                vector_expressions=self.vector_expressions,
+                vector_components=self.vector_components,
             )
         except DifferentialLabError as exc:
             messagebox.showerror("Error", str(exc), parent=self.win)
@@ -476,6 +498,15 @@ class ParametersDialog:
 
         from frontend.ui_dialogs.result_dialog import ResultDialog
 
+        animation_data: dict | None = None
+        if getattr(result, "is_vector", False) and getattr(result, "animation_fig", None):
+            animation_data = {
+                "x": result.x,
+                "y": result.y,
+                "order": getattr(result, "vector_order", 2),
+                "vector_components": getattr(result, "vector_components", 1),
+                "title": result.metadata.get("equation_name", "ODE") + " — f_i(x)",
+            }
         ResultDialog(
             self.parent,
             fig=result.fig,
@@ -485,4 +516,7 @@ class ParametersDialog:
             csv_path=result.csv_path,
             json_path=result.json_path,
             plot_path=result.plot_path,
+            animation_fig=getattr(result, "animation_fig", None),
+            animation_3d_fig=getattr(result, "animation_3d_fig", None),
+            animation_data=animation_data,
         )

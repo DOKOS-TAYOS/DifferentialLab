@@ -391,6 +391,134 @@ def parse_pde_rhs_expression(
     return rhs_func
 
 
+def parse_vector_expression(
+    expressions: list[str],
+    order: int,
+    parameters: dict[str, float] | None = None,
+) -> Callable[[float, np.ndarray], np.ndarray]:
+    """Parse a list of ODE expressions into a vector ODE callable.
+
+    For [f_0(x), f_1(x), ...] with f_i'' = h_i(x, f_0, f_1, ..., f_0', f_1', ...):
+    - State y = [f_0, f_1, ..., f_0', f_1', ...] (size = n_components * order)
+    - y[0..n-1] = f_0, f_1, ... (the functions)
+    - y[n..2n-1] = f_0', f_1', ... (first derivatives, if order >= 2)
+    - etc.
+
+    Each expression i gives the highest derivative h_i for component i.
+    In expression i, use y[j] for f_j and y[n+j] for f_j' (when order=2).
+
+    Args:
+        expressions: List of Python expressions, one per component.
+        order: Order of each ODE (1, 2, …).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable f(x, y) that returns dy/dx as a 1-D array.
+    """
+    n_components = len(expressions)
+    if n_components == 0:
+        raise EquationParseError("vector_expressions must have at least one expression")
+
+    params = dict(parameters) if parameters else {}
+    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+
+    compiled_list: list[Any] = []
+    for i, expr in enumerate(expressions):
+        expr = normalize_unicode_escapes(expr)
+        _validate_ast(expr)
+        compiled_list.append(compile(expr, f"<vector_ode_{i}>", "eval"))
+
+    state_size = n_components * order
+    n = n_components
+
+    def _test_eval() -> None:
+        test_y = np.zeros(state_size)
+        test_ns = {**namespace, "x": 0.0, "y": test_y}
+        for i, compiled in enumerate(compiled_list):
+            try:
+                eval(compiled, {"__builtins__": {}}, test_ns)
+            except Exception as exc:
+                raise EquationParseError(
+                    f"Expression {i} evaluation failed: {exc}"
+                ) from exc
+
+    _test_eval()
+
+    def ode_func(x: float, y: np.ndarray) -> np.ndarray:
+        dydt = np.empty(state_size)
+        local_ns = {**namespace, "x": x, "y": y}
+
+        for i in range(n_components):
+            for k in range(order - 1):
+                dydt[i * order + k] = y[i * order + k + 1]
+            highest = eval(compiled_list[i], {"__builtins__": {}}, local_ns)
+            dydt[i * order + order - 1] = float(highest)
+
+        return dydt
+
+    return ode_func
+
+
+def get_vector_ode_function(
+    *,
+    vector_expressions: list[str],
+    function_name: str | None = None,
+    order: int,
+    vector_components: int,
+    parameters: dict[str, float] | None = None,
+) -> Callable[[float, np.ndarray], np.ndarray]:
+    """Resolve a vector ODE function from expressions or Python function.
+
+    Exactly one of vector_expressions or function_name must be provided.
+
+    Args:
+        vector_expressions: List of expressions for each component's highest derivative.
+        function_name: Name of function in config.equations (returns full dydt).
+        order: Order of each ODE component.
+        vector_components: Number of components (f_0, f_1, ...).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable f(x, y) that returns dy/dx.
+    """
+    params = dict(parameters) if parameters else {}
+    if vector_expressions and function_name:
+        raise ValueError("Provide either vector_expressions or function_name, not both")
+    if not vector_expressions and not function_name:
+        raise ValueError("Provide either vector_expressions or function_name")
+
+    if vector_expressions:
+        if len(vector_expressions) != vector_components:
+            raise EquationParseError(
+                f"vector_expressions length ({len(vector_expressions)}) "
+                f"must match vector_components ({vector_components})"
+            )
+        return parse_vector_expression(vector_expressions, order, params)
+
+    try:
+        from config import equations as equations_module
+    except ImportError as exc:
+        raise EquationParseError(
+            f"Cannot import config.equations: {exc}"
+        ) from exc
+
+    if not hasattr(equations_module, function_name):
+        raise EquationParseError(
+            f"Function '{function_name}' not found in config.equations"
+        )
+
+    func = getattr(equations_module, function_name)
+    if not callable(func):
+        raise EquationParseError(
+            f"'{function_name}' in config.equations is not callable"
+        )
+
+    def ode_func(x: float, y: np.ndarray) -> np.ndarray:
+        return func(x, y, **params)
+
+    return ode_func
+
+
 def validate_expression(expression: str) -> list[str]:
     """Check an expression for obvious errors without evaluating.
 

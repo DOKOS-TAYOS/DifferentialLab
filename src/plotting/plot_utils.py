@@ -294,6 +294,258 @@ def create_contour_plot(
     return fig
 
 
+def create_vector_animation_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    order: int,
+    vector_components: int,
+    title: str = "f_i(x) vs component",
+) -> Figure:
+    """Create an interactive plot: x-axis = component index i, y-axis = f_i(x).
+
+    The figure stores _animation_update(idx) and _animation_n_points for use
+    with a Tkinter Scale (matplotlib Slider is unreliable when embedded in Tk).
+    For vector ODE: y has shape (n_state, n_points), with f_i at y[i*order].
+
+    Args:
+        x: Independent variable values (1D).
+        y: Solution array, shape (n_state, n_points).
+        order: Order per component.
+        vector_components: Number of components.
+        title: Plot title.
+
+    Returns:
+        A matplotlib Figure (use with embed_animation_plot_in_tk).
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    ax_main = fig.add_axes([0.12, 0.15, 0.78, 0.78])
+
+    y_2d = np.atleast_2d(y)
+    if y_2d.shape[1] != len(x):
+        y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
+
+    f_values = np.array([y_2d[i * order] for i in range(vector_components)])
+    n_points = len(x)
+    time_index = min(n_points // 2, n_points - 1) if n_points else 0
+
+    color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
+    try:
+        cmap = plt.colormaps.get_cmap(color_scheme)
+        colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
+    except (ValueError, AttributeError):
+        colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
+
+    y_min_global = float(np.min(f_values)) - 0.1
+    y_max_global = float(np.max(f_values)) + 0.1
+    ax_main.set_ylim(y_min_global, y_max_global)
+
+    indices = np.arange(vector_components)
+    vals = np.array([f_values[j][time_index] for j in range(vector_components)])
+    (line_chain,) = ax_main.plot(
+        indices, vals, "o-", color=colors[0], markersize=8, linewidth=2,
+    )
+    vlines_coll = ax_main.vlines(
+        indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6
+    )
+    ax_main.set_xticks(indices)
+    ax_main.set_xticklabels([f"f_{i}" for i in range(vector_components)])
+
+    def update(idx: int) -> None:
+        i = max(0, min(idx, n_points - 1))
+        new_vals = np.array([f_values[j][i] for j in range(vector_components)])
+        line_chain.set_ydata(new_vals)
+        vlines_coll.set_segments(
+            [np.array([[j, 0], [j, new_vals[j]]]) for j in range(vector_components)]
+        )
+        fig.canvas.draw_idle()
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax_main.set_title(title)
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    ax_main.set_xlabel("Component index i", fontstyle=axis_style)
+    ax_main.set_ylabel("f_i(x)", fontstyle=axis_style)
+    if get_env_from_schema("PLOT_SHOW_GRID"):
+        ax_main.grid(True, alpha=0.3)
+    fig.subplots_adjust(bottom=0.12, left=0.12, right=0.95, top=0.92)
+
+    fig._animation_update = update
+    fig._animation_n_points = n_points
+    fig._animation_initial_index = time_index
+    fig._animation_x = x
+    fig._animation_f_values = f_values
+    fig._animation_vector_components = vector_components
+    return fig
+
+
+def create_vector_animation_3d(
+    x: np.ndarray,
+    y: np.ndarray,
+    order: int,
+    vector_components: int,
+    title: str = "f_i(x) — 3D",
+) -> Figure:
+    """Create a 3D plot: x (independent), component index i, f_i(x).
+
+    Args:
+        x: Independent variable values.
+        y: Solution array, shape (n_state, n_points).
+        order: Order per component.
+        vector_components: Number of components.
+        title: Plot title.
+
+    Returns:
+        A matplotlib Figure with 3D surface.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    ax = fig.add_subplot(111, projection="3d")
+
+    y_2d = np.atleast_2d(y)
+    if y_2d.shape[1] != len(x):
+        y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
+
+    X_grid, I_grid = np.meshgrid(x, np.arange(vector_components))
+    Z_grid = np.array([y_2d[i * order] for i in range(vector_components)])
+    ax.plot_surface(X_grid, I_grid, Z_grid, cmap="viridis", alpha=0.9, edgecolor="none")
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    ax.set_xlabel("x", fontstyle=axis_style)
+    ax.set_ylabel("Component i", fontstyle=axis_style)
+    ax.set_zlabel("f_i(x)", fontstyle=axis_style)
+    fig.tight_layout()
+    return fig
+
+
+_MAX_MP4_FRAMES = 500
+
+
+def export_animation_to_mp4(
+    x: np.ndarray,
+    y: np.ndarray,
+    order: int,
+    vector_components: int,
+    filepath: Path,
+    *,
+    title: str = "f_i(x) vs component",
+    duration_seconds: float = 10.0,
+) -> Path:
+    """Export vector animation as MP4 video.
+
+    Frames are downsampled to at most _MAX_MP4_FRAMES to avoid memory exhaustion.
+    Requires ffmpeg to be installed on the system.
+
+    Args:
+        x: Independent variable values.
+        y: Solution array, shape (n_state, n_points).
+        order: Order per component.
+        vector_components: Number of components.
+        filepath: Output path for the MP4 file.
+        title: Plot title.
+        duration_seconds: Desired video duration in seconds. FPS is computed.
+
+    Returns:
+        The path that was written.
+
+    Raises:
+        RuntimeError: If ffmpeg is not available.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.animation import FuncAnimation
+
+    _apply_plot_style()
+    dpi: int = get_env_from_schema("DPI")
+
+    y_2d = np.atleast_2d(y)
+    if y_2d.shape[1] != len(x):
+        y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
+
+    f_values = np.array([y_2d[i * order] for i in range(vector_components)])
+    n_points = len(x)
+
+    frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
+    num_frames = len(frame_indices)
+    fps = max(1, num_frames / max(0.5, duration_seconds))
+
+    color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
+    try:
+        cmap = plt.colormaps.get_cmap(color_scheme)
+        colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
+    except (ValueError, AttributeError):
+        colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
+    y_min = float(np.min(f_values)) - 0.1
+    y_max = float(np.max(f_values)) + 0.1
+    ax.set_ylim(y_min, y_max)
+    ax.set_xlabel("Component index i")
+    ax.set_ylabel("f_i(x)")
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    if get_env_from_schema("PLOT_SHOW_GRID"):
+        ax.grid(True, alpha=0.3)
+
+    indices = np.arange(vector_components)
+    vals = np.array([f_values[j][frame_indices[0]] for j in range(vector_components)])
+    (line_chain,) = ax.plot(indices, vals, "o-", color=colors[0], markersize=8, linewidth=2)
+    vlines_coll = ax.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
+    ax.set_xticks(indices)
+    ax.set_xticklabels([f"f_{i}" for i in range(vector_components)])
+
+    def _frame(idx: int) -> None:
+        new_vals = np.array([f_values[j][idx] for j in range(vector_components)])
+        line_chain.set_ydata(new_vals)
+        vlines_coll.set_segments(
+            [np.array([[j, 0], [j, new_vals[j]]]) for j in range(vector_components)]
+        )
+
+    anim = FuncAnimation(
+        fig,
+        lambda i: _frame(frame_indices[i]),
+        frames=num_frames,
+        interval=int(1000 / fps),
+        blit=False,
+    )
+
+    from matplotlib.animation import writers
+
+    if not writers.is_available("ffmpeg"):
+        plt.close(fig)
+        raise RuntimeError(
+            "FFMpeg is not available. Install ffmpeg and ensure it is in your PATH."
+        )
+
+    try:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        anim.save(str(filepath), writer="ffmpeg", fps=fps)
+    except Exception as exc:
+        plt.close(fig)
+        raise RuntimeError(
+            f"Failed to export MP4. Is ffmpeg installed? {exc}"
+        ) from exc
+    plt.close(fig)
+    logger.info("Animation exported: %s (%d frames)", filepath, len(frame_indices))
+    return filepath
+
+
 def save_plot(fig: Figure, filepath: Path) -> Path:
     """Save a matplotlib figure to disk.
 
