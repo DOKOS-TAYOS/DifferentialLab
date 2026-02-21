@@ -48,6 +48,7 @@ class ParametersDialog:
         default_domain: list[float],
         selected_derivatives: list[int] | None = None,
         display_formula: str | None = None,
+        equation_type: str = "ode",
     ) -> None:
         self.parent = parent
         self.expression = expression
@@ -63,6 +64,7 @@ class ParametersDialog:
         self.selected_derivatives = (
             selected_derivatives if selected_derivatives else list(range(order))
         )
+        self.equation_type = equation_type
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Parameters — {equation_name}")
@@ -125,37 +127,38 @@ class ParametersDialog:
         )
 
         # Domain
-        domain_frame = ttk.LabelFrame(scroll_frame, text="Domain", padding=pad)
+        domain_label = "Domain (n_min, n_max)" if self.equation_type == "difference" else "Domain"
+        domain_frame = ttk.LabelFrame(scroll_frame, text=domain_label, padding=pad)
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
+        x_min_label = "n_min:" if self.equation_type == "difference" else "x_min:"
+        x_max_label = "n_max:" if self.equation_type == "difference" else "x_max:"
         row_d = ttk.Frame(domain_frame)
         row_d.pack(fill=tk.X)
-        ttk.Label(row_d, text="x_min:").pack(side=tk.LEFT)
-        self.xmin_var = tk.StringVar(value=str(default_domain[0]))
+        ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
+        self.xmin_var = tk.StringVar(value=str(int(default_domain[0]) if self.equation_type == "difference" else default_domain[0]))
         ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(
             side=tk.LEFT, padx=pad
         )
-        ttk.Label(row_d, text="x_max:").pack(side=tk.LEFT)
-        self.xmax_var = tk.StringVar(value=str(default_domain[1]))
+        ttk.Label(row_d, text=x_max_label).pack(side=tk.LEFT)
+        self.xmax_var = tk.StringVar(value=str(int(default_domain[1]) if self.equation_type == "difference" else default_domain[1]))
         ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(
             side=tk.LEFT, padx=pad
         )
 
-        row_n = ttk.Frame(domain_frame)
-        row_n.pack(fill=tk.X, pady=(pad, 0))
-        ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
-        self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
-
-        npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font())
-        npoints_entry.pack(side=tk.LEFT, padx=pad)
-
-        btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
-                                  command=lambda: self._change_npoints(0.1))
-        btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
-
-        btn_increase = ttk.Button(row_n, text="+", width=3, style="Small.TButton",
-                                  command=lambda: self._change_npoints(10))
-        btn_increase.pack(side=tk.LEFT)
+        if self.equation_type != "difference":
+            row_n = ttk.Frame(domain_frame)
+            row_n.pack(fill=tk.X, pady=(pad, 0))
+            ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
+            self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
+            npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font())
+            npoints_entry.pack(side=tk.LEFT, padx=pad)
+            btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
+                                      command=lambda: self._change_npoints(0.1))
+            btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
+            btn_increase = ttk.Button(row_n, text="+", width=3, style="Small.TButton",
+                                      command=lambda: self._change_npoints(10))
+            btn_increase.pack(side=tk.LEFT)
 
         # Initial conditions
         ic_frame = ttk.LabelFrame(scroll_frame, text="Initial Conditions", padding=pad)
@@ -163,7 +166,7 @@ class ParametersDialog:
 
         _subscripts = "₀₁₂₃₄₅₆₇₈₉"
         ic_labels = self._ic_labels()
-        default_x0_val = str(default_domain[0])
+        default_x0_val = str(int(default_domain[0]) if self.equation_type == "difference" else default_domain[0])
         for i in range(self.order):
             row = ttk.Frame(ic_frame)
             row.pack(fill=tk.X, pady=2)
@@ -176,29 +179,34 @@ class ParametersDialog:
                 side=tk.LEFT, padx=(pad, pad * 2),
             )
 
-            ttk.Label(row, text=f"x{sub} =").pack(side=tk.LEFT)
-            x_var = tk.StringVar(value=default_x0_val)
-            ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
-                side=tk.LEFT, padx=pad,
-            )
+            if self.equation_type != "difference":
+                ttk.Label(row, text=f"x{sub} =").pack(side=tk.LEFT)
+                x_var = tk.StringVar(value=default_x0_val)
+                ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
+                    side=tk.LEFT, padx=pad,
+                )
+                self._x0_vars.append(x_var)
+            else:
+                self._x0_vars.append(tk.StringVar(value=default_x0_val))
 
             self._y0_vars.append(var)
-            self._x0_vars.append(x_var)
 
-        # Solver method
-        method_frame = ttk.LabelFrame(scroll_frame, text="Solver Method", padding=pad)
-        method_frame.pack(fill=tk.X, pady=(0, pad))
+        # Solver method (ODE only)
+        self.method_frame = ttk.LabelFrame(scroll_frame, text="Solver Method", padding=pad)
+        self.method_frame.pack(fill=tk.X, pady=(0, pad))
 
         self.method_var = tk.StringVar(value=get_env_from_schema("SOLVER_DEFAULT_METHOD"))
-        combo = ttk.Combobox(method_frame, textvariable=self.method_var,
+        combo = ttk.Combobox(self.method_frame, textvariable=self.method_var,
                               values=list(SOLVER_METHODS), state="readonly", width=15,
                               font=get_font())
         combo.pack(anchor=tk.W)
-        self.method_desc = ttk.Label(method_frame, text="", style="Small.TLabel",
+        self.method_desc = ttk.Label(self.method_frame, text="", style="Small.TLabel",
                                      wraplength=600, justify=tk.LEFT)
         self.method_desc.pack(anchor=tk.W, pady=(2, 0))
         combo.bind("<<ComboboxSelected>>", self._on_method_change)
         self._on_method_change(None)
+        if self.equation_type == "difference":
+            self.method_frame.pack_forget()
 
         # Statistics listbox (extended selection)
         stats_frame = ttk.LabelFrame(scroll_frame, text="Statistics & Magnitudes", padding=pad)
@@ -244,6 +252,8 @@ class ParametersDialog:
 
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
+        if self.equation_type == "difference":
+            return [f"y{subscripts[i] if i < len(subscripts) else str(i)}" for i in range(self.order)]
         labels = [f"y(x{subscripts[0]})"]
         for i in range(1, self.order):
             primes = "'" * i
@@ -289,20 +299,39 @@ class ParametersDialog:
             x_min = float(self.xmin_var.get())
             x_max = float(self.xmax_var.get())
         except ValueError:
+            domain_name = "n_min and n_max" if self.equation_type == "difference" else "x_min and x_max"
             messagebox.showerror("Invalid Domain",
-                                 "x_min and x_max must be numbers.",
+                                 f"{domain_name} must be numbers.",
                                  parent=self.win)
             return
 
-        try:
-            n_points = int(self.npoints_var.get())
-        except ValueError:
-            messagebox.showerror("Invalid Grid",
-                                 "Number of points must be an integer.",
-                                 parent=self.win)
-            return
+        if self.equation_type == "difference":
+            n_points = int(x_max) - int(x_min) + 1
+            x0_list = None
+            method = "iteration"
+        else:
+            try:
+                n_points = int(self.npoints_var.get())
+            except ValueError:
+                messagebox.showerror("Invalid Grid",
+                                     "Number of points must be an integer.",
+                                     parent=self.win)
+                return
+            subscripts = "₀₁₂₃₄₅₆₇₈₉"
+            x0_list = []
+            for i, x_var in enumerate(self._x0_vars):
+                sub = subscripts[i] if i < len(subscripts) else str(i)
+                try:
+                    x0_list.append(float(x_var.get()))
+                except ValueError:
+                    messagebox.showerror(
+                        "Invalid IC Point",
+                        f"x{sub} must be a number.",
+                        parent=self.win,
+                    )
+                    return
+            method = self.method_var.get()
 
-        subscripts = "₀₁₂₃₄₅₆₇₈₉"
         y0: list[float] = []
         for i, var in enumerate(self._y0_vars):
             try:
@@ -315,20 +344,6 @@ class ParametersDialog:
                 )
                 return
 
-        x0_list: list[float] = []
-        for i, x_var in enumerate(self._x0_vars):
-            sub = subscripts[i] if i < len(subscripts) else str(i)
-            try:
-                x0_list.append(float(x_var.get()))
-            except ValueError:
-                messagebox.showerror(
-                    "Invalid IC Point",
-                    f"x{sub} must be a number.",
-                    parent=self.win,
-                )
-                return
-
-        method = self.method_var.get()
         selected_indices = self._stats_listbox.curselection()
         selected_stats = {self._stat_keys[i] for i in selected_indices}
 
@@ -349,6 +364,7 @@ class ParametersDialog:
                 selected_stats=selected_stats,
                 selected_derivatives=self.selected_derivatives,
                 x0_list=x0_list,
+                equation_type=self.equation_type,
             )
         except DifferentialLabError as exc:
             messagebox.showerror("Error", str(exc), parent=self.win)

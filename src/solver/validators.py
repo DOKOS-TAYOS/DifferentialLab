@@ -137,22 +137,24 @@ def validate_all_inputs(
     method: str,
     params: dict[str, float] | None = None,
     x0_list: list[float] | None = None,
+    equation_type: str = "ode",
 ) -> list[str]:
     """Run all validations and return accumulated errors.
 
     Either expression or function_name must be provided.
 
     Args:
-        expression: ODE expression (optional).
-        function_name: Name of function in config.equations (optional).
-        order: ODE order.
-        x_min: Domain start.
-        x_max: Domain end.
+        expression: ODE/difference expression (optional).
+        function_name: Name of function in config (optional).
+        order: Equation order.
+        x_min: Domain start (n_min for difference).
+        x_max: Domain end (n_max for difference).
         y0: Initial conditions.
-        num_points: Grid points.
-        method: Solver method.
+        num_points: Grid points (ODE only).
+        method: Solver method (ODE only).
         params: Named parameters.
-        x0_list: Per-derivative initial condition points.
+        x0_list: Per-derivative initial condition points (ODE only).
+        equation_type: ``"ode"`` or ``"difference"``.
 
     Returns:
         List of all error messages (empty if everything is valid).
@@ -166,12 +168,22 @@ def validate_all_inputs(
         errors.extend(validate_expression(expression))
     errors.extend(_validate_domain(x_min, x_max))
     errors.extend(_validate_initial_conditions(y0, order))
-    errors.extend(_validate_grid(num_points))
-    errors.extend(_validate_method(method))
+
+    if equation_type == "difference":
+        n_min, n_max = int(x_min), int(x_max)
+        n_points = n_max - n_min + 1
+        if n_points < 2:
+            errors.append("Difference equation needs at least 2 points (n_max > n_min)")
+        if n_points > 1_000_000:
+            errors.append("Number of points must not exceed 1,000,000")
+    else:
+        errors.extend(_validate_grid(num_points))
+        errors.extend(_validate_method(method))
+        if x0_list:
+            errors.extend(_validate_ic_points(x0_list, x_min, x_max))
+
     if params:
         errors.extend(_validate_parameters(params))
-    if x0_list:
-        errors.extend(_validate_ic_points(x0_list, x_min, x_max))
     if errors:
         logger.warning("Validation errors: %s", errors)
     return errors

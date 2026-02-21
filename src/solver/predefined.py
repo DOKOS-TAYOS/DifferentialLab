@@ -16,12 +16,15 @@ _EQUATIONS_PATH = Path(__file__).resolve().parent.parent / "config" / "equations
 _cache: dict[str, PredefinedEquation] | None = None
 
 
+EquationType = str  # "ode" | "difference"
+
+
 @dataclass
 class PredefinedEquation:
-    """Representation of a predefined ODE loaded from YAML.
+    """Representation of a predefined equation (ODE or difference) loaded from YAML.
 
     formula is always required for display. Either expression or function_name
-    must be set for execution. If function_name is set, the ODE is resolved by
+    must be set for execution. If function_name is set, the equation is resolved by
     importing the function from config.equations; otherwise expression is used.
 
     Attributes:
@@ -29,12 +32,13 @@ class PredefinedEquation:
         name: Human-readable name.
         formula: Compact human-readable equation string (e.g. ``"y'' + ω²y = 0"``).
         description: Multi-line description with formula and context.
-        order: ODE order (1, 2, …).
+        order: Equation order (1, 2, …).
         parameters: Mapping of param name to ``{default, description}``.
         expression: Python expression for execution (optional if function_name set).
         function_name: Name of function in config.equations to import (optional).
         default_initial_conditions: Default y0 vector.
-        default_domain: Default ``[x_min, x_max]``.
+        default_domain: Default ``[x_min, x_max]`` for ODE or ``[n_min, n_max]`` for difference.
+        equation_type: ``"ode"`` (differential) or ``"difference"``.
     """
 
     key: str
@@ -47,6 +51,7 @@ class PredefinedEquation:
     function_name: str | None
     default_initial_conditions: list[float]
     default_domain: list[float] = field(default_factory=lambda: [0.0, 10.0])
+    equation_type: EquationType = "ode"
 
 
 def load_predefined_equations() -> dict[str, PredefinedEquation]:
@@ -98,6 +103,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             function_name=function_name,
             default_initial_conditions=list(data.get("default_initial_conditions", [0.0])),
             default_domain=list(data.get("default_domain", [0.0, 10.0])),
+            equation_type=str(data.get("equation_type", "ode")),
         )
         equations[key] = eq
         logger.debug("Loaded predefined equation: %s", key)

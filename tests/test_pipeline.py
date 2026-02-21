@@ -117,3 +117,40 @@ def test_run_solver_pipeline_multipoint(
     assert result.y.shape[0] == 2
     np.testing.assert_allclose(result.y[0, 0], 1.0)
     np.testing.assert_allclose(result.y[1, 0], 0.0)
+
+
+@patch("config.paths.get_env_from_schema")
+def test_run_solver_pipeline_difference_equation(
+    mock_paths_env: object,
+    tmp_path: object,
+) -> None:
+    def env_side_effect(key: str) -> object:
+        env = {
+            "FILE_OUTPUT_DIR": str(tmp_path),
+            "FILE_PLOT_FORMAT": "png",
+        }
+        return env.get(key, 100)
+
+    mock_paths_env.side_effect = env_side_effect
+
+    result = run_solver_pipeline(
+        expression="r * y[0]",
+        function_name=None,
+        order=1,
+        parameters={"r": 1.5},
+        equation_name="Geometric growth",
+        x_min=0,
+        x_max=20,
+        y0=[1.0],
+        n_points=21,
+        method="iteration",
+        selected_stats={"mean", "max"},
+        equation_type="difference",
+    )
+
+    assert isinstance(result, SolverResult)
+    assert result.x.shape == (21,)
+    assert result.y.shape == (1, 21)
+    np.testing.assert_allclose(result.y[0, 0], 1.0)
+    np.testing.assert_allclose(result.y[0, -1], 1.5**20)
+    assert result.metadata["equation_type"] == "difference"

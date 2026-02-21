@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Difference equations (recurrence relations)**: the project now supports both differential equations (ODEs) and difference equations. Select "Difference (recurrence)" in the equation dialog to solve recurrences of the form y_{n+order} = f(n, y_n, y_{n+1}, ...). Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.
+- **Predefined difference equations**: geometric growth, logistic map, Fibonacci recurrence, second-order linear recurrence, discrete logistic (cobweb model).
+- **`config/difference_equations.py`**: Python functions for difference equations (geometric_growth, logistic_map, fibonacci, linear_recurrence_2, cobweb_model).
+- **`solver/difference_solver.py`**: iterative solver for difference equations.
+- **ODEs defined via Python functions**: equations in `equations.yaml` can now use `function_name` to reference a function in `config.equations.py` instead of (or in addition to) the `expression` string. This allows defining complex differential equations in code rather than a single expression.
+- **`config/equations.py`**: new module with Python-callable ODE functions: harmonic oscillator, damped oscillator, exponential growth, logistic, Van der Pol, pendulum, RC circuit, free fall, time-dependent Schrödinger equation, Lorenz system, Duffing oscillator, Lotka-Volterra, rigid body Euler equations, and Bloch equations.
+- **New predefined equations**: Time-dependent Schrödinger equation, Lorenz system, Duffing oscillator, Lotka-Volterra predator-prey, rigid body Euler equations, Bloch equations.
+
+### Changed
+
+- **`formula` is now required**: all predefined equations must have a `formula` field for display; equations without it are skipped on load.
+- **`expression` optional when `function_name` is set**: equations using `function_name` no longer need an `expression`; execution uses the imported function.
+- **Pipeline and validators**: `run_solver_pipeline` and `validate_all_inputs` now accept either `expression` or `function_name` (keyword-only arguments).
+
 ## [0.2.0] - 2026-02-20
 
 ### Added

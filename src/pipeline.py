@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -13,7 +13,9 @@ from config import generate_output_basename, get_csv_path, get_json_path, get_pl
 from plotting import create_phase_plot, create_solution_plot, save_plot
 from solver import (
     compute_statistics,
+    get_difference_function,
     get_ode_function,
+    solve_difference,
     solve_multipoint,
     solve_ode,
     validate_all_inputs,
@@ -21,6 +23,8 @@ from solver import (
 from utils import ValidationError, export_all_results, get_logger
 
 logger = get_logger(__name__)
+
+EquationType = Literal["ode", "difference"]
 
 
 @dataclass
@@ -53,6 +57,7 @@ def run_solver_pipeline(
     selected_stats: set[str],
     selected_derivatives: list[int] | None = None,
     x0_list: list[float] | None = None,
+    equation_type: EquationType = "ode",
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
@@ -90,64 +95,90 @@ def run_solver_pipeline(
         method=method,
         params=parameters,
         x0_list=x0_list,
+        equation_type=equation_type,
     )
     if errors:
         raise ValidationError("\n".join(errors))
 
-    ode_func = get_ode_function(
-        expression=expression,
-        function_name=function_name,
-        order=order,
-        parameters=parameters,
-    )
-
-    t_eval = np.linspace(x_min, x_max, n_points)
-
-    use_multipoint = (
-        x0_list is not None
-        and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
-    )
-
-    if use_multipoint:
-        conditions = list(enumerate(zip(x0_list, y0)))  # type: ignore[arg-type]
-        conditions_flat = [(k, xi, ai) for k, (xi, ai) in conditions]
-        solution = solve_multipoint(
-            ode_func,
-            conditions=conditions_flat,
+    if equation_type == "difference":
+        recur_func = get_difference_function(
+            expression=expression,
+            function_name=function_name,
             order=order,
-            x_min=x_min,
-            x_max=x_max,
-            method=method,
-            t_eval=t_eval,
+            parameters=parameters,
         )
+        n_min = int(x_min)
+        n_max = int(x_max)
+        diff_sol = solve_difference(recur_func, n_min, n_max, y0, order)
+        if not diff_sol.success:
+            from utils import SolverFailedError
+            raise SolverFailedError(diff_sol.message)
+        solution_x = diff_sol.n
+        solution_y = diff_sol.y
+        solution_success = diff_sol.success
+        solution_message = diff_sol.message
+        solution_n_eval = 0
     else:
-        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+        ode_func = get_ode_function(
+            expression=expression,
+            function_name=function_name,
+            order=order,
+            parameters=parameters,
+        )
+        t_eval = np.linspace(x_min, x_max, n_points)
+        use_multipoint = (
+            x0_list is not None
+            and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
+        )
+        if use_multipoint:
+            conditions = list(enumerate(zip(x0_list, y0)))  # type: ignore[arg-type]
+            conditions_flat = [(k, xi, ai) for k, (xi, ai) in conditions]
+            solution = solve_multipoint(
+                ode_func,
+                conditions=conditions_flat,
+                order=order,
+                x_min=x_min,
+                x_max=x_max,
+                method=method,
+                t_eval=t_eval,
+            )
+        else:
+            solution = solve_ode(
+                ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval
+            )
+        solution_x = solution.x
+        solution_y = solution.y
+        solution_success = solution.success
+        solution_message = solution.message
+        solution_n_eval = solution.n_eval
 
-    stats = compute_statistics(solution.x, solution.y, selected_stats)
+    stats = compute_statistics(solution_x, solution_y, selected_stats)
 
     basename = generate_output_basename()
     csv_path = get_csv_path(basename)
     json_path = get_json_path(basename)
     plot_path = get_plot_path(basename)
 
+    xlabel = "n" if equation_type == "difference" else "x"
     metadata: dict[str, Any] = {
         "equation_name": equation_name,
+        "equation_type": equation_type,
         "expression": expression if expression else f"<function:{function_name}>",
         "order": order,
         "parameters": parameters,
         "domain": [x_min, x_max],
         "initial_conditions": y0,
         "ic_points": x0_list if x0_list is not None else [x_min] * order,
-        "method": method,
+        "method": method if equation_type == "ode" else "iteration",
         "num_points": n_points,
-        "solver_success": solution.success,
-        "solver_message": solution.message,
-        "n_evaluations": solution.n_eval,
+        "solver_success": solution_success,
+        "solver_message": solution_message,
+        "n_evaluations": solution_n_eval,
     }
 
     fig = create_solution_plot(
-        solution.x, solution.y,
-        title=equation_name, xlabel="x", ylabel="y",
+        solution_x, solution_y,
+        title=equation_name, xlabel=xlabel, ylabel="y",
         selected_derivatives=selected_derivatives,
     )
     save_plot(fig, plot_path)
@@ -155,16 +186,16 @@ def run_solver_pipeline(
     phase_fig: Figure | None = None
     if order >= 2:
         phase_fig = create_phase_plot(
-            solution.y, title=f"{equation_name} — Phase",
+            solution_y, title=f"{equation_name} — Phase",
         )
 
-    export_all_results(solution.x, solution.y, stats, metadata, csv_path, json_path)
+    export_all_results(solution_x, solution_y, stats, metadata, csv_path, json_path)
 
     logger.info("Pipeline complete for '%s'", equation_name)
 
     return SolverResult(
-        x=solution.x,
-        y=solution.y,
+        x=solution_x,
+        y=solution_y,
         statistics=stats,
         metadata=metadata,
         fig=fig,

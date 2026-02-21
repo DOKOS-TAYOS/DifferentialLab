@@ -35,9 +35,11 @@ class EquationDialog:
 
         self.equations = load_predefined_equations()
         self._equation_keys: list[str] = list(self.equations.keys())
+        self._filtered_keys: list[str] = list(self.equations.keys())
         self._selected_key: str | None = None
         self._param_vars: dict[str, tk.StringVar] = {}
         self._derivative_vars: list[tk.BooleanVar] = []
+        self._equation_type_var = tk.StringVar(value="ode")
 
         self._build_ui()
 
@@ -75,6 +77,27 @@ class EquationDialog:
             side=tk.BOTTOM, fill=tk.X,
         )
 
+        # ── Equation type selector ──
+        type_frame = ttk.Frame(self.win)
+        type_frame.pack(fill=tk.X, padx=pad, pady=(pad, 0))
+        ttk.Label(type_frame, text="Equation type:", style="Subtitle.TLabel").pack(
+            side=tk.LEFT, padx=(0, pad)
+        )
+        ttk.Radiobutton(
+            type_frame,
+            text="Differential (ODE)",
+            variable=self._equation_type_var,
+            value="ode",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
+            text="Difference (recurrence)",
+            variable=self._equation_type_var,
+            value="difference",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
+
         # ── Notebook ──
         self._notebook = ttk.Notebook(self.win)
         self._notebook.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
@@ -111,9 +134,6 @@ class EquationDialog:
         self.eq_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        for key, eq in self.equations.items():
-            self.eq_listbox.insert(tk.END, eq.name)
-
         self.eq_listbox.bind("<<ListboxSelect>>", self._on_select_equation)
 
         right = ttk.Frame(predef_frame)
@@ -130,6 +150,7 @@ class EquationDialog:
         self.derivatives_frame = ttk.LabelFrame(right, text="Derivatives to Plot", padding=pad)
         self.derivatives_frame.pack(fill=tk.X, pady=(0, pad))
 
+        self._populate_equation_list()
 
         # --- Tab 2: Custom (scrollable) ---
         custom_frame = ttk.Frame(self._notebook)
@@ -141,20 +162,26 @@ class EquationDialog:
         ci = custom_scroll.inner
         ci.configure(padding=pad)
 
-        ttk.Label(
+        self.custom_hint_label = ttk.Label(
             ci,
             text="Write the highest derivative as a Python expression.",
             style="Subtitle.TLabel",
-        ).pack(anchor=tk.W, pady=(0, pad))
-
-        hint = (
-            "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
-            "Use x for the independent variable.\n"
-            "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
-            "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
         )
-        ttk.Label(ci, text=hint, style="Small.TLabel",
-                  justify=tk.LEFT).pack(anchor=tk.W, pady=(0, pad))
+        self.custom_hint_label.pack(anchor=tk.W, pady=(0, pad))
+
+        self.custom_hint_text = tk.StringVar(
+            value=(
+                "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
+                "Use x for the independent variable.\n"
+                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
+                "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
+            )
+        )
+        self.custom_hint_detail = ttk.Label(
+            ci, textvariable=self.custom_hint_text, style="Small.TLabel",
+            justify=tk.LEFT,
+        )
+        self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad))
 
         unicode_frame = ttk.LabelFrame(
             ci, text="Unicode symbols — select and copy", padding=pad
@@ -186,14 +213,16 @@ class EquationDialog:
 
         row_order = ttk.Frame(ci)
         row_order.pack(fill=tk.X, pady=(pad, pad))
-        ttk.Label(row_order, text="ODE Order:").pack(side=tk.LEFT)
+        self.custom_order_label = ttk.Label(row_order, text="Order:")
+        self.custom_order_label.pack(side=tk.LEFT)
         self.custom_order_var = tk.StringVar(value="2")
         _font = get_font()
         spinbox = ttk.Spinbox(row_order, from_=1, to=10, width=5,
                      textvariable=self.custom_order_var, font=_font)
         spinbox.pack(side=tk.LEFT, padx=(pad, 0))
 
-        ttk.Label(ci, text="Expression for highest derivative:").pack(anchor=tk.W)
+        self.custom_expr_label = ttk.Label(ci, text="Expression for highest derivative:")
+        self.custom_expr_label.pack(anchor=tk.W)
         self.custom_expr = tk.Text(
             ci, height=3, width=60,
             bg=_btn_bg,
@@ -218,10 +247,53 @@ class EquationDialog:
 
         custom_scroll.bind_new_children()
         self.eq_listbox.focus_set()
+        self._update_custom_hints()
 
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
+
+    def _populate_equation_list(self) -> None:
+        """Populate the listbox with equations matching the current type."""
+        eq_type = self._equation_type_var.get()
+        self._filtered_keys = [
+            k for k, eq in self.equations.items()
+            if getattr(eq, "equation_type", "ode") == eq_type
+        ]
+        self.eq_listbox.delete(0, tk.END)
+        for key in self._filtered_keys:
+            self.eq_listbox.insert(tk.END, self.equations[key].name)
+        self._selected_key = None
+        self.desc_label.config(text="")
+
+    def _on_type_change(self) -> None:
+        """When equation type changes, refresh the list and custom hints."""
+        self._populate_equation_list()
+        self._update_custom_hints()
+
+    def _update_custom_hints(self) -> None:
+        """Update custom tab hints based on equation type."""
+        if self._equation_type_var.get() == "difference":
+            self.custom_hint_label.config(
+                text="Write y_{n+order} as a Python expression."
+            )
+            self.custom_hint_text.set(
+                "Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.\n"
+                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
+                "Example (geometric growth):  r * y[0]"
+            )
+            self.custom_expr_label.config(text="Expression for y_{n+order}:")
+        else:
+            self.custom_hint_label.config(
+                text="Write the highest derivative as a Python expression."
+            )
+            self.custom_hint_text.set(
+                "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
+                "Use x for the independent variable.\n"
+                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
+                "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
+            )
+            self.custom_expr_label.config(text="Expression for highest derivative:")
 
     def _update_custom_derivatives(self, *_args: Any) -> None:
         """Rebuild the derivatives listbox when the ODE order changes."""
@@ -265,7 +337,7 @@ class EquationDialog:
             self.desc_label.config(text="")
             return
         idx = sel[0]
-        key = self._equation_keys[idx]
+        key = self._filtered_keys[idx]
         eq = self.equations[key]
         self._selected_key = key
 
@@ -327,6 +399,7 @@ class EquationDialog:
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
+        eq_type: str = getattr(eq, "equation_type", "ode")
         ParametersDialog(
             self.parent,
             expression=eq.expression,
@@ -338,6 +411,7 @@ class EquationDialog:
             default_domain=eq.default_domain,
             selected_derivatives=selected_derivatives,
             display_formula=eq.formula,
+            equation_type=eq_type,
         )
 
     def _on_next_custom(self) -> None:
@@ -393,17 +467,20 @@ class EquationDialog:
                                    parent=self.win)
             return
 
+        eq_type = self._equation_type_var.get()
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
+        default_domain = [0, 50] if eq_type == "difference" else [0.0, 10.0]
         ParametersDialog(
             self.parent,
             expression=expr,
             function_name=None,
             order=order,
             parameters=params,
-            equation_name="Custom ODE",
+            equation_name="Custom difference" if eq_type == "difference" else "Custom ODE",
             default_y0=[1.0] * order,
-            default_domain=[0.0, 10.0],
+            default_domain=default_domain,
             selected_derivatives=selected_derivatives,
+            equation_type=eq_type,
         )

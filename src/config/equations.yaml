@@ -263,3 +263,88 @@ bloch_equations:
   function_name: bloch_equations
   default_initial_conditions: [0.0, 0.0, 1.0]
   default_domain: [0.0, 10.0]
+
+# --- Difference equations (recurrence relations) ---
+
+geometric_growth_diff:
+  name: "Geometric Growth (Discrete)"
+  formula: "y_{n+1} = r·y_n"
+  description: |
+    y_{n+1} = r·y_n
+    Discrete exponential growth. Use n for index, y[0] for y_n.
+  equation_type: difference
+  order: 1
+  parameters:
+    r:
+      default: 1.5
+      description: "Growth factor"
+  expression: "r * y[0]"
+  default_initial_conditions: [1.0]
+  default_domain: [0, 50]
+
+logistic_map_diff:
+  name: "Logistic Map"
+  formula: "y_{n+1} = r·y_n·(1 - y_n)"
+  description: |
+    y_{n+1} = r·y_n·(1 - y_n)
+    Classic chaotic map. For r≈3.57 exhibits chaos.
+  equation_type: difference
+  order: 1
+  parameters:
+    r:
+      default: 3.5
+      description: "Growth parameter"
+  expression: "r * y[0] * (1 - y[0])"
+  default_initial_conditions: [0.5]
+  default_domain: [0, 100]
+
+fibonacci_diff:
+  name: "Fibonacci Recurrence"
+  formula: "y_{n+2} = y_{n+1} + y_n"
+  description: |
+    y_{n+2} = y_{n+1} + y_n
+    Classic Fibonacci sequence. y[0]=y_n, y[1]=y_{n+1}.
+  equation_type: difference
+  order: 2
+  parameters: {}
+  expression: "y[1] + y[0]"
+  default_initial_conditions: [0.0, 1.0]
+  default_domain: [0, 30]
+
+linear_recurrence_2_diff:
+  name: "Second-Order Linear Recurrence"
+  formula: "y_{n+2} = a·y_{n+1} + b·y_n"
+  description: |
+    y_{n+2} = a·y_{n+1} + b·y_n
+    General second-order linear recurrence.
+  equation_type: difference
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+      description: "Coefficient of y_{n+1}"
+    b:
+      default: 1.0
+      description: "Coefficient of y_n"
+  expression: "a * y[1] + b * y[0]"
+  default_initial_conditions: [0.0, 1.0]
+  default_domain: [0, 30]
+
+cobweb_model_diff:
+  name: "Discrete Logistic (Cobweb)"
+  formula: "y_{n+1} = r·y_n·(1 - y_n/K)"
+  description: |
+    y_{n+1} = r·y_n·(1 - y_n/K)
+    Discrete population model with carrying capacity.
+  equation_type: difference
+  order: 1
+  parameters:
+    r:
+      default: 2.5
+      description: "Growth rate"
+    K:
+      default: 1.0
+      description: "Carrying capacity"
+  function_name: cobweb_model
+  default_initial_conditions: [0.5]
+  default_domain: [0, 50]

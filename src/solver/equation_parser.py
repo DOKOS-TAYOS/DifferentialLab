@@ -229,6 +229,117 @@ def get_ode_function(
     return ode_func
 
 
+def parse_difference_expression(
+    expression: str,
+    order: int,
+    parameters: dict[str, float] | None = None,
+) -> Callable[[int, np.ndarray], float]:
+    """Parse a difference equation expression into a callable ``f(n, y) -> y_next``.
+
+    The expression gives y_{n+order} in terms of n and y[0], y[1], ..., y[order-1].
+    Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.
+
+    Args:
+        expression: Python expression string for the next value.
+        order: Order of the recurrence (1, 2, …).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable ``f(n, y)`` that returns the next value (scalar).
+
+    Raises:
+        EquationParseError: If the expression is invalid.
+    """
+    expression = normalize_unicode_escapes(expression)
+    _validate_ast(expression)
+    params = dict(parameters) if parameters else {}
+    logger.debug(
+        "Parsing difference expression (order=%d): %s, params=%s",
+        order, expression, params,
+    )
+
+    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    compiled = compile(expression, "<difference_expression>", "eval")
+
+    def _test_eval() -> None:
+        test_y = np.zeros(order)
+        test_ns = {**namespace, "n": 0, "y": test_y}
+        try:
+            eval(compiled, {"__builtins__": {}}, test_ns)
+        except Exception as exc:
+            raise EquationParseError(
+                f"Expression evaluation failed: {exc}"
+            ) from exc
+
+    _test_eval()
+
+    def recur_func(n: int, y: np.ndarray) -> float:
+        local_ns = {**namespace, "n": n, "y": y}
+        return float(eval(compiled, {"__builtins__": {}}, local_ns))
+
+    return recur_func
+
+
+def get_difference_function(
+    *,
+    expression: str | None = None,
+    function_name: str | None = None,
+    order: int,
+    parameters: dict[str, float] | None = None,
+) -> Callable[[int, np.ndarray], float]:
+    """Resolve a difference equation function from expression or Python function.
+
+    Exactly one of expression or function_name must be provided.
+
+    Args:
+        expression: Python expression for y_{n+order}.
+        function_name: Name of a function in config.difference_equations to import.
+        order: Recurrence order (1, 2, …).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable ``f(n, y)`` that returns the next value (scalar).
+
+    Raises:
+        EquationParseError: If expression is invalid or function cannot be resolved.
+        ValueError: If neither or both expression and function_name are provided.
+    """
+    params = dict(parameters) if parameters else {}
+    if expression is not None and function_name is not None:
+        raise ValueError("Provide either expression or function_name, not both")
+    if expression is None and function_name is None:
+        raise ValueError("Provide either expression or function_name")
+
+    if expression is not None:
+        return parse_difference_expression(expression, order, params)
+
+    try:
+        from config import difference_equations as diff_module
+    except ImportError:
+        try:
+            from config import equations as diff_module
+        except ImportError as exc:
+            raise EquationParseError(
+                f"Cannot import config.difference_equations or config.equations: {exc}"
+            ) from exc
+
+    if not hasattr(diff_module, function_name):
+        raise EquationParseError(
+            f"Function '{function_name}' not found in config"
+        )
+
+    func = getattr(diff_module, function_name)
+    if not callable(func):
+        raise EquationParseError(
+            f"'{function_name}' is not callable"
+        )
+
+    def recur_func(n: int, y: np.ndarray) -> float:
+        return float(func(n, y, **params))
+
+    return recur_func
+
+
 def validate_expression(expression: str) -> list[str]:
     """Check an expression for obvious errors without evaluating.
 
