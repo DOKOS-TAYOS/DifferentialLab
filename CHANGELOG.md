@@ -9,11 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Automatic update check on startup**: checks weekly (configurable) if a newer version is available in the repository. If so, prompts the user to update; on acceptance, runs `git pull` while preserving `input/`, `output/`, and `.env`. Configurable via `CHECK_UPDATES`, `CHECK_UPDATES_FORCE`, and `UPDATE_CHECK_URL` in `.env`. See `utils/update_checker.py`.
+- **Solver error metrics in results**: the Solver Info section now shows rtol, atol, residual max/mean/rms (how well the solution satisfies the ODE), and Jacobian evaluations (for implicit methods). Computed via `solver/error_metrics.py` for ODE and vector ODE runs.
+- **Phase portrait for first-order ODEs**: phase plot is now always shown for ODEs. For first-order equations it displays y vs dy/dx (numerical derivative); for second-order and above it shows y vs y′ as before.
+
+- **Function Transforms module**: new "Transforms" button in the main menu opens a dialog to enter a scalar function f(x), apply mathematical transforms, and visualize or export the result. Supports: Original (f(x)), Fourier (FFT), Laplace (real axis), Taylor series, Hilbert (discrete), and Z-transform (discrete).
+- **Display mode**: second combobox to choose between "Curve (f vs x)" and "Coefficients (a_i vs i)". Coefficients view shows Taylor a_i, Fourier |F[k]|, Laplace L(s_i), Hilbert |H[k]|, or Z-transform samples x[n] vs index.
+- **`transforms/` module**: `function_parser` for safe parsing of f(x) expressions, `transform_engine` with `apply_transform`, `get_transform_coefficients`, `TransformKind`, and `DisplayMode`.
+- **Transform help dialog**: collapsible sections (About, Function Input, Transformations, Display Mode, Export) with grab handling so collapsibles work when opened from the modal Transform dialog.
 - **Vector ODE support**: equations can now be vector-valued [f₀(x), f₁(x), …] with f_i'' = h_i(x, f₀, f₁, …, f₀', f₁'). The system detects vector mode via `vector_expressions` or `equation_type: vector_ode`. Scalar ODEs and PDEs behave unchanged.
 - **`parse_vector_expression` and `get_vector_ode_function`**: parse lists of expressions into vector ODE callables. State layout: [f₀, f₀', f₁, f₁', …].
-- **Animation tab**: for vector ODEs, a new "f_i(x) Animation" tab with a Tkinter Scale to vary x and see f_i(x) vs component index i. Export MP4 button to save the animation as video (requires ffmpeg).
+- **Animation tab**: for vector ODEs, a new "f_i(x) Animation" tab with Tkinter Scale, Play (▶) and Stop (■) buttons, and duration entry. Chain-style plot (points + lines, verticals to x-axis) instead of bars. Duration (seconds) controls both playback speed and MP4 export length. Playback capped at 30 fps to avoid matplotlib overload.
 - **3D vector tab**: "f_i(x) 3D" tab showing x (independent), component index i, and f_i(x) as a surface.
-- **Predefined vector equations**: Coupled Harmonic Oscillators, Double Pendulum (Linearized), Three Coupled Oscillators, Damped Coupled System in `equations.yaml`.
+- **Predefined vector equations**: Coupled Harmonic Oscillators, Double Pendulum (Linearized), Three Coupled Oscillators, 20 Coupled Harmonic Oscillators, Damped Coupled System in `equations.yaml`.
 - **PDE (multivariate) support**: equations can now have multiple independent variables (e.g. f(x,y)). Select "PDE (multivariate)" in the equation dialog. For f(x,y), the output is a 3D surface plot by default; the user can choose 2D contour instead. Domain and grid size are configurable per dimension.
 - **`solver/pde_solver.py`**: finite-difference solver for 2D elliptic PDEs (-u_xx - u_yy = f). Uses 5-point stencil and zero Dirichlet boundary conditions.
 - **`parse_pde_rhs_expression`**: parses RHS expressions for PDEs using variable names (x, y, …) and parameters.
@@ -22,12 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`variables` and `partial_derivatives`** in `PredefinedEquation`: schema extended for multivariate equations.
 - **`compute_statistics_2d`**: statistics (mean, std, max, min, integral) for 2D scalar fields.
 - **2D CSV export**: `export_all_results` accepts optional `y_grid` for x,y,u column format.
+- **`export_animation_to_mp4`**: exports vector animation as MP4 with user-specified duration; frames downsampled to 500 max to avoid memory exhaustion; explicit ffmpeg availability check.
+
+### Fixed
+
+- **PDE grid size**: validation limits grid to 1000 points per axis to avoid excessive memory allocation. User-entered values above this show a dialog before attempting solve.
+- **Uncaught solver exceptions**: `MemoryError`, `OSError`, and other exceptions in the solver pipeline are now caught and shown in a messagebox instead of crashing with a traceback.
 
 ### Changed
 
+- **Results dialog sections**: Magnitudes, Statistics, Solver Info, and Output Files are now collapsible (expand/collapse via clickable headers with arrow indicators).
 - **Pipeline**: detects 1D vs multivariate from `variables`; routes to ODE or PDE solver accordingly.
 - **Equation dialog**: added PDE type; passes `variables` to parameters dialog.
 - **Parameters dialog**: for PDE, shows y_min/y_max, grid points per axis, and plot type (3D/2D).
+- **Animation playback**: Tkinter Scale instead of matplotlib Slider (fixes unresponsive slider when embedded); duration (seconds) replaces pts/s for both Play and MP4 export; playback capped at 30 fps.
 
 - **Difference equations (recurrence relations)**: the project now supports both differential equations (ODEs) and difference equations. Select "Difference (recurrence)" in the equation dialog to solve recurrences of the form y_{n+order} = f(n, y_n, y_{n+1}, ...). Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.
 - **Predefined difference equations**: geometric growth, logistic map, Fibonacci recurrence, second-order linear recurrence, discrete logistic (cobweb model).

@@ -9,7 +9,13 @@ from typing import Any, Literal
 import numpy as np
 from matplotlib.figure import Figure
 
-from config import generate_output_basename, get_csv_path, get_json_path, get_plot_path
+from config import (
+    generate_output_basename,
+    get_csv_path,
+    get_env_from_schema,
+    get_json_path,
+    get_plot_path,
+)
 from plotting import (
     create_contour_plot,
     create_phase_plot,
@@ -20,6 +26,7 @@ from plotting import (
     save_plot,
 )
 from solver import (
+    compute_ode_residual_error,
     compute_statistics,
     compute_statistics_2d,
     get_difference_function,
@@ -111,6 +118,8 @@ def run_solver_pipeline(
     """
     vars_list = variables if variables else ["x"]
     is_pde = equation_type == "pde" or is_multivariate(vars_list)
+    error_metrics: dict[str, float] = {}
+    solver_quality: dict[str, Any] = {}
     is_vector = (
         (vector_expressions is not None and len(vector_expressions) > 0)
         or equation_type == "vector_ode"
@@ -196,6 +205,15 @@ def run_solver_pipeline(
         solution_success = solution.success
         solution_message = solution.message
         solution_n_eval = solution.n_eval
+        error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
+        solver_quality = {
+            "rtol": get_env_from_schema("SOLVER_RTOL"),
+            "atol": get_env_from_schema("SOLVER_ATOL"),
+        }
+        if solution.raw is not None:
+            njev = getattr(solution.raw, "njev", None)
+            if njev is not None:
+                solver_quality["n_jacobian_evals"] = int(njev)
     else:
         ode_func = get_ode_function(
             expression=expression,
@@ -229,6 +247,15 @@ def run_solver_pipeline(
         solution_success = solution.success
         solution_message = solution.message
         solution_n_eval = solution.n_eval
+        error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
+        solver_quality = {
+            "rtol": get_env_from_schema("SOLVER_RTOL"),
+            "atol": get_env_from_schema("SOLVER_ATOL"),
+        }
+        if solution.raw is not None:
+            njev = getattr(solution.raw, "njev", None)
+            if njev is not None:
+                solver_quality["n_jacobian_evals"] = int(njev)
 
     if is_pde and len(vars_list) >= 2:
         stats = compute_statistics_2d(
@@ -261,6 +288,12 @@ def run_solver_pipeline(
         "solver_success": solution_success,
         "solver_message": solution_message,
         "n_evaluations": solution_n_eval,
+        "rtol": solver_quality.get("rtol"),
+        "atol": solver_quality.get("atol"),
+        "residual_max": error_metrics.get("residual_max"),
+        "residual_mean": error_metrics.get("residual_mean"),
+        "residual_rms": error_metrics.get("residual_rms"),
+        "n_jacobian_evals": solver_quality.get("n_jacobian_evals"),
     }
 
     if is_pde and len(vars_list) >= 2:
@@ -294,9 +327,11 @@ def run_solver_pipeline(
         phase_fig = None
         animation_fig = None
         animation_3d_fig = None
-        if order >= 2 and not is_pde and not is_vector:
+        if not is_pde and not is_vector:
             phase_fig = create_phase_plot(
-                solution_y, title=f"{equation_name} — Phase",
+                solution_y,
+                title=f"{equation_name} — Phase",
+                x=solution_x if order == 1 else None,
             )
         if is_vector and vector_components > 1:
             animation_fig = create_vector_animation_plot(

@@ -155,14 +155,19 @@ def create_phase_plot(
     title: str = "Phase Portrait",
     xlabel: str = "y",
     ylabel: str = "y'",
+    x: np.ndarray | None = None,
 ) -> Figure:
-    """Create a phase portrait for a second-order ODE.
+    """Create a phase portrait for an ODE.
+
+    For second-order (or higher): plots y vs y' (position vs velocity).
+    For first-order: plots y vs dy/dx using numerical derivative (requires x).
 
     Args:
-        y: Solution array — shape ``(n_vars, n_points)`` with at least 2 rows.
+        y: Solution array — shape ``(n_vars, n_points)``.
         title: Plot title.
         xlabel: Label for horizontal axis.
         ylabel: Label for vertical axis.
+        x: Independent variable (required for first-order to compute dy/dx).
 
     Returns:
         A matplotlib :class:`Figure`.
@@ -175,10 +180,18 @@ def create_phase_plot(
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
 
     y_2d = np.atleast_2d(y)
-    ax.plot(y_2d[0], y_2d[1], color=line_color, linewidth=line_width)
+    if y_2d.shape[0] >= 2:
+        ax.plot(y_2d[0], y_2d[1], color=line_color, linewidth=line_width)
+        horiz, vert = y_2d[0], y_2d[1]
+    else:
+        if x is None:
+            raise ValueError("x is required for first-order phase portrait")
+        horiz = y_2d[0]
+        vert = np.gradient(y_2d[0], x)
+        ax.plot(horiz, vert, color=line_color, linewidth=line_width)
 
-    ax.plot(y_2d[0, 0], y_2d[1, 0], "o", color="green", markersize=8, label="Start")
-    ax.plot(y_2d[0, -1], y_2d[1, -1], "s", color="red", markersize=8, label="End")
+    ax.plot(horiz[0], vert[0], "o", color="green", markersize=8, label="Start")
+    ax.plot(horiz[-1], vert[-1], "s", color="red", markersize=8, label="End")
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=True)
     fig.tight_layout()

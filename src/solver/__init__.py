@@ -1,6 +1,7 @@
 """ODE, difference, and PDE solving engine."""
 
 from solver.difference_solver import solve_difference
+from solver.error_metrics import compute_ode_residual_error
 from solver.equation_parser import (
     get_difference_function,
     get_ode_function,
@@ -16,6 +17,7 @@ from solver.statistics import compute_statistics, compute_statistics_2d
 from solver.validators import validate_all_inputs
 
 __all__ = [
+    "compute_ode_residual_error",
     "get_difference_function",
     "get_ode_function",
     "get_vector_ode_function",

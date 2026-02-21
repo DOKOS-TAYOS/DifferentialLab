@@ -109,6 +109,19 @@ class MainMenu:
         self.btn_config.pack(pady=padding)
         ToolTip(self.btn_config, "Adjust solver settings, theme, and other preferences.")
 
+        self.btn_transforms = ttk.Button(
+            btn_frame,
+            text="Transforms",
+            width=btn_width,
+            style="Accent2.TButton",
+            command=self._on_transforms,
+        )
+        self.btn_transforms.pack(pady=padding)
+        ToolTip(
+            self.btn_transforms,
+            "Enter a function, apply Fourier/Laplace/Taylor transforms, and export data.",
+        )
+
         self.btn_info = ttk.Button(
             btn_frame,
             text="Information",
@@ -136,6 +149,7 @@ class MainMenu:
         setup_arrow_enter_navigation([
             [self.btn_solve],
             [self.btn_config],
+            [self.btn_transforms],
             [self.btn_info],
             [self.btn_quit],
         ])
@@ -157,6 +171,13 @@ class MainMenu:
         from frontend.ui_dialogs import EquationDialog
 
         EquationDialog(self.root)
+
+    def _on_transforms(self) -> None:
+        """Open the function transforms dialog."""
+        logger.info("User clicked Transforms")
+        from frontend.ui_dialogs import TransformDialog
+
+        TransformDialog(self.root)
 
     def _on_config(self) -> None:
         """Open the configuration dialog; restart the app if saved."""

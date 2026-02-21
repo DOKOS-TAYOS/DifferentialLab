@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_output_dir, get_env_from_schema
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
@@ -142,39 +143,54 @@ class ResultDialog:
         other_stats = {k: v for k, v in statistics.items() if k not in _MAGNITUDE_KEYS}
 
         if magnitudes:
-            mag_lf = ttk.LabelFrame(left_inner, text="Magnitudes", padding=pad)
-            mag_lf.pack(fill=tk.X, pady=(0, pad))
+            mag_section = CollapsibleSection(
+                left_inner, left_scroll, "Magnitudes", expanded=True, pad=pad
+            )
             for key, val in magnitudes.items():
-                self._render_stat_entry(mag_lf, key, val, pad)
+                self._render_stat_entry(mag_section.content, key, val, pad)
 
         if other_stats:
-            stat_lf = ttk.LabelFrame(left_inner, text="Statistics", padding=pad)
-            stat_lf.pack(fill=tk.X, pady=(0, pad))
+            stat_section = CollapsibleSection(
+                left_inner, left_scroll, "Statistics", expanded=True, pad=pad
+            )
             for key, val in other_stats.items():
-                self._render_stat_entry(stat_lf, key, val, pad)
+                self._render_stat_entry(stat_section.content, key, val, pad)
 
-        # Solver info
-        info_lf = ttk.LabelFrame(left_inner, text="Solver Info", padding=pad)
-        info_lf.pack(fill=tk.X, pady=(0, pad))
-
-        info_items = [
+        # Solver info (with error metrics)
+        info_section = CollapsibleSection(
+            left_inner, left_scroll, "Solver Info", expanded=True, pad=pad
+        )
+        info_items: list[tuple[str, Any]] = [
             ("Method", metadata.get("method", "?")),
             ("Success", "Yes" if metadata.get("solver_success") else "No"),
             ("Evaluations", metadata.get("n_evaluations", "?")),
             ("Points", metadata.get("num_points", "?")),
         ]
+        # Error and quality metrics (ODE/vector only)
+        if metadata.get("rtol") is not None:
+            info_items.append(("rtol", metadata["rtol"]))
+        if metadata.get("atol") is not None:
+            info_items.append(("atol", metadata["atol"]))
+        if metadata.get("residual_max") is not None:
+            info_items.append(("Residual max", f"{metadata['residual_max']:.2e}"))
+        if metadata.get("residual_mean") is not None:
+            info_items.append(("Residual mean", f"{metadata['residual_mean']:.2e}"))
+        if metadata.get("residual_rms") is not None:
+            info_items.append(("Residual RMS", f"{metadata['residual_rms']:.2e}"))
+        if metadata.get("n_jacobian_evals") is not None:
+            info_items.append(("Jacobian evals", metadata["n_jacobian_evals"]))
         for label, value in info_items:
-            row = ttk.Frame(info_lf)
+            row = ttk.Frame(info_section.content)
             row.pack(fill=tk.X, pady=1)
             ttk.Label(row, text=f"{label}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
             ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
 
         # File paths
-        files_lf = ttk.LabelFrame(left_inner, text="Output Files", padding=pad)
-        files_lf.pack(fill=tk.X, pady=(0, pad))
-
+        files_section = CollapsibleSection(
+            left_inner, left_scroll, "Output Files", expanded=True, pad=pad
+        )
         for label, path in [("Solution", csv_path), ("Metadata", json_path), ("Plot", plot_path)]:
-            row = ttk.Frame(files_lf)
+            row = ttk.Frame(files_section.content)
             row.pack(fill=tk.X, pady=1)
             ttk.Label(row, text=f"{label}:", width=8, anchor=tk.W).pack(side=tk.LEFT)
             path_lbl = ttk.Label(row, text=str(path), style="Small.TLabel", anchor=tk.W)

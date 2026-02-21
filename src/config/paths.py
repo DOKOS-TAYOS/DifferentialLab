@@ -8,6 +8,15 @@ from config.env import get_env_from_schema
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+def get_project_root() -> Path:
+    """Return the absolute project root directory.
+
+    Returns:
+        Path to the project root (parent of src/).
+    """
+    return _PROJECT_ROOT
+
+
 def get_output_dir() -> Path:
     """Return the absolute output directory, creating it if needed.
 

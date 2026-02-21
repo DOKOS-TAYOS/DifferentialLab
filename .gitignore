@@ -15,6 +15,9 @@ build/
 # Environment
 .env
 
+# Update check state (last check timestamp)
+.last_update_check
+
 # IDE
 .vscode/
 .idea/
@@ -33,6 +36,7 @@ output/*.json
 output/*.png
 output/*.jpg
 output/*.pdf
+output/*.mp4
 
 # Logs
 *.log
