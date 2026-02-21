@@ -10,21 +10,31 @@ import numpy as np
 from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_csv_path, get_json_path, get_plot_path
-from plotting import create_phase_plot, create_solution_plot, save_plot
+from plotting import (
+    create_contour_plot,
+    create_phase_plot,
+    create_solution_plot,
+    create_surface_plot,
+    save_plot,
+)
 from solver import (
     compute_statistics,
+    compute_statistics_2d,
     get_difference_function,
     get_ode_function,
+    is_multivariate,
+    parse_pde_rhs_expression,
     solve_difference,
     solve_multipoint,
     solve_ode,
+    solve_pde_2d,
     validate_all_inputs,
 )
 from utils import ValidationError, export_all_results, get_logger
 
 logger = get_logger(__name__)
 
-EquationType = Literal["ode", "difference"]
+EquationType = Literal["ode", "difference", "pde"]
 
 
 @dataclass
@@ -58,6 +68,11 @@ def run_solver_pipeline(
     selected_derivatives: list[int] | None = None,
     x0_list: list[float] | None = None,
     equation_type: EquationType = "ode",
+    variables: list[str] | None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    n_points_y: int | None = None,
+    plot_3d: bool = True,
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
@@ -84,23 +99,52 @@ def run_solver_pipeline(
         EquationParseError: If the expression cannot be parsed or function not found.
         DifferentialLabError: If the solver fails.
     """
-    errors = validate_all_inputs(
-        expression=expression,
-        function_name=function_name,
-        order=order,
-        x_min=x_min,
-        x_max=x_max,
-        y0=y0,
-        num_points=n_points,
-        method=method,
-        params=parameters,
-        x0_list=x0_list,
-        equation_type=equation_type,
-    )
-    if errors:
-        raise ValidationError("\n".join(errors))
+    vars_list = variables if variables else ["x"]
+    is_pde = equation_type == "pde" or is_multivariate(vars_list)
 
-    if equation_type == "difference":
+    if not is_pde:
+        errors = validate_all_inputs(
+            expression=expression,
+            function_name=function_name,
+            order=order,
+            x_min=x_min,
+            x_max=x_max,
+            y0=y0,
+            num_points=n_points,
+            method=method,
+            params=parameters,
+            x0_list=x0_list,
+            equation_type=equation_type,
+        )
+        if errors:
+            raise ValidationError("\n".join(errors))
+
+    if is_pde and len(vars_list) >= 2:
+        # PDE path: 2D (or more) variables
+        if y_min is None or y_max is None:
+            raise ValidationError("PDE requires y_min and y_max for 2D domain")
+        ny = n_points_y if n_points_y is not None else n_points
+        rhs_func = parse_pde_rhs_expression(
+            expression or "0", vars_list, parameters
+        )
+
+        def residual(x: float, y: float, f: float, fx: float, fy: float,
+                     fxx: float, fxy: float, fyy: float, **kw: Any) -> float:
+            return rhs_func(x, y, **kw)
+
+        pde_sol = solve_pde_2d(
+            residual,
+            x_min, x_max, float(y_min), float(y_max),
+            n_points, ny,
+            parameters=parameters,
+        )
+        solution_x = pde_sol.grid[0]
+        solution_y_grid = pde_sol.grid[1]
+        solution_y = pde_sol.u  # shape (ny, nx)
+        solution_success = pde_sol.success
+        solution_message = pde_sol.message
+        solution_n_eval = pde_sol.n_eval
+    elif equation_type == "difference":
         recur_func = get_difference_function(
             expression=expression,
             function_name=function_name,
@@ -152,7 +196,12 @@ def run_solver_pipeline(
         solution_message = solution.message
         solution_n_eval = solution.n_eval
 
-    stats = compute_statistics(solution_x, solution_y, selected_stats)
+    if is_pde and len(vars_list) >= 2:
+        stats = compute_statistics_2d(
+            solution_x, solution_y_grid, solution_y, selected_stats
+        )
+    else:
+        stats = compute_statistics(solution_x, solution_y, selected_stats)
 
     basename = generate_output_basename()
     csv_path = get_csv_path(basename)
@@ -166,30 +215,50 @@ def run_solver_pipeline(
         "expression": expression if expression else f"<function:{function_name}>",
         "order": order,
         "parameters": parameters,
-        "domain": [x_min, x_max],
+        "domain": (
+            [x_min, x_max, y_min, y_max]
+            if (is_pde and y_min is not None and y_max is not None)
+            else [x_min, x_max]
+        ),
         "initial_conditions": y0,
         "ic_points": x0_list if x0_list is not None else [x_min] * order,
-        "method": method if equation_type == "ode" else "iteration",
+        "method": method if equation_type == "ode" else "fdm",
         "num_points": n_points,
         "solver_success": solution_success,
         "solver_message": solution_message,
         "n_evaluations": solution_n_eval,
     }
 
-    fig = create_solution_plot(
-        solution_x, solution_y,
-        title=equation_name, xlabel=xlabel, ylabel="y",
-        selected_derivatives=selected_derivatives,
-    )
-    save_plot(fig, plot_path)
-
-    phase_fig: Figure | None = None
-    if order >= 2:
-        phase_fig = create_phase_plot(
-            solution_y, title=f"{equation_name} — Phase",
+    if is_pde and len(vars_list) >= 2:
+        if plot_3d:
+            fig = create_surface_plot(
+                solution_x, solution_y_grid, solution_y,
+                title=equation_name, xlabel="x", ylabel="y", zlabel="u",
+            )
+        else:
+            fig = create_contour_plot(
+                solution_x, solution_y_grid, solution_y,
+                title=equation_name, xlabel="x", ylabel="y",
+            )
+        phase_fig = None
+        export_all_results(
+            solution_x, solution_y, stats, metadata, csv_path, json_path,
+            y_grid=solution_y_grid,
         )
+    else:
+        fig = create_solution_plot(
+            solution_x, solution_y,
+            title=equation_name, xlabel=xlabel, ylabel="y",
+            selected_derivatives=selected_derivatives,
+        )
+        phase_fig = None
+        if order >= 2 and not is_pde:
+            phase_fig = create_phase_plot(
+                solution_y, title=f"{equation_name} — Phase",
+            )
+        export_all_results(solution_x, solution_y, stats, metadata, csv_path, json_path)
 
-    export_all_results(solution_x, solution_y, stats, metadata, csv_path, json_path)
+    save_plot(fig, plot_path)
 
     logger.info("Pipeline complete for '%s'", equation_name)
 

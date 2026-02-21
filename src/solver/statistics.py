@@ -19,8 +19,9 @@ def compute_statistics(
     """Compute requested statistics for the primary solution component.
 
     Args:
-        x: Independent variable values.
-        y: Solution array — shape ``(n_vars, n_points)`` or ``(n_points,)``.
+        x: Independent variable values (1D) or tuple of grids for 2D.
+        y: Solution array — shape ``(n_vars, n_points)`` or ``(n_points,)``
+            for 1D, or ``(ny, nx)`` for 2D PDE.
         selected: Set of statistic keys to compute. ``None`` means all.
 
     Returns:
@@ -143,3 +144,50 @@ def _estimate_energy(x: np.ndarray, y_2d: np.ndarray) -> dict[str, float]:
         "potential_mean": float(np.mean(potential)),
         "total_mean": float(np.mean(kinetic + potential)),
     }
+
+
+def compute_statistics_2d(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    u: np.ndarray,
+    selected: set[str] | None = None,
+) -> dict[str, Any]:
+    """Compute statistics for a 2D scalar field u(x,y).
+
+    Args:
+        x_grid: 1D array of x values.
+        y_grid: 1D array of y values.
+        u: 2D array of shape (len(y_grid), len(x_grid)).
+        selected: Set of statistic keys. ``None`` means all 2D stats.
+
+    Returns:
+        Dictionary with mean, std, max, min, integral_2d.
+    """
+    all_stats = selected or {"mean", "std", "max", "min", "integral"}
+    results: dict[str, Any] = {}
+
+    flat = u.ravel()
+    if "mean" in all_stats:
+        results["mean"] = float(np.mean(flat))
+    if "std" in all_stats:
+        results["std"] = float(np.std(flat))
+    if "max" in all_stats:
+        ij = np.unravel_index(np.argmax(u), u.shape)
+        results["max"] = {
+            "value": float(u[ij]),
+            "x": float(x_grid[ij[1]]),
+            "y": float(y_grid[ij[0]]),
+        }
+    if "min" in all_stats:
+        ij = np.unravel_index(np.argmin(u), u.shape)
+        results["min"] = {
+            "value": float(u[ij]),
+            "x": float(x_grid[ij[1]]),
+            "y": float(y_grid[ij[0]]),
+        }
+    if "integral" in all_stats:
+        results["integral"] = float(np.trapezoid(
+            np.trapezoid(u, x_grid, axis=1), y_grid, axis=0
+        ))
+
+    return results

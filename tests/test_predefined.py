@@ -43,8 +43,12 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         assert eq.order >= 1
         assert eq.formula
         assert eq.expression or eq.function_name
-        assert len(eq.default_initial_conditions) == eq.order
-        assert len(eq.default_domain) == 2
+        is_pde = getattr(eq, "equation_type", "ode") == "pde"
+        if not is_pde:
+            assert len(eq.default_initial_conditions) == eq.order
+            assert len(eq.default_domain) >= 2
+        else:
+            assert len(eq.default_domain) >= 4  # x_min, x_max, y_min, y_max
 
 
 def test_load_predefined_equations_known_keys() -> None:

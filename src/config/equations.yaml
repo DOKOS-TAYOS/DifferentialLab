@@ -348,3 +348,37 @@ cobweb_model_diff:
   function_name: cobweb_model
   default_initial_conditions: [0.5]
   default_domain: [0, 50]
+
+# --- PDE (multivariate) equations ---
+
+poisson_2d:
+  name: "Poisson Equation (2D)"
+  formula: "-∇²u = f(x,y)"
+  description: |
+    -u_xx - u_yy = f(x,y)
+    Elliptic PDE. Solves for u(x,y) with zero Dirichlet boundary conditions.
+    Use expression for the RHS f(x,y). Example: k for constant, or x*y.
+  equation_type: pde
+  variables: ["x", "y"]
+  order: 1
+  parameters:
+    k:
+      default: 1.0
+      description: "Constant RHS (if expression is 'k')"
+  expression: "k"
+  default_initial_conditions: []
+  default_domain: [0.0, 1.0, 0.0, 1.0]
+
+laplace_2d:
+  name: "Laplace Equation (2D)"
+  formula: "∇²u = 0"
+  description: |
+    u_xx + u_yy = 0
+    Harmonic function. Zero Dirichlet BC.
+  equation_type: pde
+  variables: ["x", "y"]
+  order: 1
+  parameters: {}
+  expression: "0"
+  default_initial_conditions: []
+  default_domain: [0.0, 1.0, 0.0, 1.0]

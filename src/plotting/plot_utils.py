@@ -119,12 +119,12 @@ def create_solution_plot(
     labels = ["y"] if y_2d.shape[0] == 1 else [f"y[{i}]" for i in range(y_2d.shape[0])]
 
     try:
-        cmap = plt.cm.get_cmap(color_scheme)
+        cmap = plt.colormaps.get_cmap(color_scheme)
         n_colors = max(1, len(selected_derivatives) - 1)
         colors = [line_color] + list(cmap(np.linspace(0, 1, n_colors)))
     except (ValueError, AttributeError):
         n_fallback = max(1, len(selected_derivatives) - 1)
-        colors = [line_color] + list(plt.cm.Set1(np.linspace(0, 1, n_fallback)))
+        colors = [line_color] + list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, n_fallback)))
 
     for plot_idx, deriv_idx in enumerate(selected_derivatives):
         if deriv_idx >= y_2d.shape[0]:
@@ -181,6 +181,115 @@ def create_phase_plot(
     ax.plot(y_2d[0, -1], y_2d[1, -1], "s", color="red", markersize=8, label="End")
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=True)
+    fig.tight_layout()
+    return fig
+
+
+def create_surface_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    title: str = "f(x, y)",
+    xlabel: str = "x",
+    ylabel: str = "y",
+    zlabel: str = "f",
+) -> Figure:
+    """Create a 3D surface plot for 2D scalar field data.
+
+    Args:
+        x: 1D array of x values.
+        y: 1D array of y values.
+        z: 2D array of values, shape (len(y), len(x)).
+        title: Plot title.
+        xlabel: Label for x-axis.
+        ylabel: Label for y-axis.
+        zlabel: Label for z-axis.
+
+    Returns:
+        A matplotlib :class:`Figure`.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    ax = fig.add_subplot(111, projection="3d")
+
+    X, Y = np.meshgrid(x, y)
+    if z.shape != X.shape:
+        z = np.asarray(z)
+        if z.shape != X.shape:
+            raise ValueError(
+                f"z shape {z.shape} does not match grid {X.shape}"
+            )
+
+    surf = ax.plot_surface(
+        X, Y, z,
+        cmap="viridis",
+        alpha=0.9,
+        edgecolor="none",
+    )
+    fig.colorbar(surf, ax=ax, shrink=0.6)
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    ax.set_xlabel(xlabel, fontstyle=axis_style)
+    ax.set_ylabel(ylabel, fontstyle=axis_style)
+    ax.set_zlabel(zlabel, fontstyle=axis_style)
+
+    fig.tight_layout()
+    return fig
+
+
+def create_contour_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    title: str = "f(x, y)",
+    xlabel: str = "x",
+    ylabel: str = "y",
+) -> Figure:
+    """Create a 2D contour plot for 2D scalar field data.
+
+    Args:
+        x: 1D array of x values.
+        y: 1D array of y values.
+        z: 2D array of values, shape (len(y), len(x)).
+        title: Plot title.
+        xlabel: Label for x-axis.
+        ylabel: Label for y-axis.
+
+    Returns:
+        A matplotlib :class:`Figure`.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig, ax = _new_figure()
+
+    X, Y = np.meshgrid(x, y)
+    if z.shape != X.shape:
+        z = np.asarray(z)
+        if z.shape != X.shape:
+            raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
+
+    contour = ax.contourf(X, Y, z, levels=20, cmap="viridis")
+    fig.colorbar(contour, ax=ax)
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    ax.set_xlabel(xlabel, fontstyle=axis_style)
+    ax.set_ylabel(ylabel, fontstyle=axis_style)
+    if get_env_from_schema("PLOT_SHOW_GRID"):
+        ax.grid(True, alpha=0.3)
+
     fig.tight_layout()
     return fig
 

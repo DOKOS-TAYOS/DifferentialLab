@@ -103,6 +103,33 @@ def _make_serializable(obj: Any) -> Any:
     return obj
 
 
+def _export_csv_2d(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    u: np.ndarray,
+    filepath: Path,
+) -> Path:
+    """Write 2D solution data to CSV (x, y, u columns).
+
+    Args:
+        x_grid: 1D x values.
+        y_grid: 1D y values.
+        u: 2D array shape (len(y_grid), len(x_grid)).
+        filepath: Destination path.
+
+    Returns:
+        Path written.
+    """
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["x", "y", "u"])
+        for j, yv in enumerate(y_grid):
+            for i, xv in enumerate(x_grid):
+                writer.writerow([xv, yv, u[j, i]])
+    return filepath
+
+
 def export_all_results(
     x: np.ndarray,
     y: np.ndarray,
@@ -110,20 +137,26 @@ def export_all_results(
     metadata: dict[str, Any],
     csv_path: Path,
     json_path: Path,
+    *,
+    y_grid: np.ndarray | None = None,
 ) -> tuple[Path, Path]:
     """Export both CSV data and JSON statistics.
 
     Args:
-        x: Independent variable values.
-        y: Solution values.
+        x: Independent variable values (1D) or x grid for 2D.
+        y: Solution values. For 2D PDE: shape (ny, nx).
         statistics: Computed statistics dict.
         metadata: Equation/solver metadata dict.
         csv_path: CSV destination.
         json_path: JSON destination.
+        y_grid: For 2D PDE, the y grid. If provided with 2D y, uses 2D CSV.
 
     Returns:
         Tuple of ``(csv_path, json_path)`` that were written.
     """
-    csv_out = _export_csv(x, y, csv_path)
-    json_out = _export_json(statistics, metadata, json_path)
-    return csv_out, json_out
+    if y_grid is not None and y.ndim == 2:
+        _export_csv_2d(x, y_grid, y, csv_path)
+    else:
+        _export_csv(x, y, csv_path)
+    _export_json(statistics, metadata, json_path)
+    return csv_path, json_path

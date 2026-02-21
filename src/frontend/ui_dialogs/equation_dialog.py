@@ -97,6 +97,13 @@ class EquationDialog:
             value="difference",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
+            text="PDE (multivariate)",
+            variable=self._equation_type_var,
+            value="pde",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
 
         # ── Notebook ──
         self._notebook = ttk.Notebook(self.win)
@@ -390,7 +397,8 @@ class EquationDialog:
                 return
 
         selected_derivatives = [i for i, var in enumerate(self._derivative_vars) if var.get()]
-        if not selected_derivatives:
+        eq_type = getattr(eq, "equation_type", "ode")
+        if not selected_derivatives and eq_type != "pde":
             messagebox.showwarning("No Derivatives Selected",
                                    "Please select at least one derivative to plot.",
                                    parent=self.win)
@@ -400,6 +408,7 @@ class EquationDialog:
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
         eq_type: str = getattr(eq, "equation_type", "ode")
+        variables: list[str] = getattr(eq, "variables", ["x"])
         ParametersDialog(
             self.parent,
             expression=eq.expression,
@@ -412,6 +421,7 @@ class EquationDialog:
             selected_derivatives=selected_derivatives,
             display_formula=eq.formula,
             equation_type=eq_type,
+            variables=variables,
         )
 
     def _on_next_custom(self) -> None:

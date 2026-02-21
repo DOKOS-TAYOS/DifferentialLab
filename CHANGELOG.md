@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **PDE (multivariate) support**: equations can now have multiple independent variables (e.g. f(x,y)). Select "PDE (multivariate)" in the equation dialog. For f(x,y), the output is a 3D surface plot by default; the user can choose 2D contour instead. Domain and grid size are configurable per dimension.
+- **`solver/pde_solver.py`**: finite-difference solver for 2D elliptic PDEs (-u_xx - u_yy = f). Uses 5-point stencil and zero Dirichlet boundary conditions.
+- **`parse_pde_rhs_expression`**: parses RHS expressions for PDEs using variable names (x, y, …) and parameters.
+- **`create_surface_plot` and `create_contour_plot`**: 3D surface and 2D contour plots for 2D scalar fields.
+- **Predefined PDE equations**: Poisson 2D (-∇²u = f) and Laplace 2D (∇²u = 0) in `equations.yaml`.
+- **`variables` and `partial_derivatives`** in `PredefinedEquation`: schema extended for multivariate equations.
+- **`compute_statistics_2d`**: statistics (mean, std, max, min, integral) for 2D scalar fields.
+- **2D CSV export**: `export_all_results` accepts optional `y_grid` for x,y,u column format.
+
+### Changed
+
+- **Pipeline**: detects 1D vs multivariate from `variables`; routes to ODE or PDE solver accordingly.
+- **Equation dialog**: added PDE type; passes `variables` to parameters dialog.
+- **Parameters dialog**: for PDE, shows y_min/y_max, grid points per axis, and plot type (3D/2D).
+
 - **Difference equations (recurrence relations)**: the project now supports both differential equations (ODEs) and difference equations. Select "Difference (recurrence)" in the equation dialog to solve recurrences of the form y_{n+order} = f(n, y_n, y_{n+1}, ...). Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.
 - **Predefined difference equations**: geometric growth, logistic map, Fibonacci recurrence, second-order linear recurrence, discrete logistic (cobweb model).
 - **`config/difference_equations.py`**: Python functions for difference equations (geometric_growth, logistic_map, fibonacci, linear_recurrence_2, cobweb_model).

@@ -340,6 +340,57 @@ def get_difference_function(
     return recur_func
 
 
+def parse_pde_rhs_expression(
+    expression: str,
+    variables: list[str],
+    parameters: dict[str, float] | None = None,
+) -> Callable[..., float]:
+    """Parse a PDE RHS expression into a callable f(x, y, ...) -> float.
+
+    The expression can use variable names (x, y, z, ...) and parameters.
+    Used for the RHS of Poisson-type equations -u_xx - u_yy = f(x,y).
+
+    Args:
+        expression: Python expression string (e.g. ``"k"`` or ``"x * y"``).
+        variables: List of variable names (e.g. ``["x", "y"]``).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable that takes (x, y, ...) and returns the RHS value.
+
+    Raises:
+        EquationParseError: If the expression is invalid.
+    """
+    expression = normalize_unicode_escapes(expression)
+    _validate_ast(expression)
+    params = dict(parameters) if parameters else {}
+    logger.debug(
+        "Parsing PDE RHS expression: %s, variables=%s, params=%s",
+        expression, variables, params,
+    )
+
+    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    compiled = compile(expression, "<pde_rhs>", "eval")
+
+    def rhs_func(*args: float, **kwargs: Any) -> float:
+        local_ns = {**namespace, **kwargs}
+        for i, var in enumerate(variables):
+            if i < len(args):
+                local_ns[var] = args[i]
+        return float(eval(compiled, {"__builtins__": {}}, local_ns))
+
+    # Test evaluation
+    test_ns = {**namespace}
+    for i, var in enumerate(variables):
+        test_ns[var] = 0.0
+    try:
+        eval(compiled, {"__builtins__": {}}, test_ns)
+    except Exception as exc:
+        raise EquationParseError(f"PDE expression evaluation failed: {exc}") from exc
+
+    return rhs_func
+
+
 def validate_expression(expression: str) -> list[str]:
     """Check an expression for obvious errors without evaluating.
 
