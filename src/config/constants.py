@@ -3,7 +3,7 @@
 from typing import Final
 
 APP_NAME: Final[str] = "DifferentialLab"
-APP_VERSION: Final[str] = "0.2.0"
+APP_VERSION: Final[str] = "0.2.1"
 
 SOLVER_METHODS: Final[tuple[str, ...]] = (
     "RK45",

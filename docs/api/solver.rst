@@ -1,5 +1,5 @@
-solver -- ODE Solving Engine
-============================
+solver -- ODE, Difference, and PDE Solving Engine
+=================================================
 
 .. automodule:: solver
 
@@ -13,6 +13,24 @@ solver.ode_solver
 -----------------
 
 .. automodule:: solver.ode_solver
+   :members:
+
+solver.difference_solver
+------------------------
+
+.. automodule:: solver.difference_solver
+   :members:
+
+solver.pde_solver
+-----------------
+
+.. automodule:: solver.pde_solver
+   :members:
+
+solver.error_metrics
+--------------------
+
+.. automodule:: solver.error_metrics
    :members:
 
 solver.predefined

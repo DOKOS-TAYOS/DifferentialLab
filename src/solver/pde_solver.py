@@ -49,7 +49,8 @@ def solve_pde_2d(
 ) -> PDESolution:
     """Solve a 2D elliptic PDE using finite differences.
 
-    The residual_func is called as residual_func(x, y, f, f_x, f_y, f_xx, f_xy, f_yy, **params)
+    The residual_func is called as
+    ``residual_func(x, y, f, f_x, f_y, f_xx, f_xy, f_yy, **params)``
     and should return the residual (LHS - RHS) that must be zero.
 
     For linear Poisson -u_xx - u_yy = f(x,y), the residual is -u_xx - u_yy - f.

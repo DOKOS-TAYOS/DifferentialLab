@@ -85,3 +85,9 @@ frontend.ui_dialogs.keyboard_nav
 
 .. automodule:: frontend.ui_dialogs.keyboard_nav
    :members:
+
+frontend.ui_dialogs.transform_dialog
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: frontend.ui_dialogs.transform_dialog
+   :members:

@@ -1,7 +1,8 @@
 """Difference equation (recurrence) functions.
 
-Functions here are callable as f(n, y, **params) and return the next value (scalar).
-They can be referenced from equations.yaml via function_name for equation_type: difference.
+Functions here are callable as ``f(n, y, **params)`` and return the next value
+(scalar). They can be referenced from equations.yaml via function_name for
+equation_type: difference.
 """
 
 from __future__ import annotations

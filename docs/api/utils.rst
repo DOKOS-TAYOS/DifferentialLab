@@ -21,3 +21,9 @@ utils.logger
 
 .. automodule:: utils.logger
    :members:
+
+utils.update_checker
+---------------------
+
+.. automodule:: utils.update_checker
+   :members:

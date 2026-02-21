@@ -11,19 +11,23 @@ sys.path.insert(0, str(_project_root / "src"))
 project = "DifferentialLab"
 author = "Alejandro Mata Ali"
 copyright = "2026, Alejandro Mata Ali"  # noqa: A001
-release = "0.2.0"
+release = "0.2.1"
 version = "0.2"
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
     "myst_parser",
 ]
+
+# Enable autosummary for :autosummary: directives (used in API index)
+autosummary_generate = True
 
 source_suffix = {
     ".rst": "restructuredtext",
@@ -78,8 +82,11 @@ intersphinx_mapping = {
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_logo = "_static/DifferentialLab_logo.png"
 html_theme_options = {
-    "navigation_depth": 3,
+    "navigation_depth": 4,
     "collapse_navigation": False,
     "titles_only": False,
+    "includehidden": True,
 }
+templates_path = ["_templates"]

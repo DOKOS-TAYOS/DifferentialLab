@@ -1,7 +1,7 @@
 """ODE functions for complex differential equations defined in code.
 
-Functions here are callable as f(x, y, **params) and return dy/dx as a 1-D numpy array.
-They can be referenced from equations.yaml via function_name.
+Functions here are callable as ``f(x, y, **params)`` and return dy/dx as a 1-D
+numpy array. They can be referenced from equations.yaml via function_name.
 """
 
 from __future__ import annotations

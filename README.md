@@ -1,17 +1,36 @@
+<div align="center">
+
+![DifferentialLab Logo](images/DifferentialLab_logo.png)
+
 # DifferentialLab
 
-**Numerical ODE solver with a graphical interface for scientists, engineers, and students.**
+**Numerical ODE, difference equation, and PDE solver with a graphical interface for scientists, engineers, and students.**
+
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org/)
+[![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
+[![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=matplotlib&logoColor=white)](https://matplotlib.org/)
+
+[📖 **Documentation**](docs/index.md) • [🐛 **Report Bug**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) • [💡 **Request Feature**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues)
+
+</div>
 
 ---
 
 ## Features
 
-- **Numerical ODE solving** powered by SciPy (`solve_ivp`, `solve_bvp`)
-- **Predefined equations**: harmonic oscillator, damped oscillator, logistic equation, Van der Pol, pendulum, and more
-- **Custom equations**: write any ODE in Python syntax
-- **Professional plots** with matplotlib (publication-ready, fully configurable)
-- **Statistics and magnitudes**: mean, max/min, period, energy, RMS, integral, amplitude
-- **Multiple output formats**: CSV data, JSON statistics, PNG plots
+- **ODEs**: Six methods (RK45, RK23, DOP853, Radau, BDF, LSODA) via SciPy
+- **Difference equations**: Recurrence relations (geometric growth, logistic map, Fibonacci, etc.)
+- **PDEs**: 2D elliptic solver (Poisson, Laplace)
+- **Vector ODEs**: Coupled systems with animation and 3D visualization
+- **Predefined equations**: Harmonic oscillator, pendulum, Van der Pol, Lorenz, Lotka-Volterra, and more
+- **Function transforms**: Fourier (FFT), Laplace, Taylor series, Hilbert, Z-transform
+- **Custom equations**: Write any ODE, difference equation, or PDE in Python syntax
+- **Professional plots**: Solution curves, phase portraits, surface/contour, vector animation
+- **Statistics**: Mean, max/min, period, energy, RMS, residual error metrics
+- **Export**: CSV, JSON, PNG/JPG/PDF, MP4 animation
 - **Configurable** via `.env` file or in-app configuration dialog
 - **Desktop GUI** built with Tkinter/ttk
 

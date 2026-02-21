@@ -93,3 +93,11 @@ code (`#RRGGBB`).
 | `LOG_LEVEL`   | str  | `INFO`                   | Verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
 | `LOG_FILE`    | str  | `differential_lab.log`   | Log file name (project root).        |
 | `LOG_CONSOLE` | bool | `false`                  | Also print logs to the terminal.     |
+
+## Update Check
+
+| Variable           | Type | Default | Description                                      |
+|--------------------|------|---------|--------------------------------------------------|
+| `CHECK_UPDATES`    | bool | `true`  | Check for updates on startup (once per week).   |
+| `CHECK_UPDATES_FORCE` | bool | `false` | Force update check on every startup.         |
+| `UPDATE_CHECK_URL` | str  | *(main branch)* | URL to pyproject.toml for version check. |
