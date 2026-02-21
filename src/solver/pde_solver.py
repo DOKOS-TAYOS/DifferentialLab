@@ -112,7 +112,7 @@ def solve_pde_2d(
     for j in range(1, ny - 1):
         for i in range(1, nx - 1):
             k = k_idx(i, j)
-            # Interior point: -u_xx - u_yy = f  =>  diag*u - cx*(u[i+1]+u[i-1]) - cy*(u[j+1]+u[j-1]) = f
+            # Interior: -u_xx - u_yy = f => diag*u - cx*(u[i±1]) - cy*(u[j±1]) = f
             rows.append(k)
             cols.append(k)
             data.append(diag)

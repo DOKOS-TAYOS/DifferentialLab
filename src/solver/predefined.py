@@ -21,7 +21,7 @@ EquationType = str  # "ode" | "difference"
 
 @dataclass
 class PredefinedEquation:
-    """Representation of a predefined equation (ODE, difference, PDE, or vector ODE) loaded from YAML.
+    """Predefined equation (ODE, difference, PDE, or vector ODE) loaded from YAML.
 
     formula is always required for display. Either expression or function_name
     must be set for execution. If function_name is set, the equation is resolved by
@@ -103,7 +103,8 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
         has_vector = vector_expressions is not None and len(vector_expressions) > 0
         if not expression and not function_name and not has_vector:
             logger.warning(
-                "Equation '%s' has neither expression, function_name, nor vector_expressions; skipping",
+                "Equation '%s' has neither expression, function_name, nor vector_expressions; "
+                "skipping",
                 key,
             )
             continue

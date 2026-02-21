@@ -281,7 +281,6 @@ def create_contour_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
-    import matplotlib.pyplot as plt
     import numpy as np
 
     fig, ax = _new_figure()

@@ -185,7 +185,9 @@ def perform_git_pull() -> Tuple[bool, str]:
             )
 
         if result.returncode == 0:
-            return True, "Update completed successfully. Restart the application to use the new version."
+            return True, (
+                "Update completed successfully. Restart the application to use the new version."
+            )
         err = (result.stderr or result.stdout or "").strip()
         return False, err or "Update failed. Check your connection and try again."
     except subprocess.TimeoutExpired:

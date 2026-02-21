@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import warnings
 import tkinter as tk
+import warnings
 from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 

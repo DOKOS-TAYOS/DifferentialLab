@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 from config import APP_NAME, APP_VERSION, get_env_from_schema
@@ -48,7 +47,8 @@ class MainMenu:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Logo
-        logo_path = Path(__file__).resolve().parent.parent.parent / "images" / "DifferentialLab_logo.png"
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        logo_path = base_dir / "images" / "DifferentialLab_logo.png"
         if logo_path.exists():
             logo_img = tk.PhotoImage(file=str(logo_path)).subsample(2, 2)
             logo_label = ttk.Label(main_frame, image=logo_img)

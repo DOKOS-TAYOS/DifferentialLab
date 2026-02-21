@@ -1,7 +1,6 @@
 """ODE, difference, and PDE solving engine."""
 
 from solver.difference_solver import solve_difference
-from solver.error_metrics import compute_ode_residual_error
 from solver.equation_parser import (
     get_difference_function,
     get_ode_function,
@@ -10,6 +9,7 @@ from solver.equation_parser import (
     parse_expression,
     parse_pde_rhs_expression,
 )
+from solver.error_metrics import compute_ode_residual_error
 from solver.ode_solver import solve_multipoint, solve_ode
 from solver.pde_solver import solve_pde_2d
 from solver.predefined import is_multivariate, is_vector_ode, load_predefined_equations

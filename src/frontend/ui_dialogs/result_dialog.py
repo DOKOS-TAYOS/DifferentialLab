@@ -9,7 +9,7 @@ from typing import Any
 
 from matplotlib.figure import Figure
 
-from config import generate_output_basename, get_output_dir, get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation

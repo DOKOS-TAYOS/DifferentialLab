@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import sys
 import tkinter as tk
-from tkinter import messagebox
 from pathlib import Path
+from tkinter import messagebox
 
 # Ensure src/ is on the import path when run directly
 _src_dir = Path(__file__).resolve().parent
@@ -19,13 +19,13 @@ def _check_for_updates() -> None:
     If yes, perform git pull (preserves input/, output/, .env).
     """
     from config import APP_VERSION
+    from utils import get_logger
     from utils.update_checker import (
         is_update_available,
         perform_git_pull,
         record_check_done,
         should_run_check,
     )
-    from utils import get_logger
 
     logger = get_logger(__name__)
 

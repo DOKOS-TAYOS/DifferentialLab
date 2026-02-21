@@ -42,14 +42,14 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         assert eq.key == key
         assert eq.order >= 1
         assert eq.formula
-        has_defn = eq.expression or eq.function_name or (
-            getattr(eq, "vector_expressions", None) and len(getattr(eq, "vector_expressions", [])) > 0
-        )
+        vec_exprs = getattr(eq, "vector_expressions", None)
+        has_defn = eq.expression or eq.function_name or (vec_exprs and len(vec_exprs) > 0)
         assert has_defn
         is_pde = getattr(eq, "equation_type", "ode") == "pde"
-        is_vector = getattr(eq, "vector_expressions", None) and len(getattr(eq, "vector_expressions", [])) > 0
+        is_vector = vec_exprs is not None and len(vec_exprs) > 0
         if not is_pde:
-            expected_ic_len = eq.order * getattr(eq, "vector_components", 1) if is_vector else eq.order
+            vec_comp = getattr(eq, "vector_components", 1)
+            expected_ic_len = eq.order * vec_comp if is_vector else eq.order
             assert len(eq.default_initial_conditions) == expected_ic_len
             assert len(eq.default_domain) >= 2
         else:

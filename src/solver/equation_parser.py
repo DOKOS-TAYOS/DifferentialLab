@@ -429,7 +429,6 @@ def parse_vector_expression(
         compiled_list.append(compile(expr, f"<vector_ode_{i}>", "eval"))
 
     state_size = n_components * order
-    n = n_components
 
     def _test_eval() -> None:
         test_y = np.zeros(state_size)

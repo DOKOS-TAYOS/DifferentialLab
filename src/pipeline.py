@@ -317,8 +317,8 @@ def run_solver_pipeline(
     else:
         plot_derivs = selected_derivatives
         if is_vector and vector_components > 1:
-            plot_derivs = [i * order for i in (selected_derivatives or list(range(vector_components)))
-                          if i < vector_components]
+            sel = selected_derivatives or list(range(vector_components))
+            plot_derivs = [i * order for i in sel if i < vector_components]
         fig = create_solution_plot(
             solution_x, solution_y,
             title=equation_name, xlabel=xlabel, ylabel="y",

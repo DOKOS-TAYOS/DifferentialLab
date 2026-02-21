@@ -147,12 +147,15 @@ class ParametersDialog:
         row_d = ttk.Frame(domain_frame)
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
-        self.xmin_var = tk.StringVar(value=str(int(default_domain[0]) if self.equation_type == "difference" else default_domain[0]))
+        is_diff = self.equation_type == "difference"
+        xmin_val = int(default_domain[0]) if is_diff else default_domain[0]
+        self.xmin_var = tk.StringVar(value=str(xmin_val))
         ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(
             side=tk.LEFT, padx=pad
         )
         ttk.Label(row_d, text=x_max_label).pack(side=tk.LEFT)
-        self.xmax_var = tk.StringVar(value=str(int(default_domain[1]) if self.equation_type == "difference" else default_domain[1]))
+        xmax_val = int(default_domain[1]) if is_diff else default_domain[1]
+        self.xmax_var = tk.StringVar(value=str(xmax_val))
         ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(
             side=tk.LEFT, padx=pad
         )
@@ -194,7 +197,9 @@ class ParametersDialog:
             row_n.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
             self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
-            npoints_entry = ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font())
+            npoints_entry = ttk.Entry(
+                row_n, textvariable=self.npoints_var, width=10, font=get_font()
+            )
             npoints_entry.pack(side=tk.LEFT, padx=pad)
             btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
                                       command=lambda: self._change_npoints(0.1))
@@ -219,7 +224,8 @@ class ParametersDialog:
             _subscripts = "₀₁₂₃₄₅₆₇₈₉"
             ic_labels = self._ic_labels()
             n_ic = self.order * self.vector_components if self.is_vector else self.order
-            default_x0_val = str(int(default_domain[0]) if self.equation_type == "difference" else default_domain[0])
+            x0_val = int(default_domain[0]) if is_diff else default_domain[0]
+            default_x0_val = str(x0_val)
             for i in range(n_ic):
                 row = ttk.Frame(ic_frame)
                 row.pack(fill=tk.X, pady=2)
@@ -306,7 +312,10 @@ class ParametersDialog:
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
         if self.equation_type == "difference":
-            return [f"y{subscripts[i] if i < len(subscripts) else str(i)}" for i in range(self.order)]
+            def _sub(i: int) -> str:
+                return subscripts[i] if i < len(subscripts) else str(i)
+
+            return [f"y{_sub(i)}" for i in range(self.order)]
         if self.is_vector:
             labels: list[str] = []
             for c in range(self.vector_components):
@@ -363,7 +372,9 @@ class ParametersDialog:
             x_min = float(self.xmin_var.get())
             x_max = float(self.xmax_var.get())
         except ValueError:
-            domain_name = "n_min and n_max" if self.equation_type == "difference" else "x_min and x_max"
+            domain_name = (
+                "n_min and n_max" if self.equation_type == "difference" else "x_min and x_max"
+            )
             messagebox.showerror("Invalid Domain",
                                  f"{domain_name} must be numbers.",
                                  parent=self.win)
