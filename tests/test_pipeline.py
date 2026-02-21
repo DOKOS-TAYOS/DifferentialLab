@@ -38,6 +38,7 @@ def test_run_solver_pipeline_success(
 
     result = run_solver_pipeline(
         expression="k * y[0]",
+        function_name=None,
         order=1,
         parameters={"k": 0.5},
         equation_name="Exponential",
@@ -63,6 +64,7 @@ def test_run_solver_pipeline_validation_error() -> None:
     with pytest.raises(ValidationError):
         run_solver_pipeline(
             expression="",
+            function_name=None,
             order=1,
             parameters={},
             equation_name="Bad",
@@ -100,6 +102,7 @@ def test_run_solver_pipeline_multipoint(
     # Standard IVP with x0_list all at start
     result = run_solver_pipeline(
         expression="-y[0]",
+        function_name=None,
         order=2,
         parameters={},
         equation_name="Harmonic",

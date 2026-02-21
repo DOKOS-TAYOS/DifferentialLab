@@ -171,6 +171,64 @@ def parse_expression(
     return ode_func
 
 
+def get_ode_function(
+    *,
+    expression: str | None = None,
+    function_name: str | None = None,
+    order: int,
+    parameters: dict[str, float] | None = None,
+) -> Callable[[float, np.ndarray], np.ndarray]:
+    """Resolve an ODE function from either an expression string or a Python function.
+
+    Exactly one of expression or function_name must be provided.
+
+    Args:
+        expression: Python expression for the highest derivative.
+        function_name: Name of a function in config.equations to import.
+        order: ODE order (1, 2, …).
+        parameters: Named parameter values.
+
+    Returns:
+        A callable ``f(x, y)`` that returns ``dy/dx`` as a 1-D array.
+
+    Raises:
+        EquationParseError: If expression is invalid or function cannot be resolved.
+        ValueError: If neither or both expression and function_name are provided.
+    """
+    params = dict(parameters) if parameters else {}
+    if expression is not None and function_name is not None:
+        raise ValueError("Provide either expression or function_name, not both")
+    if expression is None and function_name is None:
+        raise ValueError("Provide either expression or function_name")
+
+    if expression is not None:
+        return parse_expression(expression, order, params)
+
+    # Import function from config.equations
+    try:
+        from config import equations as equations_module
+    except ImportError as exc:
+        raise EquationParseError(
+            f"Cannot import config.equations: {exc}"
+        ) from exc
+
+    if not hasattr(equations_module, function_name):
+        raise EquationParseError(
+            f"Function '{function_name}' not found in config.equations"
+        )
+
+    func = getattr(equations_module, function_name)
+    if not callable(func):
+        raise EquationParseError(
+            f"'{function_name}' in config.equations is not callable"
+        )
+
+    def ode_func(x: float, y: np.ndarray) -> np.ndarray:
+        return func(x, y, **params)
+
+    return ode_func
+
+
 def validate_expression(expression: str) -> list[str]:
     """Check an expression for obvious errors without evaluating.
 

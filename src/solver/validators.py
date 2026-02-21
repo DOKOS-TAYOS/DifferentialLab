@@ -126,7 +126,9 @@ def _validate_ic_points(
 
 
 def validate_all_inputs(
-    expression: str,
+    *,
+    expression: str | None = None,
+    function_name: str | None = None,
     order: int,
     x_min: float,
     x_max: float,
@@ -138,8 +140,11 @@ def validate_all_inputs(
 ) -> list[str]:
     """Run all validations and return accumulated errors.
 
+    Either expression or function_name must be provided.
+
     Args:
-        expression: ODE expression.
+        expression: ODE expression (optional).
+        function_name: Name of function in config.equations (optional).
         order: ODE order.
         x_min: Domain start.
         x_max: Domain end.
@@ -153,7 +158,12 @@ def validate_all_inputs(
         List of all error messages (empty if everything is valid).
     """
     errors: list[str] = []
-    errors.extend(validate_expression(expression))
+    if expression is not None and function_name is not None:
+        errors.append("Provide either expression or function_name, not both")
+    elif expression is None and function_name is None:
+        errors.append("Provide either expression or function_name")
+    elif expression is not None:
+        errors.extend(validate_expression(expression))
     errors.extend(_validate_domain(x_min, x_max))
     errors.extend(_validate_initial_conditions(y0, order))
     errors.extend(_validate_grid(num_points))

@@ -262,6 +262,7 @@ class EquationDialog:
     def _on_select_equation(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         sel = self.eq_listbox.curselection()
         if not sel:
+            self.desc_label.config(text="")
             return
         idx = sel[0]
         key = self._equation_keys[idx]
@@ -329,13 +330,14 @@ class EquationDialog:
         ParametersDialog(
             self.parent,
             expression=eq.expression,
+            function_name=eq.function_name,
             order=eq.order,
             parameters=params,
             equation_name=eq.name,
             default_y0=eq.default_initial_conditions,
             default_domain=eq.default_domain,
             selected_derivatives=selected_derivatives,
-            display_formula=eq.description,
+            display_formula=eq.formula,
         )
 
     def _on_next_custom(self) -> None:
@@ -397,6 +399,7 @@ class EquationDialog:
         ParametersDialog(
             self.parent,
             expression=expr,
+            function_name=None,
             order=order,
             parameters=params,
             equation_name="Custom ODE",

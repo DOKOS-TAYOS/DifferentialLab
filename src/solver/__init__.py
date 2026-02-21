@@ -1,6 +1,6 @@
 """ODE solving engine."""
 
-from solver.equation_parser import parse_expression
+from solver.equation_parser import get_ode_function, parse_expression
 from solver.ode_solver import solve_multipoint, solve_ode
 from solver.predefined import (
     load_predefined_equations,
@@ -9,6 +9,7 @@ from solver.statistics import compute_statistics
 from solver.validators import validate_all_inputs
 
 __all__ = [
+    "get_ode_function",
     "parse_expression",
     "solve_multipoint",
     "solve_ode",

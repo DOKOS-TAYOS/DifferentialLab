@@ -119,3 +119,147 @@ free_fall_drag:
   expression: "g - (b / m) * y[1]"
   default_initial_conditions: [0.0, 0.0]
   default_domain: [0.0, 10.0]
+
+# --- Equations defined via function_name (from config.equations) ---
+
+schrodinger_equation:
+  name: "Time-Dependent Schrödinger Equation"
+  formula: "iℏ ∂ψ/∂t = Ĥ(t)ψ"
+  description: |
+    iℏ ∂ψ/∂t = Ĥ(t)ψ
+    Time-dependent Schrödinger equation with Hamiltonian H(t) and potential V(t).
+    y = [Re(ψ), Im(ψ)]. Parameters a, b tune the default H and V.
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+      description: "Hamiltonian scale"
+    b:
+      default: 0.5
+      description: "Potential scale"
+  function_name: schrodinger_equation
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [0.0, 20.0]
+
+lorentz_system:
+  name: "Lorenz System"
+  formula: "dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz"
+  description: |
+    dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz
+    Classic chaotic attractor (Lorenz 1963).
+  order: 3
+  parameters:
+    sigma:
+      default: 10.0
+      description: "Prandtl number"
+    rho:
+      default: 28.0
+      description: "Rayleigh number"
+    beta:
+      default: 2.667
+      description: "Geometry factor"
+  function_name: lorentz_system
+  default_initial_conditions: [1.0, 1.0, 1.0]
+  default_domain: [0.0, 25.0]
+
+duffing_oscillator:
+  name: "Duffing Oscillator"
+  formula: "y'' + δy' + αy + βy³ = γcos(ωt)"
+  description: |
+    y'' + δy' + αy + βy³ = γcos(ωt)
+    Nonlinear oscillator with cubic stiffness and forcing.
+  order: 2
+  parameters:
+    delta:
+      default: 0.5
+      description: "Damping"
+    alpha:
+      default: -1.0
+      description: "Linear stiffness"
+    beta:
+      default: 1.0
+      description: "Cubic stiffness"
+    gamma:
+      default: 0.3
+      description: "Forcing amplitude"
+    omega:
+      default: 1.2
+      description: "Forcing frequency"
+  function_name: duffing_oscillator
+  default_initial_conditions: [0.0, 0.0]
+  default_domain: [0.0, 50.0]
+
+lotka_volterra:
+  name: "Lotka-Volterra (Predator-Prey)"
+  formula: "dx/dt = αx - βxy, dy/dt = δxy - γy"
+  description: |
+    dx/dt = αx - βxy, dy/dt = δxy - γy
+    Classic predator-prey population dynamics.
+  order: 2
+  parameters:
+    alpha:
+      default: 1.0
+      description: "Prey growth rate"
+    beta:
+      default: 0.1
+      description: "Predation rate"
+    gamma:
+      default: 1.5
+      description: "Predator death rate"
+    delta:
+      default: 0.075
+      description: "Predator growth from prey"
+  function_name: lotka_volterra
+  default_initial_conditions: [10.0, 5.0]
+  default_domain: [0.0, 50.0]
+
+rigid_body_euler:
+  name: "Rigid Body (Euler Equations)"
+  formula: "dω/dt = I⁻¹(τ - ω×(Iω)), τ=0"
+  description: |
+    dω/dt = I⁻¹(τ - ω×(Iω)), τ=0
+    Free rotation of a rigid body (Euler equations).
+  order: 3
+  parameters:
+    I1:
+      default: 1.0
+      description: "Moment of inertia 1"
+    I2:
+      default: 2.0
+      description: "Moment of inertia 2"
+    I3:
+      default: 3.0
+      description: "Moment of inertia 3"
+  function_name: rigid_body_euler
+  default_initial_conditions: [1.0, 0.0, 0.5]
+  default_domain: [0.0, 20.0]
+
+bloch_equations:
+  name: "Bloch Equations"
+  formula: "dM/dt = γ(M×B) - relaxation"
+  description: |
+    dM/dt = γ(M×B) - relaxation
+    Magnetization dynamics in a magnetic field.
+  order: 3
+  parameters:
+    gamma:
+      default: 1.0
+      description: "Gyromagnetic ratio"
+    Bx:
+      default: 0.0
+      description: "B-field x"
+    By:
+      default: 0.0
+      description: "B-field y"
+    Bz:
+      default: 1.0
+      description: "B-field z"
+    T1:
+      default: 1e6
+      description: "Longitudinal relaxation time"
+    T2:
+      default: 1e6
+      description: "Transverse relaxation time"
+  function_name: bloch_equations
+  default_initial_conditions: [0.0, 0.0, 1.0]
+  default_domain: [0.0, 10.0]

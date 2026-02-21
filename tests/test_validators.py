@@ -18,6 +18,18 @@ class TestValidateAllInputs:
         )
         assert errors == []
 
+    def test_function_name_skips_expression_validation(self) -> None:
+        errors = validators.validate_all_inputs(
+            function_name="harmonic_oscillator",
+            order=2,
+            x_min=0.0,
+            x_max=10.0,
+            y0=[1.0, 0.0],
+            num_points=100,
+            method="RK45",
+        )
+        assert errors == []
+
     def test_empty_expression_reported(self) -> None:
         errors = validators.validate_all_inputs(
             expression="",

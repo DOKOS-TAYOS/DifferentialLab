@@ -19,9 +19,11 @@ def test_predefined_equation_dataclass() -> None:
         order=1,
         parameters={"k": {"default": 1.0, "description": "rate"}},
         expression="k * y[0]",
+        function_name=None,
         default_initial_conditions=[1.0],
         default_domain=[0.0, 10.0],
     )
+    assert eq.formula == "y' = y"
     assert eq.key == "test"
     assert eq.order == 1
     assert eq.default_domain == [0.0, 10.0]
@@ -39,7 +41,8 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         assert isinstance(eq, PredefinedEquation)
         assert eq.key == key
         assert eq.order >= 1
-        assert eq.expression
+        assert eq.formula
+        assert eq.expression or eq.function_name
         assert len(eq.default_initial_conditions) == eq.order
         assert len(eq.default_domain) == 2
 

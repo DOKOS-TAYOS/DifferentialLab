@@ -20,6 +20,10 @@ _cache: dict[str, PredefinedEquation] | None = None
 class PredefinedEquation:
     """Representation of a predefined ODE loaded from YAML.
 
+    formula is always required for display. Either expression or function_name
+    must be set for execution. If function_name is set, the ODE is resolved by
+    importing the function from config.equations; otherwise expression is used.
+
     Attributes:
         key: Unique identifier (YAML key).
         name: Human-readable name.
@@ -27,7 +31,8 @@ class PredefinedEquation:
         description: Multi-line description with formula and context.
         order: ODE order (1, 2, …).
         parameters: Mapping of param name to ``{default, description}``.
-        expression: Python expression for the highest derivative.
+        expression: Python expression for execution (optional if function_name set).
+        function_name: Name of function in config.equations to import (optional).
         default_initial_conditions: Default y0 vector.
         default_domain: Default ``[x_min, x_max]``.
     """
@@ -38,7 +43,8 @@ class PredefinedEquation:
     description: str
     order: int
     parameters: dict[str, dict[str, Any]]
-    expression: str
+    expression: str | None
+    function_name: str | None
     default_initial_conditions: list[float]
     default_domain: list[float] = field(default_factory=lambda: [0.0, 10.0])
 
@@ -68,14 +74,28 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
 
     equations: dict[str, PredefinedEquation] = {}
     for key, data in raw.items():
+        formula: str = data.get("formula", "")
+        if not formula:
+            logger.warning("Equation '%s' has no formula (required for display); skipping", key)
+            continue
+
+        expression: str | None = data.get("expression")
+        function_name: str | None = data.get("function_name")
+        if not expression and not function_name:
+            logger.warning(
+                "Equation '%s' has neither expression nor function_name; skipping", key
+            )
+            continue
+
         eq = PredefinedEquation(
             key=key,
             name=data.get("name", key),
-            formula=data.get("formula", data.get("description", "").split("\n")[0]),
+            formula=formula,
             description=data.get("description", ""),
             order=int(data.get("order", 1)),
             parameters=data.get("parameters", {}),
-            expression=data.get("expression", ""),
+            expression=expression,
+            function_name=function_name,
             default_initial_conditions=list(data.get("default_initial_conditions", [0.0])),
             default_domain=list(data.get("default_domain", [0.0, 10.0])),
         )

@@ -13,7 +13,7 @@ from config import generate_output_basename, get_csv_path, get_json_path, get_pl
 from plotting import create_phase_plot, create_solution_plot, save_plot
 from solver import (
     compute_statistics,
-    parse_expression,
+    get_ode_function,
     solve_multipoint,
     solve_ode,
     validate_all_inputs,
@@ -39,7 +39,9 @@ class SolverResult:
 
 
 def run_solver_pipeline(
-    expression: str,
+    *,
+    expression: str | None = None,
+    function_name: str | None = None,
     order: int,
     parameters: dict[str, float],
     equation_name: str,
@@ -54,10 +56,11 @@ def run_solver_pipeline(
 ) -> SolverResult:
     """Execute the full solve workflow and return all results.
 
-    Stages: validate → parse → solve → statistics → plot → export.
+    Stages: validate → resolve ODE function → solve → statistics → plot → export.
 
     Args:
-        expression: ODE expression string.
+        expression: ODE expression string (optional).
+        function_name: Name of function in config.equations (optional).
         order: ODE order.
         parameters: Named parameter values.
         equation_name: Display name for plots/metadata.
@@ -73,17 +76,30 @@ def run_solver_pipeline(
 
     Raises:
         ValidationError: If inputs fail validation.
-        EquationParseError: If the expression cannot be parsed.
+        EquationParseError: If the expression cannot be parsed or function not found.
         DifferentialLabError: If the solver fails.
     """
     errors = validate_all_inputs(
-        expression, order, x_min, x_max, y0, n_points, method, parameters,
+        expression=expression,
+        function_name=function_name,
+        order=order,
+        x_min=x_min,
+        x_max=x_max,
+        y0=y0,
+        num_points=n_points,
+        method=method,
+        params=parameters,
         x0_list=x0_list,
     )
     if errors:
         raise ValidationError("\n".join(errors))
 
-    ode_func = parse_expression(expression, order, parameters)
+    ode_func = get_ode_function(
+        expression=expression,
+        function_name=function_name,
+        order=order,
+        parameters=parameters,
+    )
 
     t_eval = np.linspace(x_min, x_max, n_points)
 
@@ -116,7 +132,7 @@ def run_solver_pipeline(
 
     metadata: dict[str, Any] = {
         "equation_name": equation_name,
-        "expression": expression,
+        "expression": expression if expression else f"<function:{function_name}>",
         "order": order,
         "parameters": parameters,
         "domain": [x_min, x_max],

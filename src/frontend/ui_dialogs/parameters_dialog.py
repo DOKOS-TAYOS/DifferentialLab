@@ -26,7 +26,8 @@ class ParametersDialog:
 
     Args:
         parent: Parent window.
-        expression: ODE expression string.
+        expression: ODE expression string (optional).
+        function_name: Name of function in config.equations (optional).
         order: ODE order.
         parameters: Parameter name-value mapping.
         equation_name: Display name.
@@ -37,7 +38,9 @@ class ParametersDialog:
     def __init__(
         self,
         parent: tk.Tk | tk.Toplevel,
-        expression: str,
+        *,
+        expression: str | None = None,
+        function_name: str | None = None,
         order: int,
         parameters: dict[str, float],
         equation_name: str,
@@ -48,10 +51,15 @@ class ParametersDialog:
     ) -> None:
         self.parent = parent
         self.expression = expression
+        self.function_name = function_name
         self.order = order
         self.parameters = parameters
         self.equation_name = equation_name
-        self.display_formula = display_formula if display_formula is not None else expression
+        self.display_formula = (
+            display_formula
+            if display_formula is not None
+            else (expression or f"<function:{function_name}>")
+        )
         self.selected_derivatives = (
             selected_derivatives if selected_derivatives else list(range(order))
         )
@@ -329,6 +337,7 @@ class ParametersDialog:
 
             result = run_solver_pipeline(
                 expression=self.expression,
+                function_name=self.function_name,
                 order=self.order,
                 parameters=self.parameters,
                 equation_name=self.equation_name,
