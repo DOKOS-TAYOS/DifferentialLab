@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import tkinter as tk
 from tkinter import ttk
 
@@ -44,6 +46,14 @@ class MainMenu:
 
         main_frame = ttk.Frame(self.root, padding=padding * 3)
         main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Logo
+        logo_path = Path(__file__).resolve().parent.parent.parent / "images" / "DifferentialLab_logo.png"
+        if logo_path.exists():
+            logo_img = tk.PhotoImage(file=str(logo_path)).subsample(2, 2)
+            logo_label = ttk.Label(main_frame, image=logo_img)
+            logo_label.image = logo_img  # Keep reference
+            logo_label.pack(pady=(0, padding))
 
         # Title
         title_frame = ttk.Frame(main_frame)

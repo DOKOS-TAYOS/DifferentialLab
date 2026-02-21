@@ -41,7 +41,13 @@ if [ -d "$REPO_NAME" ]; then
         PROJECT_DIR="$(pwd)"
         DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
         SHORTCUT="$DESKTOP/DifferentialLab.desktop"
+        ICON_PATH="$PROJECT_DIR/images/DifferentialLab_icon.ico"
         if [ -d "$DESKTOP" ]; then
+            if [ -f "$ICON_PATH" ]; then
+                ICON_LINE="Icon=$ICON_PATH"
+            else
+                ICON_LINE="Icon=utilities-terminal"
+            fi
             cat > "$SHORTCUT" << EOF
 [Desktop Entry]
 Version=1.0
@@ -50,7 +56,7 @@ Name=DifferentialLab
 Comment=Launch DifferentialLab
 Exec=$PROJECT_DIR/bin/run.sh
 Path=$PROJECT_DIR
-Icon=utilities-terminal
+$ICON_LINE
 Terminal=false
 EOF
             chmod +x "$SHORTCUT"
@@ -89,8 +95,14 @@ echo "[4/4] Creating desktop shortcut..."
 PROJECT_DIR="$(pwd)"
 DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
 SHORTCUT="$DESKTOP/DifferentialLab.desktop"
+ICON_PATH="$PROJECT_DIR/images/DifferentialLab_icon.ico"
 
 if [ -d "$DESKTOP" ]; then
+    if [ -f "$ICON_PATH" ]; then
+        ICON_LINE="Icon=$ICON_PATH"
+    else
+        ICON_LINE="Icon=utilities-terminal"
+    fi
     cat > "$SHORTCUT" << EOF
 [Desktop Entry]
 Version=1.0
@@ -99,7 +111,7 @@ Name=DifferentialLab
 Comment=Launch DifferentialLab
 Exec=$PROJECT_DIR/bin/run.sh
 Path=$PROJECT_DIR
-Icon=utilities-terminal
+$ICON_LINE
 Terminal=false
 EOF
     chmod +x "$SHORTCUT"

@@ -76,6 +76,7 @@ set "DESKTOP=%USERPROFILE%\Desktop"
 if not exist "%DESKTOP%" set "DESKTOP=%USERPROFILE%\Escritorio"
 set "SHORTCUT=%DESKTOP%\DifferentialLab.lnk"
 set "PROJECT_DIR=%CD%"
+set "ICON_PATH=%PROJECT_DIR%\images\DifferentialLab_icon.ico"
 
 powershell -NoProfile -Command ^
     "$ws = New-Object -ComObject WScript.Shell; ^
@@ -83,7 +84,8 @@ powershell -NoProfile -Command ^
      $sc.TargetPath = $args[1]; ^
      $sc.WorkingDirectory = $args[2]; ^
      $sc.Description = 'Launch DifferentialLab'; ^
-     $sc.Save()" "%SHORTCUT%" "%PROJECT_DIR%\bin\run.bat" "%PROJECT_DIR%" 2>nul
+     if (Test-Path $args[3]) { $sc.IconLocation = $args[3] }; ^
+     $sc.Save()" "%SHORTCUT%" "%PROJECT_DIR%\bin\run.bat" "%PROJECT_DIR%" "%ICON_PATH%" 2>nul
 
 if exist "%SHORTCUT%" (
     echo        Desktop shortcut created: %SHORTCUT%
