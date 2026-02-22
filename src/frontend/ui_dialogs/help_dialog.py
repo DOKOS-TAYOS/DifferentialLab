@@ -184,6 +184,7 @@ class HelpDialog:
                     lbl.configure(wraplength=wrap)
 
         inner.bind("<Configure>", _update_wraplength)
+        self.win.after(50, lambda: _update_wraplength(None))
 
     def _add_section(
         self,
@@ -199,7 +200,7 @@ class HelpDialog:
             parent, self._scroll, title, expanded=expanded, pad=pad,
         )
         body_lbl = ttk.Label(
-            section.content, text=body, justify=tk.LEFT, wraplength=620,
+            section.content, text=body, justify=tk.LEFT,
         )
         body_lbl.pack(anchor=tk.W, fill=tk.X)
         self._body_labels.append(body_lbl)

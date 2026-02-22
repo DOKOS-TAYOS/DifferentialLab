@@ -132,11 +132,20 @@ class TransformDialog:
         func_lf = ttk.LabelFrame(left, text="Function f(x)", padding=pad)
         func_lf.pack(fill=tk.X, pady=(0, pad))
 
-        ttk.Label(
+        func_hint_lbl = ttk.Label(
             func_lf,
             text="Use x as variable. Example: sin(x), exp(-a*x)",
             style="Small.TLabel",
-        ).pack(anchor=tk.W)
+        )
+        func_hint_lbl.pack(anchor=tk.W)
+
+        def _update_func_hint_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = func_lf.winfo_width()
+            if w > 100:
+                func_hint_lbl.configure(wraplength=max(150, w - 2 * pad))
+
+        func_lf.bind("<Configure>", _update_func_hint_wrap)
+        self.win.after(50, lambda: _update_func_hint_wrap(None))
         self._func_entry = tk.Text(
             func_lf, height=2, width=30,
             bg=btn_bg, fg=fg, insertbackground=fg, font=_font,
@@ -603,11 +612,12 @@ class _TransformHelpDialog:
         def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
             w = inner.winfo_width()
             if w > 100:
-                wrap = max(400, w - 48)
+                wrap = max(200, w - 48)
                 for lbl in self._body_labels:
                     lbl.configure(wraplength=wrap)
 
         inner.bind("<Configure>", _update_wraplength)
+        self.win.after(50, lambda: _update_wraplength(None))
 
     def _add_section(
         self,
@@ -622,7 +632,7 @@ class _TransformHelpDialog:
             parent, self._scroll, title, expanded=expanded, pad=pad,
         )
         body_lbl = ttk.Label(
-            section.content, text=body, justify=tk.LEFT, wraplength=720,
+            section.content, text=body, justify=tk.LEFT,
         )
         body_lbl.pack(anchor=tk.W, fill=tk.X)
         self._body_labels.append(body_lbl)

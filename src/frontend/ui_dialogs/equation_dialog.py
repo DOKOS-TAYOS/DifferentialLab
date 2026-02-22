@@ -43,7 +43,7 @@ class EquationDialog:
 
         self._build_ui()
 
-        fit_and_center(self.win, min_width=1060, min_height=650)
+        fit_and_center(self.win, min_width=1200, min_height=650)
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
@@ -127,7 +127,7 @@ class EquationDialog:
         select_bg, select_fg = get_select_colors(element_bg=btn_bg, text_fg=fg)
         self.eq_listbox = tk.Listbox(
             list_frame,
-            width=28,
+            width=40,
             height=18,
             bg=btn_bg,
             fg=fg,
@@ -147,9 +147,17 @@ class EquationDialog:
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.desc_label = ttk.Label(
-            right, text="", style="Small.TLabel", justify=tk.LEFT, wraplength=0,
+            right, text="", style="Small.TLabel", justify=tk.LEFT,
         )
         self.desc_label.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
+
+        def _update_desc_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = right.winfo_width()
+            if w > 100:
+                self.desc_label.configure(wraplength=max(200, w - 2 * pad))
+
+        right.bind("<Configure>", _update_desc_wrap)
+        self.win.after(50, _update_desc_wrap)
 
         self.params_frame = ttk.LabelFrame(right, text="Parameters", padding=pad)
         self.params_frame.pack(fill=tk.X, pady=(0, pad))
@@ -188,7 +196,15 @@ class EquationDialog:
             ci, textvariable=self.custom_hint_text, style="Small.TLabel",
             justify=tk.LEFT,
         )
-        self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad))
+        self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
+
+        def _update_custom_hint_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = ci.winfo_width()
+            if w > 100:
+                self.custom_hint_detail.configure(wraplength=max(200, w - 2 * pad))
+
+        ci.bind("<Configure>", _update_custom_hint_wrap)
+        self.win.after(50, _update_custom_hint_wrap)
 
         unicode_frame = ttk.LabelFrame(
             ci, text="Unicode symbols — select and copy", padding=pad

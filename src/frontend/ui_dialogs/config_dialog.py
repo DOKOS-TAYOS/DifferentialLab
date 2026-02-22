@@ -145,6 +145,7 @@ class ConfigDialog:
                     lbl.configure(wraplength=wrap)
 
         form.bind("<Configure>", _update_wraplength)
+        self.win.after(50, _update_wraplength)
 
         btn_save.focus_set()
 
@@ -208,7 +209,7 @@ class ConfigDialog:
 
         if desc_text:
             desc = ttk.Label(parent, text=desc_text, style="ConfigDesc.TLabel",
-                             wraplength=600, justify=tk.LEFT)
+                             justify=tk.LEFT)
             desc.pack(anchor=tk.W, padx=(12, 0), pady=(0, 4))
             self._desc_labels.append(desc)
 

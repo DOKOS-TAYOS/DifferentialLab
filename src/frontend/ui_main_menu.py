@@ -74,7 +74,7 @@ class MainMenu:
         ttk.Separator(main_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=padding)
 
         # Description
-        ttk.Label(
+        desc_lbl = ttk.Label(
             main_frame,
             text=(
                 "Solve ordinary differential equations numerically.\n"
@@ -82,7 +82,16 @@ class MainMenu:
             ),
             style="Small.TLabel",
             justify=tk.CENTER,
-        ).pack(pady=(0, padding * 2))
+        )
+        desc_lbl.pack(pady=(0, padding * 2))
+
+        def _update_desc_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = main_frame.winfo_width()
+            if w > 100:
+                desc_lbl.configure(wraplength=max(200, w - 6 * padding))
+
+        main_frame.bind("<Configure>", _update_desc_wrap)
+        self.root.after(50, lambda: _update_desc_wrap(None))
 
         # Buttons
         btn_frame = ttk.Frame(main_frame)

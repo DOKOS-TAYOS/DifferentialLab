@@ -14,6 +14,7 @@ def center_window(
     max_width_ratio: float = 0.85,
     max_height_ratio: float = 0.85,
     resizable: bool = False,
+    y_offset_up: int = 40,
 ) -> None:
     """Center *window* on the screen.
 
@@ -30,6 +31,7 @@ def center_window(
         max_width_ratio: Max fraction of screen width.
         max_height_ratio: Max fraction of screen height.
         resizable: Whether the window can be resized by the user.
+        y_offset_up: Pixels to shift the window up from center (avoids bottom overflow).
     """
     window.update_idletasks()
     screen_w = window.winfo_screenwidth()
@@ -49,7 +51,7 @@ def center_window(
     h = min(h, max_h)
 
     x = max(0, (screen_w - w) // 2)
-    y = max(0, (screen_h - h) // 2)
+    y = max(0, (screen_h - h) // 2 - y_offset_up)
     window.geometry(f"{w}x{h}+{x}+{y}")
     window.resizable(resizable, resizable)
 

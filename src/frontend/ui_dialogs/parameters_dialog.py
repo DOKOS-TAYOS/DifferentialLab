@@ -132,10 +132,11 @@ class ParametersDialog:
         # Equation summary
         ttk.Label(scroll_frame, text=f"Equation: {self.equation_name}",
                   style="Subtitle.TLabel").pack(anchor=tk.W, pady=(0, pad))
-        ttk.Label(scroll_frame, text=self.display_formula,
-                  style="Small.TLabel", wraplength=600, justify=tk.LEFT).pack(
-            anchor=tk.W, pady=(0, pad)
+        formula_lbl = ttk.Label(
+            scroll_frame, text=self.display_formula,
+            style="Small.TLabel", justify=tk.LEFT,
         )
+        formula_lbl.pack(anchor=tk.W, pady=(0, pad))
 
         # Two-column layout: left = domain + ICs, right = solver + statistics
         columns_frame = ttk.Frame(scroll_frame)
@@ -268,8 +269,9 @@ class ParametersDialog:
                               values=list(SOLVER_METHODS), state="readonly", width=15,
                               font=get_font())
         combo.pack(anchor=tk.W)
-        self.method_desc = ttk.Label(self.method_frame, text="", style="Small.TLabel",
-                                     wraplength=420, justify=tk.LEFT)
+        self.method_desc = ttk.Label(
+            self.method_frame, text="", style="Small.TLabel", justify=tk.LEFT,
+        )
         self.method_desc.pack(anchor=tk.W, pady=(2, 0))
         combo.bind("<<ComboboxSelected>>", self._on_method_change)
         self._on_method_change(None)
@@ -306,12 +308,29 @@ class ParametersDialog:
             self._stats_listbox.insert(tk.END, key)
         self._stats_listbox.select_set(0, tk.END)
 
-        self._stats_desc_label = ttk.Label(stats_frame, text="", style="Small.TLabel",
-                                            wraplength=420, justify=tk.LEFT)
+        self._stats_desc_label = ttk.Label(
+            stats_frame, text="", style="Small.TLabel", justify=tk.LEFT,
+        )
         self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
         self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
 
+        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
+            w = scroll_frame.winfo_width()
+            if w > 100:
+                formula_wrap = max(200, w - 2 * pad)
+                formula_lbl.configure(wraplength=formula_wrap)
+            # Use actual width of stats_frame for solver text (always visible)
+            mw = stats_frame.winfo_width()
+            if mw > 100:
+                col_wrap = max(150, mw - 2 * pad)
+                self.method_desc.configure(wraplength=col_wrap)
+                self._stats_desc_label.configure(wraplength=col_wrap)
+
+        scroll_frame.bind("<Configure>", _update_wraplength)
+        stats_frame.bind("<Configure>", _update_wraplength)
         scroll.bind_new_children()
+        self.win.after(50, _update_wraplength)
+        self.win.after(150, _update_wraplength)
         btn_solve.focus_set()
 
     # ------------------------------------------------------------------
