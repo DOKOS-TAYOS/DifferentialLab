@@ -89,7 +89,7 @@ class ParametersDialog:
 
         self._build_ui(default_y0, default_domain)
 
-        fit_and_center(self.win, min_width=920, min_height=700)
+        fit_and_center(self.win, min_width=1050, min_height=700)
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
@@ -137,9 +137,18 @@ class ParametersDialog:
             anchor=tk.W, pady=(0, pad)
         )
 
-        # Domain
+        # Two-column layout: left = domain + ICs, right = solver + statistics
+        columns_frame = ttk.Frame(scroll_frame)
+        columns_frame.pack(fill=tk.BOTH, expand=True, pady=(0, pad))
+
+        left_col = ttk.Frame(columns_frame)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, pad))
+        right_col = ttk.Frame(columns_frame)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Domain (left column)
         domain_label = "Domain (n_min, n_max)" if self.equation_type == "difference" else "Domain"
-        domain_frame = ttk.LabelFrame(scroll_frame, text=domain_label, padding=pad)
+        domain_frame = ttk.LabelFrame(left_col, text=domain_label, padding=pad)
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
         x_min_label = "n_min:" if self.equation_type == "difference" else "x_min:"
@@ -216,9 +225,9 @@ class ParametersDialog:
                 side=tk.LEFT, padx=pad
             )
 
-        # Initial conditions (skip for PDE)
+        # Initial conditions (skip for PDE) — left column
         if not self.is_pde:
-            ic_frame = ttk.LabelFrame(scroll_frame, text="Initial Conditions", padding=pad)
+            ic_frame = ttk.LabelFrame(left_col, text="Initial Conditions", padding=pad)
             ic_frame.pack(fill=tk.X, pady=(0, pad))
 
             _subscripts = "₀₁₂₃₄₅₆₇₈₉"
@@ -250,8 +259,8 @@ class ParametersDialog:
 
                 self._y0_vars.append(var)
 
-        # Solver method (ODE only)
-        self.method_frame = ttk.LabelFrame(scroll_frame, text="Solver Method", padding=pad)
+        # Solver method (ODE only) — right column
+        self.method_frame = ttk.LabelFrame(right_col, text="Solver Method", padding=pad)
         self.method_frame.pack(fill=tk.X, pady=(0, pad))
 
         self.method_var = tk.StringVar(value=get_env_from_schema("SOLVER_DEFAULT_METHOD"))
@@ -260,15 +269,15 @@ class ParametersDialog:
                               font=get_font())
         combo.pack(anchor=tk.W)
         self.method_desc = ttk.Label(self.method_frame, text="", style="Small.TLabel",
-                                     wraplength=600, justify=tk.LEFT)
+                                     wraplength=420, justify=tk.LEFT)
         self.method_desc.pack(anchor=tk.W, pady=(2, 0))
         combo.bind("<<ComboboxSelected>>", self._on_method_change)
         self._on_method_change(None)
         if self.equation_type == "difference" or self.is_pde:
             self.method_frame.pack_forget()
 
-        # Statistics listbox (extended selection)
-        stats_frame = ttk.LabelFrame(scroll_frame, text="Statistics & Magnitudes", padding=pad)
+        # Statistics listbox (extended selection) — right column
+        stats_frame = ttk.LabelFrame(right_col, text="Statistics & Magnitudes", padding=pad)
         stats_frame.pack(fill=tk.X, pady=(0, pad))
 
         self._stat_keys: list[str] = list(AVAILABLE_STATISTICS.keys())
@@ -298,7 +307,7 @@ class ParametersDialog:
         self._stats_listbox.select_set(0, tk.END)
 
         self._stats_desc_label = ttk.Label(stats_frame, text="", style="Small.TLabel",
-                                            wraplength=600, justify=tk.LEFT)
+                                            wraplength=420, justify=tk.LEFT)
         self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
         self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
 
