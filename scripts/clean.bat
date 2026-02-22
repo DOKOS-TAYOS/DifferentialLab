@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================================
 REM DifferentialLab - Clean temporary files (Windows)
-REM Removes __pycache__, .pyc, .pyo, .log, and other temp files.
+REM Removes __pycache__, .pyc, .pyo, .log, .pytest_cache, .ruff_cache, and other temp files.
 REM Skips the .venv directory.
 REM ============================================================================
 
@@ -25,7 +25,14 @@ for %%e in (pyc pyo) do (
     )
 )
 
-REM Remove .mypy_cache, .pytest_cache, .ruff_cache (excluding .venv)
+REM Remove .mypy_cache, .pytest_cache, .ruff_cache from root
+for %%d in (.mypy_cache .pytest_cache .ruff_cache) do (
+    if exist "%%d" (
+        rmdir /s /q "%%d" 2>nul
+        set /a count+=1
+    )
+)
+REM Remove .mypy_cache, .pytest_cache, .ruff_cache in subdirs (excluding .venv)
 for %%d in (.mypy_cache .pytest_cache .ruff_cache) do (
     for /f "delims=" %%p in ('dir /s /b /ad "%%d" 2^>nul ^| findstr /v /i "\\.venv\\"') do (
         rmdir /s /q "%%p" 2>nul

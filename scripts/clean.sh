@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # DifferentialLab - Clean temporary files (Unix/Mac)
-# Removes __pycache__, .pyc, .pyo, .log, and other temp files.
+# Removes __pycache__, .pyc, .pyo, .log, .pytest_cache, .ruff_cache, and other temp files.
 # Skips the .venv directory.
 # ============================================================================
 
@@ -25,7 +25,10 @@ while IFS= read -r -d '' file; do
     ((count++))
 done < <(find . -path ./.venv -prune -o -type f \( -name "*.pyc" -o -name "*.pyo" \) -print0 2>/dev/null | grep -z -v "^./\.venv")
 
-# Remove .mypy_cache, .pytest_cache, .ruff_cache
+# Remove .mypy_cache, .pytest_cache, .ruff_cache (root and subdirs)
+for cache_dir in .mypy_cache .pytest_cache .ruff_cache; do
+    [ -d "$cache_dir" ] && rm -rf "$cache_dir" && ((count++))
+done
 for cache_dir in .mypy_cache .pytest_cache .ruff_cache; do
     while IFS= read -r -d '' dir; do
         rm -rf "$dir"
