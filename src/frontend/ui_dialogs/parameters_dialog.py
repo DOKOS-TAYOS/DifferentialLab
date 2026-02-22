@@ -14,6 +14,7 @@ from config import (
 )
 from frontend.theme import get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import fit_and_center, make_modal
 from utils import DifferentialLabError, get_logger
@@ -47,6 +48,7 @@ class ParametersDialog:
         default_y0: list[float],
         default_domain: list[float],
         selected_derivatives: list[int] | None = None,
+        parameters_schema: dict[str, dict[str, Any]] | None = None,
         display_formula: str | None = None,
         equation_type: str = "ode",
         variables: list[str] | None = None,
@@ -64,8 +66,12 @@ class ParametersDialog:
             if display_formula is not None
             else (expression or f"<function:{function_name}>")
         )
+        self.parameters_schema = parameters_schema or {}
+        n_derivs = vector_components if (
+            (vector_expressions and len(vector_expressions) > 0) or equation_type == "vector_ode"
+        ) else order
         self.selected_derivatives = (
-            selected_derivatives if selected_derivatives else list(range(order))
+            selected_derivatives if selected_derivatives is not None else list(range(n_derivs))
         )
         self.equation_type = equation_type
         self.variables = variables if variables else ["x"]
@@ -85,6 +91,8 @@ class ParametersDialog:
 
         self._y0_vars: list[tk.StringVar] = []
         self._x0_vars: list[tk.StringVar] = []
+        self._eq_param_vars: dict[str, tk.StringVar] = {}
+        self._derivatives_listbox: tk.Listbox | None = None
         self._stat_keys: list[str] = []
 
         self._build_ui(default_y0, default_domain)
@@ -187,7 +195,7 @@ class ParametersDialog:
             row_ny = ttk.Frame(domain_frame)
             row_ny.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_ny, text="Grid points (y):").pack(side=tk.LEFT)
-            self.npoints_y_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
+            self.npoints_y_var = tk.StringVar(value="1000")
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
@@ -198,6 +206,62 @@ class ParametersDialog:
                 plot_frame, text="3D surface plot (uncheck for 2D contour)",
                 variable=self.plot_3d_var,
             ).pack(anchor=tk.W)
+
+        # Equation parameters (ω, γ, etc.) — left column
+        if self.parameters:
+            eq_params_frame = ttk.LabelFrame(left_col, text="Equation Parameters", padding=pad)
+            eq_params_frame.pack(fill=tk.X, pady=(0, pad))
+            for pname, val in self.parameters.items():
+                row = ttk.Frame(eq_params_frame)
+                row.pack(fill=tk.X, pady=2)
+                ttk.Label(row, text=f"{pname}:", width=12).pack(side=tk.LEFT)
+                var = tk.StringVar(value=str(val))
+                entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
+                entry.pack(side=tk.LEFT, padx=(pad, 0))
+                self._eq_param_vars[pname] = var
+                pinfo = self.parameters_schema.get(pname, {})
+                ToolTip(entry, pinfo.get("description", ""))
+
+        # Derivatives to plot — right column (skip for PDE)
+        if not self.is_pde:
+            deriv_frame = ttk.LabelFrame(right_col, text="Derivatives to Plot", padding=pad)
+            deriv_frame.pack(fill=tk.X, pady=(0, pad))
+            vec_exprs = self.vector_expressions
+            is_vec = (vec_exprs is not None and len(vec_exprs) > 0) or self.equation_type == "vector_ode"
+            if is_vec and self.vector_components > 1:
+                subscripts = "₀₁₂₃₄₅₆₇₈₉"
+                def _sub(i: int) -> str:
+                    return subscripts[i] if i < len(subscripts) else str(i)
+                derivative_labels = [f"f_{_sub(i)}" for i in range(self.vector_components)]
+            else:
+                derivative_labels = ["y"] if self.order == 1 else [f"y[{i}]" for i in range(self.order)]
+            deriv_list_frame = ttk.Frame(deriv_frame)
+            deriv_list_frame.pack(fill=tk.X)
+            deriv_scrollbar = ttk.Scrollbar(deriv_list_frame, orient=tk.VERTICAL)
+            _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
+            _fg: str = get_env_from_schema("UI_FOREGROUND")
+            _select_bg: str = get_env_from_schema("UI_BUTTON_FG")
+            _select_fg: str = "#000000"
+            self._derivatives_listbox = tk.Listbox(
+                deriv_list_frame,
+                selectmode=tk.EXTENDED,
+                height=min(len(derivative_labels), 6),
+                bg=_btn_bg,
+                fg=_fg,
+                selectbackground=_select_bg,
+                selectforeground=_select_fg,
+                font=get_font(),
+                exportselection=False,
+                yscrollcommand=deriv_scrollbar.set,
+            )
+            deriv_scrollbar.config(command=self._derivatives_listbox.yview)
+            self._derivatives_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            deriv_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            for label in derivative_labels:
+                self._derivatives_listbox.insert(tk.END, label)
+            for i in self.selected_derivatives:
+                if 0 <= i < len(derivative_labels):
+                    self._derivatives_listbox.select_set(i)
 
         if self.equation_type != "difference" and not self.is_pde:
             row_n = ttk.Frame(domain_frame)
@@ -218,7 +282,7 @@ class ParametersDialog:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_n, text="Grid points (x):").pack(side=tk.LEFT)
-            self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
+            self.npoints_var = tk.StringVar(value="1000")
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
@@ -286,6 +350,8 @@ class ParametersDialog:
 
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
+        stats_select_bg: str = get_env_from_schema("UI_BUTTON_FG")
+        stats_select_fg: str = "#000000"
         stats_scrollbar = ttk.Scrollbar(stats_list_frame, orient=tk.VERTICAL)
         self._stats_listbox = tk.Listbox(
             stats_list_frame,
@@ -293,6 +359,8 @@ class ParametersDialog:
             height=min(len(self._stat_keys), 6),
             bg=btn_bg,
             fg=fg,
+            selectbackground=stats_select_bg,
+            selectforeground=stats_select_fg,
             font=get_font(),
             exportselection=False,
             yscrollcommand=stats_scrollbar.set,
@@ -393,6 +461,33 @@ class ParametersDialog:
 
     def _on_solve(self) -> None:
         """Parse inputs, run the solver pipeline, and open the result dialog."""
+        # Equation parameters
+        if self._eq_param_vars:
+            params: dict[str, float] = {}
+            for pname, var in self._eq_param_vars.items():
+                try:
+                    params[pname] = float(var.get())
+                except ValueError:
+                    messagebox.showerror(
+                        "Invalid Parameter",
+                        f"Parameter '{pname}' must be a number.",
+                        parent=self.win,
+                    )
+                    return
+            self.parameters = params
+
+        # Derivatives to plot
+        if self._derivatives_listbox is not None:
+            selected = list(self._derivatives_listbox.curselection())
+            if not selected:
+                messagebox.showwarning(
+                    "No Derivatives Selected",
+                    "Please select at least one derivative to plot.",
+                    parent=self.win,
+                )
+                return
+            self.selected_derivatives = selected
+
         try:
             x_min = float(self.xmin_var.get())
             x_max = float(self.xmax_var.get())

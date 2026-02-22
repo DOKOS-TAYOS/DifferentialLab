@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from typing import Any
 
 from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
 from solver import load_predefined_equations
@@ -37,8 +35,6 @@ class EquationDialog:
         self._equation_keys: list[str] = list(self.equations.keys())
         self._filtered_keys: list[str] = list(self.equations.keys())
         self._selected_key: str | None = None
-        self._param_vars: dict[str, tk.StringVar] = {}
-        self._derivative_vars: list[tk.BooleanVar] = []
         self._equation_type_var = tk.StringVar(value="ode")
 
         self._build_ui()
@@ -156,23 +152,12 @@ class EquationDialog:
         right.bind("<Configure>", _update_desc_wrap)
         self.win.after(50, _update_desc_wrap)
 
-        self.params_frame = ttk.LabelFrame(right, text="Parameters", padding=pad)
-        self.params_frame.pack(fill=tk.X, pady=(0, pad))
-
-        self.derivatives_frame = ttk.LabelFrame(right, text="Derivatives to Plot", padding=pad)
-        self.derivatives_frame.pack(fill=tk.X, pady=(0, pad))
-
         self._populate_equation_list()
 
-        # --- Tab 2: Custom (scrollable) ---
-        custom_frame = ttk.Frame(self._notebook)
+        # --- Tab 2: Custom ---
+        custom_frame = ttk.Frame(self._notebook, padding=pad)
         self._notebook.add(custom_frame, text="  Custom  ")
-
-        custom_scroll = ScrollableFrame(custom_frame)
-        custom_scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        custom_scroll.pack(fill=tk.BOTH, expand=True)
-        ci = custom_scroll.inner
-        ci.configure(padding=pad)
+        ci = custom_frame
 
         self.custom_hint_label = ttk.Label(
             ci,
@@ -183,9 +168,8 @@ class EquationDialog:
 
         self.custom_hint_text = tk.StringVar(
             value=(
-                "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
+                "Use y[0] for y, y[1] for y', y[2] for y'', etc. "
                 "Use x for the independent variable.\n"
-                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
                 "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
             )
         )
@@ -257,15 +241,6 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9=1.0, \u03b3=0.1")
 
-        self.custom_derivatives_frame = ttk.LabelFrame(
-            ci, text="Derivatives to Plot", padding=pad
-        )
-        self.custom_derivatives_frame.pack(fill=tk.X, pady=(pad, 0))
-        self._custom_deriv_listbox: tk.Listbox | None = None
-        self.custom_order_var.trace_add("write", self._update_custom_derivatives)
-        self._update_custom_derivatives()
-
-        custom_scroll.bind_new_children()
         self.eq_listbox.focus_set()
         self._update_custom_hints()
 
@@ -299,7 +274,6 @@ class EquationDialog:
             )
             self.custom_hint_text.set(
                 "Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.\n"
-                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
                 "Example (geometric growth):  r * y[0]"
             )
             self.custom_expr_label.config(text="Expression for y_{n+order}:")
@@ -308,40 +282,11 @@ class EquationDialog:
                 text="Write the highest derivative as a Python expression."
             )
             self.custom_hint_text.set(
-                "Use y[0] for y, y[1] for y', y[2] for y'', etc.\n"
+                "Use y[0] for y, y[1] for y', y[2] for y'', etc. "
                 "Use x for the independent variable.\n"
-                "Available: sin, cos, tan, exp, log, sqrt, pi, e, abs, \u2026\n"
                 "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
             )
             self.custom_expr_label.config(text="Expression for highest derivative:")
-
-    def _update_custom_derivatives(self, *_args: Any) -> None:
-        """Rebuild the derivatives listbox when the ODE order changes."""
-        try:
-            order = int(self.custom_order_var.get())
-        except ValueError:
-            order = 1
-
-        for child in self.custom_derivatives_frame.winfo_children():
-            child.destroy()
-
-        derivative_labels = ["y"] if order == 1 else [f"y[{i}]" for i in range(order)]
-        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
-        lb = tk.Listbox(
-            self.custom_derivatives_frame,
-            selectmode=tk.EXTENDED,
-            height=min(len(derivative_labels), 6),
-            bg=btn_bg,
-            fg=fg,
-            font=get_font(),
-            exportselection=False,
-        )
-        for label in derivative_labels:
-            lb.insert(tk.END, label)
-        lb.select_set(0, tk.END)
-        lb.pack(fill=tk.X)
-        self._custom_deriv_listbox = lb
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
@@ -363,44 +308,6 @@ class EquationDialog:
 
         self.desc_label.config(text=eq.description)
 
-        for child in self.params_frame.winfo_children():
-            child.destroy()
-        self._param_vars.clear()
-
-        pad: int = get_env_from_schema("UI_PADDING")
-        for pname, pinfo in eq.parameters.items():
-            row = ttk.Frame(self.params_frame)
-            row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=f"{pname}:", width=12).pack(side=tk.LEFT)
-            var = tk.StringVar(value=str(pinfo["default"]))
-            entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
-            entry.pack(side=tk.LEFT, padx=(pad, 0))
-            self._param_vars[pname] = var
-            ToolTip(entry, pinfo.get("description", ""))
-
-        for child in self.derivatives_frame.winfo_children():
-            child.destroy()
-        self._derivative_vars.clear()
-
-        vec_exprs = getattr(eq, "vector_expressions", None)
-        is_vector = vec_exprs is not None and len(vec_exprs) > 0
-        is_vector = is_vector or getattr(eq, "equation_type", "") == "vector_ode"
-        vector_components = getattr(eq, "vector_components", 1)
-        if is_vector and vector_components > 1:
-            subscripts = "₀₁₂₃₄₅₆₇₈₉"
-            def _sub(i: int) -> str:
-                return subscripts[i] if i < len(subscripts) else str(i)
-
-            derivative_labels = [f"f_{_sub(i)}" for i in range(vector_components)]
-        else:
-            derivative_labels = ["y"] if eq.order == 1 else [f"y[{i}]" for i in range(eq.order)]
-        for i, label in enumerate(derivative_labels):
-            var = tk.BooleanVar(value=True)
-            cb = ttk.Checkbutton(self.derivatives_frame, text=label, variable=var)
-            cb.pack(anchor=tk.W)
-            self._derivative_vars.append(var)
-
-
     def _on_next_predefined(self) -> None:
         if self._selected_key is None:
             messagebox.showwarning("No Selection", "Please select an equation.",
@@ -408,25 +315,10 @@ class EquationDialog:
             return
 
         eq = self.equations[self._selected_key]
-        params: dict[str, float] = {}
-        for pname, var in self._param_vars.items():
-            try:
-                params[pname] = float(var.get())
-            except ValueError:
-                messagebox.showerror(
-                    "Invalid Parameter",
-                    f"Parameter '{pname}' must be a number.",
-                    parent=self.win,
-                )
-                return
-
-        selected_derivatives = [i for i, var in enumerate(self._derivative_vars) if var.get()]
-        eq_type = getattr(eq, "equation_type", "ode")
-        if not selected_derivatives and eq_type != "pde":
-            messagebox.showwarning("No Derivatives Selected",
-                                   "Please select at least one derivative to plot.",
-                                   parent=self.win)
-            return
+        params: dict[str, float] = {
+            pname: float(pinfo.get("default", 0.0))
+            for pname, pinfo in eq.parameters.items()
+        }
 
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
@@ -441,10 +333,11 @@ class EquationDialog:
             function_name=eq.function_name,
             order=eq.order,
             parameters=params,
+            parameters_schema=eq.parameters,
             equation_name=eq.name,
             default_y0=eq.default_initial_conditions,
             default_domain=eq.default_domain,
-            selected_derivatives=selected_derivatives,
+            selected_derivatives=None,
             display_formula=eq.formula,
             equation_type=eq_type,
             variables=variables,
@@ -494,17 +387,6 @@ class EquationDialog:
                     )
                     return
 
-        selected_derivatives = (
-            list(self._custom_deriv_listbox.curselection())
-            if self._custom_deriv_listbox is not None
-            else []
-        )
-        if not selected_derivatives:
-            messagebox.showwarning("No Derivatives Selected",
-                                   "Please select at least one derivative to plot.",
-                                   parent=self.win)
-            return
-
         eq_type = self._equation_type_var.get()
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
@@ -516,9 +398,10 @@ class EquationDialog:
             function_name=None,
             order=order,
             parameters=params,
+            parameters_schema=None,
             equation_name="Custom difference" if eq_type == "difference" else "Custom ODE",
             default_y0=[1.0] * order,
             default_domain=default_domain,
-            selected_derivatives=selected_derivatives,
+            selected_derivatives=None,
             equation_type=eq_type,
         )
