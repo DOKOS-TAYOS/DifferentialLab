@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import webbrowser
 import tkinter as tk
+import webbrowser
 from tkinter import ttk
-
-YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 
 from config import (
     APP_NAME,
@@ -21,6 +19,8 @@ from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import fit_and_center, make_modal
 from utils import get_logger
+
+YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 
 logger = get_logger(__name__)
 
