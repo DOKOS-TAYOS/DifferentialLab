@@ -161,11 +161,13 @@ class MainMenu:
         self.btn_quit.grid(row=3, column=1, padx=padding, pady=padding)
         ToolTip(self.btn_quit, "Close the application.")
 
-        setup_arrow_enter_navigation([
-            [self.btn_solve, self.btn_transforms],
-            [self.btn_info],
-            [self.btn_config, self.btn_quit],
-        ])
+        setup_arrow_enter_navigation(
+            [
+                [self.btn_solve, self.btn_transforms],
+                [self.btn_info],
+                [self.btn_config, self.btn_quit],
+            ]
+        )
         self.btn_solve.focus_set()
 
     def _on_close(self) -> None:

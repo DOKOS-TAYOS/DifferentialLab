@@ -30,8 +30,16 @@ def compute_statistics(
     y_2d = np.atleast_2d(y)
     y_primary = y_2d[0]
     all_stats = selected or {
-        "mean", "rms", "std", "max", "min", "integral",
-        "zero_crossings", "period", "amplitude", "energy",
+        "mean",
+        "rms",
+        "std",
+        "max",
+        "min",
+        "integral",
+        "zero_crossings",
+        "period",
+        "amplitude",
+        "energy",
     }
 
     results: dict[str, Any] = {}
@@ -84,8 +92,8 @@ def _compute_rms(x: np.ndarray, y: np.ndarray) -> float:
     """Root mean square over the domain."""
     span = x[-1] - x[0]
     if span == 0:
-        return float(np.sqrt(np.mean(y ** 2)))
-    return float(np.sqrt(np.trapezoid(y ** 2, x) / span))
+        return float(np.sqrt(np.mean(y**2)))
+    return float(np.sqrt(np.trapezoid(y**2, x) / span))
 
 
 def _count_zero_crossings(y: np.ndarray) -> int:
@@ -133,8 +141,8 @@ def _estimate_energy(x: np.ndarray, y_2d: np.ndarray) -> dict[str, float]:
     position = y_2d[0]
     velocity = y_2d[1]
 
-    kinetic = 0.5 * velocity ** 2
-    potential = 0.5 * position ** 2
+    kinetic = 0.5 * velocity**2
+    potential = 0.5 * position**2
 
     return {
         "kinetic_initial": float(kinetic[0]),
@@ -186,8 +194,6 @@ def compute_statistics_2d(
             "y": float(y_grid[ij[0]]),
         }
     if "integral" in all_stats:
-        results["integral"] = float(np.trapezoid(
-            np.trapezoid(u, x_grid, axis=1), y_grid, axis=0
-        ))
+        results["integral"] = float(np.trapezoid(np.trapezoid(u, x_grid, axis=1), y_grid, axis=0))
 
     return results

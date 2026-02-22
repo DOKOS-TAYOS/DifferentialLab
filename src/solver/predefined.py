@@ -166,4 +166,3 @@ def is_vector_ode(eq: PredefinedEquation) -> bool:
         getattr(eq, "vector_expressions", None) is not None
         and len(getattr(eq, "vector_expressions", [])) > 0
     )
-

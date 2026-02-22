@@ -67,9 +67,14 @@ class ParametersDialog:
             else (expression or f"<function:{function_name}>")
         )
         self.parameters_schema = parameters_schema or {}
-        n_derivs = vector_components if (
-            (vector_expressions and len(vector_expressions) > 0) or equation_type == "vector_ode"
-        ) else order
+        n_derivs = (
+            vector_components
+            if (
+                (vector_expressions and len(vector_expressions) > 0)
+                or equation_type == "vector_ode"
+            )
+            else order
+        )
         self.selected_derivatives = (
             selected_derivatives if selected_derivatives is not None else list(range(n_derivs))
         )
@@ -78,9 +83,8 @@ class ParametersDialog:
         self.vector_expressions = vector_expressions
         self.vector_components = vector_components
         self.is_vector = (
-            (vector_expressions is not None and len(vector_expressions) > 0)
-            or equation_type == "vector_ode"
-        )
+            vector_expressions is not None and len(vector_expressions) > 0
+        ) or equation_type == "vector_ode"
         self.is_pde = equation_type == "pde" or len(self.variables) > 1
 
         self.win = tk.Toplevel(parent)
@@ -118,13 +122,14 @@ class ParametersDialog:
         btn_solve.pack(side=tk.LEFT, padx=pad)
 
         btn_cancel = ttk.Button(
-            btn_inner, text="Cancel", style="Cancel.TButton",
+            btn_inner,
+            text="Cancel",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
         btn_cancel.pack(side=tk.LEFT, padx=pad)
 
         setup_arrow_enter_navigation([[btn_solve, btn_cancel]])
-
 
         # ── Scrollable content ──
         scroll = ScrollableFrame(self.win)
@@ -135,11 +140,14 @@ class ParametersDialog:
         scroll_frame.configure(padding=pad)
 
         # Equation summary
-        ttk.Label(scroll_frame, text=f"Equation: {self.equation_name}",
-                  style="Subtitle.TLabel").pack(anchor=tk.W, pady=(0, pad))
+        ttk.Label(
+            scroll_frame, text=f"Equation: {self.equation_name}", style="Subtitle.TLabel"
+        ).pack(anchor=tk.W, pady=(0, pad))
         formula_lbl = ttk.Label(
-            scroll_frame, text=self.display_formula,
-            style="Small.TLabel", justify=tk.LEFT,
+            scroll_frame,
+            text=self.display_formula,
+            style="Small.TLabel",
+            justify=tk.LEFT,
         )
         formula_lbl.pack(anchor=tk.W, pady=(0, pad))
 
@@ -203,7 +211,8 @@ class ParametersDialog:
             plot_frame.pack(fill=tk.X, pady=(pad, 0))
             self.plot_3d_var = tk.BooleanVar(value=True)
             ttk.Checkbutton(
-                plot_frame, text="3D surface plot (uncheck for 2D contour)",
+                plot_frame,
+                text="3D surface plot (uncheck for 2D contour)",
                 variable=self.plot_3d_var,
             ).pack(anchor=tk.W)
 
@@ -228,13 +237,14 @@ class ParametersDialog:
             deriv_frame.pack(fill=tk.X, pady=(0, pad))
             vec_exprs = self.vector_expressions
             is_vec = (
-                (vec_exprs is not None and len(vec_exprs) > 0)
-                or self.equation_type == "vector_ode"
-            )
+                vec_exprs is not None and len(vec_exprs) > 0
+            ) or self.equation_type == "vector_ode"
             if is_vec and self.vector_components > 1:
                 subscripts = "₀₁₂₃₄₅₆₇₈₉"
+
                 def _sub(i: int) -> str:
                     return subscripts[i] if i < len(subscripts) else str(i)
+
                 derivative_labels = [f"f_{_sub(i)}" for i in range(self.vector_components)]
             else:
                 derivative_labels = (
@@ -277,11 +287,21 @@ class ParametersDialog:
                 row_n, textvariable=self.npoints_var, width=10, font=get_font()
             )
             npoints_entry.pack(side=tk.LEFT, padx=pad)
-            btn_decrease = ttk.Button(row_n, text="−", width=3, style="Small.TButton",
-                                      command=lambda: self._change_npoints(0.1))
+            btn_decrease = ttk.Button(
+                row_n,
+                text="−",
+                width=3,
+                style="Small.TButton",
+                command=lambda: self._change_npoints(0.1),
+            )
             btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
-            btn_increase = ttk.Button(row_n, text="+", width=3, style="Small.TButton",
-                                      command=lambda: self._change_npoints(10))
+            btn_increase = ttk.Button(
+                row_n,
+                text="+",
+                width=3,
+                style="Small.TButton",
+                command=lambda: self._change_npoints(10),
+            )
             btn_increase.pack(side=tk.LEFT)
         elif self.is_pde:
             row_n = ttk.Frame(domain_frame)
@@ -311,14 +331,16 @@ class ParametersDialog:
                 ttk.Label(row, text=f"{ic_labels[i]} =", width=14).pack(side=tk.LEFT)
                 var = tk.StringVar(value=str(default_val))
                 ttk.Entry(row, textvariable=var, width=10, font=get_font()).pack(
-                    side=tk.LEFT, padx=(pad, pad * 2),
+                    side=tk.LEFT,
+                    padx=(pad, pad * 2),
                 )
 
                 if self.equation_type != "difference":
                     ttk.Label(row, text=f"x{sub} =").pack(side=tk.LEFT)
                     x_var = tk.StringVar(value=default_x0_val)
                     ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
-                        side=tk.LEFT, padx=pad,
+                        side=tk.LEFT,
+                        padx=pad,
                     )
                     self._x0_vars.append(x_var)
                 else:
@@ -331,12 +353,20 @@ class ParametersDialog:
         self.method_frame.pack(fill=tk.X, pady=(0, pad))
 
         self.method_var = tk.StringVar(value=get_env_from_schema("SOLVER_DEFAULT_METHOD"))
-        combo = ttk.Combobox(self.method_frame, textvariable=self.method_var,
-                              values=list(SOLVER_METHODS), state="readonly", width=15,
-                              font=get_font())
+        combo = ttk.Combobox(
+            self.method_frame,
+            textvariable=self.method_var,
+            values=list(SOLVER_METHODS),
+            state="readonly",
+            width=15,
+            font=get_font(),
+        )
         combo.pack(anchor=tk.W)
         self.method_desc = ttk.Label(
-            self.method_frame, text="", style="Small.TLabel", justify=tk.LEFT,
+            self.method_frame,
+            text="",
+            style="Small.TLabel",
+            justify=tk.LEFT,
         )
         self.method_desc.pack(anchor=tk.W, pady=(2, 0))
         combo.bind("<<ComboboxSelected>>", self._on_method_change)
@@ -379,7 +409,10 @@ class ParametersDialog:
         self._stats_listbox.select_set(0, tk.END)
 
         self._stats_desc_label = ttk.Label(
-            stats_frame, text="", style="Small.TLabel", justify=tk.LEFT,
+            stats_frame,
+            text="",
+            style="Small.TLabel",
+            justify=tk.LEFT,
         )
         self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
         self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
@@ -410,6 +443,7 @@ class ParametersDialog:
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
         if self.equation_type == "difference":
+
             def _sub(i: int) -> str:
                 return subscripts[i] if i < len(subscripts) else str(i)
 
@@ -500,29 +534,30 @@ class ParametersDialog:
             domain_name = (
                 "n_min and n_max" if self.equation_type == "difference" else "x_min and x_max"
             )
-            messagebox.showerror("Invalid Domain",
-                                 f"{domain_name} must be numbers.",
-                                 parent=self.win)
+            messagebox.showerror(
+                "Invalid Domain", f"{domain_name} must be numbers.", parent=self.win
+            )
             return
 
         if self.is_pde:
             if self.ymin_var is None or self.ymax_var is None:
-                messagebox.showerror("Invalid PDE", "y_min and y_max required.",
-                                     parent=self.win)
+                messagebox.showerror("Invalid PDE", "y_min and y_max required.", parent=self.win)
                 return
             try:
                 y_min = float(self.ymin_var.get())
                 y_max = float(self.ymax_var.get())
             except ValueError:
-                messagebox.showerror("Invalid Domain", "y_min and y_max must be numbers.",
-                                     parent=self.win)
+                messagebox.showerror(
+                    "Invalid Domain", "y_min and y_max must be numbers.", parent=self.win
+                )
                 return
             try:
                 n_points = int(self.npoints_var.get())
                 n_points_y = int(self.npoints_y_var.get()) if self.npoints_y_var else n_points
             except (ValueError, AttributeError):
-                messagebox.showerror("Invalid Grid", "Grid points must be integers.",
-                                     parent=self.win)
+                messagebox.showerror(
+                    "Invalid Grid", "Grid points must be integers.", parent=self.win
+                )
                 return
             _max_pde_grid = 1000
             if n_points > _max_pde_grid or n_points_y > _max_pde_grid:
@@ -549,9 +584,9 @@ class ParametersDialog:
             try:
                 n_points = int(self.npoints_var.get())
             except ValueError:
-                messagebox.showerror("Invalid Grid",
-                                     "Number of points must be an integer.",
-                                     parent=self.win)
+                messagebox.showerror(
+                    "Invalid Grid", "Number of points must be an integer.", parent=self.win
+                )
                 return
             subscripts = "₀₁₂₃₄₅₆₇₈₉"
             x0_list = []

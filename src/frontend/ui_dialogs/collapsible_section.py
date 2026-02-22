@@ -50,12 +50,16 @@ class CollapsibleSection:
         header.pack(fill=tk.X)
 
         arrow_lbl = ttk.Label(
-            header, textvariable=arrow_var, style="SectionHeader.TLabel",
+            header,
+            textvariable=arrow_var,
+            style="SectionHeader.TLabel",
         )
         arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
 
         title_lbl = ttk.Label(
-            header, text=title, style="SectionHeader.TLabel",
+            header,
+            text=title,
+            style="SectionHeader.TLabel",
         )
         title_lbl.pack(side=tk.LEFT, pady=8)
 

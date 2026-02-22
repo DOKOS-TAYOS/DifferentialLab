@@ -36,13 +36,17 @@ def _nth_derivative(
         return f(x0)
     try:
         from scipy.misc import derivative as scipy_deriv
+
         return scipy_deriv(f, x0, n=n, dx=dx, order=2 * n + 1)
     except (ImportError, AttributeError):
         logger.debug("scipy.misc.derivative unavailable, using central-difference fallback")
+
     # Fallback: recursive central difference
     def df(x: float) -> float:
-        return (_nth_derivative(f, x + dx, n - 1, dx)
-                - _nth_derivative(f, x - dx, n - 1, dx)) / (2 * dx)
+        return (_nth_derivative(f, x + dx, n - 1, dx) - _nth_derivative(f, x - dx, n - 1, dx)) / (
+            2 * dx
+        )
+
     return df(x0)
 
 

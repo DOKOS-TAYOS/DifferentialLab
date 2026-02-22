@@ -45,9 +45,7 @@ def test_solve_ode_success(
     assert result.y.shape == (1, len(sample_t_eval))
     np.testing.assert_allclose(result.y[0, 0], 1.0)
     # Exponential growth y'=0.5*y, y(0)=1 => y(10) = exp(5)
-    np.testing.assert_allclose(
-        result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5
-    )
+    np.testing.assert_allclose(result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5)
 
 
 @patch("solver.ode_solver.get_env_from_schema")

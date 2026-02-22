@@ -51,4 +51,3 @@ def compute_ode_residual_error(
         "residual_mean": float(np.mean(residuals)),
         "residual_rms": float(np.sqrt(np.mean(residuals**2))),
     }
-

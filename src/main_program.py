@@ -87,6 +87,7 @@ def main() -> None:
         raise
     finally:
         import matplotlib.pyplot as _plt
+
         _plt.close("all")
         logger.info("DifferentialLab shutting down")
         sys.exit(0)

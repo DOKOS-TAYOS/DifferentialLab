@@ -57,18 +57,21 @@ class EquationDialog:
         btn_inner.pack()
 
         self._btn_next = ttk.Button(
-            btn_inner, text="Next \u2192", command=self._on_next,
+            btn_inner,
+            text="Next \u2192",
+            command=self._on_next,
         )
         self._btn_next.pack(side=tk.LEFT, padx=pad)
 
         btn_cancel = ttk.Button(
-            btn_inner, text="Cancel", style="Cancel.TButton",
+            btn_inner,
+            text="Cancel",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
         btn_cancel.pack(side=tk.LEFT, padx=pad)
 
         setup_arrow_enter_navigation([[self._btn_next, btn_cancel]])
-
 
         # ── Equation type selector ──
         type_frame = ttk.Frame(self.win)
@@ -184,7 +187,10 @@ class EquationDialog:
         desc_frame.rowconfigure(0, weight=1)
 
         self.desc_label = ttk.Label(
-            desc_frame, text="", style="Small.TLabel", justify=tk.LEFT,
+            desc_frame,
+            text="",
+            style="Small.TLabel",
+            justify=tk.LEFT,
         )
         self.desc_label.pack(anchor=tk.W, fill=tk.BOTH, expand=True)
 
@@ -218,7 +224,9 @@ class EquationDialog:
             )
         )
         self.custom_hint_detail = ttk.Label(
-            ci, textvariable=self.custom_hint_text, style="Small.TLabel",
+            ci,
+            textvariable=self.custom_hint_text,
+            style="Small.TLabel",
             justify=tk.LEFT,
         )
         self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
@@ -231,17 +239,15 @@ class EquationDialog:
         ci.bind("<Configure>", _update_custom_hint_wrap)
         self.win.after(50, _update_custom_hint_wrap)
 
-        unicode_frame = ttk.LabelFrame(
-            ci, text="Unicode symbols — select and copy", padding=pad
-        )
+        unicode_frame = ttk.LabelFrame(ci, text="Unicode symbols — select and copy", padding=pad)
         unicode_frame.pack(fill=tk.X, pady=(0, pad))
 
         # Each entry shows the escape code (copyable) followed by '=' and the rendered character.
         _unicode_hint_display = (
-            "\\u03B1=\u03B1  \\u03B2=\u03B2  \\u03B3=\u03B3  \\u03B4=\u03B4  \\u03B5=\u03B5\n"
-            "\\u03B6=\u03B6  \\u03B7=\u03B7  \\u03B8=\u03B8  \\u03BB=\u03BB  \\u03BC=\u03BC\n"
-            "\\u03BE=\u03BE  \\u03C0=\u03C0  \\u03C1=\u03C1  \\u03C3=\u03C3  \\u03C6=\u03C6\n"
-            "\\u03C9=\u03C9  \\u0394=\u0394  \\u03A3=\u03A3  \\u03A6=\u03A6  \\u03A9=\u03A9"
+            "\\u03B1=\u03b1  \\u03B2=\u03b2  \\u03B3=\u03b3  \\u03B4=\u03b4  \\u03B5=\u03b5\n"
+            "\\u03B6=\u03b6  \\u03B7=\u03b7  \\u03B8=\u03b8  \\u03BB=\u03bb  \\u03BC=\u03bc\n"
+            "\\u03BE=\u03be  \\u03C0=\u03c0  \\u03C1=\u03c1  \\u03C3=\u03c3  \\u03C6=\u03c6\n"
+            "\\u03C9=\u03c9  \\u0394=\u0394  \\u03A3=\u03a3  \\u03A6=\u03a6  \\u03A9=\u03a9"
         )
         _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         _fg: str = get_env_from_schema("UI_FOREGROUND")
@@ -265,14 +271,17 @@ class EquationDialog:
         self.custom_order_label.pack(side=tk.LEFT)
         self.custom_order_var = tk.StringVar(value="2")
         _font = get_font()
-        spinbox = ttk.Spinbox(row_order, from_=1, to=10, width=5,
-                     textvariable=self.custom_order_var, font=_font)
+        spinbox = ttk.Spinbox(
+            row_order, from_=1, to=10, width=5, textvariable=self.custom_order_var, font=_font
+        )
         spinbox.pack(side=tk.LEFT, padx=(pad, 0))
 
         self.custom_expr_label = ttk.Label(ci, text="Expression for highest derivative:")
         self.custom_expr_label.pack(anchor=tk.W)
         self.custom_expr = tk.Text(
-            ci, height=3, width=60,
+            ci,
+            height=3,
+            width=60,
             bg=_btn_bg,
             fg=_fg,
             insertbackground=_fg,
@@ -353,9 +362,7 @@ class EquationDialog:
     def _update_custom_hints(self) -> None:
         """Update custom tab hints based on equation type."""
         if self._equation_type_var.get() == "difference":
-            self.custom_hint_label.config(
-                text="Write y_{n+order} as a Python expression."
-            )
+            self.custom_hint_label.config(text="Write y_{n+order} as a Python expression.")
             self.custom_hint_text.set(
                 "Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.\n"
                 "Example (geometric growth):  r * y[0]"
@@ -394,14 +401,12 @@ class EquationDialog:
 
     def _on_next_predefined(self) -> None:
         if self._selected_key is None:
-            messagebox.showwarning("No Selection", "Please select an equation.",
-                                   parent=self.win)
+            messagebox.showwarning("No Selection", "Please select an equation.", parent=self.win)
             return
 
         eq = self.equations[self._selected_key]
         params: dict[str, float] = {
-            pname: float(pinfo.get("default", 0.0))
-            for pname, pinfo in eq.parameters.items()
+            pname: float(pinfo.get("default", 0.0)) for pname, pinfo in eq.parameters.items()
         }
 
         self.win.destroy()
@@ -434,17 +439,17 @@ class EquationDialog:
 
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
-            messagebox.showwarning("Empty Expression",
-                                   "Please enter an ODE expression.",
-                                   parent=self.win)
+            messagebox.showwarning(
+                "Empty Expression", "Please enter an ODE expression.", parent=self.win
+            )
             return
 
         try:
             order = int(self.custom_order_var.get())
         except ValueError:
-            messagebox.showerror("Invalid Order",
-                                 "ODE order must be a positive integer.",
-                                 parent=self.win)
+            messagebox.showerror(
+                "Invalid Order", "ODE order must be a positive integer.", parent=self.win
+            )
             return
 
         params: dict[str, float] = {}

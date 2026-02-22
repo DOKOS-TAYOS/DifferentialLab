@@ -100,7 +100,9 @@ def _validate_parameters(params: dict[str, float]) -> list[str]:
 
 
 def _validate_ic_points(
-    x0_list: list[float], x_min: float, x_max: float,
+    x0_list: list[float],
+    x_min: float,
+    x_max: float,
 ) -> list[str]:
     """Validate per-derivative initial condition points.
 
@@ -119,9 +121,7 @@ def _validate_ic_points(
         if not _is_finite(xi):
             errors.append(f"x{sub} = {xi} is not a finite number")
         elif not (x_min <= xi <= x_max):
-            errors.append(
-                f"x{sub} = {xi} must lie within the domain [{x_min}, {x_max}]"
-            )
+            errors.append(f"x{sub} = {xi} must lie within the domain [{x_min}, {x_max}]")
     return errors
 
 
@@ -172,9 +172,7 @@ def validate_all_inputs(
             errors.append("Vector ODE requires vector_expressions or function_name")
         elif vector_expressions:
             for i, expr in enumerate(vector_expressions):
-                errors.extend(
-                    f"Vector expression {i}: {e}" for e in validate_expression(expr)
-                )
+                errors.extend(f"Vector expression {i}: {e}" for e in validate_expression(expr))
     else:
         if expression is not None and function_name is not None:
             errors.append("Provide either expression or function_name, not both")

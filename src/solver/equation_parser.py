@@ -108,9 +108,7 @@ def _validate_ast(expression: str) -> None:
 
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODE_TYPES):
-            raise EquationParseError(
-                f"Disallowed construct in expression: {type(node).__name__}"
-            )
+            raise EquationParseError(f"Disallowed construct in expression: {type(node).__name__}")
 
 
 def parse_expression(
@@ -155,9 +153,7 @@ def parse_expression(
             eval(compiled, {"__builtins__": {}}, test_ns)
         except Exception as exc:
             logger.debug("ODE expression evaluation failed: %s — %s", expression[:80], exc)
-            raise EquationParseError(
-                f"Expression evaluation failed: {exc}"
-            ) from exc
+            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     _test_eval()
 
@@ -210,20 +206,14 @@ def get_ode_function(
     try:
         from config import equations as equations_module
     except ImportError as exc:
-        raise EquationParseError(
-            f"Cannot import config.equations: {exc}"
-        ) from exc
+        raise EquationParseError(f"Cannot import config.equations: {exc}") from exc
 
     if not hasattr(equations_module, function_name):
-        raise EquationParseError(
-            f"Function '{function_name}' not found in config.equations"
-        )
+        raise EquationParseError(f"Function '{function_name}' not found in config.equations")
 
     func = getattr(equations_module, function_name)
     if not callable(func):
-        raise EquationParseError(
-            f"'{function_name}' in config.equations is not callable"
-        )
+        raise EquationParseError(f"'{function_name}' in config.equations is not callable")
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         return func(x, y, **params)
@@ -257,7 +247,9 @@ def parse_difference_expression(
     params = dict(parameters) if parameters else {}
     logger.debug(
         "Parsing difference expression (order=%d): %s, params=%s",
-        order, expression, params,
+        order,
+        expression,
+        params,
     )
 
     namespace: dict[str, Any] = {**_SAFE_MATH, **params}
@@ -269,9 +261,7 @@ def parse_difference_expression(
         try:
             eval(compiled, {"__builtins__": {}}, test_ns)
         except Exception as exc:
-            raise EquationParseError(
-                f"Expression evaluation failed: {exc}"
-            ) from exc
+            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     _test_eval()
 
@@ -326,15 +316,11 @@ def get_difference_function(
             ) from exc
 
     if not hasattr(diff_module, function_name):
-        raise EquationParseError(
-            f"Function '{function_name}' not found in config"
-        )
+        raise EquationParseError(f"Function '{function_name}' not found in config")
 
     func = getattr(diff_module, function_name)
     if not callable(func):
-        raise EquationParseError(
-            f"'{function_name}' is not callable"
-        )
+        raise EquationParseError(f"'{function_name}' is not callable")
 
     def recur_func(n: int, y: np.ndarray) -> float:
         return float(func(n, y, **params))
@@ -368,7 +354,9 @@ def parse_pde_rhs_expression(
     params = dict(parameters) if parameters else {}
     logger.debug(
         "Parsing PDE RHS expression: %s, variables=%s, params=%s",
-        expression, variables, params,
+        expression,
+        variables,
+        params,
     )
 
     namespace: dict[str, Any] = {**_SAFE_MATH, **params}
@@ -440,9 +428,7 @@ def parse_vector_expression(
             try:
                 eval(compiled, {"__builtins__": {}}, test_ns)
             except Exception as exc:
-                raise EquationParseError(
-                    f"Expression {i} evaluation failed: {exc}"
-                ) from exc
+                raise EquationParseError(f"Expression {i} evaluation failed: {exc}") from exc
 
     _test_eval()
 
@@ -500,20 +486,14 @@ def get_vector_ode_function(
     try:
         from config import equations as equations_module
     except ImportError as exc:
-        raise EquationParseError(
-            f"Cannot import config.equations: {exc}"
-        ) from exc
+        raise EquationParseError(f"Cannot import config.equations: {exc}") from exc
 
     if not hasattr(equations_module, function_name):
-        raise EquationParseError(
-            f"Function '{function_name}' not found in config.equations"
-        )
+        raise EquationParseError(f"Function '{function_name}' not found in config.equations")
 
     func = getattr(equations_module, function_name)
     if not callable(func):
-        raise EquationParseError(
-            f"'{function_name}' in config.equations is not callable"
-        )
+        raise EquationParseError(f"'{function_name}' in config.equations is not callable")
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         return func(x, y, **params)

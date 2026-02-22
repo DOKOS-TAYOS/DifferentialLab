@@ -15,7 +15,7 @@ def harmonic_oscillator(x: float, y: np.ndarray, omega: float = 1.0, **kwargs: A
     """y'' + ω²y = 0 — Simple harmonic oscillator."""
     dydt = np.empty(2)
     dydt[0] = y[1]
-    dydt[1] = -omega**2 * y[0]
+    dydt[1] = -(omega**2) * y[0]
     return dydt
 
 
@@ -115,7 +115,7 @@ def schrodinger_equation(
     # Using ℏ=1
     omega = H + V
     dydt = np.empty(2)
-    dydt[0] = omega * y[1]   # d(Reψ)/dt
+    dydt[0] = omega * y[1]  # d(Reψ)/dt
     dydt[1] = -omega * y[0]  # d(Imψ)/dt
     return dydt
 

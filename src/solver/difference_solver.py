@@ -79,7 +79,9 @@ def solve_difference(
 
         logger.info(
             "Difference equation solved: %d points from n=%d to n=%d",
-            n_points, n_min, n_max,
+            n_points,
+            n_min,
+            n_max,
         )
         return DifferenceSolution(
             n=n_arr,

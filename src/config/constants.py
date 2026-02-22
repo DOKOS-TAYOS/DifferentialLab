@@ -27,17 +27,35 @@ PLOT_FORMATS: Final[tuple[str, ...]] = ("png", "jpg", "pdf")
 LINE_STYLES: Final[tuple[str, ...]] = ("-", "--", "-.", ":")
 MARKER_FORMATS: Final[tuple[str, ...]] = ("o", "s", "^", "d", "*")
 FONT_FAMILIES: Final[tuple[str, ...]] = (
-    "serif", "sans-serif", "monospace", "cursive", "fantasy",
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
 )
 FONT_SIZES: Final[tuple[str, ...]] = (
-    "xx-small", "x-small", "small", "medium", "large", "x-large", "xx-large",
+    "xx-small",
+    "x-small",
+    "small",
+    "medium",
+    "large",
+    "x-large",
+    "xx-large",
 )
 FONT_WEIGHTS: Final[tuple[str, ...]] = (
-    "normal", "bold", "light", "semibold", "heavy",
+    "normal",
+    "bold",
+    "light",
+    "semibold",
+    "heavy",
 )
 FONT_STYLES: Final[tuple[str, ...]] = ("normal", "italic", "oblique")
 LOG_LEVELS: Final[tuple[str, ...]] = (
-    "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL",
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR",
+    "CRITICAL",
 )
 
 AVAILABLE_STATISTICS: Final[dict[str, str]] = {

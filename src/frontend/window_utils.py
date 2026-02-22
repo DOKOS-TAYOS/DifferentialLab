@@ -90,7 +90,9 @@ def fit_and_center(
     h = min(max(req_h, min_height), int(screen_h * max_ratio))
 
     center_window(
-        window, w, h,
+        window,
+        w,
+        h,
         max_width_ratio=max_ratio,
         max_height_ratio=max_ratio,
         **center_kwargs,

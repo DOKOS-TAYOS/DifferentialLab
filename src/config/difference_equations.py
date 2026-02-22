@@ -34,8 +34,6 @@ def linear_recurrence_2(
     return a * y[1] + b * y[0]
 
 
-def cobweb_model(
-    n: int, y: np.ndarray, r: float = 2.5, K: float = 1.0, **kwargs: Any
-) -> float:
+def cobweb_model(n: int, y: np.ndarray, r: float = 2.5, K: float = 1.0, **kwargs: Any) -> float:
     """y_{n+1} = r * y_n * (1 - y_n/K) — Discrete logistic (Ricker-type)."""
     return r * y[0] * (1.0 - y[0] / K)

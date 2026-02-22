@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import webbrowser
 import tkinter as tk
 from tkinter import ttk
+
+YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 
 from config import (
     APP_NAME,
@@ -142,14 +145,23 @@ class HelpDialog:
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
+        btn_youtube = ttk.Button(
+            btn_frame,
+            text="If you want to support",
+            command=lambda: webbrowser.open(YOUTUBE_CHANNEL_URL),
+            padding=(14,8)
+        )
+        btn_youtube.pack(side=tk.LEFT, padx=(0, pad))
+
         btn_close = ttk.Button(
-            btn_frame, text="Close", style="Cancel.TButton",
+            btn_frame,
+            text="Close",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
-        btn_close.pack()
+        btn_close.pack(side=tk.LEFT)
 
-
-        setup_arrow_enter_navigation([[btn_close]])
+        setup_arrow_enter_navigation([[btn_youtube, btn_close]])
         btn_close.focus_set()
 
         # Scrollable content
@@ -194,10 +206,16 @@ class HelpDialog:
         """Add a collapsible section (header + body) wrapped in a container."""
         pad: int = get_env_from_schema("UI_PADDING")
         section = CollapsibleSection(
-            parent, self._scroll, title, expanded=expanded, pad=pad,
+            parent,
+            self._scroll,
+            title,
+            expanded=expanded,
+            pad=pad,
         )
         body_lbl = ttk.Label(
-            section.content, text=body, justify=tk.LEFT,
+            section.content,
+            text=body,
+            justify=tk.LEFT,
         )
         body_lbl.pack(anchor=tk.W, fill=tk.X)
         self._body_labels.append(body_lbl)

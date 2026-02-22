@@ -94,11 +94,7 @@ def fetch_latest_version(version_url: Optional[str] = None) -> Optional[str]:
     Returns:
         Version string (e.g. '0.2.2') or None if fetch failed.
     """
-    url = (
-        version_url
-        or get_env("UPDATE_CHECK_URL", _DEFAULT_VERSION_URL, str)
-        or ""
-    ).strip()
+    url = (version_url or get_env("UPDATE_CHECK_URL", _DEFAULT_VERSION_URL, str) or "").strip()
     if not url:
         url = _DEFAULT_VERSION_URL
 
@@ -170,9 +166,7 @@ def perform_git_pull() -> Tuple[bool, str]:
             timeout=60,
         )
 
-        if stash_result.returncode == 0 and "No local changes" not in (
-            stash_result.stdout or ""
-        ):
+        if stash_result.returncode == 0 and "No local changes" not in (stash_result.stdout or ""):
             subprocess.run(
                 ["git", "stash", "pop"],
                 cwd=str(root),

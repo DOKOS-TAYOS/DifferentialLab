@@ -69,8 +69,7 @@ class ResultDialog:
         self._statistics = statistics
         self._metadata = metadata
         self._animation_data = animation_data
-        self._build_ui(fig, phase_fig, statistics, metadata,
-                       animation_fig, animation_3d_fig)
+        self._build_ui(fig, phase_fig, statistics, metadata, animation_fig, animation_3d_fig)
 
         pad: int = get_env_from_schema("UI_PADDING")
         screen_w = self.win.winfo_screenwidth()
@@ -86,7 +85,7 @@ class ResultDialog:
         aspect: float = fig_w / fig_h if fig_h else 2.0
         right_w = win_w - _LEFT_MIN_WIDTH - 3 * pad
         plot_h = int(right_w / aspect)
-        chrome_h = 30 + 26 + 46 + 2 * pad   # toolbar + tab strip + btn bar + padding
+        chrome_h = 30 + 26 + 46 + 2 * pad  # toolbar + tab strip + btn bar + padding
         win_h = min(max(plot_h + chrome_h, 500), int(screen_h * 0.92))
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.92, resizable=True)
@@ -110,7 +109,9 @@ class ResultDialog:
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
         btn_close = ttk.Button(
-            btn_frame, text="Close", style="Cancel.TButton",
+            btn_frame,
+            text="Close",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
         btn_close.pack()
@@ -190,12 +191,14 @@ class ResultDialog:
         btn_row = ttk.Frame(export_section.content)
         btn_row.pack(fill=tk.X, pady=2)
         btn_csv = ttk.Button(
-            btn_row, text="Save CSV...",
+            btn_row,
+            text="Save CSV...",
             command=self._on_save_csv,
         )
         btn_csv.pack(side=tk.LEFT, padx=(0, pad))
         btn_json = ttk.Button(
-            btn_row, text="Save JSON...",
+            btn_row,
+            text="Save JSON...",
             command=self._on_save_json,
         )
         btn_json.pack(side=tk.LEFT)
@@ -222,18 +225,14 @@ class ResultDialog:
             anim_tab = ttk.Frame(notebook)
             notebook.add(anim_tab, text="  f_i(x) Animation  ")
             export_cb = self._on_export_animation_mp4 if self._animation_data else None
-            embed_animation_plot_in_tk(
-                animation_fig, anim_tab, on_export_mp4=export_cb
-            )
+            embed_animation_plot_in_tk(animation_fig, anim_tab, on_export_mp4=export_cb)
 
         if animation_3d_fig is not None:
             anim3d_tab = ttk.Frame(notebook)
             notebook.add(anim3d_tab, text="  f_i(x) 3D  ")
             embed_plot_in_tk(animation_3d_fig, anim3d_tab)
 
-    def _render_stat_entry(
-        self, parent: tk.Widget, key: str, val: Any, pad: int
-    ) -> None:
+    def _render_stat_entry(self, parent: tk.Widget, key: str, val: Any, pad: int) -> None:
         """Render one statistic inside *parent*.
 
         Scalar values get a single ``key: value`` row.  Dict values get a
@@ -249,22 +248,22 @@ class ResultDialog:
         if isinstance(val, dict):
             hdr = ttk.Frame(parent)
             hdr.pack(fill=tk.X, pady=(2, 0))
-            ttk.Label(hdr, text=f"{key}:", width=16, anchor=tk.W,
-                      style="Small.TLabel").pack(side=tk.LEFT)
+            ttk.Label(hdr, text=f"{key}:", width=16, anchor=tk.W, style="Small.TLabel").pack(
+                side=tk.LEFT
+            )
             for sub_key, sub_val in val.items():
                 sub_row = ttk.Frame(parent)
                 sub_row.pack(fill=tk.X, pady=0)
-                ttk.Label(sub_row, text=f"  {sub_key}:", width=22,
-                          anchor=tk.W).pack(side=tk.LEFT)
+                ttk.Label(sub_row, text=f"  {sub_key}:", width=22, anchor=tk.W).pack(side=tk.LEFT)
                 formatted = f"{sub_val:.6g}" if isinstance(sub_val, float) else str(sub_val)
-                ttk.Label(sub_row, text=formatted,
-                          style="Small.TLabel").pack(side=tk.LEFT, padx=(2, 0))
+                ttk.Label(sub_row, text=formatted, style="Small.TLabel").pack(
+                    side=tk.LEFT, padx=(2, 0)
+                )
         else:
             row = ttk.Frame(parent)
             row.pack(fill=tk.X, pady=1)
             ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
-            ttk.Label(row, text=self._format_stat(val),
-                      style="Small.TLabel").pack(side=tk.LEFT)
+            ttk.Label(row, text=self._format_stat(val), style="Small.TLabel").pack(side=tk.LEFT)
 
     def _on_save_csv(self) -> None:
         """Save solution data to CSV via file dialog."""
@@ -280,9 +279,7 @@ class ResultDialog:
             return
         path = Path(filepath)
         try:
-            export_csv_to_path(
-                self._x, self._y, path, y_grid=self._y_grid
-            )
+            export_csv_to_path(self._x, self._y, path, y_grid=self._y_grid)
             messagebox.showinfo(
                 "Export Complete",
                 f"CSV saved to:\n{path}",
@@ -306,9 +303,7 @@ class ResultDialog:
             return
         path = Path(filepath)
         try:
-            export_json_to_path(
-                self._statistics, self._metadata, path
-            )
+            export_json_to_path(self._statistics, self._metadata, path)
             messagebox.showinfo(
                 "Export Complete",
                 f"JSON saved to:\n{path}",
@@ -368,8 +363,9 @@ class ResultDialog:
         if value is None:
             return "N/A"
         if isinstance(value, dict):
-            parts = [f"{k}={v:.6g}" if isinstance(v, float) else f"{k}={v}"
-                     for k, v in value.items()]
+            parts = [
+                f"{k}={v:.6g}" if isinstance(v, float) else f"{k}={v}" for k, v in value.items()
+            ]
             return ", ".join(parts)
         if isinstance(value, float):
             return f"{value:.6g}"

@@ -195,13 +195,28 @@ def solve_pde_2d_linear_poisson(
     Returns:
         PDESolution.
     """
-    def rhs_only(x: float, y: float, _f: float, _fx: float, _fy: float,
-                 _fxx: float, _fxy: float, _fyy: float, **kw: Any) -> float:
+
+    def rhs_only(
+        x: float,
+        y: float,
+        _f: float,
+        _fx: float,
+        _fy: float,
+        _fxx: float,
+        _fxy: float,
+        _fyy: float,
+        **kw: Any,
+    ) -> float:
         if callable(f_source):
             return f_source(x, y)
         return float(f_source)
 
     return solve_pde_2d(
         rhs_only,
-        x_min, x_max, y_min, y_max, nx, ny,
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+        nx,
+        ny,
     )

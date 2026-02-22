@@ -96,21 +96,25 @@ class TransformDialog:
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
         btn_help = ttk.Button(
-            btn_frame, text="Help",
+            btn_frame,
+            text="Help",
             command=self._on_help,
         )
         btn_help.pack(side=tk.LEFT, padx=pad)
         ToolTip(btn_help, "Show help about the Transforms section.")
 
         btn_export = ttk.Button(
-            btn_frame, text="Export CSV",
+            btn_frame,
+            text="Export CSV",
             command=self._on_export,
         )
         btn_export.pack(side=tk.LEFT, padx=pad)
         ToolTip(btn_export, "Export the transformed data points to a CSV file.")
 
         btn_close = ttk.Button(
-            btn_frame, text="Close", style="Cancel.TButton",
+            btn_frame,
+            text="Close",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
         btn_close.pack(side=tk.LEFT, padx=pad)
@@ -144,15 +148,18 @@ class TransformDialog:
         func_lf.bind("<Configure>", _update_func_hint_wrap)
         self.win.after(50, lambda: _update_func_hint_wrap(None))
         self._func_entry = tk.Text(
-            func_lf, height=2, width=30,
-            bg=btn_bg, fg=fg, insertbackground=fg, font=_font,
+            func_lf,
+            height=2,
+            width=30,
+            bg=btn_bg,
+            fg=fg,
+            insertbackground=fg,
+            font=_font,
         )
         self._func_entry.insert("1.0", "sin(x)")
         self._func_entry.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(func_lf, text="Parameters (name=value, comma-separated):").pack(
-            anchor=tk.W
-        )
+        ttk.Label(func_lf, text="Parameters (name=value, comma-separated):").pack(anchor=tk.W)
         self._params_entry = ttk.Entry(func_lf, width=32, font=_font)
         self._params_entry.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self._params_entry, "E.g.: a=1.0, omega=2.0")
@@ -211,7 +218,9 @@ class TransformDialog:
         self._taylor_order_var = tk.StringVar(value="5")
         ttk.Spinbox(
             self._taylor_frame,
-            from_=1, to=15, width=5,
+            from_=1,
+            to=15,
+            width=5,
             textvariable=self._taylor_order_var,
             font=_font,
         ).pack(side=tk.LEFT, padx=(4, pad))
@@ -226,7 +235,8 @@ class TransformDialog:
 
         # Apply button
         self._btn_apply = ttk.Button(
-            left, text="Apply / Update plot",
+            left,
+            text="Apply / Update plot",
             command=self._on_apply,
         )
         self._btn_apply.pack(fill=tk.X, pady=pad)
@@ -264,9 +274,7 @@ class TransformDialog:
         """
         from solver.equation_parser import normalize_unicode_escapes
 
-        expr = normalize_unicode_escapes(
-            self._func_entry.get("1.0", tk.END).strip()
-        )
+        expr = normalize_unicode_escapes(self._func_entry.get("1.0", tk.END).strip())
         if not expr:
             raise ValueError("Please enter a function expression.")
 
@@ -373,6 +381,7 @@ class TransformDialog:
 
         if kind == TransformKind.TAYLOR and not self._show_coefficients:
             from transforms import compute_function_samples
+
             x_orig, y_orig = compute_function_samples(func, x_min, x_max, n_points)
             self._y_original = y_orig
         else:
@@ -400,9 +409,7 @@ class TransformDialog:
             width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
             height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
             dpi: int = get_env_from_schema("DPI")
-            self._fig, self._ax = plt.subplots(
-                figsize=(width, height), dpi=dpi
-            )
+            self._fig, self._ax = plt.subplots(figsize=(width, height), dpi=dpi)
             self._canvas = embed_plot_in_tk(self._fig, self._plot_container)
         else:
             self._ax = self._fig.axes[0] if self._fig.axes else None
@@ -415,7 +422,8 @@ class TransformDialog:
 
         if self._show_coefficients:
             markerline, stemlines, baseline = self._ax.stem(
-                x, y,
+                x,
+                y,
                 linefmt="-",
                 markerfmt="o",
                 basefmt=" ",
@@ -427,9 +435,12 @@ class TransformDialog:
             self._ax.plot(x, y, color=line_color, linewidth=line_width, label=ylabel)
             if self._y_original is not None:
                 self._ax.plot(
-                    x, self._y_original,
-                    color="coral", linewidth=line_width * 0.8,
-                    linestyle="--", label="f(x)",
+                    x,
+                    self._y_original,
+                    color="coral",
+                    linewidth=line_width * 0.8,
+                    linestyle="--",
+                    label="f(x)",
                 )
         if self._y_original is not None:
             self._ax.legend()
@@ -455,9 +466,7 @@ class TransformDialog:
             )
             return
 
-        default_path = get_csv_path(
-            generate_output_basename(prefix="transform")
-        )
+        default_path = get_csv_path(generate_output_basename(prefix="transform"))
         filepath = filedialog.asksaveasfilename(
             parent=self.win,
             defaultextension=".csv",
@@ -474,6 +483,7 @@ class TransformDialog:
         data = np.column_stack([self._current_x, self._current_y])
         with open(path, "w", newline="", encoding="utf-8") as f:
             import csv
+
             writer = csv.writer(f)
             writer.writerow(headers)
             writer.writerows(data.tolist())
@@ -574,7 +584,9 @@ class _TransformHelpDialog:
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
         btn_close = ttk.Button(
-            btn_frame, text="Close", style="Cancel.TButton",
+            btn_frame,
+            text="Close",
+            style="Cancel.TButton",
             command=self._do_close,
         )
         btn_close.pack()
@@ -622,10 +634,16 @@ class _TransformHelpDialog:
     ) -> None:
         pad: int = get_env_from_schema("UI_PADDING")
         section = CollapsibleSection(
-            parent, self._scroll, title, expanded=expanded, pad=pad,
+            parent,
+            self._scroll,
+            title,
+            expanded=expanded,
+            pad=pad,
         )
         body_lbl = ttk.Label(
-            section.content, text=body, justify=tk.LEFT,
+            section.content,
+            text=body,
+            justify=tk.LEFT,
         )
         body_lbl.pack(anchor=tk.W, fill=tk.X)
         self._body_labels.append(body_lbl)

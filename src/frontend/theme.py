@@ -174,62 +174,91 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     style = ttk.Style(root)
     style.theme_use("clam")
 
-    style.configure(".", background=bg, foreground=fg, font=font,
-                    borderwidth=0, focuscolor=focus_bg)
+    style.configure(
+        ".", background=bg, foreground=fg, font=font, borderwidth=0, focuscolor=focus_bg
+    )
     style.configure("TFrame", background=bg)
     style.configure("TLabel", background=bg, foreground=fg, font=font)
     style.configure("TLabelframe", background=bg, foreground=fg, font=font)
     style.configure("TLabelframe.Label", background=bg, foreground=fg, font=font_bold)
 
     # --- Buttons ---
-    style.configure("TButton", background=btn_bg, foreground=btn_fg,
-                    font=font, padding=padding, borderwidth=1, relief="raised",
-                    justify=tk.CENTER)
-    style.map("TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg), ("focus", btn_fg)])
+    style.configure(
+        "TButton",
+        background=btn_bg,
+        foreground=btn_fg,
+        font=font,
+        padding=padding,
+        borderwidth=1,
+        relief="raised",
+        justify=tk.CENTER,
+    )
+    style.map(
+        "TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg), ("focus", btn_fg)],
+    )
 
     style.configure("Cancel.TButton", foreground=btn_fg_cancel, justify=tk.CENTER)
-    style.map("Cancel.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)])
+    style.map(
+        "Cancel.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)],
+    )
 
     style.configure("Accent2.TButton", foreground=btn_fg_accent2, justify=tk.CENTER)
-    style.map("Accent2.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)])
+    style.map(
+        "Accent2.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)],
+    )
 
-    style.configure("Small.TButton", background=btn_bg, foreground=btn_fg,
-                    font=font, padding=(4, 2), borderwidth=1, relief="raised",
-                    justify=tk.CENTER)
-    style.map("Small.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg), ("focus", btn_fg)])
+    style.configure(
+        "Small.TButton",
+        background=btn_bg,
+        foreground=btn_fg,
+        font=font,
+        padding=(4, 2),
+        borderwidth=1,
+        relief="raised",
+        justify=tk.CENTER,
+    )
+    style.map(
+        "Small.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg), ("focus", btn_fg)],
+    )
 
     # Small menu buttons (Configuration, Quit) - smaller font and padding
-    style.configure("SmallMenu.TButton", background=btn_bg, foreground=btn_fg,
-                    font=font_small, padding=(4, 2), borderwidth=1, relief="raised",
-                    justify=tk.CENTER)
-    style.map("SmallMenu.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg), ("focus", btn_fg)])
-    style.configure("SmallMenu.Accent2.TButton", foreground=btn_fg_accent2,
-                    justify=tk.CENTER)
-    style.map("SmallMenu.Accent2.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)])
-    style.configure("SmallMenu.Cancel.TButton", foreground=btn_fg_cancel,
-                    justify=tk.CENTER, padding=(50,6))
-    style.map("SmallMenu.Cancel.TButton",
-              background=[("pressed", focus_bg), ("focus", focus_bg),
-                          ("active", focus_bg)],
-              foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)])
+    style.configure(
+        "SmallMenu.TButton",
+        background=btn_bg,
+        foreground=btn_fg,
+        font=font_small,
+        padding=(4, 2),
+        borderwidth=1,
+        relief="raised",
+        justify=tk.CENTER,
+    )
+    style.map(
+        "SmallMenu.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg), ("focus", btn_fg)],
+    )
+    style.configure("SmallMenu.Accent2.TButton", foreground=btn_fg_accent2, justify=tk.CENTER)
+    style.map(
+        "SmallMenu.Accent2.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)],
+    )
+    style.configure(
+        "SmallMenu.Cancel.TButton", foreground=btn_fg_cancel, justify=tk.CENTER, padding=(50, 6)
+    )
+    style.map(
+        "SmallMenu.Cancel.TButton",
+        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
+        foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)],
+    )
 
     # --- Labels ---
     style.configure("Title.TLabel", font=font_large, foreground=btn_fg)
@@ -239,58 +268,87 @@ def configure_ttk_styles(root: tk.Tk) -> None:
 
     # Collapsible-section header style
     style.configure("SectionHeader.TFrame", background=btn_bg)
-    style.configure("SectionHeader.TLabel", background=btn_bg, foreground=btn_fg,
-                    font=font_bold)
+    style.configure("SectionHeader.TLabel", background=btn_bg, foreground=btn_fg, font=font_bold)
 
     # --- Entry (larger font + focus highlight) ---
-    style.configure("TEntry", fieldbackground=btn_bg, foreground=fg,
-                    insertcolor=fg, selectbackground=select_bg,
-                    selectforeground=select_fg, padding=6, font=font)
-    style.map("TEntry",
-              fieldbackground=[("focus", "#2a2a2a")])
+    style.configure(
+        "TEntry",
+        fieldbackground=btn_bg,
+        foreground=fg,
+        insertcolor=fg,
+        selectbackground=select_bg,
+        selectforeground=select_fg,
+        padding=6,
+        font=font,
+    )
+    style.map("TEntry", fieldbackground=[("focus", "#2a2a2a")])
 
     # --- Spinbox ---
-    style.configure("TSpinbox", fieldbackground=btn_bg, foreground=fg,
-                    arrowcolor=fg, insertcolor=fg, selectbackground=select_bg,
-                    selectforeground=select_fg, padding=6, font=font, arrowsize=font[1] + padding*2)
-    style.map("TSpinbox",
-              fieldbackground=[("focus", "#2a2a2a")])
+    style.configure(
+        "TSpinbox",
+        fieldbackground=btn_bg,
+        foreground=fg,
+        arrowcolor=fg,
+        insertcolor=fg,
+        selectbackground=select_bg,
+        selectforeground=select_fg,
+        padding=6,
+        font=font,
+        arrowsize=font[1] + padding * 2,
+    )
+    style.map("TSpinbox", fieldbackground=[("focus", "#2a2a2a")])
 
     # --- Combobox ---
-    style.configure("TCombobox", fieldbackground=btn_bg, foreground=fg,
-                    selectbackground=select_bg, selectforeground=select_fg,
-                    padding=6, font=font)
-    style.map("TCombobox",
-              fieldbackground=[("readonly", btn_bg), ("focus", "#2a2a2a")],
-              foreground=[("readonly", fg)])
+    style.configure(
+        "TCombobox",
+        fieldbackground=btn_bg,
+        foreground=fg,
+        selectbackground=select_bg,
+        selectforeground=select_fg,
+        padding=6,
+        font=font,
+    )
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", btn_bg), ("focus", "#2a2a2a")],
+        foreground=[("readonly", fg)],
+    )
 
     # --- Checkbutton ---
-    style.configure("TCheckbutton", background=bg, foreground=fg, font=font,
-                    indicatorcolor=btn_bg)
-    style.map("TCheckbutton",
-              background=[("active", bg), ("focus", "#2a2a2a")],
-              indicatorcolor=[("selected", btn_fg)])
+    style.configure("TCheckbutton", background=bg, foreground=fg, font=font, indicatorcolor=btn_bg)
+    style.map(
+        "TCheckbutton",
+        background=[("active", bg), ("focus", "#2a2a2a")],
+        indicatorcolor=[("selected", btn_fg)],
+    )
 
     # --- Treeview ---
-    style.configure("Treeview", background=btn_bg, foreground=fg,
-                    fieldbackground=btn_bg, font=font_small,
-                    rowheight=int(font_size * 1.8))
+    style.configure(
+        "Treeview",
+        background=btn_bg,
+        foreground=fg,
+        fieldbackground=btn_bg,
+        font=font_small,
+        rowheight=int(font_size * 1.8),
+    )
     style.configure("Treeview.Heading", background=bg, foreground=fg, font=font_bold)
-    style.map("Treeview",
-              background=[("selected", select_bg)],
-              foreground=[("selected", select_fg)])
+    style.map(
+        "Treeview", background=[("selected", select_bg)], foreground=[("selected", select_fg)]
+    )
 
     # --- Scrollbar ---
-    style.configure("TScrollbar", background=btn_bg, troughcolor=bg,
-                    arrowcolor=fg, borderwidth=0)
+    style.configure("TScrollbar", background=btn_bg, troughcolor=bg, arrowcolor=fg, borderwidth=0)
 
     # --- Notebook ---
     style.configure("TNotebook", background=bg, borderwidth=0)
-    style.configure("TNotebook.Tab", background=btn_bg, foreground=fg,
-                    font=font, padding=[padding, padding // 2])
-    style.map("TNotebook.Tab",
-              background=[("selected", bg)],
-              foreground=[("selected", btn_fg)])
+    style.configure(
+        "TNotebook.Tab",
+        background=btn_bg,
+        foreground=fg,
+        font=font,
+        padding=[padding, padding // 2],
+    )
+    style.map("TNotebook.Tab", background=[("selected", bg)], foreground=[("selected", btn_fg)])
 
     # --- Separator ---
     style.configure("TSeparator", background=btn_bg)

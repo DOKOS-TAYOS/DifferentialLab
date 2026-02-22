@@ -22,14 +22,16 @@ def _apply_plot_style() -> None:
     """Configure matplotlib rcParams from environment variables."""
     import matplotlib
 
-    matplotlib.rcParams.update({
-        "font.family": get_env_from_schema("FONT_FAMILY"),
-        "font.size": get_env_from_schema("FONT_TICK_SIZE"),
-        "axes.titlesize": get_env_from_schema("FONT_TITLE_SIZE"),
-        "axes.titleweight": get_env_from_schema("FONT_TITLE_WEIGHT"),
-        "axes.labelsize": get_env_from_schema("FONT_AXIS_SIZE"),
-        "figure.dpi": get_env_from_schema("DPI"),
-    })
+    matplotlib.rcParams.update(
+        {
+            "font.family": get_env_from_schema("FONT_FAMILY"),
+            "font.size": get_env_from_schema("FONT_TICK_SIZE"),
+            "axes.titlesize": get_env_from_schema("FONT_TITLE_SIZE"),
+            "axes.titleweight": get_env_from_schema("FONT_TITLE_WEIGHT"),
+            "axes.labelsize": get_env_from_schema("FONT_AXIS_SIZE"),
+            "figure.dpi": get_env_from_schema("DPI"),
+        }
+    )
 
 
 def _new_figure() -> tuple[Any, Any]:
@@ -131,8 +133,14 @@ def create_solution_plot(
         if deriv_idx >= y_2d.shape[0]:
             continue
         color = colors[plot_idx] if plot_idx < len(colors) else None
-        ax.plot(x, y_2d[deriv_idx], color=color, linewidth=line_width,
-                linestyle=line_style, label=labels[deriv_idx])
+        ax.plot(
+            x,
+            y_2d[deriv_idx],
+            color=color,
+            linewidth=line_width,
+            linestyle=line_style,
+            label=labels[deriv_idx],
+        )
 
     if show_markers:
         marker: str = get_env_from_schema("PLOT_MARKER_FORMAT")
@@ -143,8 +151,15 @@ def create_solution_plot(
         for plot_idx, deriv_idx in enumerate(selected_derivatives):
             if deriv_idx >= y_2d.shape[0]:
                 continue
-            ax.plot(x[::step], y_2d[deriv_idx, ::step], marker=marker, markersize=msize,
-                    markerfacecolor=mfc, markeredgecolor=mec, linestyle="none")
+            ax.plot(
+                x[::step],
+                y_2d[deriv_idx, ::step],
+                marker=marker,
+                markersize=msize,
+                markerfacecolor=mfc,
+                markeredgecolor=mec,
+                linestyle="none",
+            )
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=len(selected_derivatives) > 1)
     fig.tight_layout()
@@ -238,12 +253,12 @@ def create_surface_plot(
     if z.shape != X.shape:
         z = np.asarray(z)
         if z.shape != X.shape:
-            raise ValueError(
-                f"z shape {z.shape} does not match grid {X.shape}"
-            )
+            raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
     surf = ax.plot_surface(
-        X, Y, z,
+        X,
+        Y,
+        z,
         cmap="viridis",
         alpha=0.9,
         edgecolor="none",
@@ -364,11 +379,14 @@ def create_vector_animation_plot(
     indices = np.arange(vector_components)
     vals = np.array([f_values[j][time_index] for j in range(vector_components)])
     (line_chain,) = ax_main.plot(
-        indices, vals, "o-", color=colors[0], markersize=8, linewidth=2,
+        indices,
+        vals,
+        "o-",
+        color=colors[0],
+        markersize=8,
+        linewidth=2,
     )
-    vlines_coll = ax_main.vlines(
-        indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6
-    )
+    vlines_coll = ax_main.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
     ax_main.set_xticks(indices)
     ax_main.set_xticklabels([f"f_{i}" for i in range(vector_components)])
 
@@ -544,9 +562,7 @@ def export_animation_to_mp4(
 
     if not writers.is_available("ffmpeg"):
         plt.close(fig)
-        raise RuntimeError(
-            "FFMpeg is not available. Install ffmpeg and ensure it is in your PATH."
-        )
+        raise RuntimeError("FFMpeg is not available. Install ffmpeg and ensure it is in your PATH.")
 
     try:
         filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -554,9 +570,7 @@ def export_animation_to_mp4(
     except Exception as exc:
         logger.error("MP4 export failed: %s", exc, exc_info=True)
         plt.close(fig)
-        raise RuntimeError(
-            f"Failed to export MP4. Is ffmpeg installed? {exc}"
-        ) from exc
+        raise RuntimeError(f"Failed to export MP4. Is ffmpeg installed? {exc}") from exc
     plt.close(fig)
     logger.info("Animation exported: %s (%d frames)", filepath, len(frame_indices))
     return filepath

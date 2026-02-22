@@ -28,6 +28,7 @@ def get_output_dir() -> Path:
     out.mkdir(parents=True, exist_ok=True)
     return out
 
+
 def generate_output_basename(prefix: str = "solution") -> str:
     """Generate a timestamped base filename.
 

@@ -88,9 +88,7 @@ def _validate_ast(expression: str) -> None:
 
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_NODE_TYPES):
-            raise EquationParseError(
-                f"Disallowed construct in expression: {type(node).__name__}"
-            )
+            raise EquationParseError(f"Disallowed construct in expression: {type(node).__name__}")
 
 
 def parse_scalar_function(
@@ -126,18 +124,17 @@ def parse_scalar_function(
         try:
             eval(compiled, {"__builtins__": {}}, test_ns)
         except Exception as exc:
-            raise EquationParseError(
-                f"Expression evaluation failed: {exc}"
-            ) from exc
+            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     _test_eval()
 
     def scalar_func(x: np.ndarray) -> np.ndarray:
         return np.array(
-            [float(eval(compiled, {"__builtins__": {}}, {**namespace, "x": float(xi)}))
-            for xi in np.atleast_1d(x)
-        ],
-        dtype=float,
-    )
+            [
+                float(eval(compiled, {"__builtins__": {}}, {**namespace, "x": float(xi)}))
+                for xi in np.atleast_1d(x)
+            ],
+            dtype=float,
+        )
 
     return scalar_func

@@ -73,6 +73,7 @@ def test_load_predefined_equations_missing_file_raises() -> None:
     with patch("solver.predefined._EQUATIONS_PATH", Path("/nonexistent/equations.yaml")):
         # Clear cache so load is attempted
         import solver.predefined as mod
+
         mod._cache = None
         with pytest.raises(FileNotFoundError):
             load_predefined_equations()

@@ -23,34 +23,86 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
-    ("ui_theme", "UI Theme", [
-        "UI_BACKGROUND", "UI_FOREGROUND", "UI_BUTTON_BG", "UI_BUTTON_WIDTH",
-        "UI_BUTTON_FG", "UI_BUTTON_FG_CANCEL", "UI_BUTTON_FG_ACCENT2",
-        "UI_FONT_SIZE", "UI_FONT_FAMILY", "UI_PADDING",
-    ]),
-    ("plot_style", "Plot Style", [
-        "PLOT_FIGSIZE_WIDTH", "PLOT_FIGSIZE_HEIGHT", "DPI",
-        "PLOT_SHOW_TITLE", "PLOT_SHOW_GRID",
-        "PLOT_LINE_COLOR", "PLOT_LINE_WIDTH", "PLOT_LINE_STYLE",
-    ]),
-    ("plot_markers", "Plot Markers", [
-        "PLOT_MARKER_FORMAT", "PLOT_MARKER_SIZE",
-        "PLOT_MARKER_FACE_COLOR", "PLOT_MARKER_EDGE_COLOR",
-    ]),
-    ("plot_fonts", "Plot Fonts", [
-        "FONT_FAMILY", "FONT_TITLE_SIZE", "FONT_TITLE_WEIGHT",
-        "FONT_AXIS_SIZE", "FONT_AXIS_STYLE", "FONT_TICK_SIZE",
-    ]),
-    ("solver", "Solver Defaults", [
-        "SOLVER_DEFAULT_METHOD", "SOLVER_MAX_STEP",
-        "SOLVER_RTOL", "SOLVER_ATOL", "SOLVER_NUM_POINTS",
-    ]),
-    ("files", "File Paths", [
-        "FILE_OUTPUT_DIR", "FILE_PLOT_FORMAT",
-    ]),
-    ("logging", "Logging", [
-        "LOG_LEVEL", "LOG_FILE", "LOG_CONSOLE",
-    ]),
+    (
+        "ui_theme",
+        "UI Theme",
+        [
+            "UI_BACKGROUND",
+            "UI_FOREGROUND",
+            "UI_BUTTON_BG",
+            "UI_BUTTON_WIDTH",
+            "UI_BUTTON_FG",
+            "UI_BUTTON_FG_CANCEL",
+            "UI_BUTTON_FG_ACCENT2",
+            "UI_FONT_SIZE",
+            "UI_FONT_FAMILY",
+            "UI_PADDING",
+        ],
+    ),
+    (
+        "plot_style",
+        "Plot Style",
+        [
+            "PLOT_FIGSIZE_WIDTH",
+            "PLOT_FIGSIZE_HEIGHT",
+            "DPI",
+            "PLOT_SHOW_TITLE",
+            "PLOT_SHOW_GRID",
+            "PLOT_LINE_COLOR",
+            "PLOT_LINE_WIDTH",
+            "PLOT_LINE_STYLE",
+        ],
+    ),
+    (
+        "plot_markers",
+        "Plot Markers",
+        [
+            "PLOT_MARKER_FORMAT",
+            "PLOT_MARKER_SIZE",
+            "PLOT_MARKER_FACE_COLOR",
+            "PLOT_MARKER_EDGE_COLOR",
+        ],
+    ),
+    (
+        "plot_fonts",
+        "Plot Fonts",
+        [
+            "FONT_FAMILY",
+            "FONT_TITLE_SIZE",
+            "FONT_TITLE_WEIGHT",
+            "FONT_AXIS_SIZE",
+            "FONT_AXIS_STYLE",
+            "FONT_TICK_SIZE",
+        ],
+    ),
+    (
+        "solver",
+        "Solver Defaults",
+        [
+            "SOLVER_DEFAULT_METHOD",
+            "SOLVER_MAX_STEP",
+            "SOLVER_RTOL",
+            "SOLVER_ATOL",
+            "SOLVER_NUM_POINTS",
+        ],
+    ),
+    (
+        "files",
+        "File Paths",
+        [
+            "FILE_OUTPUT_DIR",
+            "FILE_PLOT_FORMAT",
+        ],
+    ),
+    (
+        "logging",
+        "Logging",
+        [
+            "LOG_LEVEL",
+            "LOG_FILE",
+            "LOG_CONSOLE",
+        ],
+    ),
 ]
 
 _SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
@@ -105,7 +157,9 @@ class ConfigDialog:
         btn_save.pack(side=tk.LEFT, padx=pad)
 
         btn_cancel = ttk.Button(
-            btn_inner, text="Cancel", style="Cancel.TButton",
+            btn_inner,
+            text="Cancel",
+            style="Cancel.TButton",
             command=self.win.destroy,
         )
         btn_cancel.pack(side=tk.LEFT, padx=pad)
@@ -121,14 +175,14 @@ class ConfigDialog:
         form.configure(padding=pad)
 
         ttk.Label(form, text="Configuration", style="Title.TLabel").pack(
-            anchor=tk.W, pady=(0, pad),
+            anchor=tk.W,
+            pady=(0, pad),
         )
 
         # --- Collapsible sections ---
         first_section = True
         for _section_id, section_title, keys in _SECTION_ORDER:
-            self._add_section(form, section_title, keys, current, pad,
-                              expanded=first_section)
+            self._add_section(form, section_title, keys, current, pad, expanded=first_section)
             first_section = False
 
         self._scroll.bind_new_children()
@@ -157,7 +211,11 @@ class ConfigDialog:
     ) -> None:
         """Add a complete collapsible section with its fields."""
         section = CollapsibleSection(
-            parent, self._scroll, title, expanded=expanded, pad=pad,
+            parent,
+            self._scroll,
+            title,
+            expanded=expanded,
+            pad=pad,
         )
         section.content.configure(padding=(16, 4, 4, 4))
 
@@ -167,12 +225,7 @@ class ConfigDialog:
                 continue
             self._add_field(section.content, item, current)
 
-    def _add_field(
-        self,
-        parent: ttk.Frame,
-        item: dict[str, Any],
-        current: dict[str, str]
-    ) -> None:
+    def _add_field(self, parent: ttk.Frame, item: dict[str, Any], current: dict[str, str]) -> None:
         key = item["key"]
         cast_type = item["cast_type"]
         val = current.get(key, str(item["default"]))
@@ -191,9 +244,12 @@ class ConfigDialog:
         elif "options" in item:
             svar = tk.StringVar(value=val)
             combo = ttk.Combobox(
-                row, textvariable=svar,
+                row,
+                textvariable=svar,
                 values=list(item["options"]),
-                state="readonly", width=22, font=get_font()
+                state="readonly",
+                width=22,
+                font=get_font(),
             )
             combo.pack(side=tk.LEFT)
             self._vars[key] = svar
@@ -204,8 +260,7 @@ class ConfigDialog:
             self._vars[key] = svar
 
         if desc_text:
-            desc = ttk.Label(parent, text=desc_text, style="ConfigDesc.TLabel",
-                             justify=tk.LEFT)
+            desc = ttk.Label(parent, text=desc_text, style="ConfigDesc.TLabel", justify=tk.LEFT)
             desc.pack(anchor=tk.W, padx=(12, 0), pady=(0, 4))
             self._desc_labels.append(desc)
 
@@ -229,5 +284,4 @@ class ConfigDialog:
             self.win.destroy()
         except Exception as exc:
             logger.error("Failed to save .env: %s", exc, exc_info=True)
-            messagebox.showerror("Error", f"Could not save: {exc}",
-                                 parent=self.win)
+            messagebox.showerror("Error", f"Could not save: {exc}", parent=self.win)

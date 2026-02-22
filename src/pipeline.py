@@ -111,9 +111,8 @@ def run_solver_pipeline(
     error_metrics: dict[str, float] = {}
     solver_quality: dict[str, Any] = {}
     is_vector = (
-        (vector_expressions is not None and len(vector_expressions) > 0)
-        or equation_type == "vector_ode"
-    )
+        vector_expressions is not None and len(vector_expressions) > 0
+    ) or equation_type == "vector_ode"
 
     if not is_pde:
         errors = validate_all_inputs(
@@ -142,18 +141,29 @@ def run_solver_pipeline(
             logger.warning("PDE validation failed: y_min and y_max required")
             raise ValidationError("PDE requires y_min and y_max for 2D domain")
         ny = n_points_y if n_points_y is not None else n_points
-        rhs_func = parse_pde_rhs_expression(
-            expression or "0", vars_list, parameters
-        )
+        rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
 
-        def residual(x: float, y: float, f: float, fx: float, fy: float,
-                     fxx: float, fxy: float, fyy: float, **kw: Any) -> float:
+        def residual(
+            x: float,
+            y: float,
+            f: float,
+            fx: float,
+            fy: float,
+            fxx: float,
+            fxy: float,
+            fyy: float,
+            **kw: Any,
+        ) -> float:
             return rhs_func(x, y, **kw)
 
         pde_sol = solve_pde_2d(
             residual,
-            x_min, x_max, float(y_min), float(y_max),
-            n_points, ny,
+            x_min,
+            x_max,
+            float(y_min),
+            float(y_max),
+            n_points,
+            ny,
             parameters=parameters,
         )
         solution_x = pde_sol.grid[0]
@@ -174,6 +184,7 @@ def run_solver_pipeline(
         diff_sol = solve_difference(recur_func, n_min, n_max, y0, order)
         if not diff_sol.success:
             from utils import SolverFailedError
+
             logger.error("Difference equation solver failed: %s", diff_sol.message)
             raise SolverFailedError(diff_sol.message)
         solution_x = diff_sol.n
@@ -191,9 +202,7 @@ def run_solver_pipeline(
             parameters=parameters,
         )
         t_eval = np.linspace(x_min, x_max, n_points)
-        solution = solve_ode(
-            ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval
-        )
+        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
         solution_x = solution.x
         solution_y = solution.y
         solution_success = solution.success
@@ -216,10 +225,7 @@ def run_solver_pipeline(
             parameters=parameters,
         )
         t_eval = np.linspace(x_min, x_max, n_points)
-        use_multipoint = (
-            x0_list is not None
-            and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
-        )
+        use_multipoint = x0_list is not None and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
         if use_multipoint:
             conditions = list(enumerate(zip(x0_list, y0)))  # type: ignore[arg-type]
             conditions_flat = [(k, xi, ai) for k, (xi, ai) in conditions]
@@ -233,9 +239,7 @@ def run_solver_pipeline(
                 t_eval=t_eval,
             )
         else:
-            solution = solve_ode(
-                ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval
-            )
+            solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
         solution_x = solution.x
         solution_y = solution.y
         solution_success = solution.success
@@ -252,9 +256,7 @@ def run_solver_pipeline(
                 solver_quality["n_jacobian_evals"] = int(njev)
 
     if is_pde and len(vars_list) >= 2:
-        stats = compute_statistics_2d(
-            solution_x, solution_y_grid, solution_y, selected_stats
-        )
+        stats = compute_statistics_2d(solution_x, solution_y_grid, solution_y, selected_stats)
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
 
@@ -288,13 +290,22 @@ def run_solver_pipeline(
     if is_pde and len(vars_list) >= 2:
         if plot_3d:
             fig = create_surface_plot(
-                solution_x, solution_y_grid, solution_y,
-                title=equation_name, xlabel="x", ylabel="y", zlabel="u",
+                solution_x,
+                solution_y_grid,
+                solution_y,
+                title=equation_name,
+                xlabel="x",
+                ylabel="y",
+                zlabel="u",
             )
         else:
             fig = create_contour_plot(
-                solution_x, solution_y_grid, solution_y,
-                title=equation_name, xlabel="x", ylabel="y",
+                solution_x,
+                solution_y_grid,
+                solution_y,
+                title=equation_name,
+                xlabel="x",
+                ylabel="y",
             )
         phase_fig = None
         animation_fig = None
@@ -305,8 +316,11 @@ def run_solver_pipeline(
             sel = selected_derivatives or list(range(vector_components))
             plot_derivs = [i * order for i in sel if i < vector_components]
         fig = create_solution_plot(
-            solution_x, solution_y,
-            title=equation_name, xlabel=xlabel, ylabel="y",
+            solution_x,
+            solution_y,
+            title=equation_name,
+            xlabel=xlabel,
+            ylabel="y",
             selected_derivatives=plot_derivs,
         )
         phase_fig = None
@@ -335,9 +349,7 @@ def run_solver_pipeline(
             )
     logger.info("Pipeline complete for '%s'", equation_name)
 
-    y_grid_result: np.ndarray | None = (
-        solution_y_grid if (is_pde and len(vars_list) >= 2) else None
-    )
+    y_grid_result: np.ndarray | None = solution_y_grid if (is_pde and len(vars_list) >= 2) else None
     return SolverResult(
         x=solution_x,
         y=solution_y,

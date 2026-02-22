@@ -68,6 +68,7 @@ class TestExportJson:
         )
         assert filepath.exists()
         import json
+
         data = json.loads(filepath.read_text())
         assert "metadata" in data and "statistics" in data
         assert data["metadata"]["equation_name"] == "Test"
@@ -81,7 +82,8 @@ class TestExportAllResults:
         x = np.linspace(0, 1, 10)
         y = np.sin(x).reshape(1, -1)
         csv_out, json_out = export_all_results(
-            x, y,
+            x,
+            y,
             statistics={"mean": 0.0},
             metadata={"name": "Test"},
             csv_path=csv_path,

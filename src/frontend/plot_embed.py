@@ -142,11 +142,17 @@ def embed_animation_plot_in_tk(
         ttk.Entry(ctrl_frame, textvariable=duration_var, width=14).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(
-            ctrl_frame, text="▶", width=3, style="Small.TButton",
+            ctrl_frame,
+            text="▶",
+            width=3,
+            style="Small.TButton",
             command=_on_play,
         ).pack(side=tk.LEFT, padx=4)
         ttk.Button(
-            ctrl_frame, text="■", width=3, style="Small.TButton",
+            ctrl_frame,
+            text="■",
+            width=3,
+            style="Small.TButton",
             command=_on_stop,
         ).pack(side=tk.LEFT, padx=2)
 

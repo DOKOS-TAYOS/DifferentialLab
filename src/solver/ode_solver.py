@@ -84,7 +84,11 @@ def solve_ode(
 
     logger.info(
         "Solving IVP: method=%s, span=%s, y0=%s, rtol=%s, atol=%s",
-        method, t_span, y0, rtol, atol,
+        method,
+        t_span,
+        y0,
+        rtol,
+        atol,
     )
 
     sol = solve_ivp(
@@ -173,9 +177,14 @@ def solve_multipoint(
     if all_at_start:
         y0 = [a for (_, _, a) in sorted(conditions, key=lambda c: c[0])]
         return solve_ode(
-            ode_func, (x_min, x_max), y0,
-            method=method, t_eval=t_eval,
-            max_step=max_step, rtol=rtol, atol=atol,
+            ode_func,
+            (x_min, x_max),
+            y0,
+            method=method,
+            t_eval=t_eval,
+            max_step=max_step,
+            rtol=rtol,
+            atol=atol,
         )
 
     y0_guess = np.zeros(order)
@@ -190,17 +199,19 @@ def solve_multipoint(
 
     def _residuals(y0: np.ndarray) -> np.ndarray:
         sol = solve_ivp(
-            ode_func, (x_min, x_max_needed), y0.tolist(),
-            method=method, t_eval=t_eval_fine,
-            max_step=effective_max_step, rtol=rtol, atol=atol,
+            ode_func,
+            (x_min, x_max_needed),
+            y0.tolist(),
+            method=method,
+            t_eval=t_eval_fine,
+            max_step=effective_max_step,
+            rtol=rtol,
+            atol=atol,
             dense_output=True,
         )
         if not sol.success:
             return np.full(len(conditions), 1e10)
-        return np.array([
-            np.interp(xi, sol.t, sol.y[k]) - ai
-            for (k, xi, ai) in conditions
-        ])
+        return np.array([np.interp(xi, sol.t, sol.y[k]) - ai for (k, xi, ai) in conditions])
 
     from scipy.optimize import fsolve
 
@@ -212,7 +223,12 @@ def solve_multipoint(
     logger.info("Shooting method converged; y0_opt=%s", y0_opt.tolist())
 
     return solve_ode(
-        ode_func, (x_min, x_max), y0_opt.tolist(),
-        method=method, t_eval=t_eval,
-        max_step=max_step, rtol=rtol, atol=atol,
+        ode_func,
+        (x_min, x_max),
+        y0_opt.tolist(),
+        method=method,
+        t_eval=t_eval,
+        max_step=max_step,
+        rtol=rtol,
+        atol=atol,
     )
