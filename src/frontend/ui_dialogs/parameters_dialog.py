@@ -14,8 +14,8 @@ from config import (
 )
 from frontend.theme import get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
-from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
+from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
 from utils import DifferentialLabError, get_logger
 
@@ -227,14 +227,19 @@ class ParametersDialog:
             deriv_frame = ttk.LabelFrame(right_col, text="Derivatives to Plot", padding=pad)
             deriv_frame.pack(fill=tk.X, pady=(0, pad))
             vec_exprs = self.vector_expressions
-            is_vec = (vec_exprs is not None and len(vec_exprs) > 0) or self.equation_type == "vector_ode"
+            is_vec = (
+                (vec_exprs is not None and len(vec_exprs) > 0)
+                or self.equation_type == "vector_ode"
+            )
             if is_vec and self.vector_components > 1:
                 subscripts = "₀₁₂₃₄₅₆₇₈₉"
                 def _sub(i: int) -> str:
                     return subscripts[i] if i < len(subscripts) else str(i)
                 derivative_labels = [f"f_{_sub(i)}" for i in range(self.vector_components)]
             else:
-                derivative_labels = ["y"] if self.order == 1 else [f"y[{i}]" for i in range(self.order)]
+                derivative_labels = (
+                    ["y"] if self.order == 1 else [f"y[{i}]" for i in range(self.order)]
+                )
             deriv_list_frame = ttk.Frame(deriv_frame)
             deriv_list_frame.pack(fill=tk.X)
             deriv_scrollbar = ttk.Scrollbar(deriv_list_frame, orient=tk.VERTICAL)

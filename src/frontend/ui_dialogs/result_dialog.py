@@ -10,13 +10,12 @@ from typing import Any
 from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
-from utils import export_csv_to_path, export_json_to_path
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import center_window, make_modal
-from utils import get_logger
+from utils import export_csv_to_path, export_json_to_path, get_logger
 
 logger = get_logger(__name__)
 

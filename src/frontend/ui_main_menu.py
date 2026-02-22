@@ -70,7 +70,7 @@ class MainMenu:
             text=f"v{APP_VERSION} — DifferentialLab",
             style="Small.TLabel",
         ).pack(pady=(4, 0))
-        
+
         # Description
         desc_lbl = ttk.Label(
             main_frame,

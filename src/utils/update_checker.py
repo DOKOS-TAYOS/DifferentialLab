@@ -92,7 +92,7 @@ def fetch_latest_version(version_url: Optional[str] = None) -> Optional[str]:
             or default.
 
     Returns:
-        Version string (e.g. '0.2.1') or None if fetch failed.
+        Version string (e.g. '0.2.2') or None if fetch failed.
     """
     url = (
         version_url
