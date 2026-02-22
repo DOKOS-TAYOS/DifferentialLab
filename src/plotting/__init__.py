@@ -8,7 +8,6 @@ from plotting.plot_utils import (
     create_vector_animation_3d,
     create_vector_animation_plot,
     export_animation_to_mp4,
-    save_plot,
 )
 
 __all__ = [
@@ -19,5 +18,4 @@ __all__ = [
     "create_vector_animation_3d",
     "create_vector_animation_plot",
     "export_animation_to_mp4",
-    "save_plot",
 ]

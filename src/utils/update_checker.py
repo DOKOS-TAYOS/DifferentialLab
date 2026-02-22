@@ -15,6 +15,9 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from config import get_env, get_project_root
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Default URL to fetch latest version (pyproject.toml from main repo)
 _DEFAULT_VERSION_URL = (
@@ -51,7 +54,8 @@ def should_run_check() -> bool:
         mtime = path.stat().st_mtime
         elapsed_days = (time.time() - mtime) / (24 * 3600)
         return elapsed_days >= _DAYS_BETWEEN_CHECKS
-    except OSError:
+    except OSError as exc:
+        logger.debug("Could not stat last-check file, assuming check needed: %s", exc)
         return True
 
 
@@ -60,8 +64,8 @@ def record_check_done() -> None:
     path = _get_last_check_path()
     try:
         path.touch()
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("Could not touch last-check file: %s", exc)
 
 
 def _parse_version(version_str: str) -> Tuple[int, ...]:
@@ -103,14 +107,7 @@ def fetch_latest_version(version_url: Optional[str] = None) -> Optional[str]:
         with urlopen(req, timeout=10) as resp:
             content = resp.read().decode("utf-8", errors="replace")
     except (URLError, HTTPError, OSError, ValueError) as e:
-        try:
-            from utils import get_logger
-
-            get_logger(__name__).debug(
-                "Update check: could not fetch version from %s: %s", url, e
-            )
-        except ImportError:
-            pass
+        logger.debug("Update check: could not fetch version from %s: %s", url, e)
         return None
 
     match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
@@ -191,8 +188,11 @@ def perform_git_pull() -> Tuple[bool, str]:
         err = (result.stderr or result.stdout or "").strip()
         return False, err or "Update failed. Check your connection and try again."
     except subprocess.TimeoutExpired:
+        logger.warning("Git pull timed out")
         return False, "Update timed out. Try again later."
     except FileNotFoundError:
+        logger.warning("Git not found in PATH")
         return False, "Git not found. Install Git to enable automatic updates."
     except Exception as e:
+        logger.exception("Git pull failed")
         return False, str(e)

@@ -611,9 +611,11 @@ class ParametersDialog:
                 vector_components=self.vector_components,
             )
         except DifferentialLabError as exc:
+            logger.warning("Solver pipeline failed (user-facing): %s", exc)
             messagebox.showerror("Error", str(exc), parent=self.win)
             return
         except (MemoryError, OSError) as exc:
+            logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
             messagebox.showerror(
                 "Memory Error",
                 f"Not enough memory to solve: {exc}\n\n"
@@ -622,6 +624,7 @@ class ParametersDialog:
             )
             return
         except Exception as exc:
+            logger.exception("Solver pipeline: unexpected error")
             messagebox.showerror("Error", str(exc), parent=self.win)
             return
 

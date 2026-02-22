@@ -123,6 +123,7 @@ def create_solution_plot(
         n_colors = max(1, len(selected_derivatives) - 1)
         colors = [line_color] + list(cmap(np.linspace(0, 1, n_colors)))
     except (ValueError, AttributeError):
+        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
         n_fallback = max(1, len(selected_derivatives) - 1)
         colors = [line_color] + list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, n_fallback)))
 
@@ -353,6 +354,7 @@ def create_vector_animation_plot(
         cmap = plt.colormaps.get_cmap(color_scheme)
         colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
     except (ValueError, AttributeError):
+        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
         colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
 
     y_min_global = float(np.min(f_values)) - 0.1
@@ -502,6 +504,7 @@ def export_animation_to_mp4(
         cmap = plt.colormaps.get_cmap(color_scheme)
         colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
     except (ValueError, AttributeError):
+        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
         colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
 
     fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
@@ -549,6 +552,7 @@ def export_animation_to_mp4(
         filepath.parent.mkdir(parents=True, exist_ok=True)
         anim.save(str(filepath), writer="ffmpeg", fps=fps)
     except Exception as exc:
+        logger.error("MP4 export failed: %s", exc, exc_info=True)
         plt.close(fig)
         raise RuntimeError(
             f"Failed to export MP4. Is ffmpeg installed? {exc}"
@@ -556,22 +560,3 @@ def export_animation_to_mp4(
     plt.close(fig)
     logger.info("Animation exported: %s (%d frames)", filepath, len(frame_indices))
     return filepath
-
-
-def save_plot(fig: Figure, filepath: Path) -> Path:
-    """Save a matplotlib figure to disk.
-
-    Args:
-        fig: The figure to save.
-        filepath: Destination file path.
-
-    Returns:
-        The path that was written.
-    """
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    dpi: int = get_env_from_schema("DPI")
-    fig.savefig(filepath, dpi=dpi, bbox_inches="tight")
-    logger.info("Plot saved: %s", filepath)
-    return filepath
-
-

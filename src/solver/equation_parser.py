@@ -103,6 +103,7 @@ def _validate_ast(expression: str) -> None:
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError as exc:
+        logger.debug("Expression syntax error: %s — %s", expression[:80], exc)
         raise EquationParseError(f"Syntax error in expression: {exc}") from exc
 
     for node in ast.walk(tree):
@@ -153,6 +154,7 @@ def parse_expression(
         try:
             eval(compiled, {"__builtins__": {}}, test_ns)
         except Exception as exc:
+            logger.debug("ODE expression evaluation failed: %s — %s", expression[:80], exc)
             raise EquationParseError(
                 f"Expression evaluation failed: {exc}"
             ) from exc
@@ -386,6 +388,7 @@ def parse_pde_rhs_expression(
     try:
         eval(compiled, {"__builtins__": {}}, test_ns)
     except Exception as exc:
+        logger.debug("PDE expression evaluation failed: %s — %s", expression[:80], exc)
         raise EquationParseError(f"PDE expression evaluation failed: {exc}") from exc
 
     return rhs_func

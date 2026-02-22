@@ -150,6 +150,7 @@ def solve_pde_2d(
                 f_val = residual_func(x[i], y[j], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params)
                 b[k] += f_val
             except Exception as exc:
+                logger.error("PDE residual evaluation failed at (%g, %g): %s", x[i], y[j], exc)
                 raise SolverFailedError(f"Residual evaluation failed: {exc}") from exc
 
     A = sparse.coo_matrix((data, (rows, cols)), shape=(n_interior, n_interior)).tocsr()
@@ -157,6 +158,7 @@ def solve_pde_2d(
     try:
         u_flat = spsolve(A, b)
     except Exception as exc:
+        logger.error("PDE linear solver failed: %s", exc, exc_info=True)
         raise SolverFailedError(f"Linear solver failed: {exc}") from exc
 
     # Fill interior

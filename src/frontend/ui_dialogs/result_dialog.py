@@ -290,6 +290,7 @@ class ResultDialog:
                 parent=self.win,
             )
         except Exception as exc:
+            logger.error("CSV export failed: %s", exc, exc_info=True)
             messagebox.showerror("Export Failed", str(exc), parent=self.win)
 
     def _on_save_json(self) -> None:
@@ -315,6 +316,7 @@ class ResultDialog:
                 parent=self.win,
             )
         except Exception as exc:
+            logger.error("JSON export failed: %s", exc, exc_info=True)
             messagebox.showerror("Export Failed", str(exc), parent=self.win)
 
     def _on_export_animation_mp4(self, duration_seconds: float) -> None:
@@ -351,12 +353,14 @@ class ResultDialog:
                 parent=self.win,
             )
         except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
             messagebox.showerror(
                 "Export Failed",
                 str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
                 parent=self.win,
             )
         except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
             messagebox.showerror("Export Failed", str(exc), parent=self.win)
 
     @staticmethod

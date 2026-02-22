@@ -228,6 +228,6 @@ class ConfigDialog:
             self.accepted = True
             self.win.destroy()
         except Exception as exc:
-            logger.error("Failed to save .env: %s", exc)
+            logger.error("Failed to save .env: %s", exc, exc_info=True)
             messagebox.showerror("Error", f"Could not save: {exc}",
                                  parent=self.win)

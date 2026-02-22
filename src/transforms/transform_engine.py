@@ -38,7 +38,7 @@ def _nth_derivative(
         from scipy.misc import derivative as scipy_deriv
         return scipy_deriv(f, x0, n=n, dx=dx, order=2 * n + 1)
     except (ImportError, AttributeError):
-        pass
+        logger.debug("scipy.misc.derivative unavailable, using central-difference fallback")
     # Fallback: recursive central difference
     def df(x: float) -> float:
         return (_nth_derivative(f, x + dx, n - 1, dx)
@@ -152,7 +152,8 @@ def apply_transform(
                     epsrel=1e-8,
                 )
                 laplace_vals[i] = result
-            except Exception:
+            except Exception as exc:
+                logger.debug("Laplace quad failed at s=%g: %s", s, exc)
                 laplace_vals[i] = np.nan
 
         return s_vals, laplace_vals, "s (real)", "L(s)"
@@ -288,7 +289,8 @@ def get_transform_coefficients(
                     epsrel=1e-8,
                 )
                 coeffs[i] = result
-            except Exception:
+            except Exception as exc:
+                logger.debug("Laplace quad (coeffs) failed at s=%g: %s", s, exc)
                 coeffs[i] = np.nan
 
         indices = np.arange(laplace_n_points)

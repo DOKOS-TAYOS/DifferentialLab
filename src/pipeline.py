@@ -132,11 +132,14 @@ def run_solver_pipeline(
             vector_components=vector_components if is_vector else 1,
         )
         if errors:
-            raise ValidationError("\n".join(errors))
+            msg = "\n".join(errors)
+            logger.warning("Validation failed: %s", msg)
+            raise ValidationError(msg)
 
     if is_pde and len(vars_list) >= 2:
         # PDE path: 2D (or more) variables
         if y_min is None or y_max is None:
+            logger.warning("PDE validation failed: y_min and y_max required")
             raise ValidationError("PDE requires y_min and y_max for 2D domain")
         ny = n_points_y if n_points_y is not None else n_points
         rhs_func = parse_pde_rhs_expression(
@@ -171,6 +174,7 @@ def run_solver_pipeline(
         diff_sol = solve_difference(recur_func, n_min, n_max, y0, order)
         if not diff_sol.success:
             from utils import SolverFailedError
+            logger.error("Difference equation solver failed: %s", diff_sol.message)
             raise SolverFailedError(diff_sol.message)
         solution_x = diff_sol.n
         solution_y = diff_sol.y
