@@ -43,6 +43,7 @@ class PredefinedEquation:
         default_domain: Default ``[x_min, x_max]`` for ODE or ``[n_min, n_max]`` for difference.
             For PDE: ``[x_min, x_max, y_min, y_max, ...]`` per variable.
         equation_type: ``"ode"`` (differential), ``"difference"``, ``"pde"``, or ``"vector_ode"``.
+        category: Display category (e.g. ``"Osciladores"``, ``"Poblacionales"``) for UI grouping.
         variables: Independent variable names, e.g. ``["x"]`` for 1D, ``["x","y"]`` for 2D.
             If absent or ``["x"]``, treated as 1D ODE.
         partial_derivatives: For PDEs, maps derivative keys (e.g. ``"f_xx"``, ``"f_xy"``)
@@ -62,6 +63,7 @@ class PredefinedEquation:
     vector_expressions: list[str] | None = None
     vector_components: int = 1
     equation_type: EquationType = "ode"
+    category: str = "Oscillators"
     variables: list[str] = field(default_factory=lambda: ["x"])
     partial_derivatives: dict[str, str] | None = None
 
@@ -123,6 +125,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             default_initial_conditions=list(data.get("default_initial_conditions", [0.0])),
             default_domain=list(data.get("default_domain", [0.0, 10.0])),
             equation_type=str(data.get("equation_type", "ode")),
+            category=str(data.get("category", "Oscillators")),
             variables=list(data.get("variables", ["x"])),
             partial_derivatives=dict(data.get("partial_derivatives", {})) or None,
         )
