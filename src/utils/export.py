@@ -130,6 +130,49 @@ def _export_csv_2d(
     return filepath
 
 
+def export_csv_to_path(
+    x: np.ndarray,
+    y: np.ndarray,
+    filepath: Path,
+    *,
+    y_grid: np.ndarray | None = None,
+) -> Path:
+    """Export solution data to CSV at the given path.
+
+    Args:
+        x: Independent variable values (1D) or x grid for 2D.
+        y: Solution values. For 2D PDE: shape (ny, nx).
+        filepath: Destination path.
+        y_grid: For 2D PDE, the y grid. If provided with 2D y, uses 2D CSV format.
+
+    Returns:
+        The path that was written.
+    """
+    if y_grid is not None and y.ndim == 2:
+        _export_csv_2d(x, y_grid, y, filepath)
+    else:
+        _export_csv(x, y, filepath)
+    return filepath
+
+
+def export_json_to_path(
+    statistics: dict[str, Any],
+    metadata: dict[str, Any],
+    filepath: Path,
+) -> Path:
+    """Export statistics and metadata to JSON at the given path.
+
+    Args:
+        statistics: Computed magnitudes/statistics.
+        metadata: Equation info, solver parameters, etc.
+        filepath: Destination path.
+
+    Returns:
+        The path that was written.
+    """
+    return _export_json(statistics, metadata, filepath)
+
+
 def export_all_results(
     x: np.ndarray,
     y: np.ndarray,

@@ -3,19 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
 from matplotlib.figure import Figure
 
-from config import (
-    generate_output_basename,
-    get_csv_path,
-    get_env_from_schema,
-    get_json_path,
-    get_plot_path,
-)
+from config import get_env_from_schema
 from plotting import (
     create_contour_plot,
     create_phase_plot,
@@ -23,7 +16,6 @@ from plotting import (
     create_surface_plot,
     create_vector_animation_3d,
     create_vector_animation_plot,
-    save_plot,
 )
 from solver import (
     compute_ode_residual_error,
@@ -40,7 +32,7 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
-from utils import ValidationError, export_all_results, get_logger
+from utils import ValidationError, get_logger
 
 logger = get_logger(__name__)
 
@@ -57,9 +49,7 @@ class SolverResult:
     metadata: dict[str, Any]
     fig: Figure
     phase_fig: Figure | None
-    csv_path: Path
-    json_path: Path
-    plot_path: Path
+    y_grid: np.ndarray | None = None  # For 2D PDE: y-axis grid
     animation_fig: Figure | None = None
     animation_3d_fig: Figure | None = None
     is_vector: bool = False
@@ -264,11 +254,6 @@ def run_solver_pipeline(
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
 
-    basename = generate_output_basename()
-    csv_path = get_csv_path(basename)
-    json_path = get_json_path(basename)
-    plot_path = get_plot_path(basename)
-
     xlabel = "n" if equation_type == "difference" else "x"
     metadata: dict[str, Any] = {
         "equation_name": equation_name,
@@ -310,10 +295,6 @@ def run_solver_pipeline(
         phase_fig = None
         animation_fig = None
         animation_3d_fig = None
-        export_all_results(
-            solution_x, solution_y, stats, metadata, csv_path, json_path,
-            y_grid=solution_y_grid,
-        )
     else:
         plot_derivs = selected_derivatives
         if is_vector and vector_components > 1:
@@ -348,12 +329,11 @@ def run_solver_pipeline(
                 vector_components=vector_components,
                 title=f"{equation_name} — 3D",
             )
-        export_all_results(solution_x, solution_y, stats, metadata, csv_path, json_path)
-
-    save_plot(fig, plot_path)
-
     logger.info("Pipeline complete for '%s'", equation_name)
 
+    y_grid_result: np.ndarray | None = (
+        solution_y_grid if (is_pde and len(vars_list) >= 2) else None
+    )
     return SolverResult(
         x=solution_x,
         y=solution_y,
@@ -361,11 +341,9 @@ def run_solver_pipeline(
         metadata=metadata,
         fig=fig,
         phase_fig=phase_fig,
+        y_grid=y_grid_result,
         animation_fig=animation_fig,
         animation_3d_fig=animation_3d_fig,
-        csv_path=csv_path,
-        json_path=json_path,
-        plot_path=plot_path,
         is_vector=is_vector,
         vector_components=vector_components if is_vector else 1,
         vector_order=order,

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 from matplotlib.figure import Figure
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
+from utils import export_csv_to_path, export_json_to_path
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
@@ -25,10 +26,11 @@ _LEFT_MIN_WIDTH = 580
 
 
 class ResultDialog:
-    """Window showing the ODE solution, statistics, and file paths.
+    """Window showing the ODE solution, statistics, and save buttons.
 
     The layout places text information on the left and plots on the right
-    so that both are visible at the same time.
+    so that both are visible at the same time. CSV and JSON can be saved
+    via buttons using the file explorer.
 
     Args:
         parent: Parent window.
@@ -36,9 +38,9 @@ class ResultDialog:
         phase_fig: Optional phase portrait figure.
         statistics: Computed statistics dict.
         metadata: Solver metadata dict.
-        csv_path: Path to the exported CSV.
-        json_path: Path to the exported JSON.
-        plot_path: Path to the exported plot image.
+        x: Independent variable (solution x values).
+        y: Solution values.
+        y_grid: For 2D PDE, the y-axis grid. None for ODE/difference.
     """
 
     def __init__(
@@ -48,9 +50,9 @@ class ResultDialog:
         phase_fig: Figure | None,
         statistics: dict[str, Any],
         metadata: dict[str, Any],
-        csv_path: Path,
-        json_path: Path,
-        plot_path: Path,
+        x: Any,
+        y: Any,
+        y_grid: Any = None,
         animation_fig: Figure | None = None,
         animation_3d_fig: Figure | None = None,
         animation_data: dict[str, Any] | None = None,
@@ -62,9 +64,13 @@ class ResultDialog:
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
 
+        self._x = x
+        self._y = y
+        self._y_grid = y_grid
+        self._statistics = statistics
+        self._metadata = metadata
         self._animation_data = animation_data
         self._build_ui(fig, phase_fig, statistics, metadata,
-                       csv_path, json_path, plot_path,
                        animation_fig, animation_3d_fig)
 
         pad: int = get_env_from_schema("UI_PADDING")
@@ -95,9 +101,6 @@ class ResultDialog:
         phase_fig: Figure | None,
         statistics: dict[str, Any],
         metadata: dict[str, Any],
-        csv_path: Path,
-        json_path: Path,
-        plot_path: Path,
         animation_fig: Figure | None = None,
         animation_3d_fig: Figure | None = None,
     ) -> None:
@@ -185,20 +188,22 @@ class ResultDialog:
             ttk.Label(row, text=f"{label}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
             ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
 
-        # File paths
-        files_section = CollapsibleSection(
-            left_inner, left_scroll, "Output Files", expanded=True, pad=pad
+        # Save CSV / JSON buttons
+        export_section = CollapsibleSection(
+            left_inner, left_scroll, "Export Data", expanded=True, pad=pad
         )
-        for label, path in [("Solution", csv_path), ("Metadata", json_path), ("Plot", plot_path)]:
-            row = ttk.Frame(files_section.content)
-            row.pack(fill=tk.X, pady=1)
-            ttk.Label(row, text=f"{label}:", width=8, anchor=tk.W).pack(side=tk.LEFT)
-            path_lbl = ttk.Label(row, text=str(path), style="Small.TLabel", anchor=tk.W)
-            path_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            path_lbl.bind(
-                "<Configure>",
-                lambda e, lbl=path_lbl: lbl.configure(wraplength=max(1, e.width - 4)),
-            )
+        btn_row = ttk.Frame(export_section.content)
+        btn_row.pack(fill=tk.X, pady=2)
+        btn_csv = ttk.Button(
+            btn_row, text="Save CSV...",
+            command=self._on_save_csv,
+        )
+        btn_csv.pack(side=tk.LEFT, padx=(0, pad))
+        btn_json = ttk.Button(
+            btn_row, text="Save JSON...",
+            command=self._on_save_json,
+        )
+        btn_json.pack(side=tk.LEFT)
 
         left_scroll.bind_new_children()
 
@@ -266,18 +271,74 @@ class ResultDialog:
             ttk.Label(row, text=self._format_stat(val),
                       style="Small.TLabel").pack(side=tk.LEFT)
 
+    def _on_save_csv(self) -> None:
+        """Save solution data to CSV via file dialog."""
+        default_path = get_output_dir() / f"{generate_output_basename()}.csv"
+        filepath = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".csv",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not filepath:
+            return
+        path = Path(filepath)
+        try:
+            export_csv_to_path(
+                self._x, self._y, path, y_grid=self._y_grid
+            )
+            messagebox.showinfo(
+                "Export Complete",
+                f"CSV saved to:\n{path}",
+                parent=self.win,
+            )
+        except Exception as exc:
+            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+
+    def _on_save_json(self) -> None:
+        """Save metadata and statistics to JSON via file dialog."""
+        default_path = get_output_dir() / f"{generate_output_basename()}.json"
+        filepath = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".json",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if not filepath:
+            return
+        path = Path(filepath)
+        try:
+            export_json_to_path(
+                self._statistics, self._metadata, path
+            )
+            messagebox.showinfo(
+                "Export Complete",
+                f"JSON saved to:\n{path}",
+                parent=self.win,
+            )
+        except Exception as exc:
+            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+
     def _on_export_animation_mp4(self, duration_seconds: float) -> None:
         """Export the vector animation as MP4 video with given duration."""
         data = self._animation_data
         if not data:
             return
+        default_path = get_output_dir() / f"{generate_output_basename(prefix='animation')}.mp4"
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+        filepath = Path(filepath_str)
         try:
             from plotting import export_animation_to_mp4
-
-            basename = generate_output_basename(prefix="animation")
-            out_dir = get_output_dir()
-            out_dir.mkdir(parents=True, exist_ok=True)
-            filepath = out_dir / f"{basename}.mp4"
 
             export_animation_to_mp4(
                 data["x"],

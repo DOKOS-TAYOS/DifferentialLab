@@ -55,9 +55,6 @@ def test_run_solver_pipeline_success(
     assert result.y.shape == (1, 100)
     assert "mean" in result.statistics
     assert result.metadata["equation_name"] == "Exponential"
-    assert result.csv_path.exists()
-    assert result.json_path.exists()
-    assert result.plot_path.exists()
 
 
 def test_run_solver_pipeline_validation_error() -> None:
