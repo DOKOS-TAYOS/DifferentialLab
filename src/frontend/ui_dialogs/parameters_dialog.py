@@ -117,9 +117,6 @@ class ParametersDialog:
 
         setup_arrow_enter_navigation([[btn_solve, btn_cancel]])
 
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
 
         # ── Scrollable content ──
         scroll = ScrollableFrame(self.win)

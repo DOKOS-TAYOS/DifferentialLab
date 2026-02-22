@@ -116,9 +116,6 @@ class TransformDialog:
         btn_close.pack(side=tk.LEFT, padx=pad)
 
         setup_arrow_enter_navigation([[btn_help, btn_export, btn_close]])
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
 
         # ── Main content ──
         content = ttk.Frame(self.win)
@@ -581,10 +578,6 @@ class _TransformHelpDialog:
             command=self._do_close,
         )
         btn_close.pack()
-
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
 
         setup_arrow_enter_navigation([[btn_close]])
         btn_close.focus_set()

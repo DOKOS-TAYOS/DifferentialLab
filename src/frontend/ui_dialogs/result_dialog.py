@@ -119,10 +119,6 @@ class ResultDialog:
         setup_arrow_enter_navigation([[btn_close]])
         btn_close.focus_set()
 
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
-
         # ── Main content area (grid: left info | right plot) ──
         content = ttk.Frame(self.win)
         content.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)

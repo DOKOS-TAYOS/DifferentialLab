@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Save CSV / Save JSON buttons** in the Results dialog: new "Export Data" section with buttons that open the file explorer so the user can choose the save path for solution data (CSV) and metadata/statistics (JSON).
+
+### Changed
+
+- **No automatic file saving**: graphs, CSV, and JSON files are no longer saved automatically. Plots can be saved via the Matplotlib toolbar; CSV and JSON via the new Save buttons in the Results dialog.
+- **MP4 animation export**: the Export MP4 button now opens the file explorer to let the user choose the save path instead of writing to a fixed output directory.
+
 ## [0.2.1]
 
 ### Added

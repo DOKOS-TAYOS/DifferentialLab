@@ -70,9 +70,7 @@ class MainMenu:
             text=f"v{APP_VERSION} — DifferentialLab",
             style="Small.TLabel",
         ).pack(pady=(4, 0))
-
-        ttk.Separator(main_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=padding)
-
+        
         # Description
         desc_lbl = ttk.Label(
             main_frame,
@@ -97,40 +95,41 @@ class MainMenu:
         btn_frame = ttk.Frame(main_frame)
         btn_frame.pack(expand=True)
 
+        # Center grid: columns and rows expand to center content
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
+        btn_frame.rowconfigure(0, weight=1)
+        btn_frame.rowconfigure(1, weight=0)
+        btn_frame.rowconfigure(2, weight=0)
+        btn_frame.rowconfigure(3, weight=0)
+        btn_frame.rowconfigure(4, weight=1)
+
         btn_width: int = get_env_from_schema("UI_BUTTON_WIDTH")
 
+        # Row 1: Solve Differential Equation | Function Transform
         self.btn_solve = ttk.Button(
             btn_frame,
-            text="Solve",
+            text="Solve Differential\nEquation",
             width=btn_width,
             command=self._on_solve,
         )
-        self.btn_solve.pack(pady=padding)
+        self.btn_solve.grid(row=1, column=0, padx=padding, pady=padding)
         ToolTip(self.btn_solve, "Select or write an ODE and solve it numerically.")
-
-        self.btn_config = ttk.Button(
-            btn_frame,
-            text="Configuration",
-            width=btn_width,
-            style="Accent2.TButton",
-            command=self._on_config,
-        )
-        self.btn_config.pack(pady=padding)
-        ToolTip(self.btn_config, "Adjust solver settings, theme, and other preferences.")
 
         self.btn_transforms = ttk.Button(
             btn_frame,
-            text="Transforms",
+            text="Function\nTransform",
             width=btn_width,
             style="Accent2.TButton",
             command=self._on_transforms,
         )
-        self.btn_transforms.pack(pady=padding)
+        self.btn_transforms.grid(row=1, column=1, padx=padding, pady=padding)
         ToolTip(
             self.btn_transforms,
             "Enter a function, apply Fourier/Laplace/Taylor transforms, and export data.",
         )
 
+        # Row 2: Information
         self.btn_info = ttk.Button(
             btn_frame,
             text="Information",
@@ -138,29 +137,34 @@ class MainMenu:
             style="Accent2.TButton",
             command=self._on_info,
         )
-        self.btn_info.pack(pady=padding)
+        self.btn_info.grid(row=2, column=0, columnspan=2, padx=padding, pady=padding)
         ToolTip(self.btn_info, "View help, usage instructions, and app information.")
 
-        ttk.Separator(main_frame, orient=tk.HORIZONTAL).pack(
-            fill=tk.X, pady=padding, side=tk.BOTTOM,
+        # Row 3: Configuration | Quit (sized to text)
+        self.btn_config = ttk.Button(
+            btn_frame,
+            text="Configuration",
+            width=len("Configuration"),
+            style="SmallMenu.Accent2.TButton",
+            command=self._on_config,
         )
+        self.btn_config.grid(row=3, column=0, padx=padding, pady=padding)
+        ToolTip(self.btn_config, "Adjust solver settings, theme, and other preferences.")
 
         self.btn_quit = ttk.Button(
-            main_frame,
+            btn_frame,
             text="Quit",
-            width=btn_width,
-            style="Cancel.TButton",
+            width=len("Quit"),
+            style="SmallMenu.Cancel.TButton",
             command=self._on_close,
         )
-        self.btn_quit.pack(side=tk.BOTTOM, pady=(padding, 0))
+        self.btn_quit.grid(row=3, column=1, padx=padding, pady=padding)
         ToolTip(self.btn_quit, "Close the application.")
 
         setup_arrow_enter_navigation([
-            [self.btn_solve],
-            [self.btn_config],
-            [self.btn_transforms],
+            [self.btn_solve, self.btn_transforms],
             [self.btn_info],
-            [self.btn_quit],
+            [self.btn_config, self.btn_quit],
         ])
         self.btn_solve.focus_set()
 

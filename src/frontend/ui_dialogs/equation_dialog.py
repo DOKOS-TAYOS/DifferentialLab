@@ -73,9 +73,6 @@ class EquationDialog:
 
         setup_arrow_enter_navigation([[self._btn_next, btn_cancel]])
 
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
 
         # ── Equation type selector ──
         type_frame = ttk.Frame(self.win)

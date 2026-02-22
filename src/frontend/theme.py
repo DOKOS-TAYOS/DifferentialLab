@@ -183,30 +183,53 @@ def configure_ttk_styles(root: tk.Tk) -> None:
 
     # --- Buttons ---
     style.configure("TButton", background=btn_bg, foreground=btn_fg,
-                    font=font, padding=padding, borderwidth=1, relief="raised")
+                    font=font, padding=padding, borderwidth=1, relief="raised",
+                    justify=tk.CENTER)
     style.map("TButton",
               background=[("pressed", focus_bg), ("focus", focus_bg),
                           ("active", focus_bg)],
               foreground=[("active", btn_fg), ("focus", btn_fg)])
 
-    style.configure("Cancel.TButton", foreground=btn_fg_cancel)
+    style.configure("Cancel.TButton", foreground=btn_fg_cancel, justify=tk.CENTER)
     style.map("Cancel.TButton",
               background=[("pressed", focus_bg), ("focus", focus_bg),
                           ("active", focus_bg)],
               foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)])
 
-    style.configure("Accent2.TButton", foreground=btn_fg_accent2)
+    style.configure("Accent2.TButton", foreground=btn_fg_accent2, justify=tk.CENTER)
     style.map("Accent2.TButton",
               background=[("pressed", focus_bg), ("focus", focus_bg),
                           ("active", focus_bg)],
               foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)])
 
     style.configure("Small.TButton", background=btn_bg, foreground=btn_fg,
-                    font=font, padding=(4, 2), borderwidth=1, relief="raised")
+                    font=font, padding=(4, 2), borderwidth=1, relief="raised",
+                    justify=tk.CENTER)
     style.map("Small.TButton",
               background=[("pressed", focus_bg), ("focus", focus_bg),
                           ("active", focus_bg)],
               foreground=[("active", btn_fg), ("focus", btn_fg)])
+
+    # Small menu buttons (Configuration, Quit) - smaller font and padding
+    style.configure("SmallMenu.TButton", background=btn_bg, foreground=btn_fg,
+                    font=font_small, padding=(4, 2), borderwidth=1, relief="raised",
+                    justify=tk.CENTER)
+    style.map("SmallMenu.TButton",
+              background=[("pressed", focus_bg), ("focus", focus_bg),
+                          ("active", focus_bg)],
+              foreground=[("active", btn_fg), ("focus", btn_fg)])
+    style.configure("SmallMenu.Accent2.TButton", foreground=btn_fg_accent2,
+                    justify=tk.CENTER)
+    style.map("SmallMenu.Accent2.TButton",
+              background=[("pressed", focus_bg), ("focus", focus_bg),
+                          ("active", focus_bg)],
+              foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)])
+    style.configure("SmallMenu.Cancel.TButton", foreground=btn_fg_cancel,
+                    justify=tk.CENTER, padding=(50,6))
+    style.map("SmallMenu.Cancel.TButton",
+              background=[("pressed", focus_bg), ("focus", focus_bg),
+                          ("active", focus_bg)],
+              foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)])
 
     # --- Labels ---
     style.configure("Title.TLabel", font=font_large, foreground=btn_fg)

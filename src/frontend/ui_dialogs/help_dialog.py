@@ -148,9 +148,6 @@ class HelpDialog:
         )
         btn_close.pack()
 
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
 
         setup_arrow_enter_navigation([[btn_close]])
         btn_close.focus_set()

@@ -110,10 +110,6 @@ class ConfigDialog:
         )
         btn_cancel.pack(side=tk.LEFT, padx=pad)
 
-        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(
-            side=tk.BOTTOM, fill=tk.X,
-        )
-
         setup_arrow_enter_navigation([[btn_save, btn_cancel]])
 
         # --- Scrollable area ---
