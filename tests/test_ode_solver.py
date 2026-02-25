@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from solver.equation_parser import parse_expression
+from solver.equation_parser import _parse_expression
 from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
 
 # Default env values used when mocking get_env_from_schema
@@ -27,9 +27,9 @@ def test_solve_ode_success(
     sample_t_eval: np.ndarray,
 ) -> None:
     mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
-    ode_func = parse_expression("0.5 * y[0]", order=1, parameters={"k": 0.5})
+    ode_func = _parse_expression("0.5 * y[0]", order=1, parameters={"k": 0.5})
     # Actually use y0 passed in; expression is k*y[0], so we need param
-    ode_func = parse_expression("k * y[0]", order=1, parameters={"k": 0.5})
+    ode_func = _parse_expression("k * y[0]", order=1, parameters={"k": 0.5})
 
     result = solve_ode(
         ode_func,
@@ -51,7 +51,7 @@ def test_solve_ode_success(
 @patch("solver.ode_solver.get_env_from_schema")
 def test_solve_ode_uses_env_when_args_none(mock_get_env: object) -> None:
     mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
-    ode_func = parse_expression("y[0]", order=1)
+    ode_func = _parse_expression("y[0]", order=1)
     result = solve_ode(
         ode_func,
         t_span=(0.0, 1.0),
@@ -69,7 +69,7 @@ def test_solve_ode_uses_env_when_args_none(mock_get_env: object) -> None:
 @patch("solver.ode_solver.get_env_from_schema")
 def test_solve_multipoint_all_at_start_reduces_to_ivp(mock_get_env: object) -> None:
     mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
-    ode_func = parse_expression("-y[0]", order=2, parameters={})
+    ode_func = _parse_expression("-y[0]", order=2, parameters={})
     conditions = [(0, 0.0, 1.0), (1, 0.0, 0.0)]  # all at x=0
     result = solve_multipoint(
         ode_func,
@@ -88,7 +88,7 @@ def test_solve_multipoint_all_at_start_reduces_to_ivp(mock_get_env: object) -> N
 def test_solve_multipoint_different_points(mock_get_env: object) -> None:
     mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
     # Multipoint: y'' = -y with y(0)=1 and y(pi/2)=0. Shooting finds y'(0).
-    ode_func = parse_expression("-y[0]", order=2)
+    ode_func = _parse_expression("-y[0]", order=2)
     conditions = [(0, 0.0, 1.0), (0, np.pi / 2, 0.0)]
     t_eval = np.linspace(0, np.pi, 100)
     result = solve_multipoint(

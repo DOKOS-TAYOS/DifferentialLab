@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from solver.equation_parser import (
+    _parse_expression,
     normalize_unicode_escapes,
-    parse_expression,
     validate_expression,
 )
 from utils import EquationParseError
@@ -72,7 +72,7 @@ class TestParseExpression:
         sample_parameters: dict[str, float],
     ) -> None:
         params = {"k": 0.5}
-        ode_func = parse_expression(sample_expression_order1, order=1, parameters=params)
+        ode_func = _parse_expression(sample_expression_order1, order=1, parameters=params)
         x, y = 0.0, np.array([1.0])
         dydx = ode_func(x, y)
         assert dydx.shape == (1,)
@@ -84,7 +84,7 @@ class TestParseExpression:
         sample_y0_order2: list[float],
     ) -> None:
         params = {"omega": 1.0}
-        ode_func = parse_expression(sample_expression_order2, order=2, parameters=params)
+        ode_func = _parse_expression(sample_expression_order2, order=2, parameters=params)
         x, y = 0.0, np.array([1.0, 0.0])
         dydx = ode_func(x, y)
         assert dydx.shape == (2,)
@@ -93,19 +93,19 @@ class TestParseExpression:
 
     def test_unicode_escape_in_expression(self) -> None:
         # ω as \u03C9 in expression
-        ode_func = parse_expression(r"\u03C9**2 * y[0]", order=1, parameters={"ω": 2.0})
+        ode_func = _parse_expression(r"\u03C9**2 * y[0]", order=1, parameters={"ω": 2.0})
         # Param key in Python must be the actual char; expression uses omega**2 * y[0]
-        ode_func = parse_expression("omega**2 * y[0]", order=1, parameters={"omega": 2.0})
+        ode_func = _parse_expression("omega**2 * y[0]", order=1, parameters={"omega": 2.0})
         x, y = 0.0, np.array([1.0])
         dydx = ode_func(x, y)
         np.testing.assert_allclose(dydx, [4.0])
 
     def test_invalid_expression_raises(self) -> None:
         with pytest.raises(EquationParseError):
-            parse_expression("y[0] + ", order=1)
+            _parse_expression("y[0] + ", order=1)
 
     def test_empty_parameters_allowed(self) -> None:
-        ode_func = parse_expression("y[0]", order=1, parameters=None)
+        ode_func = _parse_expression("y[0]", order=1, parameters=None)
         x, y = 0.0, np.array([3.0])
         dydx = ode_func(x, y)
         np.testing.assert_allclose(dydx, [3.0])

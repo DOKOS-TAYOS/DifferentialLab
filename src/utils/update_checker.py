@@ -84,7 +84,7 @@ def _parse_version(version_str: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def fetch_latest_version(version_url: str | None = None) -> str | None:
+def _fetch_latest_version(version_url: str | None = None) -> str | None:
     """Fetch the latest version from the remote pyproject.toml.
 
     Args:
@@ -121,7 +121,7 @@ def is_update_available(current_version: str) -> str | None:
     Returns:
         The latest version string if newer, else None.
     """
-    latest = fetch_latest_version()
+    latest = _fetch_latest_version()
     if not latest:
         return None
 

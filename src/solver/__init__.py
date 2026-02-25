@@ -5,15 +5,12 @@ from solver.equation_parser import (
     get_difference_function,
     get_ode_function,
     get_vector_ode_function,
-    parse_difference_expression,
-    parse_expression,
     parse_pde_rhs_expression,
-    validate_expression,
 )
 from solver.error_metrics import compute_ode_residual_error
 from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
 from solver.pde_solver import solve_pde_2d
-from solver.predefined import is_multivariate, is_vector_ode, load_predefined_equations
+from solver.predefined import is_multivariate, load_predefined_equations
 from solver.statistics import compute_statistics, compute_statistics_2d
 from solver.validators import validate_all_inputs
 
@@ -23,10 +20,7 @@ __all__ = [
     "get_ode_function",
     "get_vector_ode_function",
     "is_multivariate",
-    "is_vector_ode",
     "ODESolution",
-    "parse_difference_expression",
-    "parse_expression",
     "parse_pde_rhs_expression",
     "solve_difference",
     "solve_multipoint",
@@ -36,5 +30,4 @@ __all__ = [
     "compute_statistics",
     "compute_statistics_2d",
     "validate_all_inputs",
-    "validate_expression",
 ]

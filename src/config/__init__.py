@@ -21,9 +21,7 @@ from config.paths import (
     generate_output_basename,
     get_csv_path,
     get_env_path,
-    get_json_path,
     get_output_dir,
-    get_plot_path,
     get_project_root,
 )
 
@@ -47,8 +45,6 @@ __all__ = [
     "generate_output_basename",
     "get_csv_path",
     "get_env_path",
-    "get_json_path",
     "get_output_dir",
-    "get_plot_path",
     "get_project_root",
 ]

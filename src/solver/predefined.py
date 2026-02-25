@@ -149,20 +149,3 @@ def is_multivariate(variables: list[str] | None) -> bool:
     if not variables:
         return False
     return len(variables) > 1
-
-
-def is_vector_ode(eq: PredefinedEquation) -> bool:
-    """Return True if the equation is a vector ODE ([f_0, f_1, ...]).
-
-    Args:
-        eq: Predefined equation.
-
-    Returns:
-        True if vector_expressions is set or equation_type is vector_ode.
-    """
-    if getattr(eq, "equation_type", "ode") == "vector_ode":
-        return True
-    return (
-        getattr(eq, "vector_expressions", None) is not None
-        and len(getattr(eq, "vector_expressions", [])) > 0
-    )

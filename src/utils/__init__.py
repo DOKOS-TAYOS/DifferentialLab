@@ -8,7 +8,6 @@ from utils.exceptions import (
 )
 from utils.logger import get_logger
 from utils.export import (
-    export_all_results,
     export_csv_to_path,
     export_json_to_path,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "EquationParseError",
     "SolverFailedError",
     "ValidationError",
-    "export_all_results",
     "export_csv_to_path",
     "export_json_to_path",
     "get_logger",

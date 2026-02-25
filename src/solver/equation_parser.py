@@ -17,7 +17,7 @@ from utils import (
 logger = get_logger(__name__)
 
 
-def parse_expression(
+def _parse_expression(
     expression: str,
     order: int,
     parameters: dict[str, float] | None = None,
@@ -106,7 +106,7 @@ def get_ode_function(
         raise ValueError("Provide either expression or function_name")
 
     if expression is not None:
-        return parse_expression(expression, order, params)
+        return _parse_expression(expression, order, params)
 
     assert function_name is not None  # Guaranteed by validation above
     try:
@@ -127,7 +127,7 @@ def get_ode_function(
     return ode_func
 
 
-def parse_difference_expression(
+def _parse_difference_expression(
     expression: str,
     order: int,
     parameters: dict[str, float] | None = None,
@@ -209,7 +209,7 @@ def get_difference_function(
         raise ValueError("Provide either expression or function_name")
 
     if expression is not None:
-        return parse_difference_expression(expression, order, params)
+        return _parse_difference_expression(expression, order, params)
 
     assert function_name is not None  # Guaranteed by validation above
     try:
@@ -289,7 +289,7 @@ def parse_pde_rhs_expression(
     return rhs_func
 
 
-def parse_vector_expression(
+def _parse_vector_expression(
     expressions: list[str],
     order: int,
     parameters: dict[str, float] | None = None,
@@ -388,7 +388,7 @@ def get_vector_ode_function(
                 f"vector_expressions length ({len(vector_expressions)}) "
                 f"must match vector_components ({vector_components})"
             )
-        return parse_vector_expression(vector_expressions, order, params)
+        return _parse_vector_expression(vector_expressions, order, params)
 
     assert function_name is not None  # Guaranteed by validation above
     try:
