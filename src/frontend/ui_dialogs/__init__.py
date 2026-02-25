@@ -2,16 +2,29 @@
 
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.ui_dialogs.config_dialog import ConfigDialog
-from frontend.ui_dialogs.equation_dialog import EquationDialog
-from frontend.ui_dialogs.help_dialog import HelpDialog
-from frontend.ui_dialogs.transform_dialog import TransformDialog
 
 __all__ = [
+    "setup_arrow_enter_navigation",
+    "ToolTip",
     "ConfigDialog",
     "EquationDialog",
     "HelpDialog",
     "TransformDialog",
-    "setup_arrow_enter_navigation",
-    "ToolTip",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy-load heavy dialog modules on first access to speed up startup."""
+    if name == "ConfigDialog":
+        from frontend.ui_dialogs.config_dialog import ConfigDialog
+        return ConfigDialog
+    if name == "EquationDialog":
+        from frontend.ui_dialogs.equation_dialog import EquationDialog
+        return EquationDialog
+    if name == "HelpDialog":
+        from frontend.ui_dialogs.help_dialog import HelpDialog
+        return HelpDialog
+    if name == "TransformDialog":
+        from frontend.ui_dialogs.transform_dialog import TransformDialog
+        return TransformDialog
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

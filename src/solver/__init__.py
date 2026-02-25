@@ -15,17 +15,17 @@ from solver.statistics import compute_statistics, compute_statistics_2d
 from solver.validators import validate_all_inputs
 
 __all__ = [
-    "compute_ode_residual_error",
+    "solve_difference",
     "get_difference_function",
     "get_ode_function",
     "get_vector_ode_function",
-    "is_multivariate",
-    "ODESolution",
     "parse_pde_rhs_expression",
-    "solve_difference",
+    "compute_ode_residual_error",
+    "ODESolution",
     "solve_multipoint",
     "solve_ode",
     "solve_pde_2d",
+    "is_multivariate",
     "load_predefined_equations",
     "compute_statistics",
     "compute_statistics_2d",
