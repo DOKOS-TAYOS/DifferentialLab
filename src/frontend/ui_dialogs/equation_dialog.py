@@ -480,7 +480,7 @@ class EquationDialog:
         self.win.destroy()
         from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
-        default_domain = [0, 50] if eq_type == "difference" else [0.0, 10.0]
+        default_domain: list[float] = [0.0, 50.0] if eq_type == "difference" else [0.0, 10.0]
         ParametersDialog(
             self.parent,
             expression=expr,

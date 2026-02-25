@@ -97,7 +97,6 @@ class ParametersDialog:
         self._x0_vars: list[tk.StringVar] = []
         self._eq_param_vars: dict[str, tk.StringVar] = {}
         self._derivatives_listbox: tk.Listbox | None = None
-        self._stat_keys: list[str] = []
 
         self._build_ui(default_y0, default_domain)
 
@@ -378,7 +377,7 @@ class ParametersDialog:
         stats_frame = ttk.LabelFrame(right_col, text="Statistics & Magnitudes", padding=pad)
         stats_frame.pack(fill=tk.X, pady=(0, pad))
 
-        self._stat_keys: list[str] = list(AVAILABLE_STATISTICS.keys())
+        self._stat_keys = list(AVAILABLE_STATISTICS.keys())
 
         stats_list_frame = ttk.Frame(stats_frame)
         stats_list_frame.pack(fill=tk.X)

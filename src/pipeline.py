@@ -32,11 +32,25 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
+from solver.ode_solver import ODESolution
 from utils import ValidationError, get_logger
 
 logger = get_logger(__name__)
 
 EquationType = Literal["ode", "difference", "pde"]
+
+
+def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
+    """Build solver quality metadata from an ODE solution."""
+    quality: dict[str, Any] = {
+        "rtol": get_env_from_schema("SOLVER_RTOL"),
+        "atol": get_env_from_schema("SOLVER_ATOL"),
+    }
+    if solution.raw is not None:
+        njev = getattr(solution.raw, "njev", None)
+        if njev is not None:
+            quality["n_jacobian_evals"] = int(njev)
+    return quality
 
 
 @dataclass
@@ -209,14 +223,7 @@ def run_solver_pipeline(
         solution_message = solution.message
         solution_n_eval = solution.n_eval
         error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
-        solver_quality = {
-            "rtol": get_env_from_schema("SOLVER_RTOL"),
-            "atol": get_env_from_schema("SOLVER_ATOL"),
-        }
-        if solution.raw is not None:
-            njev = getattr(solution.raw, "njev", None)
-            if njev is not None:
-                solver_quality["n_jacobian_evals"] = int(njev)
+        solver_quality = _build_solver_quality(solution)
     else:
         ode_func = get_ode_function(
             expression=expression,
@@ -246,14 +253,7 @@ def run_solver_pipeline(
         solution_message = solution.message
         solution_n_eval = solution.n_eval
         error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
-        solver_quality = {
-            "rtol": get_env_from_schema("SOLVER_RTOL"),
-            "atol": get_env_from_schema("SOLVER_ATOL"),
-        }
-        if solution.raw is not None:
-            njev = getattr(solution.raw, "njev", None)
-            if njev is not None:
-                solver_quality["n_jacobian_evals"] = int(njev)
+        solver_quality = _build_solver_quality(solution)
 
     if is_pde and len(vars_list) >= 2:
         stats = compute_statistics_2d(solution_x, solution_y_grid, solution_y, selected_stats)

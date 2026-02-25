@@ -14,6 +14,11 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _ensure_parent_dir(filepath: Path) -> None:
+    """Create parent directory if it does not exist."""
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+
 def _export_csv(
     x: np.ndarray,
     y: np.ndarray,
@@ -41,7 +46,7 @@ def _export_csv(
     if headers is None:
         headers = ["x"] + [f"y{i}" if n_vars > 1 else "y" for i in range(n_vars)]
 
-    filepath.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_parent_dir(filepath)
     data = np.column_stack([x] + [y_2d[i] for i in range(n_vars)])
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -67,7 +72,7 @@ def _export_json(
     Returns:
         The path that was written.
     """
-    filepath.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_parent_dir(filepath)
     payload = {
         "metadata": _make_serializable(metadata),
         "statistics": _make_serializable(statistics),
@@ -120,13 +125,14 @@ def _export_csv_2d(
     Returns:
         Path written.
     """
-    filepath.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_parent_dir(filepath)
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["x", "y", "u"])
         for j, yv in enumerate(y_grid):
             for i, xv in enumerate(x_grid):
                 writer.writerow([xv, yv, u[j, i]])
+    logger.info("CSV exported (2D): %s", filepath)
     return filepath
 
 
@@ -197,9 +203,6 @@ def export_all_results(
     Returns:
         Tuple of ``(csv_path, json_path)`` that were written.
     """
-    if y_grid is not None and y.ndim == 2:
-        _export_csv_2d(x, y_grid, y, csv_path)
-    else:
-        _export_csv(x, y, csv_path)
+    export_csv_to_path(x, y, csv_path, y_grid=y_grid)
     _export_json(statistics, metadata, json_path)
     return csv_path, json_path

@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -29,7 +28,8 @@ _DAYS_BETWEEN_CHECKS = 7
 
 def _get_last_check_path() -> Path:
     """Return path to the file storing last update check timestamp."""
-    return get_project_root() / _LAST_CHECK_FILE
+    root = get_project_root()
+    return root / _LAST_CHECK_FILE
 
 
 def should_run_check() -> bool:
@@ -68,7 +68,7 @@ def record_check_done() -> None:
         logger.debug("Could not touch last-check file: %s", exc)
 
 
-def _parse_version(version_str: str) -> Tuple[int, ...]:
+def _parse_version(version_str: str) -> tuple[int, ...]:
     """Parse a version string like '1.0.0' or '1.2.3.dev1' into a comparable tuple.
 
     Args:
@@ -84,7 +84,7 @@ def _parse_version(version_str: str) -> Tuple[int, ...]:
     return tuple(parts)
 
 
-def fetch_latest_version(version_url: Optional[str] = None) -> Optional[str]:
+def fetch_latest_version(version_url: str | None = None) -> str | None:
     """Fetch the latest version from the remote pyproject.toml.
 
     Args:
@@ -112,7 +112,7 @@ def fetch_latest_version(version_url: Optional[str] = None) -> Optional[str]:
     return None
 
 
-def is_update_available(current_version: str) -> Optional[str]:
+def is_update_available(current_version: str) -> str | None:
     """Check if a newer version is available.
 
     Args:
@@ -133,7 +133,7 @@ def is_update_available(current_version: str) -> Optional[str]:
     return None
 
 
-def perform_git_pull() -> Tuple[bool, str]:
+def perform_git_pull() -> tuple[bool, str]:
     """Perform git pull in the project root.
 
     Before pulling, stashes any local changes in input/ and output/

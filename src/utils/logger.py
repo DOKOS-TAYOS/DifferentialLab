@@ -1,4 +1,9 @@
-"""Application logging setup."""
+"""Application logging setup.
+
+Configures a hierarchical logger under the ``differential_lab`` namespace.
+Log level, file output, and console output are controlled via environment
+variables (LOG_LEVEL, LOG_FILE, LOG_CONSOLE).
+"""
 
 import logging
 import sys
@@ -8,7 +13,10 @@ _CONFIGURED = False
 
 
 def _setup_root_logger() -> None:
-    """Configure the root ``differential_lab`` logger once from env settings."""
+    """Configure the root ``differential_lab`` logger once from env settings.
+
+    Idempotent: subsequent calls have no effect after the first configuration.
+    """
     global _CONFIGURED
     if _CONFIGURED:
         return

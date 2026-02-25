@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import ast
 import re
 from typing import Any, Callable
 
 import numpy as np
 
 from utils import EquationParseError, get_logger
+from utils.expression_parser_shared import SAFE_MATH, validate_expression_ast
 
 logger = get_logger(__name__)
 
@@ -29,86 +29,6 @@ def normalize_unicode_escapes(text: str) -> str:
         Unicode character.
     """
     return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
-
-
-_SAFE_MATH: dict[str, Any] = {
-    "sin": np.sin,
-    "cos": np.cos,
-    "tan": np.tan,
-    "exp": np.exp,
-    "log": np.log,
-    "log10": np.log10,
-    "sqrt": np.sqrt,
-    "abs": np.abs,
-    "pi": np.pi,
-    "e": np.e,
-    "sinh": np.sinh,
-    "cosh": np.cosh,
-    "tanh": np.tanh,
-    "arcsin": np.arcsin,
-    "arccos": np.arccos,
-    "arctan": np.arctan,
-    "floor": np.floor,
-    "ceil": np.ceil,
-    "sign": np.sign,
-    "heaviside": np.heaviside,
-}
-
-_ALLOWED_NODE_TYPES = (
-    ast.Module,
-    ast.Expr,
-    ast.Expression,
-    ast.BinOp,
-    ast.UnaryOp,
-    ast.Call,
-    ast.Name,
-    ast.Constant,
-    ast.Load,
-    ast.Add,
-    ast.Sub,
-    ast.Mult,
-    ast.Div,
-    ast.Pow,
-    ast.USub,
-    ast.UAdd,
-    ast.Subscript,
-    ast.Attribute,
-    ast.FloorDiv,
-    ast.Mod,
-    ast.Compare,
-    ast.IfExp,
-    ast.BoolOp,
-    ast.And,
-    ast.Or,
-    ast.Eq,
-    ast.NotEq,
-    ast.Lt,
-    ast.LtE,
-    ast.Gt,
-    ast.GtE,
-    ast.Tuple,
-    ast.List,
-)
-
-
-def _validate_ast(expression: str) -> None:
-    """Check that *expression* contains only allowed AST nodes.
-
-    Args:
-        expression: Python expression string.
-
-    Raises:
-        EquationParseError: If the expression contains disallowed constructs.
-    """
-    try:
-        tree = ast.parse(expression, mode="eval")
-    except SyntaxError as exc:
-        logger.debug("Expression syntax error: %s — %s", expression[:80], exc)
-        raise EquationParseError(f"Syntax error in expression: {exc}") from exc
-
-    for node in ast.walk(tree):
-        if not isinstance(node, _ALLOWED_NODE_TYPES):
-            raise EquationParseError(f"Disallowed construct in expression: {type(node).__name__}")
 
 
 def parse_expression(
@@ -138,11 +58,11 @@ def parse_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
-    _validate_ast(expression)
+    validate_expression_ast(expression, "ODE expression")
     params = dict(parameters) if parameters else {}
     logger.debug("Parsing expression (order=%d): %s, params=%s", order, expression, params)
 
-    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    namespace: dict[str, Any] = {**SAFE_MATH, **params}
 
     compiled = compile(expression, "<ode_expression>", "eval")
 
@@ -202,7 +122,7 @@ def get_ode_function(
     if expression is not None:
         return parse_expression(expression, order, params)
 
-    # Import function from config.equations
+    assert function_name is not None  # Guaranteed by validation above
     try:
         from config import equations as equations_module
     except ImportError as exc:
@@ -243,7 +163,7 @@ def parse_difference_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
-    _validate_ast(expression)
+    validate_expression_ast(expression, "difference expression")
     params = dict(parameters) if parameters else {}
     logger.debug(
         "Parsing difference expression (order=%d): %s, params=%s",
@@ -252,7 +172,7 @@ def parse_difference_expression(
         params,
     )
 
-    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    namespace: dict[str, Any] = {**SAFE_MATH, **params}
     compiled = compile(expression, "<difference_expression>", "eval")
 
     def _test_eval() -> None:
@@ -305,6 +225,7 @@ def get_difference_function(
     if expression is not None:
         return parse_difference_expression(expression, order, params)
 
+    assert function_name is not None  # Guaranteed by validation above
     try:
         from config import difference_equations as diff_module
     except ImportError:
@@ -350,7 +271,7 @@ def parse_pde_rhs_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
-    _validate_ast(expression)
+    validate_expression_ast(expression, "PDE RHS")
     params = dict(parameters) if parameters else {}
     logger.debug(
         "Parsing PDE RHS expression: %s, variables=%s, params=%s",
@@ -359,7 +280,7 @@ def parse_pde_rhs_expression(
         params,
     )
 
-    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    namespace: dict[str, Any] = {**SAFE_MATH, **params}
     compiled = compile(expression, "<pde_rhs>", "eval")
 
     def rhs_func(*args: float, **kwargs: Any) -> float:
@@ -411,12 +332,12 @@ def parse_vector_expression(
         raise EquationParseError("vector_expressions must have at least one expression")
 
     params = dict(parameters) if parameters else {}
-    namespace: dict[str, Any] = {**_SAFE_MATH, **params}
+    namespace: dict[str, Any] = {**SAFE_MATH, **params}
 
     compiled_list: list[Any] = []
     for i, expr in enumerate(expressions):
         expr = normalize_unicode_escapes(expr)
-        _validate_ast(expr)
+        validate_expression_ast(expr, f"vector expression {i}")
         compiled_list.append(compile(expr, f"<vector_ode_{i}>", "eval"))
 
     state_size = n_components * order
@@ -483,6 +404,7 @@ def get_vector_ode_function(
             )
         return parse_vector_expression(vector_expressions, order, params)
 
+    assert function_name is not None  # Guaranteed by validation above
     try:
         from config import equations as equations_module
     except ImportError as exc:
@@ -515,7 +437,7 @@ def validate_expression(expression: str) -> list[str]:
         errors.append("Expression is empty")
         return errors
     try:
-        _validate_ast(normalize_unicode_escapes(expression.strip()))
+        validate_expression_ast(normalize_unicode_escapes(expression.strip()), "expression")
     except EquationParseError as exc:
         errors.append(str(exc))
     return errors

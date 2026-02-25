@@ -507,18 +507,21 @@ def initialize_and_validate_config() -> None:
 
     Invalid values are silently corrected to defaults with a log warning.
     """
+
     try:
         from utils import get_logger
 
-        logger = get_logger(__name__)
+        log = get_logger(__name__)
     except ImportError:
-        logger = None  # type: ignore[assignment]
+        import logging
+        
+        log = logging.getLogger("differential_lab.config")
 
     results = _validate_all_env_values()
     corrected = [k for k, (_, was) in results.items() if was]
 
-    if corrected and logger:
-        logger.warning(
+    if corrected:
+        log.warning(
             "Corrected %d invalid env variable(s) to defaults: %s",
             len(corrected),
             ", ".join(corrected),
