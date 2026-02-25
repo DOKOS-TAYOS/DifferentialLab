@@ -18,6 +18,7 @@ from plotting import (
     create_vector_animation_plot,
 )
 from solver import (
+    ODESolution,
     compute_ode_residual_error,
     compute_statistics,
     compute_statistics_2d,
@@ -32,7 +33,6 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
-from solver.ode_solver import ODESolution
 from utils import ValidationError, get_logger
 
 logger = get_logger(__name__)

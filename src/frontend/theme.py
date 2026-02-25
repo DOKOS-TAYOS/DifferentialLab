@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from config.env import get_env_from_schema
+from config import get_env_from_schema
 
 # -----------------------------------------------------------------------------
 # Color conversion and transformation helpers (RegressionLab-style)

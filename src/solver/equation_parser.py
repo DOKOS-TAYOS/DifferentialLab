@@ -2,33 +2,19 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any, Callable
 
 import numpy as np
 
-from utils import EquationParseError, get_logger
-from utils.expression_parser_shared import SAFE_MATH, validate_expression_ast
+from utils import (
+    EquationParseError,
+    SAFE_MATH,
+    get_logger,
+    normalize_unicode_escapes,
+    validate_expression_ast,
+)
 
 logger = get_logger(__name__)
-
-_UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9A-Fa-f]{4})")
-
-
-def normalize_unicode_escapes(text: str) -> str:
-    """Replace ``\\uXXXX`` escape sequences with their Unicode characters.
-
-    Allows users to enter expressions like ``\\u03C9**2 * y[0]`` and have
-    them treated equivalently to ``ω**2 * y[0]``.
-
-    Args:
-        text: Input string that may contain Unicode escape sequences.
-
-    Returns:
-        String with all ``\\uXXXX`` sequences replaced by the corresponding
-        Unicode character.
-    """
-    return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
 
 
 def parse_expression(

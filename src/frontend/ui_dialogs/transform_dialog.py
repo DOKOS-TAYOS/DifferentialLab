@@ -272,7 +272,7 @@ class TransformDialog:
         Raises:
             ValueError: On parse error.
         """
-        from solver.equation_parser import normalize_unicode_escapes
+        from utils import normalize_unicode_escapes
 
         expr = normalize_unicode_escapes(self._func_entry.get("1.0", tk.END).strip())
         if not expr:
@@ -394,7 +394,7 @@ class TransformDialog:
         import matplotlib.pyplot as plt
 
         from config import get_env_from_schema
-        from plotting.plot_utils import _apply_plot_style, _finalize_plot
+        from plotting import _apply_plot_style, _finalize_plot
 
         if self._current_x is None or self._current_y is None:
             return

@@ -19,8 +19,8 @@ def _check_for_updates() -> None:
     If yes, perform git pull (preserves input/, output/, .env).
     """
     from config import APP_VERSION
-    from utils import get_logger
-    from utils.update_checker import (
+    from utils import (
+        get_logger,
         is_update_available,
         perform_git_pull,
         record_check_done,

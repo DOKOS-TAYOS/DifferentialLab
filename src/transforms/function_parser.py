@@ -6,9 +6,13 @@ from typing import Any, Callable
 
 import numpy as np
 
-from solver.equation_parser import normalize_unicode_escapes
-from utils import EquationParseError, get_logger
-from utils.expression_parser_shared import SAFE_MATH, validate_expression_ast
+from utils import (
+    EquationParseError,
+    SAFE_MATH,
+    get_logger,
+    normalize_unicode_escapes,
+    validate_expression_ast,
+)
 
 logger = get_logger(__name__)
 

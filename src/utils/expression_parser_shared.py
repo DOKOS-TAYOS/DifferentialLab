@@ -7,6 +7,7 @@ duplication of _SAFE_MATH, _ALLOWED_NODE_TYPES, and AST validation logic.
 from __future__ import annotations
 
 import ast
+import re
 from typing import Any
 
 import numpy as np
@@ -14,6 +15,25 @@ import numpy as np
 from utils import EquationParseError, get_logger
 
 logger = get_logger(__name__)
+
+_UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9A-Fa-f]{4})")
+
+
+def normalize_unicode_escapes(text: str) -> str:
+    """Replace ``\\uXXXX`` escape sequences with their Unicode characters.
+
+    Allows users to enter expressions like ``\\u03C9**2 * y[0]`` and have
+    them treated equivalently to ``ω**2 * y[0]``.
+
+    Args:
+        text: Input string that may contain Unicode escape sequences.
+
+    Returns:
+        String with all ``\\uXXXX`` sequences replaced by the corresponding
+        Unicode character.
+    """
+    return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
+
 
 SAFE_MATH: dict[str, Any] = {
     "sin": np.sin,

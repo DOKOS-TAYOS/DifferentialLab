@@ -435,7 +435,7 @@ class EquationDialog:
         )
 
     def _on_next_custom(self) -> None:
-        from solver.equation_parser import normalize_unicode_escapes
+        from utils import normalize_unicode_escapes
 
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
