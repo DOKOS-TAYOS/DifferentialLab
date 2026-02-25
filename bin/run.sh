@@ -13,5 +13,5 @@ if [ ! -d ".venv" ]; then
     exit 1
 fi
 
-source .venv/bin/activate && nohup python src/main_program.py > /dev/null 2>&1 &
+source .venv/bin/activate && nohup pythonw src/main_program.py > /dev/null 2>&1 &
 exit 0
