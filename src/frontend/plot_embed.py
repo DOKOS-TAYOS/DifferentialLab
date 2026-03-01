@@ -12,6 +12,31 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 
+_MAX_FPS = 30
+
+
+def _bind_resize_handler(
+    canvas: FigureCanvasTkAgg,
+    fig: Figure,
+) -> None:
+    """Bind a resize handler to update tight_layout and redraw.
+
+    Args:
+        canvas: The FigureCanvasTkAgg object.
+        fig: The Matplotlib figure.
+    """
+    def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                _fig.tight_layout()  # type: ignore[union-attr]
+            _canvas.draw_idle()  # type: ignore[union-attr]
+        except Exception:
+            pass
+
+    canvas.mpl_connect("resize_event", _on_resize)
+
+
 def embed_animation_plot_in_tk(
     fig: Figure,
     parent: tk.Widget,
@@ -49,16 +74,7 @@ def embed_animation_plot_in_tk(
     widget.config(width=1, height=1)
     widget.pack(fill=tk.BOTH, expand=True)
 
-    def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-                _fig.tight_layout()  # type: ignore[union-attr]
-            _canvas.draw_idle()  # type: ignore[union-attr]
-        except Exception:
-            pass
-
-    canvas.mpl_connect("resize_event", _on_resize)
+    _bind_resize_handler(canvas, fig)
     canvas.draw()
 
     ctrl_frame = ttk.Frame(parent)
@@ -80,8 +96,6 @@ def embed_animation_plot_in_tk(
         idx = int(float(v))
         if update_fn is not None:
             update_fn(idx)
-
-    _MAX_FPS = 30
 
     def _play_tick() -> None:
         nonlocal _play_job
@@ -138,7 +152,7 @@ def embed_animation_plot_in_tk(
         ttk.Label(ctrl_frame, text="x:").pack(side=tk.LEFT, padx=(0, 4))
         scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-        ttk.Label(ctrl_frame, text="Duración (s):").pack(side=tk.LEFT, padx=(8, 2))
+        ttk.Label(ctrl_frame, text="Duration (s):").pack(side=tk.LEFT, padx=(8, 2))
         ttk.Entry(ctrl_frame, textvariable=duration_var, width=14).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(
@@ -197,16 +211,7 @@ def embed_plot_in_tk(
     widget.config(width=1, height=1)
     widget.pack(fill=tk.BOTH, expand=True)
 
-    def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-                _fig.tight_layout()  # type: ignore[union-attr]
-            _canvas.draw_idle()  # type: ignore[union-attr]
-        except Exception:
-            pass
-
-    canvas.mpl_connect("resize_event", _on_resize)
+    _bind_resize_handler(canvas, fig)
     canvas.draw()
 
     return canvas

@@ -50,6 +50,80 @@ def _nth_derivative(
     return df(x0)
 
 
+def _compute_taylor_coeffs(
+    func: Callable[[np.ndarray], np.ndarray],
+    center: float,
+    order: int,
+) -> np.ndarray:
+    """Compute Taylor series coefficients around a center point.
+
+    Args:
+        func: Vectorized callable f(x) -> y.
+        center: Center point for Taylor expansion.
+        order: Highest order of derivative.
+
+    Returns:
+        Array of Taylor coefficients a_0, a_1, ..., a_order.
+    """
+    def nth_derivative(n: int, x0: float) -> float:
+        return _nth_derivative(
+            lambda t: float(func(np.array([t]))[0]),
+            x0,
+            n=n,
+            dx=1e-6,
+        )
+
+    coeffs = np.zeros(order + 1)
+    for n in range(order + 1):
+        coeffs[n] = nth_derivative(n, center) / math.factorial(n)
+
+    return coeffs
+
+
+def _compute_laplace_samples(
+    func: Callable[[np.ndarray], np.ndarray],
+    x_min: float,
+    x_max: float,
+    s_vals: np.ndarray,
+) -> np.ndarray:
+    """Compute Laplace transform samples over given s values.
+
+    Args:
+        func: Vectorized callable f(x) -> y.
+        x_min: Lower bound of integration.
+        x_max: Upper bound of integration.
+        s_vals: Array of s values at which to evaluate the Laplace transform.
+
+    Returns:
+        Array of Laplace transform values at each s.
+    """
+    def integrand(t: float, s: float) -> float:
+        if t < x_min or t > x_max:
+            return 0.0
+        try:
+            return float(func(np.array([t]))[0] * np.exp(-s * t))
+        except (ValueError, ZeroDivisionError, OverflowError):
+            return 0.0
+
+    laplace_vals = np.zeros_like(s_vals)
+    for i, s in enumerate(s_vals):
+        try:
+            result, _ = quad(
+                lambda t, s_val=s: integrand(t, s_val),
+                x_min,
+                x_max,
+                limit=200,
+                epsabs=1e-10,
+                epsrel=1e-8,
+            )
+            laplace_vals[i] = result
+        except Exception as exc:
+            logger.debug("Laplace quad failed at s=%g: %s", s, exc)
+            laplace_vals[i] = np.nan
+
+    return laplace_vals
+
+
 class TransformKind(str, Enum):
     """Available transformation types."""
 
@@ -135,47 +209,12 @@ def apply_transform(
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
-
-        def integrand(t: float, s: float) -> float:
-            if t < x_min or t > x_max:
-                return 0.0
-            try:
-                return float(func(np.array([t]))[0] * np.exp(-s * t))
-            except (ValueError, ZeroDivisionError, OverflowError):
-                return 0.0
-
-        laplace_vals = np.zeros_like(s_vals)
-        for i, s in enumerate(s_vals):
-            try:
-                result, _ = quad(
-                    lambda t, s_val=s: integrand(t, s_val),
-                    x_min,
-                    x_max,
-                    limit=200,
-                    epsabs=1e-10,
-                    epsrel=1e-8,
-                )
-                laplace_vals[i] = result
-            except Exception as exc:
-                logger.debug("Laplace quad failed at s=%g: %s", s, exc)
-                laplace_vals[i] = np.nan
-
+        laplace_vals = _compute_laplace_samples(func, x_min, x_max, s_vals)
         return s_vals, laplace_vals, "s (real)", "L(s)"
 
     if kind == TransformKind.TAYLOR:
         center = taylor_center if taylor_center is not None else (x_min + x_max) / 2
-
-        def nth_derivative(n: int, x0: float) -> float:
-            return _nth_derivative(
-                lambda t: float(func(np.array([t]))[0]),
-                x0,
-                n=n,
-                dx=1e-6,
-            )
-
-        coeffs = np.zeros(taylor_order + 1)
-        for n in range(taylor_order + 1):
-            coeffs[n] = nth_derivative(n, center) / math.factorial(n)
+        coeffs = _compute_taylor_coeffs(func, center, taylor_order)
 
         x = np.linspace(x_min, x_max, n_points)
         x_centered = x - center
@@ -222,6 +261,8 @@ def get_transform_coefficients(
     *,
     taylor_order: int = 5,
     taylor_center: float | None = None,
+    laplace_s_min: float = 0.1,
+    laplace_s_max: float = 10.0,
     laplace_n_points: int = 50,
 ) -> tuple[np.ndarray, np.ndarray, str, str]:
     """Return coefficient representation (index i vs a_i) for the transform.
@@ -246,18 +287,7 @@ def get_transform_coefficients(
 
     if kind == TransformKind.TAYLOR:
         center = taylor_center if taylor_center is not None else (x_min + x_max) / 2
-
-        def nth_derivative(n: int, x0: float) -> float:
-            return _nth_derivative(
-                lambda t: float(func(np.array([t]))[0]),
-                x0,
-                n=n,
-                dx=1e-6,
-            )
-
-        coeffs = np.zeros(taylor_order + 1)
-        for n in range(taylor_order + 1):
-            coeffs[n] = nth_derivative(n, center) / math.factorial(n)
+        coeffs = _compute_taylor_coeffs(func, center, taylor_order)
 
         indices = np.arange(taylor_order + 1)
         return indices, coeffs, "i", "a_i"
@@ -271,31 +301,8 @@ def get_transform_coefficients(
         return indices, coeffs, "k", "|F[k]|"
 
     if kind == TransformKind.LAPLACE:
-        s_vals = np.linspace(0.1, 10.0, laplace_n_points)
-
-        def integrand(t: float, s: float) -> float:
-            if t < x_min or t > x_max:
-                return 0.0
-            try:
-                return float(func(np.array([t]))[0] * np.exp(-s * t))
-            except (ValueError, ZeroDivisionError, OverflowError):
-                return 0.0
-
-        coeffs = np.zeros(laplace_n_points)
-        for i, s in enumerate(s_vals):
-            try:
-                result, _ = quad(
-                    lambda t, s_val=s: integrand(t, s_val),
-                    x_min,
-                    x_max,
-                    limit=200,
-                    epsabs=1e-10,
-                    epsrel=1e-8,
-                )
-                coeffs[i] = result
-            except Exception as exc:
-                logger.debug("Laplace quad (coeffs) failed at s=%g: %s", s, exc)
-                coeffs[i] = np.nan
+        s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
+        coeffs = _compute_laplace_samples(func, x_min, x_max, s_vals)
 
         indices = np.arange(laplace_n_points)
         return indices, coeffs, "i", "L(s_i)"
