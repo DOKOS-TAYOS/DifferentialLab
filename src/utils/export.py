@@ -204,5 +204,5 @@ def export_all_results(
         Tuple of ``(csv_path, json_path)`` that were written.
     """
     export_csv_to_path(x, y, csv_path, y_grid=y_grid)
-    _export_json(statistics, metadata, json_path)
+    export_json_to_path(statistics, metadata, json_path)
     return csv_path, json_path

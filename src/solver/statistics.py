@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from config.constants import AVAILABLE_STATISTICS
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,18 +30,7 @@ def compute_statistics(
     """
     y_2d = np.atleast_2d(y)
     y_primary = y_2d[0]
-    all_stats = selected or {
-        "mean",
-        "rms",
-        "std",
-        "max",
-        "min",
-        "integral",
-        "zero_crossings",
-        "period",
-        "amplitude",
-        "energy",
-    }
+    all_stats = selected or set(AVAILABLE_STATISTICS.keys())
 
     results: dict[str, Any] = {}
 

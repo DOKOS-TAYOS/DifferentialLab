@@ -265,53 +265,66 @@ class ResultDialog:
             ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
             ttk.Label(row, text=self._format_stat(val), style="Small.TLabel").pack(side=tk.LEFT)
 
-    def _on_save_csv(self) -> None:
-        """Save solution data to CSV via file dialog."""
-        default_path = get_output_dir() / f"{generate_output_basename()}.csv"
+    def _save_export_file(
+        self,
+        export_fn,
+        ext: str,
+        filetypes: list[tuple[str, str]],
+        prefix_log: str = "",
+    ) -> None:
+        """Generic handler for saving exported files via file dialog.
+
+        Args:
+            export_fn: Callable that takes a path and performs the export.
+            ext: File extension (e.g. ".csv", ".json").
+            filetypes: List of (description, pattern) tuples for file dialog.
+            prefix_log: String to include in log messages (e.g. "CSV", "JSON").
+        """
+        default_path = get_output_dir() / f"{generate_output_basename()}{ext}"
         filepath = filedialog.asksaveasfilename(
             parent=self.win,
-            defaultextension=".csv",
+            defaultextension=ext,
             initialfile=default_path.name,
             initialdir=str(default_path.parent),
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            filetypes=filetypes,
         )
         if not filepath:
             return
         path = Path(filepath)
         try:
-            export_csv_to_path(self._x, self._y, path, y_grid=self._y_grid)
+            export_fn(path)
             messagebox.showinfo(
                 "Export Complete",
-                f"CSV saved to:\n{path}",
+                f"{prefix_log} saved to:\n{path}",
                 parent=self.win,
             )
         except Exception as exc:
-            logger.error("CSV export failed: %s", exc, exc_info=True)
+            logger.error(f"{prefix_log} export failed: %s", exc, exc_info=True)
             messagebox.showerror("Export Failed", str(exc), parent=self.win)
+
+    def _on_save_csv(self) -> None:
+        """Save solution data to CSV via file dialog."""
+        export_fn = lambda path: export_csv_to_path(
+            self._x, self._y, path, y_grid=self._y_grid
+        )
+        self._save_export_file(
+            export_fn,
+            ".csv",
+            [("CSV files", "*.csv"), ("All files", "*.*")],
+            "CSV",
+        )
 
     def _on_save_json(self) -> None:
         """Save metadata and statistics to JSON via file dialog."""
-        default_path = get_output_dir() / f"{generate_output_basename()}.json"
-        filepath = filedialog.asksaveasfilename(
-            parent=self.win,
-            defaultextension=".json",
-            initialfile=default_path.name,
-            initialdir=str(default_path.parent),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        export_fn = lambda path: export_json_to_path(
+            self._statistics, self._metadata, path
         )
-        if not filepath:
-            return
-        path = Path(filepath)
-        try:
-            export_json_to_path(self._statistics, self._metadata, path)
-            messagebox.showinfo(
-                "Export Complete",
-                f"JSON saved to:\n{path}",
-                parent=self.win,
-            )
-        except Exception as exc:
-            logger.error("JSON export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+        self._save_export_file(
+            export_fn,
+            ".json",
+            [("JSON files", "*.json"), ("All files", "*.*")],
+            "JSON",
+        )
 
     def _on_export_animation_mp4(self, duration_seconds: float) -> None:
         """Export the vector animation as MP4 video with given duration."""

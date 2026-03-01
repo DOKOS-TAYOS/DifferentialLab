@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import numpy as np
+from scipy.integrate import solve_ivp
+from scipy.optimize import fsolve
 
 from config import get_env_from_schema
 from utils import SolverFailedError, get_logger
@@ -34,6 +36,42 @@ class ODESolution:
     method_used: str
     n_eval: int = 0
     raw: Any = field(default=None, repr=False)
+
+
+def _resolve_solver_params(
+    method: str | None,
+    max_step: float | None,
+    rtol: float | None,
+    atol: float | None,
+    t_span: tuple[float, float],
+) -> tuple[str, float, float, float, np.ndarray]:
+    """Resolve solver parameters using environment defaults if needed.
+
+    Args:
+        method: Integration method name (or None for default).
+        max_step: Maximum step size (or None for default).
+        rtol: Relative tolerance (or None for default).
+        atol: Absolute tolerance (or None for default).
+        t_span: Integration span to compute uniform grid over.
+
+    Returns:
+        Tuple of (method, effective_max_step, rtol, atol, t_eval).
+    """
+    if method is None:
+        method = get_env_from_schema("SOLVER_DEFAULT_METHOD")
+    if max_step is None:
+        max_step = get_env_from_schema("SOLVER_MAX_STEP")
+    if rtol is None:
+        rtol = get_env_from_schema("SOLVER_RTOL")
+    if atol is None:
+        atol = get_env_from_schema("SOLVER_ATOL")
+
+    effective_max_step = np.inf if max_step <= 0 else max_step
+
+    n_points: int = get_env_from_schema("SOLVER_NUM_POINTS")
+    t_eval = np.linspace(t_span[0], t_span[1], n_points)
+
+    return method, effective_max_step, rtol, atol, t_eval
 
 
 def solve_ode(
@@ -65,22 +103,17 @@ def solve_ode(
     Raises:
         SolverFailedError: If the solver reports failure.
     """
-    if method is None:
-        method = get_env_from_schema("SOLVER_DEFAULT_METHOD")
-    if max_step is None:
-        max_step = get_env_from_schema("SOLVER_MAX_STEP")
-    if rtol is None:
-        rtol = get_env_from_schema("SOLVER_RTOL")
-    if atol is None:
-        atol = get_env_from_schema("SOLVER_ATOL")
-
     if t_eval is None:
-        n_points: int = get_env_from_schema("SOLVER_NUM_POINTS")
-        t_eval = np.linspace(t_span[0], t_span[1], n_points)
-
-    effective_max_step = np.inf if max_step <= 0 else max_step
-
-    from scipy.integrate import solve_ivp
+        method, effective_max_step, rtol, atol, t_eval = _resolve_solver_params(
+            method, max_step, rtol, atol, t_span
+        )
+    else:
+        # If t_eval is provided, still resolve other params
+        method = method or get_env_from_schema("SOLVER_DEFAULT_METHOD")
+        max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
+        rtol = rtol or get_env_from_schema("SOLVER_RTOL")
+        atol = atol or get_env_from_schema("SOLVER_ATOL")
+        effective_max_step = np.inf if max_step <= 0 else max_step
 
     logger.info(
         "Solving IVP: method=%s, span=%s, y0=%s, rtol=%s, atol=%s",
@@ -158,20 +191,17 @@ def solve_multipoint(
     Raises:
         SolverFailedError: If the solver or shooting method fails.
     """
-    if method is None:
-        method = get_env_from_schema("SOLVER_DEFAULT_METHOD")
-    if max_step is None:
-        max_step = get_env_from_schema("SOLVER_MAX_STEP")
-    if rtol is None:
-        rtol = get_env_from_schema("SOLVER_RTOL")
-    if atol is None:
-        atol = get_env_from_schema("SOLVER_ATOL")
-
-    effective_max_step = np.inf if max_step <= 0 else max_step
-
     if t_eval is None:
-        n_points: int = get_env_from_schema("SOLVER_NUM_POINTS")
-        t_eval = np.linspace(x_min, x_max, n_points)
+        method, effective_max_step, rtol, atol, t_eval = _resolve_solver_params(
+            method, max_step, rtol, atol, (x_min, x_max)
+        )
+    else:
+        # If t_eval is provided, still resolve other params
+        method = method or get_env_from_schema("SOLVER_DEFAULT_METHOD")
+        max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
+        rtol = rtol or get_env_from_schema("SOLVER_RTOL")
+        atol = atol or get_env_from_schema("SOLVER_ATOL")
+        effective_max_step = np.inf if max_step <= 0 else max_step
 
     all_at_start = all(abs(xi - x_min) < 1e-12 for (_, xi, _) in conditions)
     if all_at_start:
@@ -195,8 +225,6 @@ def solve_multipoint(
     n_fine = max(2000, len(t_eval) * 2)
     t_eval_fine = np.linspace(x_min, x_max_needed, n_fine)
 
-    from scipy.integrate import solve_ivp
-
     def _residuals(y0: np.ndarray) -> np.ndarray:
         sol = solve_ivp(
             ode_func,
@@ -212,8 +240,6 @@ def solve_multipoint(
         if not sol.success:
             return np.full(len(conditions), 1e10)
         return np.array([np.interp(xi, sol.t, sol.y[k]) - ai for (k, xi, ai) in conditions])
-
-    from scipy.optimize import fsolve
 
     y0_opt, _, ier, mesg = fsolve(_residuals, y0_guess, full_output=True)
 

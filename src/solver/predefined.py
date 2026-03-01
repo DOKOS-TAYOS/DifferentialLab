@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -16,7 +16,7 @@ _EQUATIONS_PATH = Path(__file__).resolve().parent.parent / "config" / "equations
 _cache: dict[str, PredefinedEquation] | None = None
 
 
-EquationType = str  # "ode" | "difference"
+EquationType = Literal["ode", "difference", "pde", "vector_ode"]
 
 
 @dataclass
@@ -111,6 +111,9 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             )
             continue
 
+        partial_derivatives = data.get("partial_derivatives")
+        partial_derivatives = dict(partial_derivatives) if partial_derivatives else None
+
         eq = PredefinedEquation(
             key=key,
             name=data.get("name", key),
@@ -127,7 +130,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             equation_type=str(data.get("equation_type", "ode")),
             category=str(data.get("category", "Oscillators")),
             variables=list(data.get("variables", ["x"])),
-            partial_derivatives=dict(data.get("partial_derivatives", {})) or None,
+            partial_derivatives=partial_derivatives,
         )
         equations[key] = eq
         logger.debug("Loaded predefined equation: %s", key)

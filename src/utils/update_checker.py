@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -49,8 +50,6 @@ def should_run_check() -> bool:
         return True
 
     try:
-        import time
-
         mtime = path.stat().st_mtime
         elapsed_days = (time.time() - mtime) / (24 * 3600)
         return elapsed_days >= _DAYS_BETWEEN_CHECKS
@@ -94,9 +93,7 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
     Returns:
         Version string (e.g. '0.2.2') or None if fetch failed.
     """
-    url = (version_url or get_env("UPDATE_CHECK_URL", _DEFAULT_VERSION_URL, str) or "").strip()
-    if not url:
-        url = _DEFAULT_VERSION_URL
+    url = version_url or get_env("UPDATE_CHECK_URL", _DEFAULT_VERSION_URL, str)
 
     try:
         req = Request(url, headers={"User-Agent": "DifferentialLab-UpdateChecker/1.0"})
@@ -166,7 +163,8 @@ def perform_git_pull() -> tuple[bool, str]:
             timeout=60,
         )
 
-        if stash_result.returncode == 0 and "No local changes" not in (stash_result.stdout or ""):
+        # Only pop the stash if something was actually stashed
+        if stash_result.returncode == 0 and "Saved working directory" in (stash_result.stdout or ""):
             subprocess.run(
                 ["git", "stash", "pop"],
                 cwd=str(root),

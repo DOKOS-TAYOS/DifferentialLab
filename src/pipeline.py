@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -33,11 +33,10 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
+from solver.predefined import EquationType
 from utils import ValidationError, get_logger
 
 logger = get_logger(__name__)
-
-EquationType = Literal["ode", "difference", "pde"]
 
 
 def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
@@ -122,6 +121,7 @@ def run_solver_pipeline(
     """
     vars_list = variables if variables else ["x"]
     is_pde = equation_type == "pde" or is_multivariate(vars_list)
+    is_2d_pde = is_pde and len(vars_list) >= 2
     error_metrics: dict[str, float] = {}
     solver_quality: dict[str, Any] = {}
     is_vector = (
@@ -149,7 +149,7 @@ def run_solver_pipeline(
             logger.warning("Validation failed: %s", msg)
             raise ValidationError(msg)
 
-    if is_pde and len(vars_list) >= 2:
+    if is_2d_pde:
         # PDE path: 2D (or more) variables
         if y_min is None or y_max is None:
             logger.warning("PDE validation failed: y_min and y_max required")
@@ -255,7 +255,7 @@ def run_solver_pipeline(
         error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
         solver_quality = _build_solver_quality(solution)
 
-    if is_pde and len(vars_list) >= 2:
+    if is_2d_pde:
         stats = compute_statistics_2d(solution_x, solution_y_grid, solution_y, selected_stats)
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
@@ -287,7 +287,7 @@ def run_solver_pipeline(
         "n_jacobian_evals": solver_quality.get("n_jacobian_evals"),
     }
 
-    if is_pde and len(vars_list) >= 2:
+    if is_2d_pde:
         if plot_3d:
             fig = create_surface_plot(
                 solution_x,
@@ -349,7 +349,7 @@ def run_solver_pipeline(
             )
     logger.info("Pipeline complete for '%s'", equation_name)
 
-    y_grid_result: np.ndarray | None = solution_y_grid if (is_pde and len(vars_list) >= 2) else None
+    y_grid_result: np.ndarray | None = solution_y_grid if is_2d_pde else None
     return SolverResult(
         x=solution_x,
         y=solution_y,

@@ -22,7 +22,7 @@ def _setup_root_logger() -> None:
         return
     _CONFIGURED = True
 
-    from config import DEFAULT_LOG_FILE, DEFAULT_LOG_LEVEL, get_env
+    from config import DEFAULT_LOG_FILE, DEFAULT_LOG_LEVEL, get_env, get_project_root
 
     level_name: str = get_env("LOG_LEVEL", DEFAULT_LOG_LEVEL, str)
     log_file: str = get_env("LOG_FILE", DEFAULT_LOG_FILE, str)
@@ -39,7 +39,7 @@ def _setup_root_logger() -> None:
     )
 
     if log_file:
-        project_root = Path(__file__).resolve().parent.parent.parent
+        project_root = get_project_root()
         fh = logging.FileHandler(project_root / log_file, encoding="utf-8")
         fh.setLevel(level)
         fh.setFormatter(fmt)

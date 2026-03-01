@@ -55,12 +55,10 @@ def parse_scalar_function(
     _test_eval()
 
     def scalar_func(x: np.ndarray) -> np.ndarray:
-        return np.array(
-            [
-                float(eval(compiled, {"__builtins__": {}}, {**namespace, "x": float(xi)}))
-                for xi in np.atleast_1d(x)
-            ],
-            dtype=float,
-        )
+        """Evaluate the compiled expression over a vectorized array."""
+        x_arr = np.asarray(x, dtype=float)
+        ns = {**namespace, "x": x_arr}
+        result = eval(compiled, {"__builtins__": {}}, ns)
+        return np.asarray(result, dtype=float)
 
     return scalar_func

@@ -10,6 +10,32 @@ from utils import get_logger
 
 logger = get_logger(__name__)
 
+# Module-level constants
+_MAX_GRID_POINTS = 1_000_000
+_SUBSCRIPTS = "₀₁₂₃₄₅₆₇₈₉"
+
+
+def _ordinal(n: int) -> str:
+    """Convert an integer to its ordinal string representation.
+
+    Examples:
+        1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "4th", etc.
+    """
+    if n % 100 in (11, 12, 13):
+        suffix = "th"
+    else:
+        remainder = n % 10
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(remainder, "th")
+    return f"{n}{suffix}"
+
+
+def _is_finite(value: float) -> bool:
+    """Return ``True`` if *value* is a finite number (not NaN, not ±inf)."""
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
 
 def _validate_domain(x_min: float, x_max: float) -> list[str]:
     """Validate the integration domain.
@@ -43,7 +69,7 @@ def _validate_initial_conditions(y0: list[float], expected_order: int) -> list[s
     if len(y0) != expected_order:
         errors.append(
             f"Expected {expected_order} initial condition(s) for a "
-            f"{'1st' if expected_order == 1 else f'{expected_order}th'}-order ODE, "
+            f"{_ordinal(expected_order)}-order ODE, "
             f"got {len(y0)}"
         )
     for i, val in enumerate(y0):
@@ -64,8 +90,8 @@ def _validate_grid(num_points: int) -> list[str]:
     errors: list[str] = []
     if num_points < 10:
         errors.append("Number of points must be at least 10")
-    if num_points > 1_000_000:
-        errors.append("Number of points must not exceed 1,000,000")
+    if num_points > _MAX_GRID_POINTS:
+        errors.append(f"Number of points must not exceed {_MAX_GRID_POINTS:,}")
     return errors
 
 
@@ -114,10 +140,9 @@ def _validate_ic_points(
     Returns:
         List of error messages (empty if valid).
     """
-    subscripts = "₀₁₂₃₄₅₆₇₈₉"
     errors: list[str] = []
     for i, xi in enumerate(x0_list):
-        sub = subscripts[i] if i < len(subscripts) else str(i)
+        sub = _SUBSCRIPTS[i] if i < len(_SUBSCRIPTS) else str(i)
         if not _is_finite(xi):
             errors.append(f"x{sub} = {xi} is not a finite number")
         elif not (x_min <= xi <= x_max):
@@ -188,8 +213,8 @@ def validate_all_inputs(
         n_points = n_max - n_min + 1
         if n_points < 2:
             errors.append("Difference equation needs at least 2 points (n_max > n_min)")
-        if n_points > 1_000_000:
-            errors.append("Number of points must not exceed 1,000,000")
+        if n_points > _MAX_GRID_POINTS:
+            errors.append(f"Number of points must not exceed {_MAX_GRID_POINTS:,}")
     else:
         errors.extend(_validate_grid(num_points))
         errors.extend(_validate_method(method))
@@ -201,11 +226,3 @@ def validate_all_inputs(
     if errors:
         logger.warning("Validation errors: %s", errors)
     return errors
-
-
-def _is_finite(value: float) -> bool:
-    """Return ``True`` if *value* is a finite number (not NaN, not ±inf)."""
-    try:
-        return math.isfinite(float(value))
-    except (TypeError, ValueError):
-        return False

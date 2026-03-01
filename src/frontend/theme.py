@@ -56,7 +56,7 @@ def _color_to_rgb(color: str) -> tuple[int, int, int] | None:
         r, g, b = tmp.winfo_rgb(color)
         tmp.destroy()
         return (r // 256, g // 256, b // 256)
-    except (tk.TclError, Exception):
+    except Exception:
         pass
 
     # Fallback: matplotlib (handles many color names)

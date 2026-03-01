@@ -369,8 +369,7 @@ def _validate_env_value(
             str_value = str(value).strip()
         except (AttributeError, TypeError):
             return False, default
-        optional_fields = {"SOLVER_MAX_STEP"}
-        if not str_value and key not in optional_fields:
+        if not str_value:
             return False, default
 
     return True, value
