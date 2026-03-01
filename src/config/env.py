@@ -513,7 +513,7 @@ def initialize_and_validate_config() -> None:
         log = get_logger(__name__)
     except ImportError:
         import logging
-        
+
         log = logging.getLogger("differential_lab.config")
 
     results = _validate_all_env_values()

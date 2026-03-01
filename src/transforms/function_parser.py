@@ -7,8 +7,8 @@ from typing import Any, Callable
 import numpy as np
 
 from utils import (
-    EquationParseError,
     SAFE_MATH,
+    EquationParseError,
     get_logger,
     normalize_unicode_escapes,
     validate_expression_ast,

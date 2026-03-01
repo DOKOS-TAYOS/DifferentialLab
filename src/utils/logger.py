@@ -7,7 +7,6 @@ variables (LOG_LEVEL, LOG_FILE, LOG_CONSOLE).
 
 import logging
 import sys
-from pathlib import Path
 
 _CONFIGURED = False
 

@@ -123,7 +123,6 @@ def create_solution_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
-    import matplotlib.pyplot as plt
     import numpy as np
 
     fig, ax = _new_figure()
@@ -449,6 +448,7 @@ def create_vector_animation_3d(
     """
     import matplotlib.pyplot as plt
     import numpy as np
+
     # Axes3D import is required to enable 3D projection support in matplotlib
     # even though it's not directly referenced. The import registers the '3d' projection.
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401

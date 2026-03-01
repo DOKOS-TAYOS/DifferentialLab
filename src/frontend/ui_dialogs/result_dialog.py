@@ -304,9 +304,10 @@ class ResultDialog:
 
     def _on_save_csv(self) -> None:
         """Save solution data to CSV via file dialog."""
-        export_fn = lambda path: export_csv_to_path(
-            self._x, self._y, path, y_grid=self._y_grid
-        )
+
+        def export_fn(path: str) -> None:
+            export_csv_to_path(self._x, self._y, path, y_grid=self._y_grid)
+
         self._save_export_file(
             export_fn,
             ".csv",
@@ -316,9 +317,10 @@ class ResultDialog:
 
     def _on_save_json(self) -> None:
         """Save metadata and statistics to JSON via file dialog."""
-        export_fn = lambda path: export_json_to_path(
-            self._statistics, self._metadata, path
-        )
+
+        def export_fn(path: str) -> None:
+            export_json_to_path(self._statistics, self._metadata, path)
+
         self._save_export_file(
             export_fn,
             ".json",

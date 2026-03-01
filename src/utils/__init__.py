@@ -6,7 +6,6 @@ from utils.exceptions import (
     SolverFailedError,
     ValidationError,
 )
-from utils.logger import get_logger
 from utils.export import (
     export_csv_to_path,
     export_json_to_path,
@@ -16,6 +15,7 @@ from utils.expression_parser_shared import (
     normalize_unicode_escapes,
     validate_expression_ast,
 )
+from utils.logger import get_logger
 from utils.update_checker import (
     is_update_available,
     perform_git_pull,
