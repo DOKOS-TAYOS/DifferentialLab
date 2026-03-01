@@ -12,7 +12,8 @@ from typing import Any
 
 import numpy as np
 
-from utils import EquationParseError, get_logger
+from utils.exceptions import EquationParseError
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
