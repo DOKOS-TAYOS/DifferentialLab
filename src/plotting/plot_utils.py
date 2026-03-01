@@ -18,6 +18,28 @@ logger = get_logger(__name__)
 _MAX_ELEMENTS_PLOT = 50
 
 
+def _get_colors(color_scheme: str, n: int) -> list:
+    """Get a list of n colors from the specified colormap with fallback.
+
+    Args:
+        color_scheme: Matplotlib colormap name (e.g., 'Set1', 'tab10').
+        n: Number of colors to generate.
+
+    Returns:
+        List of matplotlib color objects.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    try:
+        cmap = plt.colormaps.get_cmap(color_scheme)
+        return [cmap(i / max(1, n - 1)) for i in range(n)]
+    except (ValueError, AttributeError):
+        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
+        cmap_fallback = plt.colormaps.get_cmap("Set1")
+        return list(cmap_fallback(np.linspace(0, 1, max(1, n))))
+
+
 def _apply_plot_style() -> None:
     """Configure matplotlib rcParams from environment variables."""
     import matplotlib
@@ -120,14 +142,8 @@ def create_solution_plot(
 
     labels = ["y"] if y_2d.shape[0] == 1 else [f"y[{i}]" for i in range(y_2d.shape[0])]
 
-    try:
-        cmap = plt.colormaps.get_cmap(color_scheme)
-        n_colors = max(1, len(selected_derivatives) - 1)
-        colors = [line_color] + list(cmap(np.linspace(0, 1, n_colors)))
-    except (ValueError, AttributeError):
-        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
-        n_fallback = max(1, len(selected_derivatives) - 1)
-        colors = [line_color] + list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, n_fallback)))
+    n_colors = max(1, len(selected_derivatives) - 1)
+    colors = [line_color] + _get_colors(color_scheme, n_colors)
 
     for plot_idx, deriv_idx in enumerate(selected_derivatives):
         if deriv_idx >= y_2d.shape[0]:
@@ -365,12 +381,7 @@ def create_vector_animation_plot(
     time_index = min(n_points // 2, n_points - 1) if n_points else 0
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
-    try:
-        cmap = plt.colormaps.get_cmap(color_scheme)
-        colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
-    except (ValueError, AttributeError):
-        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
-        colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
+    colors = _get_colors(color_scheme, vector_components)
 
     y_min_global = float(np.min(f_values)) - 0.1
     y_max_global = float(np.max(f_values)) + 0.1
@@ -520,12 +531,7 @@ def export_animation_to_mp4(
     fps = max(1, num_frames / max(0.5, duration_seconds))
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
-    try:
-        cmap = plt.colormaps.get_cmap(color_scheme)
-        colors = [cmap(i / max(1, vector_components - 1)) for i in range(vector_components)]
-    except (ValueError, AttributeError):
-        logger.debug("Colormap '%s' invalid, using Set1 fallback", color_scheme)
-        colors = list(plt.colormaps.get_cmap("Set1")(np.linspace(0, 1, max(1, vector_components))))
+    colors = _get_colors(color_scheme, vector_components)
 
     fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
     y_min = float(np.min(f_values)) - 0.1

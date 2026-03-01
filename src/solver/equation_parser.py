@@ -17,6 +17,79 @@ from utils import (
 logger = get_logger(__name__)
 
 
+def _compile_and_test(
+    expression: str,
+    namespace: dict[str, Any],
+    var_names: str | tuple[str, ...] = ("x", "y"),
+    test_values: dict[str, Any] | None = None,
+) -> Any:
+    """Compile an expression and test it for evaluation errors.
+
+    Args:
+        expression: Python expression string.
+        namespace: Namespace dict (typically {**SAFE_MATH, **params}).
+        var_names: Variable names to include in test eval (single string or tuple).
+        test_values: Override test values for variables (e.g., {"x": 0.0}).
+
+    Returns:
+        Compiled code object.
+
+    Raises:
+        EquationParseError: If compilation or test evaluation fails.
+    """
+    compiled = compile(expression, "<expression>", "eval")
+
+    # Build test namespace
+    test_ns = {**namespace}
+    if isinstance(var_names, str):
+        var_names = (var_names,)
+    for var_name in var_names:
+        if test_values and var_name in test_values:
+            test_ns[var_name] = test_values[var_name]
+        elif var_name == "x":
+            test_ns[var_name] = 0.0
+        elif var_name == "n":
+            test_ns[var_name] = 0
+        elif var_name == "y":
+            test_ns[var_name] = np.zeros(test_values.get("y_size", 1) if test_values else 1)
+
+    try:
+        eval(compiled, {"__builtins__": {}}, test_ns)
+    except Exception as exc:
+        raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
+
+    return compiled
+
+
+def _load_config_function(function_name: str, module_name: str = "config.equations") -> Callable:
+    """Load a callable function from a config module.
+
+    Args:
+        function_name: Name of the function to load.
+        module_name: Full module path (default: "config.equations").
+
+    Returns:
+        The callable function.
+
+    Raises:
+        EquationParseError: If the module cannot be imported or function not found.
+    """
+    try:
+        import importlib
+        module = importlib.import_module(module_name)
+    except ImportError as exc:
+        raise EquationParseError(f"Cannot import {module_name}: {exc}") from exc
+
+    if not hasattr(module, function_name):
+        raise EquationParseError(f"Function '{function_name}' not found in {module_name}")
+
+    func = getattr(module, function_name)
+    if not callable(func):
+        raise EquationParseError(f"'{function_name}' in {module_name} is not callable")
+
+    return func
+
+
 def _parse_expression(
     expression: str,
     order: int,
@@ -50,18 +123,12 @@ def _parse_expression(
 
     namespace: dict[str, Any] = {**SAFE_MATH, **params}
 
-    compiled = compile(expression, "<ode_expression>", "eval")
-
-    def _test_eval() -> None:
-        test_y = np.zeros(order)
-        test_ns = {**namespace, "x": 0.0, "y": test_y}
-        try:
-            eval(compiled, {"__builtins__": {}}, test_ns)
-        except Exception as exc:
-            logger.debug("ODE expression evaluation failed: %s — %s", expression[:80], exc)
-            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
-
-    _test_eval()
+    compiled = _compile_and_test(
+        expression,
+        namespace,
+        var_names=("x", "y"),
+        test_values={"y_size": order},
+    )
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         local_ns = {**namespace, "x": x, "y": y}
@@ -109,17 +176,7 @@ def get_ode_function(
         return _parse_expression(expression, order, params)
 
     assert function_name is not None  # Guaranteed by validation above
-    try:
-        from config import equations as equations_module
-    except ImportError as exc:
-        raise EquationParseError(f"Cannot import config.equations: {exc}") from exc
-
-    if not hasattr(equations_module, function_name):
-        raise EquationParseError(f"Function '{function_name}' not found in config.equations")
-
-    func = getattr(equations_module, function_name)
-    if not callable(func):
-        raise EquationParseError(f"'{function_name}' in config.equations is not callable")
+    func = _load_config_function(function_name, "config.equations")
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         return func(x, y, **params)
@@ -159,17 +216,12 @@ def _parse_difference_expression(
     )
 
     namespace: dict[str, Any] = {**SAFE_MATH, **params}
-    compiled = compile(expression, "<difference_expression>", "eval")
-
-    def _test_eval() -> None:
-        test_y = np.zeros(order)
-        test_ns = {**namespace, "n": 0, "y": test_y}
-        try:
-            eval(compiled, {"__builtins__": {}}, test_ns)
-        except Exception as exc:
-            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
-
-    _test_eval()
+    compiled = _compile_and_test(
+        expression,
+        namespace,
+        var_names=("n", "y"),
+        test_values={"y_size": order},
+    )
 
     def recur_func(n: int, y: np.ndarray) -> float:
         local_ns = {**namespace, "n": n, "y": y}
@@ -328,16 +380,14 @@ def _parse_vector_expression(
 
     state_size = n_components * order
 
-    def _test_eval() -> None:
-        test_y = np.zeros(state_size)
-        test_ns = {**namespace, "x": 0.0, "y": test_y}
-        for i, compiled in enumerate(compiled_list):
-            try:
-                eval(compiled, {"__builtins__": {}}, test_ns)
-            except Exception as exc:
-                raise EquationParseError(f"Expression {i} evaluation failed: {exc}") from exc
-
-    _test_eval()
+    # Test each compiled expression
+    test_y = np.zeros(state_size)
+    test_ns = {**namespace, "x": 0.0, "y": test_y}
+    for i, compiled in enumerate(compiled_list):
+        try:
+            eval(compiled, {"__builtins__": {}}, test_ns)
+        except Exception as exc:
+            raise EquationParseError(f"Expression {i} evaluation failed: {exc}") from exc
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         dydt = np.empty(state_size)
@@ -391,17 +441,7 @@ def get_vector_ode_function(
         return _parse_vector_expression(vector_expressions, order, params)
 
     assert function_name is not None  # Guaranteed by validation above
-    try:
-        from config import equations as equations_module
-    except ImportError as exc:
-        raise EquationParseError(f"Cannot import config.equations: {exc}") from exc
-
-    if not hasattr(equations_module, function_name):
-        raise EquationParseError(f"Function '{function_name}' not found in config.equations")
-
-    func = getattr(equations_module, function_name)
-    if not callable(func):
-        raise EquationParseError(f"'{function_name}' in config.equations is not callable")
+    func = _load_config_function(function_name, "config.equations")
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         return func(x, y, **params)

@@ -109,3 +109,27 @@ def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
     dialog.transient(parent)
     dialog.grab_set()
     dialog.focus_force()
+
+
+def bind_wraplength(
+    frame: tk.Widget,
+    label: tk.Widget,
+    pad: int = 20,
+) -> None:
+    """Bind a label's wraplength to the width of a frame.
+
+    Automatically adjusts the label's wraplength when the frame is resized,
+    ensuring text wraps nicely within the available space.
+
+    Args:
+        frame: The frame whose width determines the label's wraplength.
+        label: The label widget to update.
+        pad: Padding in pixels to subtract from frame width.
+    """
+    def _update(event=None) -> None:
+        w = frame.winfo_width()
+        if w > 100:
+            label.configure(wraplength=w - pad)
+
+    frame.bind("<Configure>", _update)
+    frame.after(100, _update)

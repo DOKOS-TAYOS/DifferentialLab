@@ -9,7 +9,7 @@ from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from solver import load_predefined_equations
 from utils import get_logger
 
@@ -194,13 +194,7 @@ class EquationDialog:
         )
         self.desc_label.pack(anchor=tk.W, fill=tk.BOTH, expand=True)
 
-        def _update_desc_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = desc_frame.winfo_width()
-            if w > 100:
-                self.desc_label.configure(wraplength=max(200, w - 2 * pad))
-
-        desc_frame.bind("<Configure>", _update_desc_wrap)
-        self.win.after(50, _update_desc_wrap)
+        bind_wraplength(desc_frame, self.desc_label, pad=2 * pad)
 
         self._populate_category_list()
 
@@ -231,13 +225,7 @@ class EquationDialog:
         )
         self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
 
-        def _update_custom_hint_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = ci.winfo_width()
-            if w > 100:
-                self.custom_hint_detail.configure(wraplength=max(200, w - 2 * pad))
-
-        ci.bind("<Configure>", _update_custom_hint_wrap)
-        self.win.after(50, _update_custom_hint_wrap)
+        bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
 
         unicode_frame = ttk.LabelFrame(ci, text="Unicode symbols — select and copy", padding=pad)
         unicode_frame.pack(fill=tk.X, pady=(0, pad))
