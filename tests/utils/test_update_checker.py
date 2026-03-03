@@ -54,17 +54,20 @@ class TestShouldRunCheck:
             assert should_run_check() is True
 
     def test_no_file_returns_true(self) -> None:
-        with patch("utils.update_checker.get_env_from_schema") as mock:
-            def env_effect(k: str) -> object:
-                if k == "CHECK_UPDATES":
-                    return "true"
-                if k == "CHECK_UPDATES_FORCE":
-                    return "false"
-                if k == "UPDATE_CHECK_INTERVAL_DAYS":
-                    return 7
-                return None
-            mock.side_effect = env_effect
-        with patch("utils.update_checker._get_last_check_path") as mock_path:
+        def env_effect(k: str) -> object:
+            if k == "CHECK_UPDATES":
+                return "true"
+            if k == "CHECK_UPDATES_FORCE":
+                return "false"
+            if k == "UPDATE_CHECK_INTERVAL_DAYS":
+                return 7
+            return None
+
+        with (
+            patch("utils.update_checker.get_env_from_schema") as mock_env,
+            patch("utils.update_checker._get_last_check_path") as mock_path,
+        ):
+            mock_env.side_effect = env_effect
             mock_path.return_value = Path("/nonexistent/.last_update_check")
             assert should_run_check() is True
 

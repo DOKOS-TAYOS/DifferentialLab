@@ -90,6 +90,8 @@ def test_apply_transform_fourier() -> None:
     assert "ω" in x_label or "F" in y_label
     assert len(x) > 0
     assert len(y) > 0
-    # Peak should be near 3 Hz (or 3/(2π) in angular)
+    # Peak should be near 3 Hz (x contains frequencies in Hz)
     peak_idx = np.argmax(y)
     assert peak_idx >= 0
+    freq_at_peak = float(x[peak_idx])
+    assert 2.0 <= freq_at_peak <= 4.0, f"Peak at {freq_at_peak} Hz, expected ~3 Hz"

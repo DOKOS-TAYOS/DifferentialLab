@@ -50,10 +50,15 @@ def test_run_solver_pipeline_success(
     assert result.y.shape == (2, 100)
     assert "mean" in result.statistics
     assert result.metadata["equation_name"] == "Exponential"
+    # Verify numerical solution: y'=0.5*y, y(0)=1 => y(x)=exp(0.5*x)
+    np.testing.assert_allclose(result.y[0, 0], 1.0)
+    np.testing.assert_allclose(
+        result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5
+    )
 
 
 def test_run_solver_pipeline_validation_error() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as exc_info:
         run_solver_pipeline(
             expression="",
             function_name=None,
@@ -67,6 +72,9 @@ def test_run_solver_pipeline_validation_error() -> None:
             method="RK45",
             selected_stats=set(),
         )
+    msg = str(exc_info.value).lower()
+    assert "empty" in msg, "Expected empty expression error in message"
+    assert "10" in msg or "points" in msg, "Expected num_points error in message"
 
 
 @patch("solver.ode_solver.get_env_from_schema")
