@@ -71,12 +71,12 @@ def test_load_predefined_equations_cached() -> None:
 
 
 def test_load_predefined_equations_missing_file_raises() -> None:
-    with patch("solver.predefined._EQUATIONS_PATH", Path("/nonexistent/equations.yaml")):
-        # Clear cache so load is attempted
-        import solver.predefined as mod
+    import solver.predefined as mod
 
+    with patch("solver.predefined._EQUATIONS_PATH", Path("/nonexistent/equations.yaml")):
         mod._cache = None
         with pytest.raises(FileNotFoundError):
             load_predefined_equations()
-        # Restore cache for other tests (next load will use real path again)
-        mod._cache = None
+    # Restore cache so other tests get the real equations
+    mod._cache = None
+    load_predefined_equations()

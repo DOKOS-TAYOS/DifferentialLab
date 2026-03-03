@@ -26,8 +26,6 @@ def test_solve_ode_success(
     sample_t_eval: np.ndarray,
 ) -> None:
     mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
-    ode_func = _parse_expression("0.5 * y[0]", order=1, parameters={"k": 0.5})
-    # Actually use y0 passed in; expression is k*y[0], so we need param
     ode_func = _parse_expression("k * y[0]", order=1, parameters={"k": 0.5})
 
     result = solve_ode(

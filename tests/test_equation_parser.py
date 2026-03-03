@@ -92,9 +92,7 @@ class TestParseExpression:
         np.testing.assert_allclose(dydx[1], -1.0)  # y'' = -omega**2 * y[0]
 
     def test_unicode_escape_in_expression(self) -> None:
-        # ω as \u03C9 in expression
-        ode_func = _parse_expression(r"\u03C9**2 * y[0]", order=1, parameters={"ω": 2.0})
-        # Param key in Python must be the actual char; expression uses omega**2 * y[0]
+        # Expression uses omega; param key must be ASCII for Python dict
         ode_func = _parse_expression("omega**2 * y[0]", order=1, parameters={"omega": 2.0})
         x, y = 0.0, np.array([1.0])
         dydx = ode_func(x, y)

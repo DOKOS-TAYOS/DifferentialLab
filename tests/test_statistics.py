@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from solver.statistics import compute_statistics
+from solver.statistics import compute_statistics, compute_statistics_2d
 
 
 def test_compute_statistics_mean_rms_std() -> None:
@@ -86,3 +86,33 @@ def test_compute_statistics_1d_y_accepted() -> None:
     stats = compute_statistics(x, y_1d, selected={"mean"})
     assert "mean" in stats
     assert stats["mean"] == pytest.approx(0.0, abs=0.1)
+
+
+def test_compute_statistics_2d_mean_std() -> None:
+    x_grid = np.linspace(0, 1, 11)
+    y_grid = np.linspace(0, 1, 11)
+    u = np.ones((11, 11)) * 5.0
+    stats = compute_statistics_2d(x_grid, y_grid, u, selected={"mean", "std"})
+    assert stats["mean"] == pytest.approx(5.0)
+    assert stats["std"] == pytest.approx(0.0)
+
+
+def test_compute_statistics_2d_max_min() -> None:
+    x_grid = np.array([0.0, 1.0, 2.0])
+    y_grid = np.array([0.0, 1.0])
+    u = np.array([[1.0, 2.0, -1.0], [3.0, 5.0, 0.0]])
+    stats = compute_statistics_2d(x_grid, y_grid, u, selected={"max", "min"})
+    assert stats["max"]["value"] == 5.0
+    assert stats["max"]["x"] == 1.0
+    assert stats["max"]["y"] == 1.0
+    assert stats["min"]["value"] == -1.0
+    assert stats["min"]["x"] == 2.0
+    assert stats["min"]["y"] == 0.0
+
+
+def test_compute_statistics_2d_integral() -> None:
+    x_grid = np.linspace(0, 1, 21)
+    y_grid = np.linspace(0, 1, 21)
+    u = np.ones((21, 21))  # constant 1 over unit square
+    stats = compute_statistics_2d(x_grid, y_grid, u, selected={"integral"})
+    assert stats["integral"] == pytest.approx(1.0, rel=1e-3)
