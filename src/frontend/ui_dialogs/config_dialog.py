@@ -8,6 +8,7 @@ from typing import Any
 
 from config import (
     ENV_SCHEMA,
+    SCHEMA_BY_KEY,
     get_current_env_values,
     get_env_from_schema,
     get_env_path,
@@ -142,8 +143,6 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
 ]
 
-_SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
-
 
 class ConfigDialog:
     """Scrollable form to edit all ``.env`` configuration values.
@@ -257,7 +256,7 @@ class ConfigDialog:
         section.content.configure(padding=(16, 4, 4, 4))
 
         for key in keys:
-            item = _SCHEMA_BY_KEY.get(key)
+            item = SCHEMA_BY_KEY.get(key)
             if item is None:
                 continue
             self._add_field(section.content, item, current)

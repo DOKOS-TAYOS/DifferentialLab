@@ -28,28 +28,6 @@ except ImportError:
 DEFAULT_LOG_LEVEL: str = "INFO"
 DEFAULT_LOG_FILE: str = "differential_lab.log"
 
-_SIZE_FIELDS: frozenset[str] = frozenset(
-    {
-        "UI_PADDING",
-        "UI_BUTTON_WIDTH",
-        "UI_FONT_SIZE",
-        "PLOT_FIGSIZE_WIDTH",
-        "PLOT_FIGSIZE_HEIGHT",
-        "PLOT_MARKER_SIZE",
-        "FONT_AXIS_SIZE",
-        "FONT_TICK_SIZE",
-        "SOLVER_NUM_POINTS",
-        "ANIMATION_MAX_FPS",
-        "UPDATE_CHECK_INTERVAL_DAYS",
-        "PLOT_PHASE_MARKER_SIZE",
-        "PLOT_CONTOUR_LEVELS",
-        "UI_TOOLTIP_DELAY_MS",
-        "UI_TOOLTIP_WRAPLENGTH",
-        "UI_TOOLTIP_PADX",
-        "UI_TOOLTIP_PADY",
-    }
-)
-
 ENV_SCHEMA: list[dict[str, Any]] = [
     # --- ui: general ---
     {
@@ -75,6 +53,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "UI_BUTTON_WIDTH",
         "default": 14,
         "cast_type": int,
+        "min": 1,
         "description": "Width of main-menu buttons in characters.",
     },
     {
@@ -100,6 +79,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "UI_FONT_SIZE",
         "default": 16,
         "cast_type": int,
+        "min": 1,
         "description": "Base font size in points used across the UI.",
     },
     {
@@ -112,30 +92,35 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "UI_PADDING",
         "default": 8,
         "cast_type": int,
+        "min": 1,
         "description": "General padding in pixels between UI elements.",
     },
     {
         "key": "UI_TOOLTIP_DELAY_MS",
         "default": 500,
         "cast_type": int,
+        "min": 1,
         "description": "Delay in milliseconds before showing a tooltip.",
     },
     {
         "key": "UI_TOOLTIP_WRAPLENGTH",
         "default": 350,
         "cast_type": int,
+        "min": 1,
         "description": "Maximum width in pixels before tooltip text wraps.",
     },
     {
         "key": "UI_TOOLTIP_PADX",
         "default": 8,
         "cast_type": int,
+        "min": 1,
         "description": "Horizontal padding inside tooltip.",
     },
     {
         "key": "UI_TOOLTIP_PADY",
         "default": 4,
         "cast_type": int,
+        "min": 1,
         "description": "Vertical padding inside tooltip.",
     },
     # --- plot: size ---
@@ -143,18 +128,22 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "PLOT_FIGSIZE_WIDTH",
         "default": 12,
         "cast_type": int,
+        "min": 1,
         "description": "Width of generated plots in inches.",
     },
     {
         "key": "PLOT_FIGSIZE_HEIGHT",
         "default": 6,
         "cast_type": int,
+        "min": 1,
         "description": "Height of generated plots in inches.",
     },
     {
         "key": "DPI",
         "default": 100,
         "cast_type": int,
+        "min": 50,
+        "max": 1000,
         "description": "Dots per inch for plot rendering (50\u2013\u20091000).",
     },
     {
@@ -180,6 +169,8 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "PLOT_LINE_WIDTH",
         "default": 1.5,
         "cast_type": float,
+        "min": 0.01,
+        "max": 20.0,
         "description": "Thickness of the solution curve line in points.",
     },
     {
@@ -208,6 +199,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "PLOT_MARKER_SIZE",
         "default": 3,
         "cast_type": int,
+        "min": 1,
         "description": "Size of the data-point markers in points.",
     },
     {
@@ -238,6 +230,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "PLOT_PHASE_MARKER_SIZE",
         "default": 8,
         "cast_type": int,
+        "min": 1,
         "description": "Size of start/end markers in phase-space plots.",
     },
     {
@@ -250,6 +243,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "PLOT_CONTOUR_LEVELS",
         "default": 20,
         "cast_type": int,
+        "min": 1,
         "description": "Number of contour levels in 2D contour plots.",
     },
     {
@@ -298,6 +292,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "ANIMATION_MAX_FPS",
         "default": 30,
         "cast_type": int,
+        "min": 1,
         "description": "Maximum frames per second for embedded animation playback.",
     },
     # --- font (plots) ---
@@ -326,6 +321,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "FONT_AXIS_SIZE",
         "default": 16,
         "cast_type": int,
+        "min": 1,
         "description": "Font size in points for axis labels.",
     },
     {
@@ -339,6 +335,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "FONT_TICK_SIZE",
         "default": 12,
         "cast_type": int,
+        "min": 1,
         "description": "Font size in points for tick labels on the axes.",
     },
     # --- solver ---
@@ -364,6 +361,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "SOLVER_NUM_POINTS",
         "default": 1000,
         "cast_type": int,
+        "min": 1,
         "description": "Number of evaluation points in the output grid.",
     },
     # --- logging ---
@@ -397,6 +395,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "key": "UPDATE_CHECK_INTERVAL_DAYS",
         "default": 7,
         "cast_type": int,
+        "min": 1,
         "description": "Days between automatic update checks.",
     },
     {
@@ -414,6 +413,9 @@ ENV_SCHEMA: list[dict[str, Any]] = [
 ]
 
 _ENV_SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
+
+# Cache of validated values, populated at startup. Avoids repeated os.getenv + validation.
+_VALIDATED_CACHE: dict[str, Any] = {}
 
 
 def _validate_env_value(
@@ -463,9 +465,11 @@ def _validate_env_value(
             int_value = int(value)
         except (TypeError, ValueError, OverflowError):
             return False, default
-        if key in _SIZE_FIELDS and int_value <= 0:
+        min_val = schema_item.get("min")
+        max_val = schema_item.get("max")
+        if min_val is not None and int_value < min_val:
             return False, default
-        if key == "DPI" and (int_value < 50 or int_value > 1000):
+        if max_val is not None and int_value > max_val:
             return False, default
 
     elif cast_type is float:
@@ -473,7 +477,11 @@ def _validate_env_value(
             float_value = float(value)
         except (TypeError, ValueError, OverflowError):
             return False, default
-        if key == "PLOT_LINE_WIDTH" and (float_value <= 0 or float_value > 20):
+        min_val = schema_item.get("min")
+        max_val = schema_item.get("max")
+        if min_val is not None and float_value < min_val:
+            return False, default
+        if max_val is not None and float_value > max_val:
             return False, default
 
     elif cast_type is str:
@@ -530,6 +538,8 @@ def get_env(
 def get_env_from_schema(key: str) -> Any:
     """Get environment variable using ``ENV_SCHEMA`` defaults.
 
+    Uses validated cache when available (after startup) for performance.
+
     Args:
         key: Environment variable name (must exist in ``ENV_SCHEMA``).
 
@@ -539,14 +549,18 @@ def get_env_from_schema(key: str) -> Any:
     Raises:
         KeyError: If *key* is not in ``ENV_SCHEMA``.
     """
+    if key in _VALIDATED_CACHE:
+        return _VALIDATED_CACHE[key]
     item = _ENV_SCHEMA_BY_KEY.get(key)
     if item is None:
         raise KeyError(f"Unknown env key: {key}")
-    return get_env(key, item["default"], item["cast_type"])
+    value = get_env(key, item["default"], item["cast_type"])
+    _VALIDATED_CACHE[key] = value
+    return value
 
 
 def _validate_all_env_values() -> dict[str, tuple[Any, bool]]:
-    """Validate all environment values and report corrections.
+    """Validate all environment values, populate cache, and report corrections.
 
     Returns:
         Mapping of key to ``(corrected_value, was_corrected)``.
@@ -557,6 +571,7 @@ def _validate_all_env_values() -> dict[str, tuple[Any, bool]]:
         default = item["default"]
         cast_type = item["cast_type"]
         current = get_env(key, default, cast_type)
+        _VALIDATED_CACHE[key] = current
         original_raw = os.getenv(key)
         was_corrected = False
         if original_raw is not None:
@@ -576,13 +591,12 @@ def _validate_all_env_values() -> dict[str, tuple[Any, bool]]:
 def get_current_env_values() -> dict[str, str]:
     """Collect current environment values as strings for all schema keys.
 
-    Returns:
-        Mapping of key to its string representation.
+    Uses validated cache when populated for performance.
     """
     result: dict[str, str] = {}
     for item in ENV_SCHEMA:
         key = item["key"]
-        val = get_env(key, item["default"], item["cast_type"])
+        val = get_env_from_schema(key)
         if item["cast_type"] is bool:
             result[key] = "true" if val else "false"
         else:

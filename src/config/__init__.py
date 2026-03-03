@@ -8,6 +8,7 @@ from config.constants import (
     SOLVER_METHODS,
     get_default_solver_method,
 )
+from config.env import _ENV_SCHEMA_BY_KEY as SCHEMA_BY_KEY
 from config.env import (
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
@@ -38,6 +39,7 @@ __all__ = [
     "DEFAULT_LOG_FILE",
     "DEFAULT_LOG_LEVEL",
     "ENV_SCHEMA",
+    "SCHEMA_BY_KEY",
     "get_current_env_values",
     "get_env",
     "get_env_from_schema",
