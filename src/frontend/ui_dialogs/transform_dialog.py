@@ -550,21 +550,22 @@ class TransformDialog:
 
 
 _TRANSFORM_HELP_ABOUT = (
-    "Apply mathematical transforms to scalar functions f(x). Enter an expression, "
-    "select a transform (Fourier, Laplace, Taylor, Hilbert, Z-transform), and "
-    "visualize the result. Switch between curve view and coefficients view. "
-    "Export data to CSV or save the plot via the Matplotlib toolbar."
+    "This dialog lets you apply classical mathematical transforms to any scalar "
+    "function f(x). Enter an expression, pick a transform, and instantly "
+    "visualise the result. You can switch between a curve view and a "
+    "coefficients view, and export the data to CSV or save the plot as an image."
 )
 
 _TRANSFORM_HELP_HOW_TO_USE = (
-    "1.  Enter a function in the Function f(x) field (e.g. sin(x), exp(-a*x)).\n"
-    "2.  Optionally add parameters (e.g. a=1.0, omega=2) in the Parameters field.\n"
-    "3.  Set the range (x\u2098\u1d62\u2099, x\u2098\u2090\u2093) for sampling.\n"
-    "4.  Select a transformation from the dropdown menu.\n"
-    "5.  For Taylor: set Order (1–15) and Center.\n"
-    "6.  Select Display: Curve (f vs x) or Coefficients (a\u1d62 vs i).\n"
-    "7.  Click  Apply / Update plot  to compute and display the result.\n"
-    "8.  Export data to CSV or use the Matplotlib toolbar to save the plot."
+    "1.  Type a function in the  f(x)  field (e.g. sin(x), exp(-a*x)).\n"
+    "2.  (Optional) Add parameters in the  Parameters  field, e.g. a=1.0, omega=2.\n"
+    "3.  Set the sampling range with  x\u2098\u1d62\u2099  and  x\u2098\u2090\u2093.\n"
+    "4.  Choose a transformation from the dropdown.\n"
+    "5.  For Taylor: adjust  Order  (1\u201315) and  Centre  as needed.\n"
+    "6.  Pick  Display  mode:  Curve  (function vs domain) or  "
+    "Coefficients  (a\u1d62 vs index).\n"
+    "7.  The plot updates automatically when you change any setting.\n"
+    "8.  Use  Export CSV  or the Matplotlib toolbar (floppy-disk icon) to save."
 )
 
 _TRANSFORM_HELP_INPUT = (

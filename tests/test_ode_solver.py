@@ -11,7 +11,6 @@ from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
 
 # Default env values used when mocking get_env_from_schema
 _SOLVER_ENV = {
-    "SOLVER_DEFAULT_METHOD": "RK45",
     "SOLVER_MAX_STEP": 0.0,
     "SOLVER_RTOL": 1e-8,
     "SOLVER_ATOL": 1e-10,

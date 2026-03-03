@@ -49,6 +49,8 @@ code (`#RRGGBB`).
 
 ## Plot Fonts
 
+Configured directly under Plot Style in the Configuration dialog.
+
 | Variable            | Type | Default     | Description                                  |
 |---------------------|------|-------------|----------------------------------------------|
 | `FONT_FAMILY`       | str  | `serif`     | Font family for matplotlib plots.  Options: `serif`, `sans-serif`, `monospace`, `cursive`, `fantasy`. |
@@ -58,12 +60,24 @@ code (`#RRGGBB`).
 | `FONT_AXIS_STYLE`   | str  | `italic`    | Axis label font style.  Options: `normal`, `italic`, `oblique`. |
 | `FONT_TICK_SIZE`    | int  | `12`        | Tick label font size in points.              |
 
+## Plot Animation
+
+| Variable                  | Type  | Default | Description                                    |
+|---------------------------|-------|---------|------------------------------------------------|
+| `PLOT_ANIMATION_LINE_WIDTH` | float | `2.0`  | Line width for vector animation plot.         |
+| `PLOT_VLINES_LINE_WIDTH`  | float | `1.5`   | Line width for vertical lines in animation.   |
+| `PLOT_VLINES_ALPHA`       | float | `0.6`   | Transparency of vertical lines (0–1).         |
+| `PLOT_ANIMATION_Y_MARGIN` | float | `0.1`   | Margin added to y-axis limits in animation.  |
+| `ANIMATION_MAX_FPS`       | int   | `30`    | Maximum frames per second for animation playback. |
+
 ## Solver Defaults
 
-| Variable                | Type  | Default  | Description                                 |
-|-------------------------|-------|----------|---------------------------------------------|
-| `SOLVER_DEFAULT_METHOD` | str   | `RK45`   | Default integration method.  Options: `RK45`, `RK23`, `DOP853`, `Radau`, `BDF`, `LSODA`. |
-| `SOLVER_MAX_STEP`       | float | `0.0`    | Maximum step size (0 = automatic).           |
+The default integration method is the first in the available list (`RK45`). Use the
+Parameters dialog to select a different method per run.
+
+| Variable            | Type  | Default  | Description                     |
+|---------------------|-------|----------|---------------------------------|
+| `SOLVER_MAX_STEP`   | float | `0.0`    | Maximum step size (0 = automatic). |
 | `SOLVER_RTOL`           | float | `1e-8`   | Relative tolerance.                          |
 | `SOLVER_ATOL`           | float | `1e-10`  | Absolute tolerance.                          |
 | `SOLVER_NUM_POINTS`     | int   | `1000`   | Number of evaluation points in the grid.     |
@@ -79,29 +93,14 @@ code (`#RRGGBB`).
 | `BDF`    | Backward Differentiation Formula -- stiff problems.      |
 | `LSODA`  | Adams/BDF auto-switching -- stiff/non-stiff detection.   |
 
-## File Paths
+## Logging & Update
 
-| Variable          | Type | Default  | Description                              |
-|-------------------|------|----------|------------------------------------------|
-| `FILE_OUTPUT_DIR` | str  | `output` | Directory for CSV, JSON, and plot files. |
-| `FILE_PLOT_FORMAT`| str  | `png`    | Image format: `png`, `jpg`, or `pdf`.    |
-
-## Logging
-
-| Variable      | Type | Default                  | Description                          |
-|---------------|------|--------------------------|--------------------------------------|
-| `LOG_LEVEL`   | str  | `INFO`                   | Verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
-| `LOG_FILE`    | str  | `differential_lab.log`   | Log file name (project root).        |
-| `LOG_CONSOLE` | bool | `false`                  | Also print logs to the terminal.     |
-
-## Update Check
-
-These variables are optional overrides (not in the main schema). Add them to
-`.env` if you need to customize update-check behaviour. They are read via
-`get_env()` with the defaults below.
-
-| Variable           | Type | Default | Description                                      |
-|--------------------|------|---------|--------------------------------------------------|
-| `CHECK_UPDATES`    | bool | `true`  | Check for updates on startup (once per week).   |
-| `CHECK_UPDATES_FORCE` | bool | `false` | Force update check on every startup.         |
-| `UPDATE_CHECK_URL` | str  | *(main branch)* | URL to pyproject.toml for version check. |
+| Variable                   | Type | Default                  | Description                          |
+|----------------------------|------|--------------------------|--------------------------------------|
+| `LOG_LEVEL`                | str  | `INFO`                   | Verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `LOG_FILE`                 | str  | `differential_lab.log`   | Log file name (project root).        |
+| `LOG_CONSOLE`              | bool | `false`                  | Also print logs to the terminal.     |
+| `CHECK_UPDATES`            | bool | `true`                   | Check for updates on startup (once per week). |
+| `UPDATE_CHECK_INTERVAL_DAYS` | int  | `7`                    | Days between automatic update checks. |
+| `CHECK_UPDATES_FORCE`      | bool | `false`                  | Force update check on every startup. |
+| `UPDATE_CHECK_URL`         | str  | *(main branch)*          | URL to pyproject.toml for version check. |

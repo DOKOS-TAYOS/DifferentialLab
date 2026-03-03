@@ -14,6 +14,11 @@ SOLVER_METHODS: Final[tuple[str, ...]] = (
     "LSODA",
 )
 
+def get_default_solver_method() -> str:
+    """Return the default ODE integration method (first in available list)."""
+    return SOLVER_METHODS[0]
+
+
 SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "RK45": "Runge-Kutta 4(5) — general-purpose explicit method",
     "RK23": "Runge-Kutta 2(3) — low-order, faster per step",
@@ -23,7 +28,6 @@ SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "LSODA": "Adams/BDF auto-switching — stiff/non-stiff detection",
 }
 
-PLOT_FORMATS: Final[tuple[str, ...]] = ("png", "jpg", "pdf")
 LINE_STYLES: Final[tuple[str, ...]] = ("-", "--", "-.", ":")
 MARKER_FORMATS: Final[tuple[str, ...]] = ("o", "s", "^", "d", "*")
 FONT_FAMILIES: Final[tuple[str, ...]] = (

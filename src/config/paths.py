@@ -3,9 +3,9 @@
 from datetime import datetime
 from pathlib import Path
 
-from config.env import get_env_from_schema
-
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+_DEFAULT_OUTPUT_DIR: str = "output"
 
 
 def get_project_root() -> Path:
@@ -21,10 +21,9 @@ def get_output_dir() -> Path:
     """Return the absolute output directory, creating it if needed.
 
     Returns:
-        Path to the output directory.
+        Path to the output directory (always ``output/`` from project root).
     """
-    rel: str = get_env_from_schema("FILE_OUTPUT_DIR")
-    out = _PROJECT_ROOT / rel
+    out = _PROJECT_ROOT / _DEFAULT_OUTPUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     return out
 
@@ -40,19 +39,6 @@ def generate_output_basename(prefix: str = "solution") -> str:
     """
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"{prefix}_{stamp}"
-
-
-def get_plot_path(basename: str) -> Path:
-    """Return the full path for a plot file.
-
-    Args:
-        basename: Base filename (without extension).
-
-    Returns:
-        Full path with the configured plot format extension.
-    """
-    fmt: str = get_env_from_schema("FILE_PLOT_FORMAT")
-    return get_output_dir() / f"{basename}.{fmt}"
 
 
 def get_csv_path(basename: str) -> Path:

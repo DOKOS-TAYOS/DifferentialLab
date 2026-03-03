@@ -14,15 +14,11 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from config import get_env, get_env_from_schema, get_project_root
+from config import get_env_from_schema, get_project_root
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Default URL to fetch latest version (pyproject.toml from main repo)
-_DEFAULT_VERSION_URL = (
-    "https://raw.githubusercontent.com/DOKOS-TAYOS/DifferentialLab/main/pyproject.toml"
-)
 _LAST_CHECK_FILE = ".last_update_check"
 _UPDATE_CHECK_TIMEOUT = 10
 
@@ -39,10 +35,10 @@ def should_run_check() -> bool:
     Returns:
         True if enough time has passed since last check, or no previous check.
     """
-    if not get_env("CHECK_UPDATES", True, bool):
+    if not get_env_from_schema("CHECK_UPDATES"):
         return False
 
-    if get_env("CHECK_UPDATES_FORCE", False, bool):
+    if get_env_from_schema("CHECK_UPDATES_FORCE"):
         return True
 
     path = _get_last_check_path()
@@ -94,7 +90,7 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
     Returns:
         Version string (e.g. '0.3.1') or None if fetch failed.
     """
-    url = version_url or get_env("UPDATE_CHECK_URL", _DEFAULT_VERSION_URL, str)
+    url = version_url or get_env_from_schema("UPDATE_CHECK_URL")
 
     try:
         req = Request(url, headers={"User-Agent": "DifferentialLab-UpdateChecker/1.0"})

@@ -28,90 +28,129 @@ logger = get_logger(__name__)
 
 _ABOUT = (
     f"Welcome to {APP_NAME} v{APP_VERSION}!\n\n"
-    f"{APP_NAME} is a graphical tool for solving differential equations "
-    "and recurrence relations numerically. It supports:\n\n"
-    "\u2022 ODEs — scalar ordinary differential equations (any order)\n"
-    "\u2022 Vector ODEs — coupled systems (Lorenz, Lotka-Volterra, etc.)\n"
-    "\u2022 Difference equations — recurrence relations (Fibonacci, logistic map)\n"
-    "\u2022 PDEs — 2D elliptic equations (Poisson, Laplace, general operator-based)\n"
-    "\u2022 Function transforms — Fourier, Laplace, Taylor, Hilbert, Z-transform\n\n"
-    "The application uses SciPy's integration engine (solve_ivp) for ODEs "
-    "and finite-difference methods for PDEs. It enables users to explore "
-    "how systems evolve over time in physics, engineering, and mathematics."
+    f"{APP_NAME} is a graphical tool for solving and visualising differential "
+    "equations, recurrence relations, and mathematical transforms. "
+    "It supports:\n\n"
+    "\u2022 Scalar ODEs — ordinary differential equations of any order\n"
+    "\u2022 Vector ODEs — coupled systems (Lorenz attractor, Lotka-Volterra, "
+    "double pendulum, and more)\n"
+    "\u2022 Difference equations — recurrence relations (Fibonacci, logistic map, ...)\n"
+    "\u2022 PDEs — 2-D elliptic equations solved with finite differences "
+    "(Poisson, Laplace, general operator-based)\n"
+    "\u2022 Function transforms — Fourier (FFT), Laplace, Taylor series, "
+    "Hilbert, and Z-transform\n\n"
+    "Under the hood the application relies on SciPy's solve_ivp integrator "
+    "for ODEs and finite-difference discretisation for PDEs.\n\n"
+    "Tip: hover over any button or field to see a tooltip with a short description."
 )
 
 _HOW_TO_USE = (
-    "Main menu: Solve, Function Transform, Information, Configuration, Quit.\n\n"
-    "Solving an equation:\n"
-    "1.  Click  Solve Differential Equation  in the main menu.\n"
-    "2.  Select a predefined equation (ODE, Vector ODE, Difference, or PDE) "
-    "or switch to the Custom tab and define a custom expression.\n"
-    "3.  Set the domain, initial conditions, evaluation points, solver method "
-    "(ODEs), and which statistics to compute.\n"
-    "4.  Press  Solve  to run the computation.\n"
-    "5.  The results window shows interactive plots (solution, phase space, "
-    "3D trajectory, animation for vector ODEs), statistics, and export buttons.\n\n"
-    "Function transforms:\n"
-    "1.  Click  Function Transform  in the main menu.\n"
-    "2.  Enter a scalar function f(x) and select a transform (Fourier, Laplace, "
-    "Taylor, Hilbert, Z-transform).\n"
-    "3.  View the result and export data to CSV or save the plot as PNG."
+    "The main menu has five buttons: Solve Differential Equation, "
+    "Function Transform, Information, Configuration, and Quit.\n\n"
+    "Solving an equation step by step:\n"
+    "1.  Click  Solve Differential Equation.\n"
+    "2.  Pick a predefined equation from the list, or switch to the  Custom  "
+    "tab and write your own expression.\n"
+    "3.  Choose the equation type: ODE, Vector ODE, Difference, or PDE.\n"
+    "4.  Click  Next  to open the parameters screen.\n"
+    "5.  Set the domain, initial/boundary conditions, evaluation points, "
+    "solver method (for ODEs), and statistics to compute.\n"
+    "6.  Press  Solve  to run the computation.\n"
+    "7.  Explore the results: interactive plots (solution curve, phase space, "
+    "3-D trajectory, animation), computed statistics, and export options "
+    "(CSV, JSON, PNG, MP4).\n\n"
+    "Function transforms step by step:\n"
+    "1.  Click  Function Transform.\n"
+    "2.  Enter a scalar function f(x) — for example sin(x) or exp(-a*x).\n"
+    "3.  (Optional) Define parameters such as a=1.0, omega=2.\n"
+    "4.  Select a transform: Fourier, Laplace, Taylor, Hilbert, or Z-transform.\n"
+    "5.  View the result and export the data to CSV or save the plot."
 )
 
 _CUSTOM_EXPRESSIONS = (
-    "Use Python / NumPy syntax.\n\n"
-    "ODEs: Independent variable  x . State vector  f  notation:\n"
-    "    f[0] = f,  f[1] = f',  f[2] = f'',  ...\n\n"
-    "Vector ODEs: Use  f[i, k]  where i = component, k = derivative:\n"
-    "    f[0,0] = position of component 0, f[0,1] = its velocity, etc.\n\n"
-    "Difference equations: Use  n  for the index, f[0] = f_n, f[1] = f_{n+1}, etc.\n\n"
-    "PDEs: Use  x, y  (and optionally more) as independent variables.\n\n"
-    "Available mathematical functions:\n"
-    "    sin, cos, tan, exp, log, log10, sqrt, abs,\n"
-    "    sinh, cosh, tanh, arcsin, arccos, arctan,\n"
-    "    floor, ceil, sign, heaviside, pi, e\n\n"
-    "Example — damped oscillator (order 2):\n"
+    "Expressions use Python / NumPy syntax. Below is the notation for each "
+    "equation type.\n\n"
+    "Scalar ODE:\n"
+    "    Independent variable: x\n"
+    "    f[0] = f(x),  f[1] = f\u2032(x),  f[2] = f\u2033(x), ...\n"
+    "    Write the highest derivative in terms of the lower ones.\n\n"
+    "Vector ODE:\n"
+    "    f[i, k]  where  i = component index,  k = derivative order.\n"
+    "    f[0,0] = component 0,  f[0,1] = its first derivative, etc.\n\n"
+    "Difference equation:\n"
+    "    Index variable: n\n"
+    "    f[0] = f\u2099,  f[1] = f\u2099\u208A\u2081,  f[2] = f\u2099\u208A\u2082, ...\n"
+    "    Write f\u2099\u208Aorder as an expression of previous terms.\n\n"
+    "PDE (2-D elliptic):\n"
+    "    Spatial variables: x, y.  Select the LHS operator from the dropdown "
+    "and write the RHS expression.\n\n"
+    "Available math functions:\n"
+    "    sin  cos  tan  exp  log  log10  sqrt  abs\n"
+    "    sinh  cosh  tanh  arcsin  arccos  arctan\n"
+    "    floor  ceil  sign  heaviside  pi  e\n\n"
+    "Example — damped harmonic oscillator (ODE, order 2):\n"
     "    Expression:   -2*gamma*f[1] - omega**2*f[0]\n"
-    "    Parameters:   omega, gamma"
+    "    Parameters:   omega, gamma\n"
+    "    Meaning:  f\u2033 = -2\u03b3 f\u2032 - \u03c9\u00b2 f"
 )
 
 _PREDEFINED_EQUATIONS = (
-    "ODE: Simple Harmonic Oscillator, Damped Oscillator, Exponential Growth/Decay, "
-    "Logistic, Van der Pol, Pendulum, RC Circuit, Free Fall with Drag.\n\n"
-    "Vector ODE: Lorenz System, Lotka-Volterra, Duffing, Rigid Body (Euler), Bloch "
-    "Equations, Schrödinger, Coupled Harmonic Oscillators, Double Pendulum, "
-    "Damped Coupled System.\n\n"
-    "Difference: Geometric Growth, Logistic Map, Fibonacci, Second-Order Linear "
-    "Recurrence, Discrete Logistic (Cobweb).\n\n"
-    "PDE: Poisson 2D, Laplace 2D, and general operator-based PDEs with "
-    "configurable derivative terms (f\u2093\u2093, f\u1d67\u1d67, f\u2093\u1d67, etc.)."
+    "The app ships with a library of classic equations ready to explore.\n\n"
+    "ODE (8 equations):\n"
+    "    Simple Harmonic Oscillator \u00b7 Damped Oscillator \u00b7 Exponential "
+    "Growth / Decay \u00b7 Logistic \u00b7 Van der Pol \u00b7 Pendulum \u00b7 "
+    "RC Circuit \u00b7 Free Fall with Drag\n\n"
+    "Vector ODE (9 systems):\n"
+    "    Lorenz System \u00b7 Lotka-Volterra \u00b7 Duffing \u00b7 Rigid Body (Euler) "
+    "\u00b7 Bloch Equations \u00b7 Schr\u00f6dinger \u00b7 Coupled Harmonic "
+    "Oscillators \u00b7 Double Pendulum \u00b7 Damped Coupled System\n\n"
+    "Difference (5 recurrences):\n"
+    "    Geometric Growth \u00b7 Logistic Map \u00b7 Fibonacci \u00b7 "
+    "Second-Order Linear Recurrence \u00b7 Discrete Logistic (Cobweb)\n\n"
+    "PDE (elliptic 2-D):\n"
+    "    Poisson 2-D \u00b7 Laplace 2-D \u00b7 General operator-based PDEs "
+    "with configurable derivative terms (f\u2093\u2093, f\u1d67\u1d67, f\u2093\u1d67, \u2026)"
 )
 
 _OUTPUT_FILES = (
-    "Files are saved on demand from the Results dialog:\n\n"
-    "\u2022 Save CSV... — tabular x, f, f′, f₀, f′₀, ... columns for spreadsheets.\n"
-    "\u2022 Save JSON... — full metadata and all computed statistics.\n"
-    "\u2022 Matplotlib toolbar — save the plot as PNG, JPG, or PDF.\n"
-    "\u2022 MP4 export — for vector ODE animations (via the Animation tab).\n\n"
-    "The output directory (default output/) is configurable in Configuration."
+    "All files are saved on demand from the Results or Transform dialog.\n\n"
+    "\u2022 Save CSV  \u2014  tabular data (x, f, f\u2032, f\u2080, f\u2032\u2080, \u2026) "
+    "ready for spreadsheets or further analysis.\n"
+    "\u2022 Save JSON  \u2014  full metadata, equation definition, and all computed "
+    "statistics in a structured format.\n"
+    "\u2022 Matplotlib toolbar  \u2014  use the floppy-disk icon below any plot to "
+    "save it as PNG, JPG, SVG, or PDF.\n"
+    "\u2022 MP4 animation  \u2014  export a video of the time evolution for vector "
+    "ODE systems (requires ffmpeg in your PATH).\n\n"
+    "The default output directory is  output/  and can be changed in "
+    "Configuration \u2192 File Paths."
 )
 
 _FUNCTION_TRANSFORMS = (
     "Open  Function Transform  from the main menu to apply mathematical "
-    "transforms to scalar functions f(x).\n\n"
-    "Transforms: Original (f(x)), Fourier (FFT), Laplace (real axis), Taylor "
-    "series, Hilbert (discrete), Z-transform (discrete).\n\n"
-    "Display mode: switch between  Curve (f vs x)  and  Coefficients (a\u1d62 vs i) "
-    "for Taylor, Fourier, Laplace, Hilbert, or Z-transform views.\n\n"
-    "Export data to CSV or save the plot as PNG from the transform dialog."
+    "transforms to any scalar function f(x).\n\n"
+    "Available transforms:\n"
+    "\u2022 Original  \u2014  plot f(x) over the chosen range.\n"
+    "\u2022 Fourier (FFT)  \u2014  magnitude spectrum |\u0046(\u03c9)|.\n"
+    "\u2022 Laplace  \u2014  L(s) evaluated along the real axis.\n"
+    "\u2022 Taylor series  \u2014  polynomial expansion around a centre point "
+    "(order 1\u201315).\n"
+    "\u2022 Hilbert  \u2014  discrete Hilbert transform H[f](x).\n"
+    "\u2022 Z-transform  \u2014  magnitude spectrum on the unit circle.\n\n"
+    "Display mode: switch between  Curve  (function vs domain) and  "
+    "Coefficients  (a\u1d62 vs index) to inspect individual terms.\n\n"
+    "Use  Export CSV  or the Matplotlib toolbar to save results."
 )
 
 _CONFIGURATION = (
-    "Almost every visual and numerical aspect of "
-    f"{APP_NAME} can be customised. Open  Configuration  from the main menu or edit the "
-    ".env  file directly.\n\n"
-    "Changes are saved to the  .env  file and the application restarts "
-    "automatically so they take effect immediately."
+    f"Almost every visual and numerical aspect of {APP_NAME} can be customised: "
+    "UI colours and fonts, plot styling (colours, line width, markers, DPI), "
+    "solver defaults (method, tolerances, step size), output paths, and "
+    "logging verbosity.\n\n"
+    "Open  Configuration  from the main menu to edit settings in a graphical "
+    "form, or edit the  .env  file directly with any text editor.\n\n"
+    "After saving, the application restarts automatically so changes take "
+    "effect immediately."
 )
 
 
@@ -129,16 +168,24 @@ def _statistics_text() -> str:
     return "\n".join(lines)
 
 
+_KEYBOARD_SHORTCUTS = (
+    "Navigate the interface with the keyboard as well as the mouse.\n\n"
+    "\u2022 Arrow keys  \u2014  move focus between buttons and fields.\n"
+    "\u2022 Enter / Space  \u2014  activate the focused button.\n"
+    "\u2022 Tab / Shift+Tab  \u2014  cycle through input fields."
+)
+
 _SECTIONS: list[tuple[str, str]] = [
     ("About", _ABOUT),
     ("How to Use", _HOW_TO_USE),
-    ("Function Transforms", _FUNCTION_TRANSFORMS),
     ("Writing Custom Expressions", _CUSTOM_EXPRESSIONS),
     ("Predefined Equations", _PREDEFINED_EQUATIONS),
-    ("Available Statistics", _statistics_text()),
+    ("Function Transforms", _FUNCTION_TRANSFORMS),
     ("Solver Methods", _solver_methods_text()),
+    ("Available Statistics", _statistics_text()),
     ("Output Files", _OUTPUT_FILES),
     ("Configuration", _CONFIGURATION),
+    ("Keyboard Shortcuts", _KEYBOARD_SHORTCUTS),
 ]
 
 
@@ -172,9 +219,9 @@ class HelpDialog:
 
         btn_youtube = ttk.Button(
             btn_frame,
-            text="If you want to support",
+            text="Support us on YouTube",
             command=lambda: webbrowser.open(YOUTUBE_CHANNEL_URL),
-            padding=(14,8)
+            padding=(14, 8),
         )
         btn_youtube.pack(side=tk.LEFT, padx=(0, pad))
 

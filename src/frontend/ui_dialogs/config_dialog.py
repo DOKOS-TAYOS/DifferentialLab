@@ -40,6 +40,16 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
+        "ui_tooltips",
+        "UI Tooltips",
+        [
+            "UI_TOOLTIP_DELAY_MS",
+            "UI_TOOLTIP_WRAPLENGTH",
+            "UI_TOOLTIP_PADX",
+            "UI_TOOLTIP_PADY",
+        ],
+    ),
+    (
         "plot_style",
         "Plot Style",
         [
@@ -51,16 +61,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
             "PLOT_LINE_COLOR",
             "PLOT_LINE_WIDTH",
             "PLOT_LINE_STYLE",
-        ],
-    ),
-    (
-        "plot_markers",
-        "Plot Markers",
-        [
-            "PLOT_MARKER_FORMAT",
-            "PLOT_MARKER_SIZE",
-            "PLOT_MARKER_FACE_COLOR",
-            "PLOT_MARKER_EDGE_COLOR",
+            "PLOT_COLOR_SCHEME",
         ],
     ),
     (
@@ -76,10 +77,50 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
+        "plot_markers",
+        "Plot Markers",
+        [
+            "PLOT_MARKER_FORMAT",
+            "PLOT_MARKER_SIZE",
+            "PLOT_MARKER_FACE_COLOR",
+            "PLOT_MARKER_EDGE_COLOR",
+        ],
+    ),
+    (
+        "plot_phase",
+        "Plot Phase-Space",
+        [
+            "PLOT_PHASE_START_COLOR",
+            "PLOT_PHASE_END_COLOR",
+            "PLOT_PHASE_MARKER_SIZE",
+        ],
+    ),
+    (
+        "plot_surface",
+        "Plot 3D / Contour",
+        [
+            "PLOT_SURFACE_CMAP",
+            "PLOT_CONTOUR_LEVELS",
+            "PLOT_GRID_ALPHA",
+            "PLOT_SURFACE_ALPHA",
+            "PLOT_COLORBAR_SHRINK",
+        ],
+    ),
+    (
+        "plot_animation",
+        "Plot Animation",
+        [
+            "PLOT_ANIMATION_LINE_WIDTH",
+            "PLOT_VLINES_LINE_WIDTH",
+            "PLOT_VLINES_ALPHA",
+            "PLOT_ANIMATION_Y_MARGIN",
+            "ANIMATION_MAX_FPS",
+        ],
+    ),
+    (
         "solver",
         "Solver Defaults",
         [
-            "SOLVER_DEFAULT_METHOD",
             "SOLVER_MAX_STEP",
             "SOLVER_RTOL",
             "SOLVER_ATOL",
@@ -87,20 +128,16 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "files",
-        "File Paths",
-        [
-            "FILE_OUTPUT_DIR",
-            "FILE_PLOT_FORMAT",
-        ],
-    ),
-    (
         "logging",
-        "Logging",
+        "Logging & Update",
         [
             "LOG_LEVEL",
             "LOG_FILE",
             "LOG_CONSOLE",
+            "CHECK_UPDATES",
+            "UPDATE_CHECK_INTERVAL_DAYS",
+            "CHECK_UPDATES_FORCE",
+            "UPDATE_CHECK_URL",
         ],
     ),
 ]

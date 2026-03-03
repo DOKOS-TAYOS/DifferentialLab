@@ -11,11 +11,9 @@ from pipeline import SolverResult, run_solver_pipeline
 from utils import ValidationError
 
 
-@patch("config.paths.get_env_from_schema")
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_success(
     mock_ode_env: object,
-    mock_paths_env: object,
     tmp_path: object,
     sample_expression_order1: str,
     sample_y0_order1: list[float],
@@ -23,18 +21,14 @@ def test_run_solver_pipeline_success(
 ) -> None:
     def env_side_effect(key: str) -> object:
         env = {
-            "SOLVER_DEFAULT_METHOD": "RK45",
             "SOLVER_MAX_STEP": 0.0,
             "SOLVER_RTOL": 1e-8,
             "SOLVER_ATOL": 1e-10,
             "SOLVER_NUM_POINTS": 100,
-            "FILE_OUTPUT_DIR": str(tmp_path),
-            "FILE_PLOT_FORMAT": "png",
         }
         return env.get(key, 100)
 
     mock_ode_env.side_effect = env_side_effect
-    mock_paths_env.side_effect = env_side_effect
 
     result = run_solver_pipeline(
         expression="k * y[0]",
@@ -75,27 +69,21 @@ def test_run_solver_pipeline_validation_error() -> None:
         )
 
 
-@patch("config.paths.get_env_from_schema")
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_multipoint(
     mock_ode_env: object,
-    mock_paths_env: object,
     tmp_path: object,
 ) -> None:
     def env_side_effect(key: str) -> object:
         env = {
-            "SOLVER_DEFAULT_METHOD": "RK45",
             "SOLVER_MAX_STEP": 0.0,
             "SOLVER_RTOL": 1e-8,
             "SOLVER_ATOL": 1e-10,
             "SOLVER_NUM_POINTS": 50,
-            "FILE_OUTPUT_DIR": str(tmp_path),
-            "FILE_PLOT_FORMAT": "png",
         }
         return env.get(key, 50)
 
     mock_ode_env.side_effect = env_side_effect
-    mock_paths_env.side_effect = env_side_effect
 
     # Standard IVP with x0_list all at start
     result = run_solver_pipeline(
@@ -118,20 +106,7 @@ def test_run_solver_pipeline_multipoint(
     np.testing.assert_allclose(result.y[1, 0], 0.0)
 
 
-@patch("config.paths.get_env_from_schema")
-def test_run_solver_pipeline_difference_equation(
-    mock_paths_env: object,
-    tmp_path: object,
-) -> None:
-    def env_side_effect(key: str) -> object:
-        env = {
-            "FILE_OUTPUT_DIR": str(tmp_path),
-            "FILE_PLOT_FORMAT": "png",
-        }
-        return env.get(key, 100)
-
-    mock_paths_env.side_effect = env_side_effect
-
+def test_run_solver_pipeline_difference_equation() -> None:
     result = run_solver_pipeline(
         expression="r * y[0]",
         function_name=None,

@@ -340,8 +340,16 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         foreground=[("readonly", fg)],
     )
 
-    # --- Checkbutton ---
-    style.configure("TCheckbutton", background=bg, foreground=fg, font=font, indicatorcolor=btn_bg)
+    # --- Checkbutton (indicator size matches font for better visibility) ---
+    indicator_size = max(14, font_size)
+    style.configure(
+        "TCheckbutton",
+        background=bg,
+        foreground=fg,
+        font=font,
+        indicatorcolor=btn_bg,
+        indicatorsize=indicator_size,
+    )
     style.map(
         "TCheckbutton",
         background=[("active", bg), ("focus", focus_field_bg)],

@@ -12,8 +12,6 @@ from config.constants import (
     LINE_STYLES,
     LOG_LEVELS,
     MARKER_FORMATS,
-    PLOT_FORMATS,
-    SOLVER_METHODS,
 )
 
 _EnvCastType = Type[Union[str, int, float, bool]]
@@ -296,6 +294,12 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "cast_type": float,
         "description": "Margin added to y-axis limits in animation plots.",
     },
+    {
+        "key": "ANIMATION_MAX_FPS",
+        "default": 30,
+        "cast_type": int,
+        "description": "Maximum frames per second for embedded animation playback.",
+    },
     # --- font (plots) ---
     {
         "key": "FONT_FAMILY",
@@ -339,13 +343,6 @@ ENV_SCHEMA: list[dict[str, Any]] = [
     },
     # --- solver ---
     {
-        "key": "SOLVER_DEFAULT_METHOD",
-        "default": "RK45",
-        "cast_type": str,
-        "options": SOLVER_METHODS,
-        "description": "Default numerical integration method.",
-    },
-    {
         "key": "SOLVER_MAX_STEP",
         "default": 0.0,
         "cast_type": float,
@@ -369,20 +366,6 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "cast_type": int,
         "description": "Number of evaluation points in the output grid.",
     },
-    # --- paths ---
-    {
-        "key": "FILE_OUTPUT_DIR",
-        "default": "output",
-        "cast_type": str,
-        "description": "Directory where CSV, JSON and plot files are saved.",
-    },
-    {
-        "key": "FILE_PLOT_FORMAT",
-        "default": "png",
-        "cast_type": str,
-        "options": PLOT_FORMATS,
-        "description": "Image format for exported plots (png, jpg, pdf).",
-    },
     # --- logging ---
     {
         "key": "LOG_LEVEL",
@@ -403,19 +386,30 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "cast_type": bool,
         "description": "Also print log messages to the terminal console.",
     },
-    # --- animation ---
-    {
-        "key": "ANIMATION_MAX_FPS",
-        "default": 30,
-        "cast_type": int,
-        "description": "Maximum frames per second for embedded animation playback.",
-    },
     # --- update checker ---
+    {
+        "key": "CHECK_UPDATES",
+        "default": True,
+        "cast_type": bool,
+        "description": "Check for updates on startup (once per week).",
+    },
     {
         "key": "UPDATE_CHECK_INTERVAL_DAYS",
         "default": 7,
         "cast_type": int,
         "description": "Days between automatic update checks.",
+    },
+    {
+        "key": "CHECK_UPDATES_FORCE",
+        "default": False,
+        "cast_type": bool,
+        "description": "Force update check on every startup (ignore interval).",
+    },
+    {
+        "key": "UPDATE_CHECK_URL",
+        "default": "https://raw.githubusercontent.com/DOKOS-TAYOS/DifferentialLab/main/pyproject.toml",
+        "cast_type": str,
+        "description": "URL to pyproject.toml for version check.",
     },
 ]
 

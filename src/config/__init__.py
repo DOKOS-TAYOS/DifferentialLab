@@ -6,6 +6,7 @@ from config.constants import (
     AVAILABLE_STATISTICS,
     SOLVER_METHOD_DESCRIPTIONS,
     SOLVER_METHODS,
+    get_default_solver_method,
 )
 from config.env import (
     DEFAULT_LOG_FILE,
@@ -32,6 +33,7 @@ __all__ = [
     "AVAILABLE_STATISTICS",
     "SOLVER_METHODS",
     "SOLVER_METHOD_DESCRIPTIONS",
+    "get_default_solver_method",
     # env
     "DEFAULT_LOG_FILE",
     "DEFAULT_LOG_LEVEL",
