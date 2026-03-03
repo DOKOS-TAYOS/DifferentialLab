@@ -53,8 +53,8 @@ def test_apply_transform_taylor_sin() -> None:
         taylor_center=0.0,
     )
     assert "Taylor" in y_label
-    # Taylor approx should match sin near 0
-    np.testing.assert_allclose(y[:20], np.sin(x[:20]), atol=0.1)
+    # Taylor approx should match sin near 0 (error O(x^5) for order 5)
+    np.testing.assert_allclose(y[:20], np.sin(x[:20]), atol=0.02)
 
 
 def test_get_transform_coefficients_taylor_sin() -> None:

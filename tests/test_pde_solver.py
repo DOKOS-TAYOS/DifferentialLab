@@ -55,9 +55,9 @@ def test_laplace_with_bc_values() -> None:
     np.testing.assert_allclose(result.u[0, :], 0.0)   # Bottom edge
     np.testing.assert_allclose(result.u[0:-1, 0], 0.0)   # Left edge (excl top-left corner)
     np.testing.assert_allclose(result.u[0:-1, -1], 0.0)  # Right edge (excl top-right corner)
-    # Interior should be between 0 and 1
+    # Interior should be between 0 and 1 (maximum principle for Laplace)
     interior = result.u[1:-1, 1:-1]
-    assert np.all(interior >= -0.01) and np.all(interior <= 1.01)
+    assert np.all(interior >= -1e-6) and np.all(interior <= 1.0 + 1e-6)
 
 
 def test_poisson_simple_rhs() -> None:
@@ -78,5 +78,5 @@ def test_poisson_simple_rhs() -> None:
     assert result.success is True
     # Poisson -f_xx - f_yy = 1 with zero BC: solution is positive (dome-shaped)
     interior = result.u[1:-1, 1:-1]
-    assert np.all(interior >= -0.01)
+    assert np.all(interior >= -1e-6)
     assert np.max(interior) > 0.01

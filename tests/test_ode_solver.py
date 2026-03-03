@@ -100,7 +100,7 @@ def test_solve_multipoint_different_points(mock_get_env: object) -> None:
     assert result.success is True
     assert result.y.shape[0] == 2
     np.testing.assert_allclose(result.y[0, 0], 1.0, atol=1e-5)
-    # Solution at pi/2 should be close to 0 (shooting target)
+    # Solution at pi/2 should be close to 0 (shooting target; interpolation at grid)
     idx_mid = np.argmin(np.abs(result.x - np.pi / 2))
     np.testing.assert_allclose(result.y[0, idx_mid], 0.0, atol=0.02)
 

@@ -168,8 +168,8 @@ def test_run_solver_pipeline_vector_ode(mock_ode_env: object) -> None:
     np.testing.assert_allclose(result.y[0, 0], 1.0)
     np.testing.assert_allclose(result.y[1, 0], 0.0)
     # cos(2π) ≈ 1, sin(2π) ≈ 0
-    np.testing.assert_allclose(result.y[0, -1], 1.0, atol=0.1)
-    np.testing.assert_allclose(result.y[1, -1], 0.0, atol=0.1)
+    np.testing.assert_allclose(result.y[0, -1], 1.0, atol=1e-5)
+    np.testing.assert_allclose(result.y[1, -1], 0.0, atol=1e-5)
 
 
 def test_run_solver_pipeline_pde_2d() -> None:
