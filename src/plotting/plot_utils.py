@@ -16,6 +16,7 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _MAX_ELEMENTS_PLOT = 50
+_SUB_DIGS = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
 
 
 def _get_colors(color_scheme: str, n: int) -> list:
@@ -99,6 +100,52 @@ def _finalize_plot(
         ax.grid(True, alpha=grid_alpha)
     if legend:
         ax.legend()
+
+
+def _new_3d_figure() -> tuple[Any, Any]:
+    """Create a configured 3D figure and axes from env settings.
+
+    Returns:
+        Tuple of ``(fig, ax)`` with 3D projection.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    ax = fig.add_subplot(111, projection="3d")
+    return fig, ax
+
+
+def _finalize_3d_plot(
+    ax: Axes,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    zlabel: str,
+    *,
+    legend: bool = False,
+) -> None:
+    """Apply title, axis labels, and optional legend for 3D plots."""
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    ax.set_xlabel(xlabel, fontstyle=axis_style)
+    ax.set_ylabel(ylabel, fontstyle=axis_style)
+    ax.set_zlabel(zlabel, fontstyle=axis_style)
+    if legend:
+        ax.legend()
+
+
+def _component_labels(n: int) -> list[str]:
+    """Generate f₀, f₁, ... labels for component indices."""
+    return [
+        f"f{_SUB_DIGS[i]}" if i < len(_SUB_DIGS) else f"f_{i}"
+        for i in range(n)
+    ]
 
 
 def create_solution_plot(
@@ -265,17 +312,7 @@ def create_phase_3d_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-    _apply_plot_style()
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    dpi: int = get_env_from_schema("DPI")
-
-    fig = plt.figure(figsize=(width, height), dpi=dpi)
-    ax = fig.add_subplot(111, projection="3d")
-
+    fig, ax = _new_3d_figure()
     line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
 
@@ -291,14 +328,7 @@ def create_phase_3d_plot(
         [data_x[-1]], [data_y[-1]], [data_z[-1]], "s",
         color=phase_end_color, markersize=phase_marker_size, label="End",
     )
-
-    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
-        ax.set_title(title)
-    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
-    ax.set_xlabel(xlabel, fontstyle=axis_style)
-    ax.set_ylabel(ylabel, fontstyle=axis_style)
-    ax.set_zlabel(zlabel, fontstyle=axis_style)
-    ax.legend()
+    _finalize_3d_plot(ax, title, xlabel, ylabel, zlabel, legend=True)
     fig.tight_layout()
     return fig
 
@@ -326,18 +356,9 @@ def create_surface_plot(
     Returns:
         A matplotlib :class:`Figure`.
     """
-    import matplotlib.pyplot as plt
     import numpy as np
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
-    _apply_plot_style()
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    dpi: int = get_env_from_schema("DPI")
-
-    fig = plt.figure(figsize=(width, height), dpi=dpi)
-    ax = fig.add_subplot(111, projection="3d")
-
+    fig, ax = _new_3d_figure()
     X, Y = np.meshgrid(x, y)
     if z.shape != X.shape:
         z = np.asarray(z)
@@ -356,14 +377,7 @@ def create_surface_plot(
         edgecolor="none",
     )
     fig.colorbar(surf, ax=ax, shrink=colorbar_shrink)
-
-    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
-        ax.set_title(title)
-    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
-    ax.set_xlabel(xlabel, fontstyle=axis_style)
-    ax.set_ylabel(ylabel, fontstyle=axis_style)
-    ax.set_zlabel(zlabel, fontstyle=axis_style)
-
+    _finalize_3d_plot(ax, title, xlabel, ylabel, zlabel)
     fig.tight_layout()
     return fig
 
@@ -403,16 +417,7 @@ def create_contour_plot(
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     contour = ax.contourf(X, Y, z, levels=contour_levels, cmap=surface_cmap)
     fig.colorbar(contour, ax=ax)
-
-    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
-        ax.set_title(title)
-    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
-    ax.set_xlabel(xlabel, fontstyle=axis_style)
-    ax.set_ylabel(ylabel, fontstyle=axis_style)
-    if get_env_from_schema("PLOT_SHOW_GRID"):
-        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
-        ax.grid(True, alpha=grid_alpha)
-
+    _finalize_plot(ax, title, xlabel, ylabel)
     fig.tight_layout()
     return fig
 
@@ -457,7 +462,8 @@ def create_vector_animation_plot(
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
-    f_values = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
+    row_indices = np.arange(vector_components) * order + deriv_offset
+    f_values = y_2d[row_indices]
     n_points = len(x)
     time_index = 0
 
@@ -474,7 +480,7 @@ def create_vector_animation_plot(
     ax_main.set_ylim(y_min_global, y_max_global)
 
     indices = np.arange(vector_components)
-    vals = np.array([f_values[j][time_index] for j in range(vector_components)])
+    vals = f_values[:, time_index]
     (line_chain,) = ax_main.plot(
         indices,
         vals,
@@ -487,19 +493,18 @@ def create_vector_animation_plot(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
     ax_main.set_xticks(indices)
-    _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
-    ax_main.set_xticklabels([
-        f"f{_sub_digs[i]}" if i < len(_sub_digs) else f"f_{i}"
-        for i in range(vector_components)
-    ])
+    ax_main.set_xticklabels(_component_labels(vector_components))
+    j_vals = indices  # Reuse for segment construction in update
 
     def update(idx: int) -> None:
         i = max(0, min(idx, n_points - 1))
-        new_vals = np.array([f_values[j][i] for j in range(vector_components)])
+        new_vals = f_values[:, i]
         line_chain.set_ydata(new_vals)
-        vlines_coll.set_segments(
-            [np.array([[j, 0], [j, new_vals[j]]]) for j in range(vector_components)]
-        )
+        segments = np.stack([
+            np.column_stack([j_vals, np.zeros(vector_components)]),
+            np.column_stack([j_vals, new_vals]),
+        ], axis=1)
+        vlines_coll.set_segments(segments)
         fig.canvas.draw_idle()
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
@@ -542,39 +547,22 @@ def create_vector_animation_3d(
     Returns:
         A matplotlib Figure with 3D surface.
     """
-    import matplotlib.pyplot as plt
     import numpy as np
 
-    # Axes3D import is required to enable 3D projection support in matplotlib
-    # even though it's not directly referenced. The import registers the '3d' projection.
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-    _apply_plot_style()
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    dpi: int = get_env_from_schema("DPI")
-
-    fig = plt.figure(figsize=(width, height), dpi=dpi)
-    ax = fig.add_subplot(111, projection="3d")
-
+    fig, ax = _new_3d_figure()
     y_2d = np.atleast_2d(y)
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     surface_alpha: float = get_env_from_schema("PLOT_SURFACE_ALPHA")
+    row_indices = np.arange(vector_components) * order + deriv_offset
+    Z_grid = y_2d[row_indices]
     X_grid, I_grid = np.meshgrid(x, np.arange(vector_components))
-    Z_grid = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
     ax.plot_surface(
         X_grid, I_grid, Z_grid, cmap=surface_cmap, alpha=surface_alpha, edgecolor="none"
     )
-
-    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
-        ax.set_title(title)
-    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
-    ax.set_xlabel("x", fontstyle=axis_style)
-    ax.set_ylabel("Component i", fontstyle=axis_style)
-    ax.set_zlabel("f_i(x)", fontstyle=axis_style)
+    _finalize_3d_plot(ax, title, "x", "Component i", "f_i(x)")
     fig.tight_layout()
     return fig
 
@@ -624,7 +612,8 @@ def export_animation_to_mp4(
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
-    f_values = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
+    row_indices = np.arange(vector_components) * order + deriv_offset
+    f_values = y_2d[row_indices]
     n_points = len(x)
 
     frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
@@ -654,7 +643,7 @@ def export_animation_to_mp4(
         ax.grid(True, alpha=grid_alpha)
 
     indices = np.arange(vector_components)
-    vals = np.array([f_values[j][frame_indices[0]] for j in range(vector_components)])
+    vals = f_values[:, frame_indices[0]]
     (line_chain,) = ax.plot(
         indices, vals, "o-",
         color=colors[0], markersize=marker_size, linewidth=anim_line_width,
@@ -663,18 +652,17 @@ def export_animation_to_mp4(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
     ax.set_xticks(indices)
-    _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
-    ax.set_xticklabels([
-        f"f{_sub_digs[i]}" if i < len(_sub_digs) else f"f_{i}"
-        for i in range(vector_components)
-    ])
+    ax.set_xticklabels(_component_labels(vector_components))
+    j_vals = indices
 
     def _frame(idx: int) -> None:
-        new_vals = np.array([f_values[j][idx] for j in range(vector_components)])
+        new_vals = f_values[:, idx]
         line_chain.set_ydata(new_vals)
-        vlines_coll.set_segments(
-            [np.array([[j, 0], [j, new_vals[j]]]) for j in range(vector_components)]
-        )
+        segments = np.stack([
+            np.column_stack([j_vals, np.zeros(vector_components)]),
+            np.column_stack([j_vals, new_vals]),
+        ], axis=1)
+        vlines_coll.set_segments(segments)
 
     anim = FuncAnimation(
         fig,
