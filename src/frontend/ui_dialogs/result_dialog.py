@@ -11,7 +11,7 @@ import numpy as np
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
-from frontend.theme import get_font
+from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -275,11 +275,12 @@ class ResultDialog:
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
         select_bg: str = get_env_from_schema("UI_BUTTON_FG")
+        select_fg: str = get_contrast_foreground(select_bg)
 
         self._sol_listbox = tk.Listbox(
             ctrl, selectmode=tk.EXTENDED, height=min(len(self._sol_labels), 4),
             width=12, bg=btn_bg, fg=fg, selectbackground=select_bg,
-            selectforeground="#000000", exportselection=False,
+            selectforeground=select_fg, exportselection=False,
         )
         for lbl in self._sol_labels:
             self._sol_listbox.insert(tk.END, lbl)
@@ -513,12 +514,13 @@ class ResultDialog:
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
         select_bg: str = get_env_from_schema("UI_BUTTON_FG")
+        select_fg: str = get_contrast_foreground(select_bg)
 
         self._vec_sol_listbox = tk.Listbox(
             ctrl, selectmode=tk.EXTENDED,
             height=min(len(self._vec_sol_labels), 6), width=12,
             bg=btn_bg, fg=fg, selectbackground=select_bg,
-            selectforeground="#000000", exportselection=False,
+            selectforeground=select_fg, exportselection=False,
         )
         for lbl in self._vec_sol_labels:
             self._vec_sol_listbox.insert(tk.END, lbl)

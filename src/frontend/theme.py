@@ -116,6 +116,27 @@ def _darken_color(color: str, factor: float = 0.25) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+def get_contrast_foreground(bg_color: str) -> str:
+    """Return a foreground color with high contrast against the given background.
+
+    Uses luminance to choose black or white for maximum readability.
+
+    Args:
+        bg_color: Background color (name or hex).
+
+    Returns:
+        Hex color string (#000000 or #ffffff).
+    """
+    rgb = _color_to_rgb(bg_color)
+    if rgb is None:
+        rgb = _color_to_rgb(get_env_from_schema("UI_BACKGROUND"))
+    if rgb is None:
+        return "#ffffff"
+    r, g, b = rgb
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "#000000" if luminance > 128 else "#ffffff"
+
+
 def get_select_colors(
     element_bg: str,
     text_fg: str,

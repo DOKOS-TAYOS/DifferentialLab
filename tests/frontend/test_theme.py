@@ -8,6 +8,7 @@ from frontend.theme import (
     _color_to_rgb,
     _darken_color,
     _lighten_color,
+    get_contrast_foreground,
     get_select_colors,
 )
 
@@ -82,6 +83,18 @@ class TestDarkenColor:
         assert result.startswith("#") and len(result) == 7
         r = int(result[1:3], 16)
         assert r <= 32  # Darkened color should be dark
+
+
+class TestGetContrastForeground:
+    def test_light_bg_returns_black(self) -> None:
+        assert get_contrast_foreground("#ffffff") == "#000000"
+        assert get_contrast_foreground("#cccccc") == "#000000"
+        assert get_contrast_foreground("lime green") == "#000000"
+
+    def test_dark_bg_returns_white(self) -> None:
+        assert get_contrast_foreground("#000000") == "#ffffff"
+        assert get_contrast_foreground("#181818") == "#ffffff"
+        assert get_contrast_foreground("#1e1e1e") == "#ffffff"
 
 
 class TestGetSelectColors:

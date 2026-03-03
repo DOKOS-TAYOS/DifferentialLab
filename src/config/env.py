@@ -45,6 +45,10 @@ _SIZE_FIELDS: frozenset[str] = frozenset(
         "UPDATE_CHECK_INTERVAL_DAYS",
         "PLOT_PHASE_MARKER_SIZE",
         "PLOT_CONTOUR_LEVELS",
+        "UI_TOOLTIP_DELAY_MS",
+        "UI_TOOLTIP_WRAPLENGTH",
+        "UI_TOOLTIP_PADX",
+        "UI_TOOLTIP_PADY",
     }
 )
 
@@ -111,6 +115,30 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "default": 8,
         "cast_type": int,
         "description": "General padding in pixels between UI elements.",
+    },
+    {
+        "key": "UI_TOOLTIP_DELAY_MS",
+        "default": 500,
+        "cast_type": int,
+        "description": "Delay in milliseconds before showing a tooltip.",
+    },
+    {
+        "key": "UI_TOOLTIP_WRAPLENGTH",
+        "default": 350,
+        "cast_type": int,
+        "description": "Maximum width in pixels before tooltip text wraps.",
+    },
+    {
+        "key": "UI_TOOLTIP_PADX",
+        "default": 8,
+        "cast_type": int,
+        "description": "Horizontal padding inside tooltip.",
+    },
+    {
+        "key": "UI_TOOLTIP_PADY",
+        "default": 4,
+        "cast_type": int,
+        "description": "Vertical padding inside tooltip.",
     },
     # --- plot: size ---
     {
@@ -225,6 +253,48 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "default": 20,
         "cast_type": int,
         "description": "Number of contour levels in 2D contour plots.",
+    },
+    {
+        "key": "PLOT_GRID_ALPHA",
+        "default": 0.3,
+        "cast_type": float,
+        "description": "Transparency of the grid lines (0\u20131).",
+    },
+    {
+        "key": "PLOT_SURFACE_ALPHA",
+        "default": 0.9,
+        "cast_type": float,
+        "description": "Transparency of 3D surfaces (0\u20131).",
+    },
+    {
+        "key": "PLOT_COLORBAR_SHRINK",
+        "default": 0.6,
+        "cast_type": float,
+        "description": "Shrink factor for the colorbar (0\u20131).",
+    },
+    {
+        "key": "PLOT_ANIMATION_LINE_WIDTH",
+        "default": 2.0,
+        "cast_type": float,
+        "description": "Line width for vector animation plot.",
+    },
+    {
+        "key": "PLOT_VLINES_LINE_WIDTH",
+        "default": 1.5,
+        "cast_type": float,
+        "description": "Line width for vertical lines in animation.",
+    },
+    {
+        "key": "PLOT_VLINES_ALPHA",
+        "default": 0.6,
+        "cast_type": float,
+        "description": "Transparency of vertical lines in animation (0\u20131).",
+    },
+    {
+        "key": "PLOT_ANIMATION_Y_MARGIN",
+        "default": 0.1,
+        "cast_type": float,
+        "description": "Margin added to y-axis limits in animation plots.",
     },
     # --- font (plots) ---
     {

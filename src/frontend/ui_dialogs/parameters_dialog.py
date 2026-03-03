@@ -14,7 +14,7 @@ from config import (
     SOLVER_METHODS,
     get_env_from_schema,
 )
-from frontend.theme import get_font
+from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -387,7 +387,7 @@ class ParametersDialog:
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
         stats_select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-        stats_select_fg: str = "#000000"
+        stats_select_fg: str = get_contrast_foreground(stats_select_bg)
         stats_scrollbar = ttk.Scrollbar(stats_list_frame, orient=tk.VERTICAL)
         self._stats_listbox = tk.Listbox(
             stats_list_frame,
@@ -682,9 +682,15 @@ class ParametersDialog:
         loading = LoadingDialog(self.parent, message="Solving...")
         self.win.destroy()
 
+        # Keep ParametersDialog alive until _check_result runs on the main thread.
+        # Otherwise GC may collect it from the worker thread when the solver finishes,
+        # causing "RuntimeError: main thread is not in main loop" in Variable.__del__.
+        dialog_ref = self
+
         threading.Thread(target=_run_solver, daemon=True).start()
 
         def _check_result() -> None:
+            _ = dialog_ref  # Closure keeps dialog_ref alive until this callback runs
             try:
                 status, data = result_queue.get_nowait()
                 try:

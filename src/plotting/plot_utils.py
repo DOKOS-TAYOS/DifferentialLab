@@ -95,7 +95,8 @@ def _finalize_plot(
     ax.set_xlabel(xlabel, fontstyle=axis_style)
     ax.set_ylabel(ylabel, fontstyle=axis_style)
     if get_env_from_schema("PLOT_SHOW_GRID"):
-        ax.grid(True, alpha=0.3)
+        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
+        ax.grid(True, alpha=grid_alpha)
     if legend:
         ax.legend()
 
@@ -344,15 +345,17 @@ def create_surface_plot(
             raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
+    surface_alpha: float = get_env_from_schema("PLOT_SURFACE_ALPHA")
+    colorbar_shrink: float = get_env_from_schema("PLOT_COLORBAR_SHRINK")
     surf = ax.plot_surface(
         X,
         Y,
         z,
         cmap=surface_cmap,
-        alpha=0.9,
+        alpha=surface_alpha,
         edgecolor="none",
     )
-    fig.colorbar(surf, ax=ax, shrink=0.6)
+    fig.colorbar(surf, ax=ax, shrink=colorbar_shrink)
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
         ax.set_title(title)
@@ -407,7 +410,8 @@ def create_contour_plot(
     ax.set_xlabel(xlabel, fontstyle=axis_style)
     ax.set_ylabel(ylabel, fontstyle=axis_style)
     if get_env_from_schema("PLOT_SHOW_GRID"):
-        ax.grid(True, alpha=0.3)
+        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
+        ax.grid(True, alpha=grid_alpha)
 
     fig.tight_layout()
     return fig
@@ -459,9 +463,14 @@ def create_vector_animation_plot(
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
     colors = _get_colors(color_scheme, vector_components)
+    marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
+    anim_line_width: float = get_env_from_schema("PLOT_ANIMATION_LINE_WIDTH")
+    vlines_line_width: float = get_env_from_schema("PLOT_VLINES_LINE_WIDTH")
+    vlines_alpha: float = get_env_from_schema("PLOT_VLINES_ALPHA")
+    y_margin: float = get_env_from_schema("PLOT_ANIMATION_Y_MARGIN")
 
-    y_min_global = float(np.min(f_values)) - 0.1
-    y_max_global = float(np.max(f_values)) + 0.1
+    y_min_global = float(np.min(f_values)) - y_margin
+    y_max_global = float(np.max(f_values)) + y_margin
     ax_main.set_ylim(y_min_global, y_max_global)
 
     indices = np.arange(vector_components)
@@ -471,10 +480,12 @@ def create_vector_animation_plot(
         vals,
         "o-",
         color=colors[0],
-        markersize=8,
-        linewidth=2,
+        markersize=marker_size,
+        linewidth=anim_line_width,
     )
-    vlines_coll = ax_main.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
+    vlines_coll = ax_main.vlines(
+        indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
+    )
     ax_main.set_xticks(indices)
     _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
     ax_main.set_xticklabels([
@@ -497,7 +508,8 @@ def create_vector_animation_plot(
     ax_main.set_xlabel("Component index i", fontstyle=axis_style)
     ax_main.set_ylabel("f_i(x)", fontstyle=axis_style)
     if get_env_from_schema("PLOT_SHOW_GRID"):
-        ax_main.grid(True, alpha=0.3)
+        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
+        ax_main.grid(True, alpha=grid_alpha)
     fig.subplots_adjust(bottom=0.12, left=0.12, right=0.95, top=0.92)
 
     fig._animation_update = update
@@ -550,9 +562,12 @@ def create_vector_animation_3d(
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
+    surface_alpha: float = get_env_from_schema("PLOT_SURFACE_ALPHA")
     X_grid, I_grid = np.meshgrid(x, np.arange(vector_components))
     Z_grid = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
-    ax.plot_surface(X_grid, I_grid, Z_grid, cmap=surface_cmap, alpha=0.9, edgecolor="none")
+    ax.plot_surface(
+        X_grid, I_grid, Z_grid, cmap=surface_cmap, alpha=surface_alpha, edgecolor="none"
+    )
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
         ax.set_title(title)
@@ -618,22 +633,35 @@ def export_animation_to_mp4(
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
     colors = _get_colors(color_scheme, vector_components)
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
+    anim_line_width: float = get_env_from_schema("PLOT_ANIMATION_LINE_WIDTH")
+    vlines_line_width: float = get_env_from_schema("PLOT_VLINES_LINE_WIDTH")
+    vlines_alpha: float = get_env_from_schema("PLOT_VLINES_ALPHA")
+    y_margin: float = get_env_from_schema("PLOT_ANIMATION_Y_MARGIN")
 
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
-    y_min = float(np.min(f_values)) - 0.1
-    y_max = float(np.max(f_values)) + 0.1
+    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi)
+    y_min = float(np.min(f_values)) - y_margin
+    y_max = float(np.max(f_values)) + y_margin
     ax.set_ylim(y_min, y_max)
     ax.set_xlabel("Component index i")
     ax.set_ylabel("f_i(x)")
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
         ax.set_title(title)
     if get_env_from_schema("PLOT_SHOW_GRID"):
-        ax.grid(True, alpha=0.3)
+        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
+        ax.grid(True, alpha=grid_alpha)
 
     indices = np.arange(vector_components)
     vals = np.array([f_values[j][frame_indices[0]] for j in range(vector_components)])
-    (line_chain,) = ax.plot(indices, vals, "o-", color=colors[0], markersize=8, linewidth=2)
-    vlines_coll = ax.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
+    (line_chain,) = ax.plot(
+        indices, vals, "o-",
+        color=colors[0], markersize=marker_size, linewidth=anim_line_width,
+    )
+    vlines_coll = ax.vlines(
+        indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
+    )
     ax.set_xticks(indices)
     _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
     ax.set_xticklabels([

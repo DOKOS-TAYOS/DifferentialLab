@@ -17,10 +17,15 @@ class ToolTip:
         delay: Delay in milliseconds before showing.
     """
 
-    def __init__(self, widget: tk.Widget, text: str, delay: int = 500) -> None:
+    def __init__(
+        self,
+        widget: tk.Widget,
+        text: str,
+        delay: int | None = None,
+    ) -> None:
         self.widget = widget
         self.text = text
-        self.delay = delay
+        self.delay = int(get_env_from_schema("UI_TOOLTIP_DELAY_MS")) if delay is None else delay
         self._tipwindow: tk.Toplevel | None = None
         self._id_after: str | None = None
         widget.bind("<Enter>", self._on_enter)
@@ -48,6 +53,9 @@ class ToolTip:
         tw.wm_geometry(f"+{x}+{y}")
         tooltip_bg: str = get_env_from_schema("UI_BUTTON_BG")
         tooltip_fg: str = get_env_from_schema("UI_FOREGROUND")
+        wraplength: int = get_env_from_schema("UI_TOOLTIP_WRAPLENGTH")
+        padx: int = get_env_from_schema("UI_TOOLTIP_PADX")
+        pady: int = get_env_from_schema("UI_TOOLTIP_PADY")
         label = tk.Label(
             tw,
             text=self.text,
@@ -56,10 +64,10 @@ class ToolTip:
             foreground=tooltip_fg,
             relief=tk.SOLID,
             borderwidth=1,
-            padx=8,
-            pady=4,
+            padx=padx,
+            pady=pady,
             font=get_font(),
-            wraplength=350,
+            wraplength=wraplength,
         )
         label.pack()
         self._tipwindow = tw
