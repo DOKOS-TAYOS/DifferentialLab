@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from solver.difference_solver import DifferenceSolution, solve_difference
+from solver.difference_solver import solve_difference
 
 
 def test_geometric_growth() -> None:
