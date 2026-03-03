@@ -447,6 +447,10 @@ def get_vector_ode_function(
 
     Returns:
         A callable f(x, y) that returns dy/dx.
+
+    Raises:
+        ValueError: If both or neither of vector_expressions and function_name provided.
+        EquationParseError: If expressions are invalid or function not found.
     """
     params = dict(parameters) if parameters else {}
     if vector_expressions and function_name:

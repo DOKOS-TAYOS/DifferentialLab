@@ -193,6 +193,9 @@ def apply_transform(
 
     Returns:
         Tuple of (x_axis, y_values, x_label, y_label).
+
+    Raises:
+        ValueError: If *kind* is not a known transform type.
     """
     if kind == TransformKind.ORIGINAL:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
@@ -279,6 +282,9 @@ def get_transform_coefficients(
 
     Returns:
         Tuple of (indices_i, coefficients_a_i, x_label, y_label).
+
+    Raises:
+        ValueError: If *kind* is not a known transform type.
     """
     if kind == TransformKind.ORIGINAL:
         x, y = compute_function_samples(func, x_min, x_max, min(n_points, 200))

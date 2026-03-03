@@ -32,7 +32,11 @@ class FNotation:
     component_orders: tuple[int, ...] = ()
 
     def state_size(self) -> int:
-        """Total number of entries in the flat state vector."""
+        """Total number of entries in the flat state vector.
+
+        Returns:
+            Number of entries in the flat ``y`` array.
+        """
         if self.component_orders:
             return sum(self.component_orders)
         return self.n_components * self.order

@@ -46,7 +46,20 @@ def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
 
 @dataclass
 class SolverResult:
-    """Data-only bundle produced by a solver run (no pre-generated plots)."""
+    """Data-only bundle produced by a solver run (no pre-generated plots).
+
+    Attributes:
+        x: Independent variable values (1D) or x grid for 2D PDE.
+        y: Solution array — shape ``(n_vars, n_points)`` or ``(ny, nx)`` for 2D.
+        statistics: Computed statistics dict.
+        metadata: Equation info, solver parameters, domain, etc.
+        equation_type: ``"ode"``, ``"difference"``, ``"pde"``, or ``"vector_ode"``.
+        y_grid: For 2D PDE, the y-axis grid. ``None`` otherwise.
+        is_vector: Whether the equation is a vector ODE.
+        vector_components: Number of components for vector ODE.
+        vector_order: Display order (derivatives per component).
+        notation: F-notation context for labels.
+    """
 
     x: np.ndarray
     y: np.ndarray
@@ -103,6 +116,18 @@ def run_solver_pipeline(
         selected_stats: Set of statistic keys to compute.
         x0_list: Per-derivative condition points ``[x₀, x₁, …]``.
             If ``None`` or all equal to ``x_min``, uses standard IVP.
+        equation_type: ``"ode"``, ``"difference"``, ``"pde"``, or ``"vector_ode"``.
+        variables: Independent variable names (e.g. ``["x"]`` or ``["x", "y"]``).
+        y_min: For 2D PDE, domain y start.
+        y_max: For 2D PDE, domain y end.
+        n_points_y: For 2D PDE, number of y grid points.
+        vector_expressions: For vector ODE, list of expressions per component.
+        vector_components: Number of components for vector ODE.
+        pde_operator: PDE operator type (e.g. ``"neg_laplacian"``).
+        component_orders: For vector ODE, order per component (optional).
+
+    Returns:
+        A :class:`SolverResult` with solution data, statistics, and metadata.
 
     Raises:
         ValidationError: If inputs fail validation.

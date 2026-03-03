@@ -12,7 +12,17 @@ import numpy as np
 
 
 def harmonic_oscillator(x: float, y: np.ndarray, omega: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y'' + ω²y = 0 — Simple harmonic oscillator."""
+    """y'' + ω²y = 0 — Simple harmonic oscillator.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        omega: Angular frequency.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(omega**2) * y[0]
@@ -22,7 +32,18 @@ def harmonic_oscillator(x: float, y: np.ndarray, omega: float = 1.0, **kwargs: A
 def damped_oscillator(
     x: float, y: np.ndarray, omega: float = 1.0, gamma: float = 0.1, **kwargs: Any
 ) -> np.ndarray:
-    """y'' + 2γy' + ω²y = 0 — Damped oscillator."""
+    """y'' + 2γy' + ω²y = 0 — Damped oscillator.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        omega: Angular frequency.
+        gamma: Damping coefficient.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -2 * gamma * y[1] - omega**2 * y[0]
@@ -30,7 +51,17 @@ def damped_oscillator(
 
 
 def exponential_growth(x: float, y: np.ndarray, k: float = 0.5, **kwargs: Any) -> np.ndarray:
-    """y' = ky — Exponential growth or decay."""
+    """y' = ky — Exponential growth or decay.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Growth/decay rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = k * y[0]
     return dydt
@@ -39,14 +70,35 @@ def exponential_growth(x: float, y: np.ndarray, k: float = 0.5, **kwargs: Any) -
 def logistic_equation(
     x: float, y: np.ndarray, r: float = 1.0, K: float = 10.0, **kwargs: Any
 ) -> np.ndarray:
-    """y' = ry(1 - y/K) — Logistic population growth."""
+    """y' = ry(1 - y/K) — Logistic population growth.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        r: Growth rate.
+        K: Carrying capacity.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = r * y[0] * (1 - y[0] / K)
     return dydt
 
 
 def van_der_pol(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y'' - μ(1 - y²)y' + y = 0 — Van der Pol oscillator."""
+    """y'' - μ(1 - y²)y' + y = 0 — Van der Pol oscillator.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        mu: Nonlinearity parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = mu * (1 - y[0] ** 2) * y[1] - y[0]
@@ -56,7 +108,18 @@ def van_der_pol(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.n
 def simple_pendulum(
     x: float, y: np.ndarray, g: float = -9.81, L: float = 1.0, **kwargs: Any
 ) -> np.ndarray:
-    """y'' + (g/L)sin(y) = 0 — Nonlinear pendulum."""
+    """y'' + (g/L)sin(y) = 0 — Nonlinear pendulum.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[θ, θ']`` (angle, angular velocity).
+        g: Gravitational acceleration.
+        L: Pendulum length.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(g / L) * np.sin(y[0])
@@ -66,7 +129,18 @@ def simple_pendulum(
 def rc_circuit(
     x: float, y: np.ndarray, R: float = 1000.0, C: float = 0.001, **kwargs: Any
 ) -> np.ndarray:
-    """y' = -y/(RC) — RC circuit discharge."""
+    """y' = -y/(RC) — RC circuit discharge.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[V]`` (voltage).
+        R: Resistance.
+        C: Capacitance.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = -y[0] / (R * C)
     return dydt
@@ -75,7 +149,19 @@ def rc_circuit(
 def free_fall_drag(
     x: float, y: np.ndarray, g: float = -9.81, b: float = 0.5, m: float = 1.0, **kwargs: Any
 ) -> np.ndarray:
-    """y'' = g - (b/m)y' — Free fall with linear drag."""
+    """y'' = g - (b/m)y' — Free fall with linear drag.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[y, y']`` (position, velocity).
+        g: Gravitational acceleration.
+        b: Drag coefficient.
+        m: Mass.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = g - (b / m) * y[1]
@@ -108,6 +194,18 @@ def schrodinger_equation(
 
     Uses Hamiltonian H(x) and potential V(x) as functions of time x.
     y = [Re(ψ), Im(ψ)] for a single-component wave function.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[Re(ψ), Im(ψ)]``.
+        a: Hamiltonian scale parameter.
+        b: Potential scale parameter.
+        hamiltonian_function: Custom H(x, a). If None, uses default.
+        potential_function: Custom V(x, b). If None, uses default.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
     """
     H = (_default_hamiltonian if hamiltonian_function is None else hamiltonian_function)(x, a)
     V = (_default_potential if potential_function is None else potential_function)(x, b)
@@ -131,7 +229,19 @@ def lorentz_system(
     beta: float = 8.0 / 3.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Lorenz system: chaotic attractor."""
+    """Lorenz system: chaotic attractor.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        sigma: Prandtl number.
+        rho: Rayleigh number.
+        beta: Geometric factor.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = sigma * (y[1] - y[0])
     dydt[1] = y[0] * (rho - y[2]) - y[1]
@@ -149,7 +259,21 @@ def duffing_oscillator(
     omega: float = 1.2,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Duffing oscillator: y'' + δy' + αy + βy³ = γcos(ωt)."""
+    """Duffing oscillator: y'' + δy' + αy + βy³ = γcos(ωt).
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[y, y']``.
+        delta: Damping.
+        alpha: Linear stiffness.
+        beta: Cubic stiffness.
+        gamma: Forcing amplitude.
+        omega: Forcing frequency.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -delta * y[1] - alpha * y[0] - beta * y[0] ** 3 + gamma * np.cos(omega * x)
@@ -165,7 +289,20 @@ def lotka_volterra(
     delta: float = 0.075,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Lotka-Volterra predator-prey: dx/dt = αx - βxy, dy/dt = δxy - γy."""
+    """Lotka-Volterra predator-prey: dx/dt = αx - βxy, dy/dt = δxy - γy.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[x, y]`` (prey, predator).
+        alpha: Prey growth rate.
+        beta: Predation rate.
+        gamma: Predator death rate.
+        delta: Predator growth from prey.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = alpha * y[0] - beta * y[0] * y[1]
     dydt[1] = delta * y[0] * y[1] - gamma * y[1]
@@ -180,7 +317,19 @@ def rigid_body_euler(
     I3: float = 3.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Euler equations for rigid body: dω/dt = I⁻¹(τ - ω×(Iω)). No torque."""
+    """Euler equations for rigid body: dω/dt = I⁻¹(τ - ω×(Iω)). No torque.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[ω₁, ω₂, ω₃]`` (angular velocities).
+        I1: Principal moment of inertia 1.
+        I2: Principal moment of inertia 2.
+        I3: Principal moment of inertia 3.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     omega1, omega2, omega3 = y[0], y[1], y[2]
     dydt = np.empty(3)
     dydt[0] = ((I2 - I3) / I1) * omega2 * omega3
@@ -200,7 +349,22 @@ def bloch_equations(
     T2: float = 1e6,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Bloch equations for magnetization: dM/dt = γ(M×B) - relaxation."""
+    """Bloch equations for magnetization: dM/dt = γ(M×B) - relaxation.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[Mx, My, Mz]``.
+        gamma: Gyromagnetic ratio.
+        Bx: Magnetic field x-component.
+        By: Magnetic field y-component.
+        Bz: Magnetic field z-component.
+        T1: Longitudinal relaxation time.
+        T2: Transverse relaxation time.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     Mx, My, Mz = y[0], y[1], y[2]
     dydt = np.empty(3)
     dydt[0] = gamma * (My * Bz - Mz * By) - Mx / T2

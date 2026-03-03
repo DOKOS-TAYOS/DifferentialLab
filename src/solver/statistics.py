@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from config.constants import AVAILABLE_STATISTICS
+from config import AVAILABLE_STATISTICS
 from utils import get_logger
 
 logger = get_logger(__name__)

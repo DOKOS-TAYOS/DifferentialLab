@@ -43,11 +43,18 @@ class ScrollableFrame(ttk.Frame):
         self._pending_refresh = False
 
     def apply_bg(self, bg: str) -> None:
-        """Set the canvas background to match the theme."""
+        """Set the canvas background to match the theme.
+
+        Args:
+            bg: Background colour (hex or Tk colour name).
+        """
         self._canvas.configure(bg=bg)
 
     def refresh_scroll_region(self) -> None:
-        """Force-update the scroll region after dynamic content changes."""
+        """Force-update the scroll region after dynamic content changes.
+
+        Call after adding or removing widgets in ``self.inner``.
+        """
         self._canvas.update_idletasks()
         bbox = self._canvas.bbox("all")
         if bbox:

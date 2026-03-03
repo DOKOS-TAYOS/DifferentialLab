@@ -14,7 +14,17 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Lazy-load heavy dialog modules on first access to speed up startup."""
+    """Lazy-load heavy dialog modules on first access to speed up startup.
+
+    Args:
+        name: Attribute name (e.g. ``"ConfigDialog"``, ``"EquationDialog"``).
+
+    Returns:
+        The requested dialog class.
+
+    Raises:
+        AttributeError: If *name* is not a known lazy-loaded attribute.
+    """
     if name == "ConfigDialog":
         from frontend.ui_dialogs.config_dialog import ConfigDialog
         return ConfigDialog

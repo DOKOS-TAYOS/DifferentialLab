@@ -43,7 +43,7 @@ class PredefinedEquation:
         default_domain: Default ``[x_min, x_max]`` for ODE or ``[n_min, n_max]`` for difference.
             For PDE: ``[x_min, x_max, y_min, y_max, ...]`` per variable.
         equation_type: ``"ode"`` (differential), ``"difference"``, ``"pde"``, or ``"vector_ode"``.
-        category: Display category (e.g. ``"Osciladores"``, ``"Poblacionales"``) for UI grouping.
+        category: Display category (e.g. ``"Oscillators"``, ``"Population"``) for UI grouping.
         variables: Independent variable names, e.g. ``["x"]`` for 1D, ``["x","y"]`` for 2D.
             If absent or ``["x"]``, treated as 1D ODE.
         partial_derivatives: For PDEs, maps derivative keys (e.g. ``"f_xx"``, ``"f_xy"``)
