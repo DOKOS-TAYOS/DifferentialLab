@@ -311,7 +311,7 @@ class ParametersDialog:
                 n_ic = self.order * self.vector_components
             else:
                 n_ic = self.order
-            ic_label_width = max(len(l) for l in ic_labels) + 1
+            ic_label_width = max(len(label) for label in ic_labels) + 1
             x0_label_width = (
                 max(
                     len(f"x{_subscripts[i] if i < len(_subscripts) else str(i)} =")

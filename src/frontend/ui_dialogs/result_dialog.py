@@ -356,6 +356,7 @@ class ResultDialog:
         if nothing could be computed.
         """
         from scipy.interpolate import interp1d
+
         from transforms import apply_transform
 
         x_min_t, x_max_t = float(x[0]), float(x[-1])
@@ -688,7 +689,7 @@ class ResultDialog:
     def _update_vec_solution_plot(self) -> None:
         """Regenerate vector ODE solution plot."""
         from plotting import create_solution_plot
-        from transforms import TransformKind, apply_transform
+        from transforms import TransformKind
 
         r = self._result
         selected = list(self._vec_sol_listbox.curselection())
@@ -875,7 +876,9 @@ class ResultDialog:
 
         xlabel, ylabel = self._pde_axis_labels()
 
-        ttk.Label(trans_ctrl, text="Slice along:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(
+            trans_ctrl, text="Slice along:", style="Small.TLabel"
+        ).pack(side=tk.LEFT, padx=(0, 4))
         self._pde_slice_var = tk.StringVar(value=xlabel)
         ttk.Combobox(
             trans_ctrl, textvariable=self._pde_slice_var,
@@ -884,10 +887,15 @@ class ResultDialog:
         ).pack(side=tk.LEFT, padx=(0, 2))
 
         r = self._result
-        x_mid = float((r.x[0] + r.x[-1]) / 2) if len(r.x) > 0 else 0.5
-        y_mid = float((r.y_grid[0] + r.y_grid[-1]) / 2) if r.y_grid is not None and len(r.y_grid) > 0 else 0.5
+        y_mid = (
+            float((r.y_grid[0] + r.y_grid[-1]) / 2)
+            if r.y_grid is not None and len(r.y_grid) > 0
+            else 0.5
+        )
 
-        ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(
+            trans_ctrl, text="at fixed value:", style="Small.TLabel"
+        ).pack(side=tk.LEFT, padx=(0, 4))
         self._pde_slice_val_var = tk.StringVar(value=str(round(y_mid, 4)))
         ttk.Entry(
             trans_ctrl, textvariable=self._pde_slice_val_var, width=4,
