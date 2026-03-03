@@ -336,7 +336,9 @@ class EquationDialog:
         bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
 
         # -- Unicode reference --
-        unicode_frame = ttk.LabelFrame(ci, text="Unicode symbols — copy and paste directly", padding=pad)
+        unicode_frame = ttk.LabelFrame(
+            ci, text="Unicode symbols — copy and paste directly", padding=pad
+        )
         unicode_frame.pack(fill=tk.X, pady=(0, pad))
         _unicode_hint = (
             "\u03b1 \u03b2 \u03b3 \u03b4 \u03b5 \u03b6 \u03b7"
@@ -504,7 +506,10 @@ class EquationDialog:
                     prime = _primes_bulk[order_val]
                     return f"Expression for f{prime}\u1d62(x) = (component i, use i as variable):"
                 sup = "".join(_superscript_bulk[int(d)] for d in str(order_val))
-                return f"Expression for f\u207d{sup}\u207e\u1d62(x) = (component i, use i as variable):"
+                return (
+                    f"Expression for f\u207d{sup}\u207e\u1d62(x) = "
+                    "(component i, use i as variable):"
+                )
 
             bulk_top = ttk.Frame(self._vec_content_frame)
             bulk_top.pack(fill=tk.X, pady=(0, pad))

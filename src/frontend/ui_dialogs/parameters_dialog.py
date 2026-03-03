@@ -159,8 +159,13 @@ class ParametersDialog:
         domain_frame = ttk.LabelFrame(left_col, text=domain_label, padding=pad)
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
-        x_min_label = "n\u2098\u1d62\u2099:" if self.equation_type == "difference" else "x\u2098\u1d62\u2099:"  # n_min, x_min
-        x_max_label = "n\u2098\u2090\u2093:" if self.equation_type == "difference" else "x\u2098\u2090\u2093:"  # n_max, x_max
+        # n_min/x_min, n_max/x_max
+        x_min_label = (
+            "n\u2098\u1d62\u2099:" if self.equation_type == "difference" else "x\u2098\u1d62\u2099:"
+        )
+        x_max_label = (
+            "n\u2098\u2090\u2093:" if self.equation_type == "difference" else "x\u2098\u2090\u2093:"
+        )
         row_d = ttk.Frame(domain_frame)
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
@@ -480,7 +485,9 @@ class ParametersDialog:
         if self.is_pde:
             if self.ymin_var is None or self.ymax_var is None:
                 messagebox.showerror(
-                    "Invalid PDE", "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.", parent=self.win
+                    "Invalid PDE",
+                    "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.",
+                    parent=self.win,
                 )
                 return
             try:
