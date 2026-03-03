@@ -650,14 +650,17 @@ class EquationDialog:
         top_row.pack(fill=tk.X, pady=(pad, pad))
 
         ttk.Label(top_row, text="Independent variables:").pack(side=tk.LEFT)
-        self._pde_vars_var = tk.StringVar(value="x, y")
-        ttk.Entry(
-            top_row, textvariable=self._pde_vars_var, width=20, font=font,
-        ).pack(side=tk.LEFT, padx=(pad, 0))
-        ToolTip(
-            top_row.winfo_children()[-1],
-            "Comma-separated variable names, e.g.: x, y"
+        self._pde_nvars_var = tk.StringVar(value="2")
+        nvars_spin = ttk.Spinbox(
+            top_row, from_=2, to=2, width=5,
+            textvariable=self._pde_nvars_var, font=font, state="readonly",
         )
+        nvars_spin.pack(side=tk.LEFT, padx=(pad, 0))
+        ToolTip(nvars_spin, "Number of independent variables (limited to 2)")
+        self._pde_vars_label = ttk.Label(
+            top_row, text="  x[0], x[1]", style="Small.TLabel",
+        )
+        self._pde_vars_label.pack(side=tk.LEFT, padx=(pad, 0))
 
         self.custom_order_var = tk.StringVar(value="2")
 
@@ -669,20 +672,21 @@ class EquationDialog:
         _pde_operators = [
             "-\u2207\u00b2f (Poisson)",
             "\u2207\u00b2f (Laplacian)",
-            "f\u2093\u2093",   # f_xx
-            "f\u1d67\u1d67",  # f_yy
-            "f\u2093\u1d67",  # f_xy
-            "f\u2093",        # f_x
-            "f\u1d67",        # f_y
+            "f\u2080\u2080",   # f_00 (second deriv wrt x[0])
+            "f\u2081\u2081",   # f_11 (second deriv wrt x[1])
+            "f\u2080\u2081",   # f_01 (mixed partial)
+            "f\u2080",         # f_0  (first deriv wrt x[0])
+            "f\u2081",         # f_1  (first deriv wrt x[1])
         ]
         ttk.Combobox(
             op_row, textvariable=self._pde_op_var,
             values=_pde_operators, state="readonly", width=22, font=font,
         ).pack(side=tk.LEFT, padx=(pad, 0))
 
-        ttk.Label(ci, text="Right-hand side expression (what the operator equals):").pack(
-            anchor=tk.W
-        )
+        ttk.Label(
+            ci,
+            text="Right-hand side expression (use x[0], x[1] or x, y for variables):",
+        ).pack(anchor=tk.W)
         self.custom_expr = tk.Text(
             ci, height=3, width=60, bg=btn_bg, fg=fg, insertbackground=fg, font=font,
         )
@@ -919,15 +923,11 @@ class EquationDialog:
             )
             return
 
-        raw_vars = self._pde_vars_var.get().strip()
-        variables = [v.strip() for v in raw_vars.split(",") if v.strip()]
-        if len(variables) < 2:
-            messagebox.showerror(
-                "Invalid Variables",
-                "PDE requires at least 2 independent variables (e.g.: x, y).",
-                parent=self.win,
-            )
-            return
+        try:
+            n_vars = int(self._pde_nvars_var.get())
+        except ValueError:
+            n_vars = 2
+        variables = [f"x[{i}]" for i in range(n_vars)]
 
         params = self._parse_custom_params()
         if params is None:
@@ -938,11 +938,11 @@ class EquationDialog:
         _op_map = {
             "-\u2207\u00b2f (Poisson)": "neg_laplacian",
             "\u2207\u00b2f (Laplacian)": "laplacian",
-            "f\u2093\u2093": "fxx",
-            "f\u1d67\u1d67": "fyy",
-            "f\u2093\u1d67": "fxy",
-            "f\u2093": "fx",
-            "f\u1d67": "fy",
+            "f\u2080\u2080": "fxx",
+            "f\u2081\u2081": "fyy",
+            "f\u2080\u2081": "fxy",
+            "f\u2080": "fx",
+            "f\u2081": "fy",
         }
         pde_operator = _op_map.get(op_label, "neg_laplacian")
 

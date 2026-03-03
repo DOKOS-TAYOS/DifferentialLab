@@ -44,6 +44,52 @@ def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
     return quality
 
 
+def _build_bc_array(
+    bc_expressions: list[str],
+    variables: list[str],
+    parameters: dict[str, float],
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    nx: int,
+    ny: int,
+) -> np.ndarray:
+    """Build a (ny, nx) boundary values array from function expressions.
+
+    ``bc_expressions`` order: [bottom(y=y_min), top(y=y_max),
+    left(x=x_min), right(x=x_max)].
+
+    Horizontal boundaries (bottom/top) are written first. Vertical
+    boundaries (left/right) overwrite corner values where they overlap.
+    """
+    bc = np.zeros((ny, nx))
+
+    # Bottom (row 0): f(x) along x at y = y_min
+    if bc_expressions[0].strip() not in ("0", ""):
+        func = parse_pde_rhs_expression(bc_expressions[0], [variables[0]], parameters)
+        for i in range(nx):
+            bc[0, i] = func(x_grid[i])
+
+    # Top (row ny-1): f(x) along x at y = y_max
+    if len(bc_expressions) > 1 and bc_expressions[1].strip() not in ("0", ""):
+        func = parse_pde_rhs_expression(bc_expressions[1], [variables[0]], parameters)
+        for i in range(nx):
+            bc[ny - 1, i] = func(x_grid[i])
+
+    # Left (col 0): f(y) along y at x = x_min
+    if len(bc_expressions) > 2 and bc_expressions[2].strip() not in ("0", ""):
+        func = parse_pde_rhs_expression(bc_expressions[2], [variables[1]], parameters)
+        for j in range(ny):
+            bc[j, 0] = func(y_grid[j])
+
+    # Right (col nx-1): f(y) along y at x = x_max
+    if len(bc_expressions) > 3 and bc_expressions[3].strip() not in ("0", ""):
+        func = parse_pde_rhs_expression(bc_expressions[3], [variables[1]], parameters)
+        for j in range(ny):
+            bc[j, nx - 1] = func(y_grid[j])
+
+    return bc
+
+
 @dataclass
 class SolverResult:
     """Data-only bundle produced by a solver run (no pre-generated plots).
@@ -96,6 +142,7 @@ def run_solver_pipeline(
     vector_components: int = 1,
     pde_operator: str = "neg_laplacian",
     component_orders: tuple[int, ...] | None = None,
+    bc_expressions: list[str] | None = None,
 ) -> SolverResult:
     """Execute the full solve workflow and return data results.
 
@@ -202,6 +249,15 @@ def run_solver_pipeline(
             # Default: neg_laplacian
             return -fxx - fyy - rhs
 
+        # Build boundary condition values from function expressions
+        bc_values: np.ndarray | None = None
+        if bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
+            x_grid = np.linspace(x_min, x_max, n_points)
+            y_grid_bc = np.linspace(float(y_min), float(y_max), ny)
+            bc_values = _build_bc_array(
+                bc_expressions, vars_list, parameters, x_grid, y_grid_bc, n_points, ny,
+            )
+
         pde_sol = solve_pde_2d(
             residual,
             x_min,
@@ -210,6 +266,7 @@ def run_solver_pipeline(
             float(y_max),
             n_points,
             ny,
+            bc_values=bc_values,
             parameters=parameters,
         )
         solution_x = pde_sol.grid[0]
@@ -348,6 +405,8 @@ def run_solver_pipeline(
         "residual_mean": error_metrics.get("residual_mean"),
         "residual_rms": error_metrics.get("residual_rms"),
         "n_jacobian_evals": solver_quality.get("n_jacobian_evals"),
+        "variables": vars_list,
+        "boundary_conditions": bc_expressions,
     }
 
     # Build notation descriptor for f-notation labels

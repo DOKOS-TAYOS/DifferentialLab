@@ -197,6 +197,39 @@ class ResultDialog:
         )
 
     # ------------------------------------------------------------------
+    # Transform controls helper
+    # ------------------------------------------------------------------
+
+    def _build_transform_controls(
+        self,
+        parent: ttk.Frame,
+        callback: Any,
+        prefix: str,
+    ) -> None:
+        """Add a transform dropdown to a tab's control bar.
+
+        The ``StringVar`` is stored as ``self._transform_{prefix}_var``.
+        """
+        from transforms import TransformKind
+
+        sep = ttk.Separator(parent, orient=tk.VERTICAL)
+        sep.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
+
+        ttk.Label(parent, text="Transform:").pack(side=tk.LEFT, padx=(0, 4))
+        var = tk.StringVar(value=TransformKind.ORIGINAL.value)
+        setattr(self, f"_transform_{prefix}_var", var)
+
+        combo = ttk.Combobox(
+            parent,
+            textvariable=var,
+            values=[k.value for k in TransformKind],
+            state="readonly",
+            width=20,
+        )
+        combo.pack(side=tk.LEFT, padx=(0, 4))
+        combo.bind("<<ComboboxSelected>>", lambda _e: callback())
+
+    # ------------------------------------------------------------------
     # Plot tab construction
     # ------------------------------------------------------------------
 
@@ -248,6 +281,8 @@ class ResultDialog:
         self._sol_listbox.select_set(0)
         self._sol_listbox.pack(side=tk.LEFT, padx=4)
         self._sol_listbox.bind("<<ListboxSelect>>", lambda _e: self._update_solution_plot())
+
+        self._build_transform_controls(ctrl, self._update_solution_plot, "sol")
 
         self._sol_plot_frame = ttk.Frame(sol_tab)
         self._sol_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -302,9 +337,70 @@ class ResultDialog:
             self._phase_canvas: FigureCanvasTkAgg | None = None
             self._update_phase_plot()
 
+    def _apply_transform_multi(
+        self,
+        x: np.ndarray,
+        y_2d: np.ndarray,
+        selected: list[int],
+        labels: list[str],
+        kind: Any,
+    ) -> tuple[np.ndarray, np.ndarray, list[str], str, str] | None:
+        """Apply a transform to each selected row and align to a common x-axis.
+
+        Returns ``(tx, ty_2d, trans_labels, txlabel, tylabel)`` or ``None``
+        if nothing could be computed.
+        """
+        from scipy.interpolate import interp1d
+        from transforms import apply_transform
+
+        x_min_t, x_max_t = float(x[0]), float(x[-1])
+        raw: list[tuple[np.ndarray, np.ndarray, str]] = []
+        txlabel = tylabel = ""
+
+        for idx in selected:
+            if idx >= y_2d.shape[0]:
+                continue
+            func = interp1d(x, y_2d[idx], kind="cubic", fill_value="extrapolate")
+            tx, ty, txlabel, tylabel = apply_transform(
+                lambda arr, f=func: f(arr), kind, x_min_t, x_max_t,
+            )
+            lbl = labels[idx] if idx < len(labels) else f"f[{idx}]"
+            raw.append((tx, ty, lbl))
+
+        if not raw:
+            return None
+
+        # Use the longest x-axis as the common grid and interpolate the rest
+        ref_tx = max(raw, key=lambda r: len(r[0]))[0]
+        aligned_rows: list[np.ndarray] = []
+        trans_labels: list[str] = []
+        for tx_i, ty_i, lbl in raw:
+            if len(tx_i) == len(ref_tx) and np.allclose(tx_i, ref_tx):
+                aligned_rows.append(ty_i)
+            else:
+                f_interp = interp1d(tx_i, ty_i, kind="linear",
+                                    bounds_error=False, fill_value=0.0)
+                aligned_rows.append(f_interp(ref_tx))
+            trans_labels.append(lbl)
+
+        return ref_tx, np.vstack(aligned_rows), trans_labels, txlabel, tylabel
+
+    def _get_transform_kind(self, prefix: str) -> Any:
+        """Return the current TransformKind for the given control prefix."""
+        from transforms import TransformKind
+
+        var = getattr(self, f"_transform_{prefix}_var", None)
+        if var is None:
+            return TransformKind.ORIGINAL
+        try:
+            return TransformKind(var.get())
+        except ValueError:
+            return TransformKind.ORIGINAL
+
     def _update_solution_plot(self) -> None:
         """Regenerate the solution f(x) plot with currently selected derivatives."""
         from plotting import create_solution_plot
+        from transforms import TransformKind
 
         r = self._result
         selected = list(self._sol_listbox.curselection())
@@ -314,14 +410,38 @@ class ResultDialog:
         xlabel = "n" if r.equation_type == "difference" else "x"
         eq_name = r.metadata.get("equation_name", "f(x)")
 
-        fig = create_solution_plot(
-            r.x, r.y,
-            title=eq_name,
-            xlabel=xlabel,
-            ylabel="f",
-            selected_derivatives=selected,
-            labels=self._sol_labels,
-        )
+        kind = self._get_transform_kind("sol")
+
+        if kind == TransformKind.ORIGINAL:
+            fig = create_solution_plot(
+                r.x, r.y,
+                title=eq_name,
+                xlabel=xlabel,
+                ylabel="f",
+                selected_derivatives=selected,
+                labels=self._sol_labels,
+            )
+        else:
+            y_2d = np.atleast_2d(r.y)
+            if y_2d.shape[1] != len(r.x):
+                y_2d = y_2d.T
+
+            result = self._apply_transform_multi(
+                r.x, y_2d, selected, self._sol_labels, kind,
+            )
+            if result is None:
+                return
+            tx, ty_2d, trans_labels, txlabel, tylabel = result
+
+            fig = create_solution_plot(
+                tx, ty_2d,
+                title=f"{eq_name} \u2014 {kind.value}",
+                xlabel=txlabel,
+                ylabel=tylabel,
+                selected_derivatives=list(range(ty_2d.shape[0])),
+                labels=trans_labels,
+            )
+
         self._replace_plot(self._sol_plot_frame, fig, "_sol_canvas")
 
     def _update_phase_plot(self) -> None:
@@ -401,6 +521,8 @@ class ResultDialog:
         self._vec_sol_listbox.bind(
             "<<ListboxSelect>>", lambda _e: self._update_vec_solution_plot()
         )
+
+        self._build_transform_controls(ctrl, self._update_vec_solution_plot, "vec_sol")
 
         self._vec_sol_plot_frame = ttk.Frame(sol_tab)
         self._vec_sol_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -554,6 +676,7 @@ class ResultDialog:
     def _update_vec_solution_plot(self) -> None:
         """Regenerate vector ODE solution plot."""
         from plotting import create_solution_plot
+        from transforms import TransformKind, apply_transform
 
         r = self._result
         selected = list(self._vec_sol_listbox.curselection())
@@ -561,14 +684,38 @@ class ResultDialog:
             selected = [0]
 
         eq_name = r.metadata.get("equation_name", "f(x)")
-        fig = create_solution_plot(
-            r.x, r.y,
-            title=eq_name,
-            xlabel="x",
-            ylabel="f",
-            selected_derivatives=selected,
-            labels=self._vec_sol_labels,
-        )
+        kind = self._get_transform_kind("vec_sol")
+
+        if kind == TransformKind.ORIGINAL:
+            fig = create_solution_plot(
+                r.x, r.y,
+                title=eq_name,
+                xlabel="x",
+                ylabel="f",
+                selected_derivatives=selected,
+                labels=self._vec_sol_labels,
+            )
+        else:
+            y_2d = np.atleast_2d(r.y)
+            if y_2d.shape[1] != len(r.x):
+                y_2d = y_2d.T
+
+            result = self._apply_transform_multi(
+                r.x, y_2d, selected, self._vec_sol_labels, kind,
+            )
+            if result is None:
+                return
+            tx, ty_2d, trans_labels, txlabel, tylabel = result
+
+            fig = create_solution_plot(
+                tx, ty_2d,
+                title=f"{eq_name} \u2014 {kind.value}",
+                xlabel=txlabel,
+                ylabel=tylabel,
+                selected_derivatives=list(range(ty_2d.shape[0])),
+                labels=trans_labels,
+            )
+
         self._replace_plot(self._vec_sol_plot_frame, fig, "_vec_sol_canvas")
 
     def _update_vec_phase_plot(self) -> None:
@@ -707,16 +854,60 @@ class ResultDialog:
         self._pde_2d_canvas: FigureCanvasTkAgg | None = None
         self._update_pde_2d()
 
+        # --- Tab 3: Transform (1D slice) ---
+        trans_tab = ttk.Frame(nb)
+        nb.add(trans_tab, text="  Transform  ")
+
+        trans_ctrl = ttk.Frame(trans_tab)
+        trans_ctrl.pack(fill=tk.X, padx=4, pady=4)
+
+        xlabel, ylabel = self._pde_axis_labels()
+
+        ttk.Label(trans_ctrl, text="Slice along:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_slice_var = tk.StringVar(value=xlabel)
+        ttk.Combobox(
+            trans_ctrl, textvariable=self._pde_slice_var,
+            values=[xlabel, ylabel], state="readonly", width=8,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        r = self._result
+        x_mid = float((r.x[0] + r.x[-1]) / 2) if len(r.x) > 0 else 0.5
+        y_mid = float((r.y_grid[0] + r.y_grid[-1]) / 2) if r.y_grid is not None and len(r.y_grid) > 0 else 0.5
+
+        ttk.Label(trans_ctrl, text="at fixed value:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_slice_val_var = tk.StringVar(value=str(round(y_mid, 4)))
+        ttk.Entry(
+            trans_ctrl, textvariable=self._pde_slice_val_var, width=8,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        self._build_transform_controls(trans_ctrl, self._update_pde_transform, "pde")
+
+        ttk.Button(
+            trans_ctrl, text="Update", command=self._update_pde_transform,
+        ).pack(side=tk.LEFT, padx=4)
+
+        self._pde_trans_frame = ttk.Frame(trans_tab)
+        self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
+        self._pde_trans_canvas: FigureCanvasTkAgg | None = None
+
+    def _pde_axis_labels(self) -> tuple[str, str]:
+        """Return (xlabel, ylabel) from metadata variable names."""
+        variables = self._result.metadata.get("variables", ["x[0]", "x[1]"])
+        xlabel = variables[0] if len(variables) > 0 else "x[0]"
+        ylabel = variables[1] if len(variables) > 1 else "x[1]"
+        return xlabel, ylabel
+
     def _update_pde_3d(self) -> None:
         """Render the 3D surface plot for PDE."""
         from plotting import create_surface_plot
 
         r = self._result
-        eq_name = r.metadata.get("equation_name", "f(x,y)")
+        xlabel, ylabel = self._pde_axis_labels()
+        eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
         fig = create_surface_plot(
             r.x, r.y_grid, r.y,
             title=eq_name,
-            xlabel="x", ylabel="y", zlabel="f",
+            xlabel=xlabel, ylabel=ylabel, zlabel="f",
         )
         self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
 
@@ -725,13 +916,70 @@ class ResultDialog:
         from plotting import create_contour_plot
 
         r = self._result
-        eq_name = r.metadata.get("equation_name", "f(x,y)")
+        xlabel, ylabel = self._pde_axis_labels()
+        eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
         fig = create_contour_plot(
             r.x, r.y_grid, r.y,
             title=eq_name,
-            xlabel="x", ylabel="y",
+            xlabel=xlabel, ylabel=ylabel,
         )
         self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
+
+    def _update_pde_transform(self) -> None:
+        """Render a 1D transform of a slice through the PDE solution."""
+        from plotting import create_solution_plot
+        from transforms import TransformKind, apply_transform
+
+        r = self._result
+        kind = self._get_transform_kind("pde")
+        xlabel, ylabel = self._pde_axis_labels()
+
+        slice_var = self._pde_slice_var.get()
+        try:
+            slice_val = float(self._pde_slice_val_var.get())
+        except ValueError:
+            slice_val = 0.5
+
+        if slice_var == xlabel:
+            # Slice along x[0] at a fixed x[1] value
+            y_idx = int(np.argmin(np.abs(r.y_grid - slice_val)))
+            data_1d = r.y[y_idx, :]
+            x_1d = r.x
+            slice_label = f"{ylabel}={slice_val:.3g}"
+            axis_label = xlabel
+        else:
+            # Slice along x[1] at a fixed x[0] value
+            x_idx = int(np.argmin(np.abs(r.x - slice_val)))
+            data_1d = r.y[:, x_idx]
+            x_1d = r.y_grid
+            slice_label = f"{xlabel}={slice_val:.3g}"
+            axis_label = ylabel
+
+        eq_name = r.metadata.get("equation_name", "PDE")
+
+        if kind == TransformKind.ORIGINAL:
+            fig = create_solution_plot(
+                x_1d, np.atleast_2d(data_1d),
+                title=f"{eq_name} \u2014 slice at {slice_label}",
+                xlabel=axis_label, ylabel="f",
+                selected_derivatives=[0], labels=["f"],
+            )
+        else:
+            from scipy.interpolate import interp1d
+
+            func = interp1d(x_1d, data_1d, kind="cubic", fill_value="extrapolate")
+            x_min_t, x_max_t = float(x_1d[0]), float(x_1d[-1])
+            tx, ty, txlabel, tylabel = apply_transform(
+                lambda arr: func(arr), kind, x_min_t, x_max_t,
+            )
+            fig = create_solution_plot(
+                tx, np.atleast_2d(ty),
+                title=f"{eq_name} \u2014 {kind.value} [slice {slice_label}]",
+                xlabel=txlabel, ylabel=tylabel,
+                selected_derivatives=[0], labels=[tylabel],
+            )
+
+        self._replace_plot(self._pde_trans_frame, fig, "_pde_trans_canvas")
 
     # ------------------------------------------------------------------
     # Plot replacement helper

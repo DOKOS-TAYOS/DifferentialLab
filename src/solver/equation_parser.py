@@ -307,6 +307,23 @@ def get_difference_function(
     return recur_func
 
 
+_INDEXED_VAR_NAMES = ["x", "y", "z", "w"]
+
+
+def _rewrite_indexed_vars(expression: str) -> str:
+    """Rewrite indexed variable notation ``x[0]``, ``x[1]``, ... to named variables.
+
+    Maps ``x[0]`` -> ``x``, ``x[1]`` -> ``y``, ``x[2]`` -> ``z``, ``x[3]`` -> ``w``.
+    This allows users to write PDE expressions using indexed notation while
+    the internal solver still uses named variables.
+    """
+    import re
+
+    for i, name in enumerate(_INDEXED_VAR_NAMES):
+        expression = re.sub(rf"\bx\[{i}\]", name, expression)
+    return expression
+
+
 def parse_pde_rhs_expression(
     expression: str,
     variables: list[str],
@@ -314,12 +331,13 @@ def parse_pde_rhs_expression(
 ) -> Callable[..., float]:
     """Parse a PDE RHS expression into a callable f(x, y, ...) -> float.
 
-    The expression can use variable names (x, y, z, ...) and parameters.
+    The expression can use variable names (x, y, z, ...) or indexed notation
+    (x[0], x[1], ...) and parameters.
     Used for the RHS of Poisson-type equations -u_xx - u_yy = f(x,y).
 
     Args:
-        expression: Python expression string (e.g. ``"k"`` or ``"x * y"``).
-        variables: List of variable names (e.g. ``["x", "y"]``).
+        expression: Python expression string (e.g. ``"k"`` or ``"x[0] * x[1]"``).
+        variables: List of variable names (e.g. ``["x", "y"]`` or ``["x[0]", "x[1]"]``).
         parameters: Named parameter values.
 
     Returns:
@@ -329,12 +347,22 @@ def parse_pde_rhs_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
+    expression = _rewrite_indexed_vars(expression)
+    # Ensure internal variable names are plain (x, y, ...) for evaluation
+    internal_vars = [
+        _INDEXED_VAR_NAMES[i] if v.startswith("x[") else v
+        for i, v in enumerate(variables)
+        if i < len(_INDEXED_VAR_NAMES)
+    ]
+    if not internal_vars:
+        internal_vars = list(variables)
     validate_expression_ast(expression, "PDE RHS")
     params = dict(parameters) if parameters else {}
     logger.debug(
-        "Parsing PDE RHS expression: %s, variables=%s, params=%s",
+        "Parsing PDE RHS expression: %s, variables=%s, internal_vars=%s, params=%s",
         expression,
         variables,
+        internal_vars,
         params,
     )
 
@@ -343,14 +371,14 @@ def parse_pde_rhs_expression(
 
     def rhs_func(*args: float, **kwargs: Any) -> float:
         local_ns = {**namespace, **kwargs}
-        for i, var in enumerate(variables):
+        for i, var in enumerate(internal_vars):
             if i < len(args):
                 local_ns[var] = args[i]
         return float(eval(compiled, {"__builtins__": {}}, local_ns))
 
     # Test evaluation
     test_ns = {**namespace}
-    for i, var in enumerate(variables):
+    for i, var in enumerate(internal_vars):
         test_ns[var] = 0.0
     try:
         eval(compiled, {"__builtins__": {}}, test_ns)

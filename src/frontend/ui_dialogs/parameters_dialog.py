@@ -160,12 +160,13 @@ class ParametersDialog:
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
         # n_min/x_min, n_max/x_max
-        x_min_label = (
-            "n\u2098\u1d62\u2099:" if self.equation_type == "difference" else "x\u2098\u1d62\u2099:"
-        )
-        x_max_label = (
-            "n\u2098\u2090\u2093:" if self.equation_type == "difference" else "x\u2098\u2090\u2093:"
-        )
+        var0 = self.variables[0] if self.variables else "x"
+        if self.equation_type == "difference":
+            x_min_label = "n\u2098\u1d62\u2099:"
+            x_max_label = "n\u2098\u2090\u2093:"
+        else:
+            x_min_label = f"{var0}\u2098\u1d62\u2099:"
+            x_max_label = f"{var0}\u2098\u2090\u2093:"
         row_d = ttk.Frame(domain_frame)
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
@@ -186,42 +187,51 @@ class ParametersDialog:
         self.ymax_var: tk.StringVar | None = None
         self.npoints_y_var: tk.StringVar | None = None
         if self.is_pde and len(default_domain) >= 4:
+            var1 = self.variables[1] if len(self.variables) > 1 else "x[1]"
             row_y = ttk.Frame(domain_frame)
             row_y.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_y, text="y\u2098\u1d62\u2099:").pack(side=tk.LEFT)  # y_min
+            ttk.Label(row_y, text=f"{var1}\u2098\u1d62\u2099:").pack(side=tk.LEFT)
             self.ymin_var = tk.StringVar(value=str(default_domain[2]))
             ttk.Entry(row_y, textvariable=self.ymin_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
-            ttk.Label(row_y, text="y\u2098\u2090\u2093:").pack(side=tk.LEFT)  # y_max
+            ttk.Label(row_y, text=f"{var1}\u2098\u2090\u2093:").pack(side=tk.LEFT)
             self.ymax_var = tk.StringVar(value=str(default_domain[3]))
             ttk.Entry(row_y, textvariable=self.ymax_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
             row_ny = ttk.Frame(domain_frame)
             row_ny.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_ny, text="Grid points (y):").pack(side=tk.LEFT)
+            ttk.Label(row_ny, text=f"Grid points ({var1}):").pack(side=tk.LEFT)
             self.npoints_y_var = tk.StringVar(value="1000")
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
 
-        # Equation parameters (ω, γ, etc.) — left column
+        # Equation parameters (ω, γ, etc.) — left column, 2 per row
         if self.parameters:
             eq_params_frame = ttk.LabelFrame(left_col, text="Equation Parameters", padding=pad)
             eq_params_frame.pack(fill=tk.X, pady=(0, pad))
-            for pname, val in self.parameters.items():
+            params_items = list(self.parameters.items())
+            label_width = (
+                max(
+                    len(self.parameters_schema.get(p, {}).get("display", p))
+                    for p in self.parameters
+                )
+                + 1
+            )
+            for i in range(0, len(params_items), 2):
                 row = ttk.Frame(eq_params_frame)
                 row.pack(fill=tk.X, pady=2)
-                pinfo = self.parameters_schema.get(pname, {})
-                display_name = pinfo.get("display", pname)
-                ttk.Label(row, text=f"{display_name}:", width=12).pack(side=tk.LEFT)
-                var = tk.StringVar(value=str(val))
-                entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
-                entry.pack(side=tk.LEFT, padx=(pad, 0))
-                self._eq_param_vars[pname] = var
-                pinfo = self.parameters_schema.get(pname, {})
-                ToolTip(entry, pinfo.get("description", ""))
+                for pname, val in params_items[i : i + 2]:
+                    pinfo = self.parameters_schema.get(pname, {})
+                    display_name = pinfo.get("display", pname)
+                    ttk.Label(row, text=f"{display_name}:", width=label_width).pack(side=tk.LEFT)
+                    var = tk.StringVar(value=str(val))
+                    entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
+                    entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
+                    self._eq_param_vars[pname] = var
+                    ToolTip(entry, pinfo.get("description", ""))
 
         if self.equation_type != "difference" and not self.is_pde:
             row_n = ttk.Frame(domain_frame)
@@ -251,14 +261,43 @@ class ParametersDialog:
         elif self.is_pde:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_n, text="Grid points (x):").pack(side=tk.LEFT)
+            ttk.Label(row_n, text=f"Grid points ({var0}):").pack(side=tk.LEFT)
             self.npoints_var = tk.StringVar(value="1000")
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
 
         # Initial conditions (skip for PDE) — left column
-        if not self.is_pde:
+        self._bc_vars: list[tk.StringVar] = []
+        if self.is_pde:
+            bc_frame = ttk.LabelFrame(
+                left_col, text="Boundary Conditions (Dirichlet)", padding=pad,
+            )
+            bc_frame.pack(fill=tk.X, pady=(0, pad))
+
+            v0 = var0
+            v1 = self.variables[1] if len(self.variables) > 1 else "x[1]"
+            boundaries = [
+                (f"{v1} = {v1}" + "\u2098\u1d62\u2099 (bottom)", v0),
+                (f"{v1} = {v1}" + "\u2098\u2090\u2093 (top)", v0),
+                (f"{v0} = {v0}" + "\u2098\u1d62\u2099 (left)", v1),
+                (f"{v0} = {v0}" + "\u2098\u2090\u2093 (right)", v1),
+            ]
+            for label_text, free_var in boundaries:
+                row = ttk.Frame(bc_frame)
+                row.pack(fill=tk.X, pady=2)
+                ttk.Label(row, text=f"{label_text}:", width=28).pack(side=tk.LEFT)
+                bc_var = tk.StringVar(value="0")
+                bc_entry = ttk.Entry(
+                    row, textvariable=bc_var, width=20, font=get_font(),
+                )
+                bc_entry.pack(side=tk.LEFT, padx=(pad, 0))
+                ToolTip(
+                    bc_entry,
+                    f"Expression as a function of {free_var}, e.g. sin(pi*{free_var})",
+                )
+                self._bc_vars.append(bc_var)
+        else:
             ic_frame = ttk.LabelFrame(left_col, text="Initial Conditions", padding=pad)
             ic_frame.pack(fill=tk.X, pady=(0, pad))
 
@@ -270,6 +309,14 @@ class ParametersDialog:
                 n_ic = self.order * self.vector_components
             else:
                 n_ic = self.order
+            ic_label_width = max(len(l) for l in ic_labels) + 1
+            x0_label_width = (
+                max(
+                    len(f"x{_subscripts[i] if i < len(_subscripts) else str(i)} =")
+                    for i in range(n_ic)
+                )
+                + 1
+            )
             x0_val = int(default_domain[0]) if is_diff else default_domain[0]
             default_x0_val = str(x0_val)
             for i in range(n_ic):
@@ -278,7 +325,7 @@ class ParametersDialog:
                 default_val = default_y0[i] if i < len(default_y0) else 1.0
                 sub = _subscripts[i] if i < len(_subscripts) else str(i)
 
-                ttk.Label(row, text=f"{ic_labels[i]} =", width=14).pack(side=tk.LEFT)
+                ttk.Label(row, text=f"{ic_labels[i]} =", width=ic_label_width).pack(side=tk.LEFT)
                 var = tk.StringVar(value=str(default_val))
                 ttk.Entry(row, textvariable=var, width=10, font=get_font()).pack(
                     side=tk.LEFT,
@@ -286,7 +333,7 @@ class ParametersDialog:
                 )
 
                 if self.equation_type != "difference":
-                    ttk.Label(row, text=f"x{sub} =").pack(side=tk.LEFT)
+                    ttk.Label(row, text=f"x{sub} =", width=x0_label_width).pack(side=tk.LEFT)
                     x_var = tk.StringVar(value=default_x0_val)
                     ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
                         side=tk.LEFT,
@@ -570,6 +617,11 @@ class ParametersDialog:
         selected_indices = self._stats_listbox.curselection()
         selected_stats = {self._stat_keys[i] for i in selected_indices}
 
+        # Collect PDE boundary condition expressions
+        bc_expressions: list[str] | None = None
+        if self.is_pde and self._bc_vars:
+            bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
+
         try:
             from pipeline import run_solver_pipeline
 
@@ -595,6 +647,7 @@ class ParametersDialog:
                 vector_components=self.vector_components,
                 pde_operator=self.pde_operator,
                 component_orders=self.component_orders,
+                bc_expressions=bc_expressions,
             )
         except DifferentialLabError as exc:
             logger.warning("Solver pipeline failed (user-facing): %s", exc)

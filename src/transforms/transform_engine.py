@@ -173,7 +173,15 @@ def _refine_fft_spectrum_in_range(
     n_points = len(y)
     f_span = max(f_high - f_low, 1.0 / (n_points * dx))
     n_refined = int(np.ceil(n_target / (f_span * dx)))
-    n_refined = min(max(n_refined, n_points), 65536)
+    n_refined = max(n_refined, n_points)
+    # Cap at a reasonable size; if the signal is longer, downsample it
+    _MAX_FFT = 65536
+    if n_refined > _MAX_FFT:
+        n_refined = _MAX_FFT
+    if n_points > n_refined:
+        step = max(1, n_points // n_refined)
+        y = y[::step]
+        n_points = len(y)
 
     y_padded = np.zeros(n_refined, dtype=complex)
     y_padded[:n_points] = y
