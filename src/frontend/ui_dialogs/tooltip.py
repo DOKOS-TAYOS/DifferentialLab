@@ -36,6 +36,8 @@ class ToolTip:
     def _show(self) -> None:
         if self._tipwindow:
             return
+        if not self.text or not self.text.strip():
+            return
         x = self.widget.winfo_rootx() + 20
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
         tw = tk.Toplevel(self.widget)

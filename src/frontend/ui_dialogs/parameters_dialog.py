@@ -151,12 +151,16 @@ class ParametersDialog:
         right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Domain (left column)
-        domain_label = "Domain (n_min, n_max)" if self.equation_type == "difference" else "Domain"
+        domain_label = (
+            "Domain (n\u2098\u1d62\u2099, n\u2098\u2090\u2093)"  # n_min, n_max
+            if self.equation_type == "difference"
+            else "Domain"
+        )
         domain_frame = ttk.LabelFrame(left_col, text=domain_label, padding=pad)
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
-        x_min_label = "n_min:" if self.equation_type == "difference" else "x_min:"
-        x_max_label = "n_max:" if self.equation_type == "difference" else "x_max:"
+        x_min_label = "n\u2098\u1d62\u2099:" if self.equation_type == "difference" else "x\u2098\u1d62\u2099:"  # n_min, x_min
+        x_max_label = "n\u2098\u2090\u2093:" if self.equation_type == "difference" else "x\u2098\u2090\u2093:"  # n_max, x_max
         row_d = ttk.Frame(domain_frame)
         row_d.pack(fill=tk.X)
         ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
@@ -179,12 +183,12 @@ class ParametersDialog:
         if self.is_pde and len(default_domain) >= 4:
             row_y = ttk.Frame(domain_frame)
             row_y.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_y, text="y_min:").pack(side=tk.LEFT)
+            ttk.Label(row_y, text="y\u2098\u1d62\u2099:").pack(side=tk.LEFT)  # y_min
             self.ymin_var = tk.StringVar(value=str(default_domain[2]))
             ttk.Entry(row_y, textvariable=self.ymin_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
-            ttk.Label(row_y, text="y_max:").pack(side=tk.LEFT)
+            ttk.Label(row_y, text="y\u2098\u2090\u2093:").pack(side=tk.LEFT)  # y_max
             self.ymax_var = tk.StringVar(value=str(default_domain[3]))
             ttk.Entry(row_y, textvariable=self.ymax_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
@@ -464,7 +468,9 @@ class ParametersDialog:
             x_max = float(self.xmax_var.get())
         except ValueError:
             domain_name = (
-                "n_min and n_max" if self.equation_type == "difference" else "x_min and x_max"
+                "n\u2098\u1d62\u2099 and n\u2098\u2090\u2093"
+                if self.equation_type == "difference"
+                else "x\u2098\u1d62\u2099 and x\u2098\u2090\u2093"
             )
             messagebox.showerror(
                 "Invalid Domain", f"{domain_name} must be numbers.", parent=self.win
@@ -473,14 +479,18 @@ class ParametersDialog:
 
         if self.is_pde:
             if self.ymin_var is None or self.ymax_var is None:
-                messagebox.showerror("Invalid PDE", "y_min and y_max required.", parent=self.win)
+                messagebox.showerror(
+                    "Invalid PDE", "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.", parent=self.win
+                )
                 return
             try:
                 y_min = float(self.ymin_var.get())
                 y_max = float(self.ymax_var.get())
             except ValueError:
                 messagebox.showerror(
-                    "Invalid Domain", "y_min and y_max must be numbers.", parent=self.win
+                    "Invalid Domain",
+                    "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 must be numbers.",
+                    parent=self.win,
                 )
                 return
             try:

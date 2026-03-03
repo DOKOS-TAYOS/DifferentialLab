@@ -322,6 +322,15 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         indicatorcolor=[("selected", btn_fg)],
     )
 
+    # --- Radiobutton (ODE, Vector ODE, etc.) — hover slightly darker than background ---
+    hover_bg = _lighten_color(bg, 0.15)
+    style.configure("TRadiobutton", background=bg, foreground=fg, font=font, indicatorcolor=btn_bg)
+    style.map(
+        "TRadiobutton",
+        background=[("active", hover_bg), ("focus", hover_bg)],
+        indicatorcolor=[("selected", btn_fg)],
+    )
+
     # --- Treeview ---
     style.configure(
         "Treeview",

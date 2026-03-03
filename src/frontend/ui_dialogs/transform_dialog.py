@@ -121,8 +121,11 @@ class TransformDialog:
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
+        btn_inner = ttk.Frame(btn_frame)
+        btn_inner.pack(anchor=tk.CENTER)
+
         btn_help = ttk.Button(
-            btn_frame,
+            btn_inner,
             text="Help",
             command=self._on_help,
         )
@@ -130,7 +133,7 @@ class TransformDialog:
         ToolTip(btn_help, "Show help about the Transforms section.")
 
         btn_export = ttk.Button(
-            btn_frame,
+            btn_inner,
             text="Export CSV",
             command=self._on_export,
         )
@@ -138,7 +141,7 @@ class TransformDialog:
         ToolTip(btn_export, "Export the transformed data points to a CSV file.")
 
         btn_close = ttk.Button(
-            btn_frame,
+            btn_inner,
             text="Close",
             style="Cancel.TButton",
             command=self.win.destroy,
@@ -166,6 +169,28 @@ class TransformDialog:
         )
         func_hint_lbl.pack(anchor=tk.W)
 
+        # Unicode symbols — copy and paste directly
+        _unicode_hint = (
+            "\u03b1 \u03b2 \u03b3 \u03b4 \u03b5 \u03b6 \u03b7 "
+            "\u03b8 \u03bb \u03bc \u03be \u03c0 \u03c1 \u03c3 "
+            "\u03c6 \u03c9 \u0394 \u03a3 \u03a6 \u03a9"
+        )
+        _font_small = (_font[0], max(9, _font[1] - 4))
+        unicode_text = tk.Text(
+            func_lf,
+            height=1,
+            width=30,
+            bg=btn_bg,
+            fg=fg,
+            font=_font_small,
+            borderwidth=0,
+            highlightthickness=0,
+            wrap="none",
+        )
+        unicode_text.insert("1.0", _unicode_hint)
+        unicode_text.config(state="disabled")
+        unicode_text.pack(fill=tk.X, pady=(2, 4))
+
         def _update_func_hint_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
             w = func_lf.winfo_width()
             if w > 100:
@@ -190,22 +215,27 @@ class TransformDialog:
         self._params_entry.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self._params_entry, "E.g.: a=1.0, omega=2.0")
 
-        # Range
-        range_lf = ttk.LabelFrame(left, text="Range", padding=pad)
-        range_lf.pack(fill=tk.X, pady=(0, pad))
-
-        row1 = ttk.Frame(range_lf)
-        row1.pack(fill=tk.X)
-        ttk.Label(row1, text="x_min:").pack(side=tk.LEFT)
+        row1 = ttk.Frame(func_lf)
+        row1.pack(fill=tk.X, pady=(pad, 0))
+        ttk.Label(row1, text="x\u2098\u1d62\u2099:").pack(side=tk.LEFT)  # x_min
         self._x_min_var = tk.StringVar(value="-10")
         ttk.Entry(row1, textvariable=self._x_min_var, width=10, font=_font).pack(
             side=tk.LEFT, padx=(4, pad)
         )
-        ttk.Label(row1, text="x_max:").pack(side=tk.LEFT, padx=(pad, 0))
+        ttk.Label(row1, text="x\u2098\u2090\u2093:").pack(side=tk.LEFT, padx=(pad, 0))  # x_max
         self._x_max_var = tk.StringVar(value="10")
         ttk.Entry(row1, textvariable=self._x_max_var, width=10, font=_font).pack(
             side=tk.LEFT, padx=(4, pad)
         )
+
+        # Apply button (below function/range)
+        self._btn_apply = ttk.Button(
+            left,
+            text="Apply / Update plot",
+            command=self._on_apply,
+        )
+        self._btn_apply.pack(fill=tk.X, pady=(0, pad))
+        ToolTip(self._btn_apply, "Parse function and apply selected transformation.")
 
         # Transform
         trans_lf = ttk.LabelFrame(left, text="Transformation", padding=pad)
@@ -258,15 +288,6 @@ class TransformDialog:
             width=8,
             font=_font,
         ).pack(side=tk.LEFT, padx=(4, 0))
-
-        # Apply button
-        self._btn_apply = ttk.Button(
-            left,
-            text="Apply / Update plot",
-            command=self._on_apply,
-        )
-        self._btn_apply.pack(fill=tk.X, pady=pad)
-        ToolTip(self._btn_apply, "Parse function and apply selected transformation.")
 
         # ── Right: plot ──
         plot_frame = ttk.Frame(content)
@@ -529,30 +550,48 @@ class TransformDialog:
 
 
 _TRANSFORM_HELP_ABOUT = (
-    "This section lets you enter a scalar function f(x), apply mathematical "
-    "transforms (Fourier, Laplace, Taylor, Hilbert, Z-transform), and visualize "
-    "the result. You can view either the curve or the coefficients a_i vs index i."
+    "Apply mathematical transforms to scalar functions f(x). Enter an expression, "
+    "select a transform (Fourier, Laplace, Taylor, Hilbert, Z-transform), and "
+    "visualize the result. Switch between curve view and coefficients view. "
+    "Export data to CSV or save the plot via the Matplotlib toolbar."
+)
+
+_TRANSFORM_HELP_HOW_TO_USE = (
+    "1.  Enter a function in the Function f(x) field (e.g. sin(x), exp(-a*x)).\n"
+    "2.  Optionally add parameters (e.g. a=1.0, omega=2) in the Parameters field.\n"
+    "3.  Set the range (x\u2098\u1d62\u2099, x\u2098\u2090\u2093) for sampling.\n"
+    "4.  Select a transformation from the dropdown menu.\n"
+    "5.  For Taylor: set Order (1–15) and Center.\n"
+    "6.  Select Display: Curve (f vs x) or Coefficients (a\u1d62 vs i).\n"
+    "7.  Click  Apply / Update plot  to compute and display the result.\n"
+    "8.  Export data to CSV or use the Matplotlib toolbar to save the plot."
 )
 
 _TRANSFORM_HELP_INPUT = (
-    "Use x as the independent variable. Example: sin(x), exp(-a*x)\n\n"
-    "Parameters: name=value, comma-separated (e.g. a=1.0, omega=2).\n\n"
-    "Range: x_min and x_max define the domain for sampling."
+    "Function: Use x as the independent variable. Example: sin(x), exp(-a*x)\n\n"
+    "Parameters: name=value, comma-separated (e.g. a=1.0, omega=2). "
+    "Unicode symbols (ω, γ, etc.) are supported.\n\n"
+    "Range: x\u2098\u1d62\u2099 and x\u2098\u2090\u2093 define the sampling domain.\n\n"
+    "Available mathematical functions: sin, cos, tan, exp, log, log10, sqrt, abs, "
+    "sinh, cosh, tanh, arcsin, arccos, arctan, floor, ceil, sign, heaviside, pi, e."
 )
 
 _TRANSFORM_HELP_TRANSFORMS = (
-    "Original (f(x)) — Plot the function as-is.\n"
-    "Fourier (FFT) — Discrete Fourier transform magnitude spectrum.\n"
-    "Laplace (real axis) — Laplace transform L(s) = ∫f(t)e^{-st}dt over the range.\n"
-    "Taylor series — Polynomial expansion around a center point (order, center).\n"
-    "Hilbert (discrete) — Discrete Hilbert transform H[f](x).\n"
+    "Original (f(x)) — Plot the function over the specified range.\n\n"
+    "Fourier (FFT) — Discrete Fourier transform magnitude spectrum |F(ω)|.\n\n"
+    "Laplace (real axis) — Laplace transform L(s) = ∫f(t)e^{-st}dt over the s range "
+    "(default 0.1 to 10).\n\n"
+    "Taylor series — Polynomial expansion around a center point. Set Taylor Order "
+    "(1–15) and Center. Uses least-squares fitting for stability.\n\n"
+    "Hilbert (discrete) — Discrete Hilbert transform H[f](x).\n\n"
     "Z-transform (discrete) — Magnitude spectrum (DFT on unit circle)."
 )
 
 _TRANSFORM_HELP_DISPLAY = (
-    "Curve (f vs x) — Plot the transformed function or spectrum vs its domain.\n\n"
-    "Coefficients — Plot coefficients vs physical axis (with metadata in title):\n"
-    "    Taylor: a_i vs i (degree)\n"
+    "Curve (f vs x) — Plot the transformed function or spectrum versus its domain. "
+    "For Taylor, the original f(x) is displayed as a dashed overlay for comparison.\n\n"
+    "Coefficients — Plot coefficients versus index (metadata shown in plot title):\n"
+    "    Taylor: a\u1d62 vs i (degree)\n"
     "    Fourier: |F(ω)| vs ω/(2π)\n"
     "    Laplace: L(s) vs s\n"
     "    Hilbert: |H(ω)| vs ω/(2π)\n"
@@ -560,12 +599,15 @@ _TRANSFORM_HELP_DISPLAY = (
 )
 
 _TRANSFORM_HELP_EXPORT = (
-    "Export the currently displayed data (curve or coefficients) to CSV. "
-    "Use the Export CSV button to save the points to a file."
+    "Export CSV — Saves the currently displayed data (curve or coefficients) to a "
+    "CSV file. A file dialog is displayed to select the save location.\n\n"
+    "Matplotlib toolbar — A toolbar is displayed below the plot. Use the save "
+    "button to export the plot as PNG, JPG, or PDF."
 )
 
 _TRANSFORM_HELP_SECTIONS: list[tuple[str, str]] = [
     ("About", _TRANSFORM_HELP_ABOUT),
+    ("How to Use", _TRANSFORM_HELP_HOW_TO_USE),
     ("Function Input", _TRANSFORM_HELP_INPUT),
     ("Transformations", _TRANSFORM_HELP_TRANSFORMS),
     ("Display Mode", _TRANSFORM_HELP_DISPLAY),

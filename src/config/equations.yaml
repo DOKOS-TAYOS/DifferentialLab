@@ -445,10 +445,10 @@ damped_coupled_system:
 geometric_growth_diff:
   category: Discrete Population
   name: "Geometric Growth (Discrete)"
-  formula: "f_{n+1} = r·f_n"
+  formula: "fₙ₊₁ = r·fₙ"
   description: |
-    f_{n+1} = r·f_n
-    Discrete exponential growth. Use n for index, f[0] for f_n.
+    fₙ₊₁ = r·fₙ
+    Discrete exponential growth. Use n for index, f[0] for fₙ.
   equation_type: difference
   order: 1
   parameters:
@@ -462,9 +462,9 @@ geometric_growth_diff:
 logistic_map_diff:
   category: Discrete Population
   name: "Logistic Map"
-  formula: "f_{n+1} = r·f_n·(1 - f_n)"
+  formula: "fₙ₊₁ = r·fₙ·(1 - fₙ)"
   description: |
-    f_{n+1} = r·f_n·(1 - f_n)
+    fₙ₊₁ = r·fₙ·(1 - fₙ)
     Classic chaotic map. For r≈3.57 exhibits chaos.
   equation_type: difference
   order: 1
@@ -479,10 +479,10 @@ logistic_map_diff:
 fibonacci_diff:
   category: Linear Recurrence
   name: "Fibonacci Recurrence"
-  formula: "f_{n+2} = f_{n+1} + f_n"
+  formula: "fₙ₊₂ = fₙ₊₁ + fₙ"
   description: |
-    f_{n+2} = f_{n+1} + f_n
-    Classic Fibonacci sequence. f[0]=f_n, f[1]=f_{n+1}.
+    fₙ₊₂ = fₙ₊₁ + fₙ
+    Classic Fibonacci sequence. f[0]=fₙ, f[1]=fₙ₊₁.
   equation_type: difference
   order: 2
   parameters: {}
@@ -493,19 +493,19 @@ fibonacci_diff:
 linear_recurrence_2_diff:
   category: Linear Recurrence
   name: "Second-Order Linear Recurrence"
-  formula: "f_{n+2} = a·f_{n+1} + b·f_n"
+  formula: "fₙ₊₂ = a·fₙ₊₁ + b·fₙ"
   description: |
-    f_{n+2} = a·f_{n+1} + b·f_n
+    fₙ₊₂ = a·fₙ₊₁ + b·fₙ
     General second-order linear recurrence.
   equation_type: difference
   order: 2
   parameters:
     a:
       default: 1.0
-      description: "Coefficient of f_{n+1}"
+      description: "Coefficient of fₙ₊₁"
     b:
       default: 1.0
-      description: "Coefficient of f_n"
+      description: "Coefficient of fₙ"
   expression: "a * f[1] + b * f[0]"
   default_initial_conditions: [0.0, 1.0]
   default_domain: [0, 30]
@@ -513,9 +513,9 @@ linear_recurrence_2_diff:
 cobweb_model_diff:
   category: Discrete Population
   name: "Discrete Logistic (Cobweb)"
-  formula: "f_{n+1} = r·f_n·(1 - f_n/K)"
+  formula: "fₙ₊₁ = r·fₙ·(1 - fₙ/K)"
   description: |
-    f_{n+1} = r·f_n·(1 - f_n/K)
+    fₙ₊₁ = r·fₙ·(1 - fₙ/K)
     Discrete population model with carrying capacity.
   equation_type: difference
   order: 1
@@ -535,11 +535,11 @@ cobweb_model_diff:
 poisson_2d:
   category: Poisson
   name: "Poisson Equation (2D)"
-  formula: "-∇²f = g(x[0],x[1])"
+  formula: "-∇²f = g(x,y)"
   description: |
-    -f[0,0] - f[1,1] = g(x[0],x[1])
-    Elliptic PDE. Solves for f(x[0],x[1]) with zero Dirichlet boundary conditions.
-    Use expression for the RHS g(x[0],x[1]). Example: k for constant, or x*y.
+    -fₓₓ - fᵧᵧ = g(x,y)
+    Elliptic PDE. Solves for f(x,y) with zero Dirichlet boundary conditions.
+    Use expression for the RHS g(x,y). Example: k for constant, or x*y.
   equation_type: pde
   variables: ["x", "y"]
   order: 1
@@ -556,7 +556,7 @@ laplace_2d:
   name: "Laplace Equation (2D)"
   formula: "∇²f = 0"
   description: |
-    f[0,0] + f[1,1] = 0
+    fₓₓ + fᵧᵧ = 0
     Harmonic function. Zero Dirichlet BC.
   equation_type: pde
   variables: ["x", "y"]
@@ -568,10 +568,10 @@ laplace_2d:
 
 poisson_xy:
   category: Poisson
-  name: "Poisson: -∇²f = x[0]·x[1]"
-  formula: "-∇²f = x[0]·x[1]"
+  name: "Poisson: -∇²f = x·y"
+  formula: "-∇²f = x·y"
   description: |
-    -f[0,0] - f[1,1] = x[0]*x[1]
+    -fₓₓ - fᵧᵧ = x·y
     Poisson equation with bilinear source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -583,11 +583,11 @@ poisson_xy:
 
 poisson_sin:
   category: Poisson
-  name: "Poisson: -∇²f = sin(πx[0])sin(πx[1])"
-  formula: "-∇²f = sin(πx[0])sin(πx[1])"
+  name: "Poisson: -∇²f = sin(πx)sin(πy)"
+  formula: "-∇²f = sin(πx)sin(πy)"
   description: |
-    -f[0,0] - f[1,1] = sin(πx[0])sin(πx[1])
-    Classic test case with known analytical solution f = sin(πx[0])sin(πx[1])/(2π²).
+    -fₓₓ - fᵧᵧ = sin(πx)sin(πy)
+    Classic test case with known analytical solution f = sin(πx)sin(πy)/(2π²).
   equation_type: pde
   variables: ["x", "y"]
   order: 1
@@ -598,10 +598,10 @@ poisson_sin:
 
 poisson_linear:
   category: Poisson
-  name: "Poisson: -∇²f = x[0] + x[1]"
-  formula: "-∇²f = x[0] + x[1]"
+  name: "Poisson: -∇²f = x + y"
+  formula: "-∇²f = x + y"
   description: |
-    -f[0,0] - f[1,1] = x[0] + x[1]
+    -fₓₓ - fᵧᵧ = x + y
     Poisson with linear source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -613,10 +613,10 @@ poisson_linear:
 
 poisson_quadratic:
   category: Poisson
-  name: "Poisson: -∇²f = x[0]² + x[1]²"
-  formula: "-∇²f = x[0]² + x[1]²"
+  name: "Poisson: -∇²f = x² + y²"
+  formula: "-∇²f = x² + y²"
   description: |
-    -f[0,0] - f[1,1] = x[0]² + x[1]²
+    -fₓₓ - fᵧᵧ = x² + y²
     Poisson with quadratic source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -628,10 +628,10 @@ poisson_quadratic:
 
 poisson_gaussian:
   category: Poisson
-  name: "Poisson: -∇²f = exp(-(x[0]²+x[1]²)/σ²)"
-  formula: "-∇²f = exp(-(x[0]²+x[1]²)/σ²)"
+  name: "Poisson: -∇²f = exp(-(x²+y²)/σ²)"
+  formula: "-∇²f = exp(-(x²+y²)/σ²)"
   description: |
-    -f[0,0] - f[1,1] = exp(-(x[0]²+x[1]²)/σ²)
+    -fₓₓ - fᵧᵧ = exp(-(x²+y²)/σ²)
     Poisson with Gaussian source. Parameter σ controls the width.
   equation_type: pde
   variables: ["x", "y"]

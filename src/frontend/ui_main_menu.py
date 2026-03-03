@@ -18,7 +18,8 @@ logger = get_logger(__name__)
 class MainMenu:
     """Application main menu window.
 
-    Presents three primary actions: Solve, Configuration, Information.
+    Presents five actions: Solve, Function Transform, Information,
+    Configuration, Quit.
 
     Args:
         root: The root Tk window.
@@ -67,7 +68,7 @@ class MainMenu:
 
         ttk.Label(
             title_frame,
-            text=f"v{APP_VERSION} — DifferentialLab",
+            text=f"v{APP_VERSION}",
             style="Small.TLabel",
         ).pack(pady=(4, 0))
 
@@ -75,8 +76,8 @@ class MainMenu:
         desc_lbl = ttk.Label(
             main_frame,
             text=(
-                "Solve ordinary differential equations numerically.\n"
-                "Choose from predefined equations or write your own."
+                "Solve ODEs, vector ODEs, difference equations, and PDEs.\n"
+                "Apply Fourier, Laplace, Taylor, and other transforms."
             ),
             style="Small.TLabel",
             justify=tk.CENTER,

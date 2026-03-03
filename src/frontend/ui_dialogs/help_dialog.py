@@ -28,65 +28,87 @@ logger = get_logger(__name__)
 
 _ABOUT = (
     f"Welcome to {APP_NAME} v{APP_VERSION}!\n\n"
-    f"{APP_NAME} is a graphical tool for solving ordinary differential "
-    "equations (ODEs) numerically. Whether you are studying physics, "
-    "engineering or mathematics, it lets you explore how systems evolve "
-    "over time — from simple exponential growth to complex oscillators.\n\n"
-    "Under the hood it uses SciPy's robust integration engine (solve_ivp) "
-    "and supports equations of any order."
+    f"{APP_NAME} is a graphical tool for solving differential equations "
+    "and recurrence relations numerically. It supports:\n\n"
+    "\u2022 ODEs — scalar ordinary differential equations (any order)\n"
+    "\u2022 Vector ODEs — coupled systems (Lorenz, Lotka-Volterra, etc.)\n"
+    "\u2022 Difference equations — recurrence relations (Fibonacci, logistic map)\n"
+    "\u2022 PDEs — 2D elliptic equations (Poisson, Laplace, general operator-based)\n"
+    "\u2022 Function transforms — Fourier, Laplace, Taylor, Hilbert, Z-transform\n\n"
+    "The application uses SciPy's integration engine (solve_ivp) for ODEs "
+    "and finite-difference methods for PDEs. It enables users to explore "
+    "how systems evolve over time in physics, engineering, and mathematics."
 )
 
 _HOW_TO_USE = (
-    "1.  Click  Solve  in the main menu.\n"
-    "2.  Pick a predefined equation (and tweak its parameters) or switch to "
-    "the Custom tab and write your own expression.\n"
-    "3.  Set the domain [x_min, x_max], initial conditions, number of "
-    "evaluation points, solver method, and which statistics to compute.\n"
+    "Main menu: Solve, Function Transform, Information, Configuration, Quit.\n\n"
+    "Solving an equation:\n"
+    "1.  Click  Solve Differential Equation  in the main menu.\n"
+    "2.  Select a predefined equation (ODE, Vector ODE, Difference, or PDE) "
+    "or switch to the Custom tab and define a custom expression.\n"
+    "3.  Set the domain, initial conditions, evaluation points, solver method "
+    "(ODEs), and which statistics to compute.\n"
     "4.  Press  Solve  to run the computation.\n"
-    "5.  A results window will appear with the solution plot, phase portrait "
-    "(for 2nd-order+ equations), statistics, and links to the exported files."
+    "5.  The results window shows interactive plots (solution, phase space, "
+    "3D trajectory, animation for vector ODEs), statistics, and export buttons.\n\n"
+    "Function transforms:\n"
+    "1.  Click  Function Transform  in the main menu.\n"
+    "2.  Enter a scalar function f(x) and select a transform (Fourier, Laplace, "
+    "Taylor, Hilbert, Z-transform).\n"
+    "3.  View the result and export data to CSV or save the plot as PNG."
 )
 
 _CUSTOM_EXPRESSIONS = (
-    "Use Python / NumPy syntax. The independent variable is  x .\n"
-    "The state vector uses  f  notation:\n"
-    "    f[0] = f        (the function itself)\n"
-    "    f[1] = f'       (first derivative)\n"
-    "    f[2] = f''      (second derivative)  ...\n\n"
-    "For vector ODEs use  f[i, k]  where i = component, k = derivative:\n"
-    "    f[0,0] = first component, f[1,0] = second component, etc.\n\n"
-    "Available math functions:\n"
+    "Use Python / NumPy syntax.\n\n"
+    "ODEs: Independent variable  x . State vector  f  notation:\n"
+    "    f[0] = f,  f[1] = f',  f[2] = f'',  ...\n\n"
+    "Vector ODEs: Use  f[i, k]  where i = component, k = derivative:\n"
+    "    f[0,0] = position of component 0, f[0,1] = its velocity, etc.\n\n"
+    "Difference equations: Use  n  for the index, f[0] = f_n, f[1] = f_{n+1}, etc.\n\n"
+    "PDEs: Use  x, y  (and optionally more) as independent variables.\n\n"
+    "Available mathematical functions:\n"
     "    sin, cos, tan, exp, log, log10, sqrt, abs,\n"
     "    sinh, cosh, tanh, arcsin, arccos, arctan,\n"
     "    floor, ceil, sign, heaviside, pi, e\n\n"
     "Example — damped oscillator (order 2):\n"
     "    Expression:   -2*gamma*f[1] - omega**2*f[0]\n"
-    "    Parameters:   omega=1.0, gamma=0.1"
+    "    Parameters:   omega, gamma"
 )
 
 _PREDEFINED_EQUATIONS = (
-    "\u2022 Simple Harmonic Oscillator — classic undamped oscillation\n"
-    "\u2022 Damped Oscillator — oscillation with energy loss\n"
-    "\u2022 Exponential Growth / Decay — constant-rate change\n"
-    "\u2022 Logistic Equation — growth with carrying capacity\n"
-    "\u2022 Van der Pol Oscillator — nonlinear self-sustained oscillation\n"
-    "\u2022 Simple Pendulum — large-angle pendulum motion\n"
-    "\u2022 RC Circuit (Discharge) — capacitor voltage over time\n"
-    "\u2022 Free Fall with Drag — motion against air resistance"
+    "ODE: Simple Harmonic Oscillator, Damped Oscillator, Exponential Growth/Decay, "
+    "Logistic, Van der Pol, Pendulum, RC Circuit, Free Fall with Drag.\n\n"
+    "Vector ODE: Lorenz System, Lotka-Volterra, Duffing, Rigid Body (Euler), Bloch "
+    "Equations, Schrödinger, Coupled Harmonic Oscillators, Double Pendulum, "
+    "Damped Coupled System.\n\n"
+    "Difference: Geometric Growth, Logistic Map, Fibonacci, Second-Order Linear "
+    "Recurrence, Discrete Logistic (Cobweb).\n\n"
+    "PDE: Poisson 2D, Laplace 2D, and general operator-based PDEs with "
+    "configurable derivative terms (f\u2093\u2093, f\u1d67\u1d67, f\u2093\u1d67, etc.)."
 )
 
 _OUTPUT_FILES = (
-    "Every time you solve an equation three files are created inside the "
-    "output/ folder (configurable):\n\n"
-    "\u2022 Solution  — tabular x, f data columns ready for spreadsheets.\n"
-    "\u2022 Metadata — full metadata and all computed statistics.\n"
-    "\u2022 Plot — image of the solution curve (PNG, JPG or PDF per your "
-    "configuration)."
+    "Files are saved on demand from the Results dialog:\n\n"
+    "\u2022 Save CSV... — tabular x, f, f′, f₀, f′₀, ... columns for spreadsheets.\n"
+    "\u2022 Save JSON... — full metadata and all computed statistics.\n"
+    "\u2022 Matplotlib toolbar — save the plot as PNG, JPG, or PDF.\n"
+    "\u2022 MP4 export — for vector ODE animations (via the Animation tab).\n\n"
+    "The output directory (default output/) is configurable in Configuration."
+)
+
+_FUNCTION_TRANSFORMS = (
+    "Open  Function Transform  from the main menu to apply mathematical "
+    "transforms to scalar functions f(x).\n\n"
+    "Transforms: Original (f(x)), Fourier (FFT), Laplace (real axis), Taylor "
+    "series, Hilbert (discrete), Z-transform (discrete).\n\n"
+    "Display mode: switch between  Curve (f vs x)  and  Coefficients (a\u1d62 vs i) "
+    "for Taylor, Fourier, Laplace, Hilbert, or Z-transform views.\n\n"
+    "Export data to CSV or save the plot as PNG from the transform dialog."
 )
 
 _CONFIGURATION = (
-    "You can customise almost every visual and numerical aspect of "
-    f"{APP_NAME}. Open  Configuration  from the main menu or edit the "
+    "Almost every visual and numerical aspect of "
+    f"{APP_NAME} can be customised. Open  Configuration  from the main menu or edit the "
     ".env  file directly.\n\n"
     "Changes are saved to the  .env  file and the application restarts "
     "automatically so they take effect immediately."
@@ -110,6 +132,7 @@ def _statistics_text() -> str:
 _SECTIONS: list[tuple[str, str]] = [
     ("About", _ABOUT),
     ("How to Use", _HOW_TO_USE),
+    ("Function Transforms", _FUNCTION_TRANSFORMS),
     ("Writing Custom Expressions", _CUSTOM_EXPRESSIONS),
     ("Predefined Equations", _PREDEFINED_EQUATIONS),
     ("Available Statistics", _statistics_text()),
@@ -136,7 +159,7 @@ class HelpDialog:
         self._body_labels: list[ttk.Label] = []
         self._build_ui()
 
-        fit_and_center(self.win, min_width=900, min_height=750)
+        fit_and_center(self.win, min_width=1000, min_height=750)
         make_modal(self.win, parent)
 
     def _build_ui(self) -> None:

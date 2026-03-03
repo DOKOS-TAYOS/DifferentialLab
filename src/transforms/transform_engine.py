@@ -328,7 +328,7 @@ class DisplayMode(str, Enum):
     """How to display the transform result."""
 
     CURVE = "Curve (f vs x)"
-    COEFFICIENTS = "Coefficients (a_i vs i)"
+    COEFFICIENTS = "Coefficients (a\u1d62 vs i)"
 
 
 def compute_function_samples(
@@ -513,7 +513,7 @@ def get_transform_coefficients(
         coeffs = _compute_taylor_coeffs(func, center, taylor_order, x_min, x_max)
         indices = np.arange(taylor_order + 1)
         meta = {**base_meta, "taylor_order": taylor_order, "taylor_center": center}
-        return indices, coeffs, "i", "a_i", meta
+        return indices, coeffs, "i", "a\u1d62", meta
 
     if kind == TransformKind.FOURIER:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
