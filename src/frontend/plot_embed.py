@@ -7,6 +7,7 @@ import warnings
 from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 
+from config import get_env_from_schema
 from frontend.theme import get_font
 
 if TYPE_CHECKING:
@@ -14,7 +15,9 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 
-_MAX_FPS = 30
+def _get_max_fps() -> int:
+    """Return configured max FPS for animation playback."""
+    return int(get_env_from_schema("ANIMATION_MAX_FPS"))
 
 
 def _bind_resize_handler(
@@ -110,13 +113,14 @@ def embed_animation_plot_in_tk(
             _play_job = None
             return
         duration_sec = _get_duration_sec()
-        ticks_total = max(1, int(_MAX_FPS * duration_sec))
+        max_fps = _get_max_fps()
+        ticks_total = max(1, int(max_fps * duration_sec))
         step = max(1, n_points // ticks_total)
         new_idx = min(idx + step, n_points - 1)
         scale_var.set(new_idx)
         if update_fn is not None:
             update_fn(new_idx)
-        interval_ms = max(34, int(1000.0 / _MAX_FPS))
+        interval_ms = max(34, int(1000.0 / max_fps))
         _play_job = root.after(interval_ms, _play_tick)
 
     def _on_play() -> None:

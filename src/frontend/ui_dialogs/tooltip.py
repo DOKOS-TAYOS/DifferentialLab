@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import tkinter as tk
 
+from config import get_env_from_schema
+from frontend.theme import get_font
+
 
 class ToolTip:
     """Hover tooltip for any Tkinter widget.
@@ -43,17 +46,19 @@ class ToolTip:
         tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
+        tooltip_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        tooltip_fg: str = get_env_from_schema("UI_FOREGROUND")
         label = tk.Label(
             tw,
             text=self.text,
             justify=tk.LEFT,
-            background="#333333",
-            foreground="#EEEEEE",
+            background=tooltip_bg,
+            foreground=tooltip_fg,
             relief=tk.SOLID,
             borderwidth=1,
             padx=8,
             pady=4,
-            font=("Segoe UI", 10),
+            font=get_font(),
             wraplength=350,
         )
         label.pack()

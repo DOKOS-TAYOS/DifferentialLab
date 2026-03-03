@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from frontend.theme import (
     _color_to_rgb,
     _darken_color,
@@ -40,8 +42,19 @@ class TestLightenColor:
         assert r == g == b
         assert r > 0
 
-    def test_invalid_returns_white(self) -> None:
+    def test_invalid_returns_derived_from_theme(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # When theme fallback also fails to parse, use final fallback
+        def mock_get_env(key: str) -> str:
+            return "notacolor"  # Invalid, so _color_to_rgb returns None
+        monkeypatch.setattr("frontend.theme.get_env_from_schema", mock_get_env)
         assert _lighten_color("notacolor", factor=0.2) == "#ffffff"
+
+    def test_invalid_uses_theme_foreground_when_available(self) -> None:
+        # With default theme, invalid color falls back to UI_FOREGROUND
+        result = _lighten_color("notacolor", factor=0.2)
+        assert result.startswith("#") and len(result) == 7
+        r = int(result[1:3], 16)
+        assert r >= 200  # Lightened color should be bright
 
 
 class TestDarkenColor:
@@ -55,9 +68,20 @@ class TestDarkenColor:
         assert r == g == b
         assert r < 255
 
-    def test_invalid_returns_dark(self) -> None:
+    def test_invalid_returns_derived_from_theme(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # When theme fallback also fails to parse, use final fallback
+        def mock_get_env(key: str) -> str:
+            return "notacolor"  # Invalid, so _color_to_rgb returns None
+        monkeypatch.setattr("frontend.theme.get_env_from_schema", mock_get_env)
         result = _darken_color("notacolor", factor=0.25)
         assert result == "#1e1e1e"
+
+    def test_invalid_uses_theme_background_when_available(self) -> None:
+        # With default theme, invalid color falls back to UI_BACKGROUND
+        result = _darken_color("notacolor", factor=0.25)
+        assert result.startswith("#") and len(result) == 7
+        r = int(result[1:3], 16)
+        assert r <= 32  # Darkened color should be dark
 
 
 class TestGetSelectColors:

@@ -23,6 +23,8 @@ from utils import DifferentialLabError, get_logger
 
 logger = get_logger(__name__)
 
+_MAX_PDE_GRID = 1000
+
 
 class ParametersDialog:
     """Dialog for configuring solver parameters, ICs, and statistics.
@@ -557,11 +559,10 @@ class ParametersDialog:
                     "Invalid Grid", "Grid points must be integers.", parent=self.win
                 )
                 return
-            _max_pde_grid = 1000
-            if n_points > _max_pde_grid or n_points_y > _max_pde_grid:
+            if n_points > _MAX_PDE_GRID or n_points_y > _MAX_PDE_GRID:
                 messagebox.showerror(
                     "Grid too large",
-                    f"PDE grid is limited to {_max_pde_grid} points per axis to avoid "
+                    f"PDE grid is limited to {_MAX_PDE_GRID} points per axis to avoid "
                     f"excessive memory use. You entered {n_points}×{n_points_y}.",
                     parent=self.win,
                 )

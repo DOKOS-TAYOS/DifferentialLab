@@ -83,6 +83,8 @@ def _lighten_color(color: str, factor: float = 0.20) -> str:
     """
     rgb = _color_to_rgb(color)
     if rgb is None:
+        rgb = _color_to_rgb(get_env_from_schema("UI_FOREGROUND"))
+    if rgb is None:
         return "#ffffff"
     r, g, b = rgb
     r = min(255, int(r + (255 - r) * factor))
@@ -102,6 +104,8 @@ def _darken_color(color: str, factor: float = 0.25) -> str:
         Hex color string (#rrggbb).
     """
     rgb = _color_to_rgb(color)
+    if rgb is None:
+        rgb = _color_to_rgb(get_env_from_schema("UI_BACKGROUND"))
     if rgb is None:
         return "#1e1e1e"
     r, g, b = rgb
@@ -162,6 +166,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     font_size: int = get_env_from_schema("UI_FONT_SIZE")
 
     focus_bg = select_bg
+    focus_field_bg = _lighten_color(btn_bg, 0.1)
 
     font = (font_family, font_size)
     font_bold = (font_family, font_size, "bold")
@@ -281,7 +286,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         padding=6,
         font=font,
     )
-    style.map("TEntry", fieldbackground=[("focus", "#2a2a2a")])
+    style.map("TEntry", fieldbackground=[("focus", focus_field_bg)])
 
     # --- Spinbox ---
     style.configure(
@@ -296,7 +301,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         font=font,
         arrowsize=font[1] + padding * 2,
     )
-    style.map("TSpinbox", fieldbackground=[("focus", "#2a2a2a")])
+    style.map("TSpinbox", fieldbackground=[("focus", focus_field_bg)])
 
     # --- Combobox ---
     style.configure(
@@ -310,7 +315,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     )
     style.map(
         "TCombobox",
-        fieldbackground=[("readonly", btn_bg), ("focus", "#2a2a2a")],
+        fieldbackground=[("readonly", btn_bg), ("focus", focus_field_bg)],
         foreground=[("readonly", fg)],
     )
 
@@ -318,7 +323,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     style.configure("TCheckbutton", background=bg, foreground=fg, font=font, indicatorcolor=btn_bg)
     style.map(
         "TCheckbutton",
-        background=[("active", bg), ("focus", "#2a2a2a")],
+        background=[("active", bg), ("focus", focus_field_bg)],
         indicatorcolor=[("selected", btn_fg)],
     )
 

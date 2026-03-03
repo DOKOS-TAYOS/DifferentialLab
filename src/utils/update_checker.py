@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from config import get_env, get_project_root
+from config import get_env, get_env_from_schema, get_project_root
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +24,7 @@ _DEFAULT_VERSION_URL = (
     "https://raw.githubusercontent.com/DOKOS-TAYOS/DifferentialLab/main/pyproject.toml"
 )
 _LAST_CHECK_FILE = ".last_update_check"
-_DAYS_BETWEEN_CHECKS = 7
+_UPDATE_CHECK_TIMEOUT = 10
 
 
 def _get_last_check_path() -> Path:
@@ -52,7 +52,8 @@ def should_run_check() -> bool:
     try:
         mtime = path.stat().st_mtime
         elapsed_days = (time.time() - mtime) / (24 * 3600)
-        return elapsed_days >= _DAYS_BETWEEN_CHECKS
+        days_between: int = get_env_from_schema("UPDATE_CHECK_INTERVAL_DAYS")
+        return elapsed_days >= days_between
     except OSError as exc:
         logger.debug("Could not stat last-check file, assuming check needed: %s", exc)
         return True
@@ -97,7 +98,7 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
 
     try:
         req = Request(url, headers={"User-Agent": "DifferentialLab-UpdateChecker/1.0"})
-        with urlopen(req, timeout=10) as resp:
+        with urlopen(req, timeout=_UPDATE_CHECK_TIMEOUT) as resp:
             content = resp.read().decode("utf-8", errors="replace")
     except (URLError, HTTPError, OSError, ValueError) as e:
         logger.debug("Update check: could not fetch version from %s: %s", url, e)

@@ -41,6 +41,10 @@ _SIZE_FIELDS: frozenset[str] = frozenset(
         "FONT_AXIS_SIZE",
         "FONT_TICK_SIZE",
         "SOLVER_NUM_POINTS",
+        "ANIMATION_MAX_FPS",
+        "UPDATE_CHECK_INTERVAL_DAYS",
+        "PLOT_PHASE_MARKER_SIZE",
+        "PLOT_CONTOUR_LEVELS",
     }
 )
 
@@ -192,6 +196,36 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "cast_type": str,
         "description": "Edge colour of data-point markers.",
     },
+    {
+        "key": "PLOT_PHASE_START_COLOR",
+        "default": "green",
+        "cast_type": str,
+        "description": "Colour of the start marker in phase-space plots.",
+    },
+    {
+        "key": "PLOT_PHASE_END_COLOR",
+        "default": "red",
+        "cast_type": str,
+        "description": "Colour of the end marker in phase-space plots.",
+    },
+    {
+        "key": "PLOT_PHASE_MARKER_SIZE",
+        "default": 8,
+        "cast_type": int,
+        "description": "Size of start/end markers in phase-space plots.",
+    },
+    {
+        "key": "PLOT_SURFACE_CMAP",
+        "default": "viridis",
+        "cast_type": str,
+        "description": "Matplotlib colormap for 3D surface and contour plots.",
+    },
+    {
+        "key": "PLOT_CONTOUR_LEVELS",
+        "default": 20,
+        "cast_type": int,
+        "description": "Number of contour levels in 2D contour plots.",
+    },
     # --- font (plots) ---
     {
         "key": "FONT_FAMILY",
@@ -298,6 +332,20 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "default": False,
         "cast_type": bool,
         "description": "Also print log messages to the terminal console.",
+    },
+    # --- animation ---
+    {
+        "key": "ANIMATION_MAX_FPS",
+        "default": 30,
+        "cast_type": int,
+        "description": "Maximum frames per second for embedded animation playback.",
+    },
+    # --- update checker ---
+    {
+        "key": "UPDATE_CHECK_INTERVAL_DAYS",
+        "default": 7,
+        "cast_type": int,
+        "description": "Days between automatic update checks.",
     },
 ]
 

@@ -224,8 +224,17 @@ def create_phase_plot(
         vert = np.gradient(y_2d[0], x)
         ax.plot(horiz, vert, color=line_color, linewidth=line_width)
 
-    ax.plot(horiz[0], vert[0], "o", color="green", markersize=8, label="Start")
-    ax.plot(horiz[-1], vert[-1], "s", color="red", markersize=8, label="End")
+    phase_start_color: str = get_env_from_schema("PLOT_PHASE_START_COLOR")
+    phase_end_color: str = get_env_from_schema("PLOT_PHASE_END_COLOR")
+    phase_marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
+    ax.plot(
+        horiz[0], vert[0], "o",
+        color=phase_start_color, markersize=phase_marker_size, label="Start",
+    )
+    ax.plot(
+        horiz[-1], vert[-1], "s",
+        color=phase_end_color, markersize=phase_marker_size, label="End",
+    )
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=True)
     fig.tight_layout()
@@ -269,9 +278,18 @@ def create_phase_3d_plot(
     line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
     line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
 
+    phase_start_color: str = get_env_from_schema("PLOT_PHASE_START_COLOR")
+    phase_end_color: str = get_env_from_schema("PLOT_PHASE_END_COLOR")
+    phase_marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
     ax.plot(data_x, data_y, data_z, color=line_color, linewidth=line_width)
-    ax.plot([data_x[0]], [data_y[0]], [data_z[0]], "o", color="green", markersize=8, label="Start")
-    ax.plot([data_x[-1]], [data_y[-1]], [data_z[-1]], "s", color="red", markersize=8, label="End")
+    ax.plot(
+        [data_x[0]], [data_y[0]], [data_z[0]], "o",
+        color=phase_start_color, markersize=phase_marker_size, label="Start",
+    )
+    ax.plot(
+        [data_x[-1]], [data_y[-1]], [data_z[-1]], "s",
+        color=phase_end_color, markersize=phase_marker_size, label="End",
+    )
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
         ax.set_title(title)
@@ -325,11 +343,12 @@ def create_surface_plot(
         if z.shape != X.shape:
             raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
+    surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     surf = ax.plot_surface(
         X,
         Y,
         z,
-        cmap="viridis",
+        cmap=surface_cmap,
         alpha=0.9,
         edgecolor="none",
     )
@@ -377,7 +396,9 @@ def create_contour_plot(
         if z.shape != X.shape:
             raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
-    contour = ax.contourf(X, Y, z, levels=20, cmap="viridis")
+    contour_levels: int = get_env_from_schema("PLOT_CONTOUR_LEVELS")
+    surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
+    contour = ax.contourf(X, Y, z, levels=contour_levels, cmap=surface_cmap)
     fig.colorbar(contour, ax=ax)
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
@@ -528,9 +549,10 @@ def create_vector_animation_3d(
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
+    surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     X_grid, I_grid = np.meshgrid(x, np.arange(vector_components))
     Z_grid = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
-    ax.plot_surface(X_grid, I_grid, Z_grid, cmap="viridis", alpha=0.9, edgecolor="none")
+    ax.plot_surface(X_grid, I_grid, Z_grid, cmap=surface_cmap, alpha=0.9, edgecolor="none")
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
         ax.set_title(title)
