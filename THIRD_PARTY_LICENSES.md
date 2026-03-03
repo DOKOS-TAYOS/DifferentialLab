@@ -1,6 +1,6 @@
 ### Third-Party Licenses for DifferentialLab
 
-DifferentialLab (`DifferentialLab`) is distributed under the **MIT** license (see `license.md` in the project root).
+DifferentialLab is distributed under the **MIT** license (see `license.md` in the project root).
 
 This document lists the third-party libraries used and their licenses, to facilitate compliance
 with their terms when redistributing DifferentialLab (as source code, installable package, binary,
@@ -15,14 +15,13 @@ or installer).
 
 These libraries are used at application runtime.
 
-| Library          | Version Range       | License Type                          |
-|------------------|---------------------|---------------------------------------|
-| **numpy**        | `>=2.0,<3.0`       | BSD-3-Clause                          |
-| **matplotlib**   | `>=3.10,<4.0`      | Matplotlib License (BSD-style + PSF)  |
-| **scipy**        | `>=1.15,<2.0`      | BSD-3-Clause                          |
-| **python-dotenv**| `>=1.0,<2.0`       | BSD-3-Clause                          |
-| **colorama**     | `>=0.4,<1.0`       | BSD-3-Clause                          |
-| **PyYAML**       | `>=6.0,<7.0`       | MIT                                   |
+| Library           | Version Range   | License Type                          |
+|-------------------|-----------------|---------------------------------------|
+| **numpy**         | `>=2.0,<3.0`    | BSD-3-Clause                          |
+| **matplotlib**    | `>=3.10,<4.0`   | Matplotlib License (BSD-style + PSF)  |
+| **scipy**         | `>=1.15,<2.0`   | BSD-3-Clause                          |
+| **python-dotenv** | `>=1.0,<2.0`    | BSD-3-Clause                          |
+| **PyYAML**        | `>=6.0,<7.0`    | MIT                                   |
 
 ---
 
@@ -30,14 +29,15 @@ These libraries are used at application runtime.
 
 The following standard-library modules are used and require no separate licensing:
 
-| Module       | Purpose                     |
-|--------------|-----------------------------|
-| **tkinter**  | Desktop GUI (Tk/ttk)        |
-| **logging**  | Application logging         |
-| **csv**      | CSV file export             |
-| **json**     | JSON file export            |
-| **math**     | Mathematical functions      |
-| **pathlib**  | File path management        |
+| Module        | Purpose                     |
+|---------------|-----------------------------|
+| **tkinter**   | Desktop GUI (Tk/ttk)        |
+| **logging**   | Application logging         |
+| **csv**       | CSV file export             |
+| **json**      | JSON file export            |
+| **math**      | Mathematical functions      |
+| **pathlib**   | File path management        |
+| **urllib**    | Update checker (HTTP)       |
 
 ---
 
@@ -45,12 +45,12 @@ The following standard-library modules are used and require no separate licensin
 
 These libraries are used only for development and are not distributed with the application.
 
-| Library          | Version Range       | License Type |
-|------------------|---------------------|--------------|
-| **pytest**       | `>=8.0,<9.0`       | MIT          |
-| **pytest-cov**   | `>=6.0,<7.0`       | MIT          |
-| **ruff**         | `>=0.9,<1.0`       | MIT          |
-| **mypy**         | `>=1.0,<2.0`       | MIT          |
+| Library        | Version Range   | License Type |
+|----------------|-----------------|--------------|
+| **pytest**    | `>=8.0,<9.0`    | MIT          |
+| **pytest-cov**| `>=6.0,<7.0`    | MIT          |
+| **ruff**      | `>=0.9,<1.0`    | MIT          |
+| **mypy**      | `>=1.0,<2.0`    | MIT          |
 
 ---
 

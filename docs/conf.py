@@ -12,7 +12,7 @@ project = "DifferentialLab"
 author = "Alejandro Mata Ali"
 copyright = "2026, Alejandro Mata Ali"  # noqa: A001
 release = "0.3.0"
-version = "0.2"
+version = "0.3"
 
 # -- General configuration ---------------------------------------------------
 
@@ -80,9 +80,12 @@ intersphinx_mapping = {
 
 # -- HTML output -------------------------------------------------------------
 
+_docs_dir = Path(__file__).resolve().parent
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-html_logo = "_static/DifferentialLab_logo.png"
+_logo_path = _docs_dir / "_static" / "DifferentialLab_logo.png"
+if _logo_path.exists():
+    html_logo = "_static/DifferentialLab_logo.png"
 html_theme_options = {
     "navigation_depth": 4,
     "collapse_navigation": False,

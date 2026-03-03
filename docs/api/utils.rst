@@ -10,6 +10,12 @@ utils.exceptions
    :members:
    :show-inheritance:
 
+utils.expression_parser_shared
+------------------------------
+
+.. automodule:: utils.expression_parser_shared
+   :members:
+
 utils.export
 ------------
 

@@ -39,6 +39,12 @@ solver.predefined
 .. automodule:: solver.predefined
    :members:
 
+solver.notation
+----------------
+
+.. automodule:: solver.notation
+   :members:
+
 solver.statistics
 -----------------
 

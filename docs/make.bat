@@ -21,9 +21,16 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
+if "%1" == "opendocs" goto opendocs
 if "%1" == "" goto help
 
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+goto end
+
+:opendocs
+%SPHINXBUILD% -M html %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+if errorlevel 1 exit /b 1
+start "" "%BUILDDIR%\html\index.html"
 goto end
 
 :help

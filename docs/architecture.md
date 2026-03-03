@@ -24,6 +24,7 @@ src/
 │   ├── pde_solver.py        # Finite-difference 2D elliptic PDE solver
 │   ├── error_metrics.py     # Residual error, Jacobian evals for ODEs
 │   ├── predefined.py        # YAML equation loader with caching
+│   ├── notation.py          # FNotation, f-notation to y-notation translation
 │   ├── statistics.py        # Post-solve statistical analysis (1D and 2D)
 │   └── validators.py        # Input validation
 ├── plotting/                # Matplotlib output
@@ -49,6 +50,7 @@ src/
 │       └── tooltip.py
 └── utils/                   # Shared utilities
     ├── exceptions.py        # Custom exception hierarchy
+    ├── expression_parser_shared.py  # SAFE_MATH, AST validation for parsers
     ├── export.py            # CSV / JSON / MP4 export
     ├── logger.py            # Logging setup
     └── update_checker.py    # Weekly version check, git pull
@@ -76,21 +78,27 @@ with a `solve_multipoint` shooting-method extension and a shared
 `_resolve_solver_params()` helper to eliminate duplicate parameter resolution.
 `difference_solver` iterates recurrence relations.  `pde_solver` solves 2D
 elliptic PDEs with finite differences.  `error_metrics` computes residual error
-and Jacobian evaluations.  `statistics` computes post-solve magnitudes (mean,
-RMS, period, energy, etc.) for 1D and 2D data, with `all_stats` linked to
-`AVAILABLE_STATISTICS` in `config.constants`.  `validators` checks all user
-inputs before solving and includes `_ordinal()` helper for correct ordinal
-suffix generation and module-level constants for repeated values.
+and Jacobian evaluations.  `notation` provides the f-notation layer: `FNotation`
+dataclass, `rewrite_f_expression()` to translate user `f[0]`/`f[1]`/`f[i,k]`
+syntax to internal `y[j]` arrays for SciPy compatibility, and
+`generate_derivative_labels()` for formatted plot labels (f, f′, f₀, f′₀).
+`statistics` computes post-solve magnitudes (mean, RMS, period, energy, etc.)
+for 1D and 2D data, with `all_stats` linked to `AVAILABLE_STATISTICS` in
+`config.constants`.  `validators` checks all user inputs before solving and
+includes `_ordinal()` helper for correct ordinal suffix generation and
+module-level constants for repeated values.
 
 ### `plotting`
 
 Creates matplotlib figures from solution data.  `plot_utils.py` includes
 `_get_colors()` helper for colormap selection with consistent fallback logic.
-`create_solution_plot` renders `y(x)` with configurable line style, colours,
-and derivatives.  `create_phase_plot` renders the phase portrait (y vs y′ or
-y vs dy/dx).  `create_surface_plot` and `create_contour_plot` handle 2D scalar
-fields.  `create_vector_animation_plot` and `create_vector_animation_3d` support
-vector ODE visualization.  All visual parameters are read from `config.env`.
+`create_solution_plot` renders the solution with configurable line style,
+colours, and derivatives.  `create_phase_plot` renders the phase portrait
+(f vs f′ or f vs df/dx).  `create_phase_3d_plot` renders 3D parametric
+trajectories for vector ODEs with 3+ components.  `create_surface_plot` and
+`create_contour_plot` handle 2D scalar fields.  `create_vector_animation_plot`
+and `create_vector_animation_3d` support vector ODE visualization.  All visual
+parameters are read from `config.env`.
 
 ### `transforms`
 
@@ -101,8 +109,9 @@ Fourier (FFT), Laplace (real axis), Taylor series, Hilbert (discrete), and
 Z-transform. Includes shared helpers `_compute_taylor_coeffs()` and
 `_compute_laplace_samples()` for identical computation blocks across
 `apply_transform` and `get_transform_coefficients`.  Supports curve view (f vs x)
-and coefficients view (a_i vs i). Laplace transform bounds are now configurable
-via environment parameters (`laplace_s_min`, `laplace_s_max`).
+and coefficients view (a_i vs i). Laplace transform bounds (`laplace_s_min`,
+`laplace_s_max`) are passed as function parameters to `apply_transform` and
+`get_transform_coefficients` (defaults 0.1 and 10.0).
 
 ### `frontend`
 
@@ -123,19 +132,24 @@ handler for CSV and JSON export buttons.
 ### `utils`
 
 Cross-cutting concerns: a custom exception hierarchy rooted at
-`DifferentialLabError`, CSV/JSON/MP4 export helpers with consistent public API,
-a logging setup that reads `LOG_LEVEL`, `LOG_FILE`, and `LOG_CONSOLE` from the
-environment (now imports `get_project_root()` from `config.paths` to avoid path
-duplication), and `update_checker` for weekly version checks and optional git
-pull with improved git stash detection logic.
+`DifferentialLabError`, `expression_parser_shared` providing `SAFE_MATH`,
+`normalize_unicode_escapes`, and `validate_expression_ast` used by equation
+parsers for safe expression evaluation, CSV/JSON/MP4 export helpers with
+consistent public API, a logging setup that reads `LOG_LEVEL`, `LOG_FILE`, and
+`LOG_CONSOLE` from the environment (now imports `get_project_root()` from
+`config.paths` to avoid path duplication), and `update_checker` for weekly
+version checks and optional git pull with improved git stash detection logic.
 
 ### `pipeline`
 
 The bridge between the GUI and the solver.  `run_solver_pipeline` executes
 the full workflow: validate inputs, resolve ODE/difference/PDE function,
-solve, compute statistics, generate plots, and export files.  It returns a
-`SolverResult` dataclass consumed by the results dialog.  Detects 1D vs
-multivariate from `variables` and routes to ODE or PDE solver accordingly.
+solve, compute statistics, and export files.  It returns a `SolverResult`
+dataclass containing raw solution data (`x`, `y`, `statistics`, `metadata`,
+`notation`) — no pre-built matplotlib figures.  The result dialog creates plots
+interactively from this data, allowing users to select derivatives, phase-space
+axes, and visualization modes without re-solving.  Detects 1D vs multivariate
+from `variables` and routes to ODE or PDE solver accordingly.
 
 ## Data Flow
 
@@ -156,14 +170,12 @@ User input (GUI)
                                       │
                            ┌──────────┼──────────┐
                            ▼          ▼          ▼
-                      statistics   plots     export
-                           │          │          │
-                           └──────────┼──────────┘
-                                      ▼
-                              SolverResult
-                                      │
+                      statistics   export   SolverResult
+                           │          │     (x, y, stats,
+                           └──────────┼     metadata, notation)
                                       ▼
                               ResultDialog (GUI)
+                              creates plots interactively
 ```
 
 ## Import Strategy
@@ -186,41 +198,7 @@ clicks a button.
 3. Code reads settings on demand via `get_env_from_schema(key)`.
 4. The Configuration dialog writes a new `.env` and restarts the process.
 
-## Code Quality and Refactoring
-
-### Helper Function Extraction
-
-To maintain consistency and reduce duplication, the following helper functions
-were introduced:
-
-| Module | Helper | Purpose |
-|--------|--------|---------|
-| `solver/ode_solver.py` | `_resolve_solver_params()` | Shared solver parameter resolution (method, max_step, rtol, atol, t_eval) |
-| `solver/equation_parser.py` | `_compile_and_test()` | Safe expression compilation with test evaluation |
-| `solver/equation_parser.py` | `_load_config_function()` | Load Python functions from config modules by name |
-| `solver/validators.py` | `_ordinal()` | Generate correct ordinal suffixes ("1st", "2nd", "3rd", etc.) |
-| `transforms/transform_engine.py` | `_compute_taylor_coeffs()` | Taylor series coefficient computation |
-| `transforms/transform_engine.py` | `_compute_laplace_samples()` | Laplace transform sample computation |
-| `plotting/plot_utils.py` | `_get_colors()` | Colormap selection with consistent fallback logic |
-| `frontend/plot_embed.py` | `_bind_resize_handler()` | Canvas resize event handling for matplotlib embedding |
-| `frontend/window_utils.py` | `bind_wraplength()` | Dynamic text wrapping for labels based on frame width |
-| `frontend/ui_dialogs/result_dialog.py` | `_save_export_file()` | Shared CSV/JSON export file dialog handler |
-
-### Performance Improvements
-
-- **Vectorized array evaluation** (10–100× speedup): `transforms/function_parser.py`
-  now passes full NumPy arrays directly to `eval()` instead of iterating
-  element-wise, dramatically improving performance for large arrays.
-
-### Code Metrics
-
-- **~250 lines of duplicated code eliminated** through extraction of 11 helpers
-- **18 files modified** with internal refactoring
-- **11 helper functions introduced** to consolidate repeated patterns
-- **Zero breaking changes** — all refactoring is internal and transparent to users
-- **Improved type safety** — `EquationType` now uses `Literal` for stricter type checking
-
-### Design Patterns
+## Design Patterns
 
 **Module-level constants**: Repeated scalar values (e.g., `_MAX_FPS`, `subscripts`,
 `_MAX_GRID_POINTS`) are defined at module level rather than inline or inside
@@ -236,3 +214,8 @@ public functions have no underscore prefix. Export public APIs via `__init__.py`
 **Error handling**: Expression parsing uses AST validation before compilation to
 provide clear error messages early. Solver exceptions are caught and displayed
 to the user via messageboxes rather than crashing.
+
+**f-notation vs internal y-notation**: Users write equations with `f[0]`, `f[1]`,
+`f[i,k]` (function, derivatives, vector components). The `notation` module
+translates these to internal `y[j]` arrays required by SciPy's `solve_ivp`.
+Plot labels and CSV headers use formatted Unicode (f, f′, f₀, f′₀) for clarity.

@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["ode", "differential-equations", "scientific", "numerical-methods", "solver"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Physics",

@@ -10,7 +10,7 @@
 [![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org/)
 [![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
 
-[🐛 **Report Bug**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) • [💡 **Request Feature**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues)
+[📂 **Repository**](https://github.com/DOKOS-TAYOS/DifferentialLab) • [🐛 **Report Bug**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) • [💡 **Request Feature**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues)
 
 ---
 
@@ -25,12 +25,14 @@ Taylor, Hilbert, Z-transform).
 
 - **ODEs**: Six numerical methods (RK45, RK23, DOP853, Radau, BDF, LSODA)
 - **Difference equations**: Recurrence relations (geometric growth, logistic map, Fibonacci, etc.)
-- **PDEs**: 2D elliptic solver (Poisson, Laplace)
-- **Vector ODEs**: Coupled systems with animation and 3D visualization
+- **PDEs**: 2D elliptic solver (Poisson, Laplace) plus general operator-based PDEs
+- **Vector ODEs**: Coupled systems with animation, 3D phase-space trajectories, and surface visualization
+- **Unified f-notation**: Write equations using `f[0]`, `f[1]`, `f[i,k]` (function, derivatives, vector components)
+- **Interactive result tabs**: Select derivatives to plot, choose phase-space axes, switch visualization modes without re-solving
 - **Predefined equations**: Harmonic oscillator, pendulum, Van der Pol, Lorenz, Lotka-Volterra, and more
 - **Function transforms**: Fourier (FFT), Laplace, Taylor series, Hilbert, Z-transform
 - **Custom equations**: Python syntax with safe evaluation
-- **Plots**: Solution curves, phase portraits, surface/contour for PDEs, vector animation
+- **Plots**: Solution curves, phase portraits (2D/3D), surface/contour for PDEs, vector animation
 - **Statistics**: Mean, RMS, period, amplitude, energy, residual error metrics
 - **Export**: CSV, JSON, PNG/JPG/PDF, MP4 animation
 

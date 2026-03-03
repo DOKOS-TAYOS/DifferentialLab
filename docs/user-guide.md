@@ -34,8 +34,7 @@ Click **Solve** to open the equation dialog.  Choose the equation type:
 
 Select from the list on the left.  When an equation is highlighted its
 description and parameters appear on the right.  You can adjust parameter
-values (e.g. angular frequency, damping coefficient) and select which
-derivatives to plot.
+values (e.g. angular frequency, damping coefficient).
 
 Available predefined equations include:
 
@@ -52,15 +51,16 @@ Available predefined equations include:
 
 #### Custom Tab
 
-**ODEs**: Write the highest derivative as a Python expression.  Use `y[0]`
-for the function, `y[1]` for the first derivative, `y[2]` for the second, etc.
+**ODEs**: Write the highest derivative as a Python expression.  Use `f[0]`
+for the function, `f[1]` for the first derivative, `f[2]` for the second, etc.
 The independent variable is `x`.
 
-**Difference equations**: Use `y[0]` for y_n, `y[1]` for y_{n+1}, etc., and
+**Difference equations**: Use `f[0]` for f_n, `f[1]` for f_{n+1}, etc., and
 `n` for the index.
 
 **Vector ODEs**: Enter a list of expressions `[f₀'', f₁'', ...]` for coupled
-systems.
+systems.  Use `f[i,k]` for component `i` and derivative order `k` (e.g. `f[0,0]`
+for position of component 0, `f[0,1]` for its velocity).
 
 **PDEs**: Use `x`, `y` (and optionally more) as independent variables.
 
@@ -74,7 +74,7 @@ the character directly.
 **Example** -- damped oscillator (order 2):
 
 ```
-Expression:   -2*γ*y[1] - ω**2*y[0]
+Expression:   -2*γ*f[1] - ω**2*f[0]
 Parameters:   ω=1.0, γ=0.1
 ```
 
@@ -101,10 +101,13 @@ After clicking **Solve**, the results window shows:
   residual error metrics), solver information (method, success status,
   evaluation count), and paths to the exported files.  Sections are
   collapsible.
-- **Right panel**: solution plot `y(x)` with selected derivatives.  For
-  second-order and higher ODEs, a **Phase Portrait** tab appears.  For
-  vector ODEs, **Animation** and **3D** tabs are available.  For PDEs,
-  a surface or contour plot is shown.
+- **Right panel**: tabs with interactive plots.  Use the multi-select listbox
+  to choose which derivatives to display; changes apply immediately without
+  re-solving.  For second-order and higher ODEs, a **Phase Space** tab lets
+  you select the axes (e.g. f vs f′).  For vector ODEs, **Phase 3D** shows
+  3D parametric trajectories; **Animation** and **3D Surface** tabs are
+  also available.  For PDEs, surface or contour plots with variable/slice
+  selectors are shown.
 
 The plot is interactive (zoom, pan) via the matplotlib toolbar at the bottom.
 Vector animations can be exported to MP4.
@@ -132,7 +135,7 @@ Every solve produces at least three files in the output directory (default
 
 | File                          | Contents                              |
 |-------------------------------|---------------------------------------|
-| `solution_YYYYMMDD_HHMMSS.csv` | Tabular `x, y0, y1, ...` columns     |
+| `solution_YYYYMMDD_HHMMSS.csv` | Tabular `x, f, f′, f₀, f′₀, ...` columns |
 | `solution_YYYYMMDD_HHMMSS.json`| Full metadata and computed statistics |
 | `solution_YYYYMMDD_HHMMSS.png` | Plot image (format configurable)      |
 

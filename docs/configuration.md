@@ -96,6 +96,10 @@ code (`#RRGGBB`).
 
 ## Update Check
 
+These variables are optional overrides (not in the main schema). Add them to
+`.env` if you need to customize update-check behaviour. They are read via
+`get_env()` with the defaults below.
+
 | Variable           | Type | Default | Description                                      |
 |--------------------|------|---------|--------------------------------------------------|
 | `CHECK_UPDATES`    | bool | `true`  | Check for updates on startup (once per week).   |

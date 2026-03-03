@@ -23,19 +23,37 @@ chmod +x install.sh
 ./install.sh
 ```
 
-These scripts create a virtual environment, install all dependencies, and
-generate a default `.env` file.
+These scripts clone the repository (if needed) and run setup, which creates a
+virtual environment, installs all dependencies, and generates a default `.env`
+file.
 
-### Manual Setup
+### Manual Setup (existing clone)
 
-1. Clone the repository:
+If you need to clone the repository first:
 
-   ```bash
-   git clone https://github.com/DOKOS-TAYOS/DifferentialLab.git
-   cd DifferentialLab
-   ```
+```bash
+git clone https://github.com/DOKOS-TAYOS/DifferentialLab.git
+cd DifferentialLab
+```
 
-2. Create and activate a virtual environment:
+If you already have the repository cloned:
+
+**Windows:**
+
+```
+bin\setup.bat
+```
+
+**Linux / macOS:**
+
+```bash
+chmod +x bin/setup.sh
+./bin/setup.sh
+```
+
+Alternatively, set up manually:
+
+1. Create and activate a virtual environment:
 
    ```bash
    python -m venv .venv
@@ -47,7 +65,7 @@ generate a default `.env` file.
    source .venv/bin/activate
    ```
 
-3. Install the package in editable mode:
+2. Install the package in editable mode:
 
    ```bash
    pip install -e .
@@ -65,7 +83,7 @@ generate a default `.env` file.
    pip install -e ".[docs]"
    ```
 
-4. Copy the example configuration:
+3. Copy the example configuration:
 
    ```bash
    cp .env.example .env
@@ -83,11 +101,10 @@ bin\run.bat
 ./bin/run.sh
 ```
 
-**Directly via Python:**
+**Directly via Python** (from project root):
 
 ```bash
-cd src
-python main_program.py
+python src/main_program.py
 ```
 
 **Via the installed entry point:**
@@ -98,28 +115,52 @@ differential-lab
 
 ## Dependencies
 
-| Package       | Version  | Purpose                    |
-|---------------|----------|----------------------------|
-| NumPy         | >= 2.0   | Numerical computations     |
-| Matplotlib    | >= 3.10  | Plotting and visualization |
-| SciPy         | >= 1.15  | ODE solving engine         |
-| python-dotenv | >= 1.0   | Environment configuration  |
-| PyYAML        | >= 6.0   | Equation definitions       |
+| Package       | Version     | Purpose                    |
+|---------------|-------------|----------------------------|
+| NumPy         | >= 2.0, < 3.0 | Numerical computations   |
+| Matplotlib    | >= 3.10, < 4.0 | Plotting and visualization |
+| SciPy         | >= 1.15, < 2.0 | ODE solving engine       |
+| python-dotenv | >= 1.0, < 2.0 | Environment configuration |
+| PyYAML        | >= 6.0, < 7.0 | Equation definitions      |
 
 ## Building the Documentation
 
 ```bash
 pip install -e ".[docs]"
 cd docs
+```
+
+**Linux / macOS:**
+
+```bash
 make html
+```
+
+**Windows:**
+
+```
+make.bat html
 ```
 
 The built HTML will be in `docs/_build/html/`. Open `index.html` in a browser
 to view it locally.
 
-On Windows without `make`, use the batch script:
+## Troubleshooting
 
-```
-cd docs
-make.bat html
-```
+**Virtual environment not found**
+
+If `bin\run.bat` or `./bin/run.sh` reports that the virtual environment is
+missing, run `bin\setup.bat` (Windows) or `./bin/setup.sh` (Linux/macOS) first
+to create it and install dependencies.
+
+**ModuleNotFoundError when running directly**
+
+If you get `ModuleNotFoundError` when running `python src/main_program.py`,
+ensure you are in the project root directory (the folder containing `src/`).
+Alternatively, use the installed entry point: `differential-lab` (after
+`pip install -e .`).
+
+**Git not found (install scripts)**
+
+The `install.bat` and `install.sh` scripts require Git. Install it from
+<https://git-scm.com/downloads> before running them.

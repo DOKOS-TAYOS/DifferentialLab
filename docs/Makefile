@@ -8,7 +8,10 @@ BUILDDIR      = _build
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile
+opendocs: html
+	@python -c "import webbrowser, os; webbrowser.open('file://' + os.path.abspath('$(BUILDDIR)/html/index.html'))"
+
+.PHONY: help opendocs Makefile
 
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
