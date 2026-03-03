@@ -21,6 +21,8 @@ logger = get_logger(__name__)
 
 _LAST_CHECK_FILE = ".last_update_check"
 _UPDATE_CHECK_TIMEOUT = 10
+_VERSION_RE = re.compile(r"^(\d+(?:\.\d+)*)")
+_PYPROJECT_VERSION_RE = re.compile(r'version\s*=\s*["\']([^"\']+)["\']')
 
 
 def _get_last_check_path() -> Path:
@@ -73,11 +75,10 @@ def _parse_version(version_str: str) -> tuple[int, ...]:
     Returns:
         Tuple of integers for comparison (e.g. (0, 2, 0)).
     """
-    match = re.match(r"^(\d+(?:\.\d+)*)", str(version_str).strip())
+    match = _VERSION_RE.match(str(version_str).strip())
     if not match:
         return (0,)
-    parts = [int(x) for x in match.group(1).split(".")]
-    return tuple(parts)
+    return tuple(int(x) for x in match.group(1).split("."))
 
 
 def _fetch_latest_version(version_url: str | None = None) -> str | None:
@@ -100,7 +101,7 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
         logger.debug("Update check: could not fetch version from %s: %s", url, e)
         return None
 
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = _PYPROJECT_VERSION_RE.search(content)
     if match:
         return match.group(1).strip()
     return None

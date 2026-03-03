@@ -47,7 +47,7 @@ def _export_csv(
         headers = ["x"] + [f"f{i}" if n_vars > 1 else "f" for i in range(n_vars)]
 
     _ensure_parent_dir(filepath)
-    data = np.column_stack([x] + [y_2d[i] for i in range(n_vars)])
+    data = np.column_stack((x, y_2d.T))
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
@@ -126,12 +126,12 @@ def _export_csv_2d(
         Path written.
     """
     _ensure_parent_dir(filepath)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    data = np.column_stack((X.ravel(), Y.ravel(), u.ravel()))
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["x", "y", "f"])
-        for j, yv in enumerate(y_grid):
-            for i, xv in enumerate(x_grid):
-                writer.writerow([xv, yv, u[j, i]])
+        writer.writerows(data.tolist())
     logger.info("CSV exported (2D): %s", filepath)
     return filepath
 

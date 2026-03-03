@@ -9,6 +9,7 @@ import logging
 import sys
 
 _CONFIGURED = False
+_LOGGER_NS = "differential_lab"
 
 
 def _setup_root_logger() -> None:
@@ -29,7 +30,7 @@ def _setup_root_logger() -> None:
 
     level = getattr(logging, level_name.upper(), logging.INFO)
 
-    root = logging.getLogger("differential_lab")
+    root = logging.getLogger(_LOGGER_NS)
     root.setLevel(level)
 
     fmt = logging.Formatter(
@@ -61,6 +62,5 @@ def get_logger(name: str) -> logging.Logger:
         A ``logging.Logger`` instance.
     """
     _setup_root_logger()
-    if name.startswith("differential_lab."):
-        return logging.getLogger(name)
-    return logging.getLogger(f"differential_lab.{name}")
+    qualified = name if name.startswith(f"{_LOGGER_NS}.") else f"{_LOGGER_NS}.{name}"
+    return logging.getLogger(qualified)

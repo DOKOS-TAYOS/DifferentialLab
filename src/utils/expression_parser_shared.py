@@ -59,7 +59,7 @@ SAFE_MATH: dict[str, Any] = {
     "heaviside": np.heaviside,
 }
 
-ALLOWED_NODE_TYPES = (
+_ALLOWED_NODE_TYPES: frozenset[type[ast.AST]] = frozenset((
     ast.Module,
     ast.Expr,
     ast.Expression,
@@ -93,7 +93,7 @@ ALLOWED_NODE_TYPES = (
     ast.GtE,
     ast.Tuple,
     ast.List,
-)
+))
 
 
 def validate_expression_ast(expression: str, context: str = "expression") -> None:
@@ -113,7 +113,7 @@ def validate_expression_ast(expression: str, context: str = "expression") -> Non
         raise EquationParseError(f"Syntax error in expression: {exc}") from exc
 
     for node in ast.walk(tree):
-        if not isinstance(node, ALLOWED_NODE_TYPES):
+        if type(node) not in _ALLOWED_NODE_TYPES:
             raise EquationParseError(
                 f"Disallowed construct in {context}: {type(node).__name__}"
             )
