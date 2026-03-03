@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_MAGNITUDE_KEYS = {"mean", "rms", "std", "integral"}
+_MAGNITUDE_KEYS = {"mean", "rms", "std", "integral", "l2_norm", "half_life", "time_constant", "doubling_time", "angular_frequency"}
 
 _LEFT_MIN_WIDTH = 580
 

@@ -66,6 +66,30 @@ def compute_statistics(
     if "energy" in all_stats and y_2d.shape[0] >= 2:
         results["energy"] = _estimate_energy(x, y_2d)
 
+    if "median" in all_stats:
+        results["median"] = float(np.median(y_primary))
+
+    if "l2_norm" in all_stats:
+        results["l2_norm"] = _compute_l2_norm(x, y_primary)
+
+    if "dominant_frequency" in all_stats:
+        results["dominant_frequency"] = _estimate_dominant_frequency(x, y_primary)
+
+    if "exponential_rate" in all_stats:
+        results["exponential_rate"] = _estimate_exponential_rate(x, y_primary)
+
+    if "half_life" in all_stats:
+        results["half_life"] = _compute_half_life(x, y_primary)
+
+    if "time_constant" in all_stats:
+        results["time_constant"] = _compute_time_constant(x, y_primary)
+
+    if "doubling_time" in all_stats:
+        results["doubling_time"] = _compute_doubling_time(x, y_primary)
+
+    if "angular_frequency" in all_stats:
+        results["angular_frequency"] = _compute_angular_frequency(x, y_primary)
+
     logger.debug("Computed statistics: %s", list(results.keys()))
     return results
 
@@ -112,6 +136,84 @@ def _estimate_period(x: np.ndarray, y: np.ndarray) -> float | None:
 def _estimate_amplitude(y: np.ndarray) -> float:
     """Estimate amplitude as half the peak-to-peak range."""
     return float((np.max(y) - np.min(y)) / 2.0)
+
+
+def _compute_l2_norm(x: np.ndarray, y: np.ndarray) -> float:
+    """L2 norm over the domain: sqrt(∫f² dx). Common in functional analysis."""
+    span = x[-1] - x[0]
+    if span == 0:
+        return float(np.sqrt(np.mean(y**2)) * len(y))
+    return float(np.sqrt(np.trapezoid(y**2, x)))
+
+
+def _estimate_dominant_frequency(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Dominant frequency via FFT (cycles per unit of x). Returns None if invalid."""
+    n = len(y)
+    if n < 4:
+        return None
+    y_centered = y - np.mean(y)
+    fft_vals = np.fft.rfft(y_centered)
+    magnitudes = np.abs(fft_vals)
+    magnitudes[0] = 0  # Ignore DC
+    if np.max(magnitudes) < 1e-10:
+        return None
+    peak_idx = int(np.argmax(magnitudes))
+    span = x[-1] - x[0]
+    if span <= 0:
+        return None
+    return float(peak_idx / span)
+
+
+def _estimate_exponential_rate(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Fit y = A*exp(λ*x). Returns λ when fit is good (monotonic, all same sign)."""
+    if len(y) < 3 or len(x) < 3:
+        return None
+    if np.any(y <= 0):
+        return None
+    try:
+        from scipy.optimize import curve_fit
+
+        def model(t: np.ndarray, a: float, lam: float) -> np.ndarray:
+            return a * np.exp(lam * t)
+
+        span = x[-1] - x[0]
+        lam0 = np.log(y[-1] / y[0]) / span if span > 0 and y[0] > 0 else 0.0
+        popt, _ = curve_fit(model, x, y, p0=(float(y[0]), float(lam0)))
+        return float(popt[1])
+    except Exception:
+        return None
+
+
+def _compute_half_life(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Half-life for exponential decay: t_1/2 = ln(2)/|λ|. Returns None if not decay."""
+    lam = _estimate_exponential_rate(x, y)
+    if lam is None or lam >= 0:
+        return None
+    return float(np.log(2) / abs(lam))
+
+
+def _compute_time_constant(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Time constant τ = 1/|λ| for exponential decay (e.g. RC circuit)."""
+    lam = _estimate_exponential_rate(x, y)
+    if lam is None or lam >= 0:
+        return None
+    return float(1.0 / abs(lam))
+
+
+def _compute_doubling_time(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Doubling time t_2 = ln(2)/λ for exponential growth."""
+    lam = _estimate_exponential_rate(x, y)
+    if lam is None or lam <= 0:
+        return None
+    return float(np.log(2) / lam)
+
+
+def _compute_angular_frequency(x: np.ndarray, y: np.ndarray) -> float | None:
+    """Angular frequency ω = 2πf (rad per unit of x) from dominant frequency."""
+    freq = _estimate_dominant_frequency(x, y)
+    if freq is None:
+        return None
+    return float(2.0 * np.pi * freq)
 
 
 def _estimate_energy(x: np.ndarray, y_2d: np.ndarray) -> dict[str, float]:
@@ -186,4 +288,22 @@ def compute_statistics_2d(
     if "integral" in all_stats:
         results["integral"] = float(np.trapezoid(np.trapezoid(u, x_grid, axis=1), y_grid, axis=0))
 
+    if "l2_norm" in all_stats:
+        integrand = np.trapezoid(np.trapezoid(u**2, x_grid, axis=1), y_grid, axis=0)
+        results["l2_norm"] = float(np.sqrt(max(0, integrand)))
+
+    if "gradient_norm" in all_stats:
+        results["gradient_norm"] = _compute_gradient_norm_2d(x_grid, y_grid, u)
+
     return results
+
+
+def _compute_gradient_norm_2d(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    u: np.ndarray,
+) -> float:
+    """Mean magnitude of gradient |∇u| over the 2D domain."""
+    uy, ux = np.gradient(u, y_grid, x_grid)
+    grad_mag = np.sqrt(ux**2 + uy**2)
+    return float(np.mean(grad_mag))
