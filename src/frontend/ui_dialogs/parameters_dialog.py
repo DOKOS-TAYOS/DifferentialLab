@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import queue
+import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any
@@ -622,53 +624,83 @@ class ParametersDialog:
         if self.is_pde and self._bc_vars:
             bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
 
-        try:
-            from pipeline import run_solver_pipeline
+        result_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
 
-            result = run_solver_pipeline(
-                expression=self.expression,
-                function_name=self.function_name,
-                order=self.order,
-                parameters=self.parameters,
-                equation_name=self.equation_name,
-                x_min=x_min,
-                x_max=x_max,
-                y0=y0,
-                n_points=n_points,
-                method=method,
-                selected_stats=selected_stats,
-                x0_list=x0_list,
-                equation_type=self.equation_type,
-                variables=self.variables,
-                y_min=y_min,
-                y_max=y_max,
-                n_points_y=n_points_y,
-                vector_expressions=self.vector_expressions,
-                vector_components=self.vector_components,
-                pde_operator=self.pde_operator,
-                component_orders=self.component_orders,
-                bc_expressions=bc_expressions,
-            )
-        except DifferentialLabError as exc:
-            logger.warning("Solver pipeline failed (user-facing): %s", exc)
-            messagebox.showerror("Error", str(exc), parent=self.win)
-            return
-        except (MemoryError, OSError) as exc:
-            logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
-            messagebox.showerror(
-                "Memory Error",
-                f"Not enough memory to solve: {exc}\n\n"
-                "Try reducing the grid size (points per axis).",
-                parent=self.win,
-            )
-            return
-        except Exception as exc:
-            logger.exception("Solver pipeline: unexpected error")
-            messagebox.showerror("Error", str(exc), parent=self.win)
-            return
+        def _run_solver() -> None:
+            try:
+                from pipeline import run_solver_pipeline
 
+                result = run_solver_pipeline(
+                    expression=self.expression,
+                    function_name=self.function_name,
+                    order=self.order,
+                    parameters=self.parameters,
+                    equation_name=self.equation_name,
+                    x_min=x_min,
+                    x_max=x_max,
+                    y0=y0,
+                    n_points=n_points,
+                    method=method,
+                    selected_stats=selected_stats,
+                    x0_list=x0_list,
+                    equation_type=self.equation_type,
+                    variables=self.variables,
+                    y_min=y_min,
+                    y_max=y_max,
+                    n_points_y=n_points_y,
+                    vector_expressions=self.vector_expressions,
+                    vector_components=self.vector_components,
+                    pde_operator=self.pde_operator,
+                    component_orders=self.component_orders,
+                    bc_expressions=bc_expressions,
+                )
+                result_queue.put(("success", result))
+            except DifferentialLabError as exc:
+                logger.warning("Solver pipeline failed (user-facing): %s", exc)
+                result_queue.put(("error", ("DifferentialLabError", str(exc))))
+            except (MemoryError, OSError) as exc:
+                logger.error(
+                    "Solver pipeline: memory/system error: %s", exc, exc_info=True
+                )
+                result_queue.put(
+                    (
+                        "error",
+                        (
+                            "Memory Error",
+                            f"Not enough memory to solve: {exc}\n\n"
+                            "Try reducing the grid size (points per axis).",
+                        ),
+                    )
+                )
+            except Exception as exc:
+                logger.exception("Solver pipeline: unexpected error")
+                result_queue.put(("error", ("Error", str(exc))))
+
+        from frontend.ui_dialogs.loading_dialog import LoadingDialog
+
+        loading = LoadingDialog(self.parent, message="Solving...")
         self.win.destroy()
 
-        from frontend.ui_dialogs.result_dialog import ResultDialog
+        threading.Thread(target=_run_solver, daemon=True).start()
 
-        ResultDialog(self.parent, result=result)
+        def _check_result() -> None:
+            try:
+                status, data = result_queue.get_nowait()
+                try:
+                    loading.destroy()
+                except tk.TclError:
+                    pass
+                if not self.parent.winfo_exists():
+                    return
+                if status == "success":
+                    from frontend.ui_dialogs.result_dialog import ResultDialog
+
+                    ResultDialog(self.parent, result=data)
+                else:
+                    title, msg = data
+                    messagebox.showerror(title, msg, parent=self.parent)
+            except queue.Empty:
+                if self.parent.winfo_exists():
+                    self.parent.after(100, _check_result)
+
+        self.parent.after(100, _check_result)
