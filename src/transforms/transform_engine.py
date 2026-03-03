@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import math
 from enum import Enum
+from functools import lru_cache
 from typing import Callable
 
 import numpy as np
+from numpy.polynomial import polynomial as P
 from scipy import fft
-from scipy.integrate import quad
+from scipy.integrate import quad_vec
 
 from utils import get_logger
 
@@ -110,8 +112,12 @@ def _compute_taylor_coeffs(
     return coeffs
 
 
+@lru_cache(maxsize=64)
 def _hilbert_filter_kernel(n: int) -> np.ndarray:
-    """Build Hilbert transform filter for FFT of length n."""
+    """Build Hilbert transform filter for FFT of length n.
+
+    Cached for repeated calls with same n (common in FFT-based transforms).
+    """
     h = np.zeros(n, dtype=complex)
     h[0] = 1
     h[1 : (n + 1) // 2] = 2
@@ -285,6 +291,8 @@ def _compute_laplace_samples(
 ) -> np.ndarray:
     """Compute Laplace transform samples over given s values.
 
+    Uses quad_vec for vectorized integration (single call for all s values).
+
     Args:
         func: Vectorized callable f(x) -> y.
         x_min: Lower bound of integration.
@@ -294,31 +302,31 @@ def _compute_laplace_samples(
     Returns:
         Array of Laplace transform values at each s.
     """
-    def integrand(t: float, s: float) -> float:
+    s_vals = np.asarray(s_vals, dtype=float)
+    n_s = len(s_vals)
+
+    def vector_integrand(t: float) -> np.ndarray:
         if t < x_min or t > x_max:
-            return 0.0
+            return np.zeros(n_s, dtype=float)
         try:
-            return float(func(np.array([t]))[0] * np.exp(-s * t))
+            ft = float(func(np.array([t]))[0])
+            return ft * np.exp(-s_vals * t)
         except (ValueError, ZeroDivisionError, OverflowError):
-            return 0.0
+            return np.zeros(n_s, dtype=float)
 
-    laplace_vals = np.zeros_like(s_vals)
-    for i, s in enumerate(s_vals):
-        try:
-            result, _ = quad(
-                lambda t, s_val=s: integrand(t, s_val),
-                x_min,
-                x_max,
-                limit=200,
-                epsabs=1e-10,
-                epsrel=1e-8,
-            )
-            laplace_vals[i] = result
-        except Exception as exc:
-            logger.debug("Laplace quad failed at s=%g: %s", s, exc)
-            laplace_vals[i] = np.nan
-
-    return laplace_vals
+    try:
+        result, _ = quad_vec(
+            vector_integrand,
+            x_min,
+            x_max,
+            epsabs=1e-10,
+            epsrel=1e-8,
+            limit=200,
+        )
+        return np.asarray(result, dtype=float)
+    except Exception as exc:
+        logger.debug("Laplace quad_vec failed: %s", exc)
+        return np.full(n_s, np.nan, dtype=float)
 
 
 class TransformKind(str, Enum):
@@ -337,6 +345,59 @@ class DisplayMode(str, Enum):
 
     CURVE = "Curve (f vs x)"
     COEFFICIENTS = "Coefficients (a\u1d62 vs i)"
+
+
+def _fft_magnitude_fn(fv: np.ndarray, n: int) -> np.ndarray:
+    """Standard FFT magnitude (Fourier/Z-transform)."""
+    return np.abs(fv[: n // 2])
+
+
+def _hilbert_magnitude_fn(fv: np.ndarray, n: int) -> np.ndarray:
+    """Hilbert filter magnitude for coefficient display."""
+    return np.abs((fv * _hilbert_filter_kernel(n))[: n // 2])
+
+
+def _apply_fft_magnitude_spectrum(
+    func: Callable[[np.ndarray], np.ndarray],
+    x_min: float,
+    x_max: float,
+    n_points: int,
+    threshold: float,
+    y_label: str,
+) -> tuple[np.ndarray, np.ndarray, str, str]:
+    """Apply FFT magnitude spectrum (shared by Fourier and Z-transform)."""
+    x, y = compute_function_samples(func, x_min, x_max, n_points)
+    dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
+    fft_vals = fft.fft(y)
+    fft_mag = np.abs(fft_vals[: n_points // 2])
+    freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+    freqs, fft_mag, _ = _trim_and_refine_fft_spectrum(
+        y, dx, freqs, fft_mag, threshold, n_points // 2,
+        magnitude_fn=_fft_magnitude_fn,
+    )
+    return freqs, fft_mag, "ω/(2π)", y_label
+
+
+def _get_fft_coefficients(
+    func: Callable[[np.ndarray], np.ndarray],
+    x_min: float,
+    x_max: float,
+    n_points: int,
+    threshold: float,
+    y_label: str,
+    base_meta: dict[str, object],
+) -> tuple[np.ndarray, np.ndarray, str, str, dict[str, object]]:
+    """Get FFT coefficient representation (shared by Fourier and Z-transform)."""
+    x, y = compute_function_samples(func, x_min, x_max, n_points)
+    dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
+    fft_mag = np.abs(fft.fft(y)[: n_points // 2])
+    freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+    freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
+        y, dx, freqs, fft_mag, threshold, n_points // 2,
+        magnitude_fn=_fft_magnitude_fn,
+    )
+    meta = {**base_meta, "amp_threshold": threshold}
+    return freqs, coeffs, "ω/(2π)", y_label, meta
 
 
 def compute_function_samples(
@@ -391,11 +452,12 @@ def apply_transform(
         laplace_s_max: Maximum s for Laplace.
         laplace_n_points: Number of s values for Laplace.
         fourier_amp_threshold: Relative amplitude threshold (fraction of max) to trim
-            Fourier spectrum at low and high frequencies. Frequencies with |F(ω)| below
-            this fraction of the maximum are excluded from the displayed range. Default 0.01.
+            Fourier spectrum at low and high frequencies. Frequencies with ``|F(ω)|``
+            below this fraction of the maximum are excluded from the displayed range.
+            Default 0.01.
         z_transform_amp_threshold: Same as fourier_amp_threshold but for Z-transform
             magnitude spectrum. Default 0.01.
-        laplace_amp_threshold: Same for Laplace: trim s range where |L(s)| is below
+        laplace_amp_threshold: Same for Laplace: trim s range where ``|L(s)|`` is below
             this fraction of max. Default 0.01.
 
     Returns:
@@ -409,16 +471,9 @@ def apply_transform(
         return x, y, "x", "f(x)"
 
     if kind == TransformKind.FOURIER:
-        x, y = compute_function_samples(func, x_min, x_max, n_points)
-        dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_vals = fft.fft(y)
-        fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        freqs, fft_mag, _ = _trim_and_refine_fft_spectrum(
-            y, dx, freqs, fft_mag, fourier_amp_threshold, n_points // 2,
-            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        return _apply_fft_magnitude_spectrum(
+            func, x_min, x_max, n_points, fourier_amp_threshold, "|F(ω)|"
         )
-        return freqs, fft_mag, "ω/(2π)", "|F(ω)|"
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
@@ -435,9 +490,7 @@ def apply_transform(
 
         x = np.linspace(x_min, x_max, n_points)
         x_centered = x - center
-        y_taylor = np.zeros_like(x)
-        for n, c in enumerate(coeffs):
-            y_taylor += c * (x_centered**n)
+        y_taylor = P.polyval(x_centered, coeffs)
 
         return x, y_taylor, "x", f"Taylor_{taylor_order}(x)"
 
@@ -449,16 +502,9 @@ def apply_transform(
         return x, hilbert_signal, "x", "H[f](x)"
 
     if kind == TransformKind.Z_TRANSFORM:
-        x, y = compute_function_samples(func, x_min, x_max, n_points)
-        dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_vals = fft.fft(y)
-        fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        freqs, fft_mag, _ = _trim_and_refine_fft_spectrum(
-            y, dx, freqs, fft_mag, z_transform_amp_threshold, n_points // 2,
-            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        return _apply_fft_magnitude_spectrum(
+            func, x_min, x_max, n_points, z_transform_amp_threshold, "|X[k]|"
         )
-        return freqs, fft_mag, "ω/(2π)", "|X[k]|"
 
     raise ValueError(f"Unknown transform kind: {kind}")
 
@@ -524,16 +570,10 @@ def get_transform_coefficients(
         return indices, coeffs, "i", "a\u1d62", meta
 
     if kind == TransformKind.FOURIER:
-        x, y = compute_function_samples(func, x_min, x_max, n_points)
-        dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_mag = np.abs(fft.fft(y)[: n_points // 2])
-        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
-            y, dx, freqs, fft_mag, fourier_amp_threshold, n_points // 2,
-            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        return _get_fft_coefficients(
+            func, x_min, x_max, n_points,
+            fourier_amp_threshold, "|F(ω)|", base_meta,
         )
-        meta = {**base_meta, "amp_threshold": fourier_amp_threshold}
-        return freqs, coeffs, "ω/(2π)", "|F(ω)|", meta
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
@@ -554,25 +594,19 @@ def get_transform_coefficients(
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
         fft_vals = fft.fft(y)
-        coeffs = np.abs((fft_vals * _hilbert_filter_kernel(len(fft_vals)))[: len(fft_vals) // 2])
+        coeffs = _hilbert_magnitude_fn(fft_vals, len(fft_vals))
         freqs = np.abs(fft.fftfreq(len(fft_vals), dx)[: len(fft_vals) // 2])
         freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
             y, dx, freqs, coeffs, hilbert_amp_threshold, n_points // 2,
-            magnitude_fn=lambda fv, n: np.abs((fv * _hilbert_filter_kernel(n))[: n // 2]),
+            magnitude_fn=_hilbert_magnitude_fn,
         )
         meta = {**base_meta, "amp_threshold": hilbert_amp_threshold}
         return freqs, coeffs, "ω/(2π)", "|H(ω)|", meta
 
     if kind == TransformKind.Z_TRANSFORM:
-        x, y = compute_function_samples(func, x_min, x_max, n_points)
-        dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_mag = np.abs(fft.fft(y)[: n_points // 2])
-        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
-            y, dx, freqs, fft_mag, z_transform_amp_threshold, n_points // 2,
-            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        return _get_fft_coefficients(
+            func, x_min, x_max, n_points,
+            z_transform_amp_threshold, "|X(ω)|", base_meta,
         )
-        meta = {**base_meta, "amp_threshold": z_transform_amp_threshold}
-        return freqs, coeffs, "ω/(2π)", "|X(ω)|", meta
 
     raise ValueError(f"Unknown transform kind: {kind}")
