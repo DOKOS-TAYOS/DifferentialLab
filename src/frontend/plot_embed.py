@@ -7,6 +7,8 @@ import warnings
 from tkinter import ttk
 from typing import TYPE_CHECKING, Callable
 
+from frontend.theme import get_font
+
 if TYPE_CHECKING:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     from matplotlib.figure import Figure
@@ -153,7 +155,7 @@ def embed_animation_plot_in_tk(
         scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
         ttk.Label(ctrl_frame, text="Duration (s):").pack(side=tk.LEFT, padx=(8, 2))
-        ttk.Entry(ctrl_frame, textvariable=duration_var, width=14).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(ctrl_frame, textvariable=duration_var, width=5, font=get_font()).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(
             ctrl_frame,

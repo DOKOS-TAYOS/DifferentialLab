@@ -429,13 +429,13 @@ class EquationDialog:
 
         ttk.Label(top_row, text="Components:").pack(side=tk.LEFT)
         self._vec_n_var = tk.StringVar(value="2")
-        ttk.Spinbox(
+        vec_spin = ttk.Spinbox(
             top_row, from_=2, to=100, width=5,
             textvariable=self._vec_n_var, font=font,
-        ).pack(side=tk.LEFT, padx=(pad, pad))
-        ttk.Button(
-            top_row, text="Refresh", command=self._refresh_vec_boxes,
-        ).pack(side=tk.LEFT)
+        )
+        vec_spin.pack(side=tk.LEFT, padx=(pad, pad))
+        self._vec_n_refresh_id: str | None = None
+        self._vec_n_var.trace_add("write", self._on_vec_n_change)
 
         # Dummy order var for compatibility (actual orders come from per-component spinboxes)
         self.custom_order_var = tk.StringVar(value="2")
@@ -469,6 +469,20 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, k")
 
+        self._refresh_vec_boxes()
+
+    def _on_vec_n_change(self, *args: object) -> None:
+        """Update expression boxes when number of components changes (debounced)."""
+        if self._vec_n_refresh_id is not None:
+            try:
+                self.win.after_cancel(self._vec_n_refresh_id)
+            except tk.TclError:
+                pass
+        self._vec_n_refresh_id = self.win.after(150, self._do_vec_n_refresh)
+
+    def _do_vec_n_refresh(self) -> None:
+        """Perform the actual refresh (called after debounce delay)."""
+        self._vec_n_refresh_id = None
         self._refresh_vec_boxes()
 
     def _on_vec_mode_change(self) -> None:

@@ -11,6 +11,7 @@ import numpy as np
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -68,10 +69,10 @@ class ResultDialog:
 
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        win_w = int(screen_w * 0.88)
+        win_w = int(screen_w * 0.94)
         win_h = min(int(screen_h * 0.85), 900)
 
-        center_window(self.win, win_w, win_h, max_width_ratio=0.92, resizable=True)
+        center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
         self.win.minsize(_LEFT_MIN_WIDTH + 500, 500)
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")
@@ -205,6 +206,8 @@ class ResultDialog:
         parent: ttk.Frame,
         callback: Any,
         prefix: str,
+        *,
+        label_style: str | None = None,
     ) -> None:
         """Add a transform dropdown to a tab's control bar.
 
@@ -215,7 +218,8 @@ class ResultDialog:
         sep = ttk.Separator(parent, orient=tk.VERTICAL)
         sep.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
 
-        ttk.Label(parent, text="Transform:").pack(side=tk.LEFT, padx=(0, 4))
+        label_kw = {"style": label_style} if label_style else {}
+        ttk.Label(parent, text="Transform:", **label_kw).pack(side=tk.LEFT, padx=(0, 4))
         var = tk.StringVar(value=TransformKind.ORIGINAL.value)
         setattr(self, f"_transform_{prefix}_var", var)
 
@@ -225,6 +229,7 @@ class ResultDialog:
             values=[k.value for k in TransformKind],
             state="readonly",
             width=20,
+            font=get_font(),
         )
         combo.pack(side=tk.LEFT, padx=(0, 4))
         combo.bind("<<ComboboxSelected>>", lambda _e: callback())
@@ -315,21 +320,21 @@ class ResultDialog:
             self._phase_x_var = tk.StringVar(value=default_x)
             phase_x_combo = ttk.Combobox(
                 phase_ctrl, textvariable=self._phase_x_var,
-                values=ps_labels, state="readonly", width=12,
+                values=ps_labels, state="readonly", width=6,
+                font=get_font(),
             )
             phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
+            phase_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_phase_plot())
 
             ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
             self._phase_y_var = tk.StringVar(value=default_y_ax)
             phase_y_combo = ttk.Combobox(
                 phase_ctrl, textvariable=self._phase_y_var,
-                values=ps_labels, state="readonly", width=12,
+                values=ps_labels, state="readonly", width=6,
+                font=get_font(),
             )
             phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
-
-            ttk.Button(
-                phase_ctrl, text="Update", command=self._update_phase_plot
-            ).pack(side=tk.LEFT, padx=4)
+            phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_phase_plot())
 
             self._phase_options_map = {lbl: idx for lbl, idx in ps_options}
             self._phase_plot_frame = ttk.Frame(phase_tab)
@@ -553,21 +558,23 @@ class ResultDialog:
 
         ttk.Label(phase_ctrl, text="X-axis:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase_x_var = tk.StringVar(value=default_x_phase)
-        ttk.Combobox(
+        vec_phase_x_combo = ttk.Combobox(
             phase_ctrl, textvariable=self._vec_phase_x_var,
-            values=ps_labels, state="readonly", width=14,
-        ).pack(side=tk.LEFT, padx=(0, 8))
+            values=ps_labels, state="readonly", width=6,
+            font=get_font(),
+        )
+        vec_phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
+        vec_phase_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_plot())
 
         ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase_y_var = tk.StringVar(value=default_y_phase)
-        ttk.Combobox(
+        vec_phase_y_combo = ttk.Combobox(
             phase_ctrl, textvariable=self._vec_phase_y_var,
-            values=ps_labels, state="readonly", width=14,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-
-        ttk.Button(
-            phase_ctrl, text="Update", command=self._update_vec_phase_plot
-        ).pack(side=tk.LEFT, padx=4)
+            values=ps_labels, state="readonly", width=6,
+            font=get_font(),
+        )
+        vec_phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
+        vec_phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_plot())
 
         self._vec_phase_options_map = {lbl: idx for lbl, idx in ps_options}
         self._vec_phase_plot_frame = ttk.Frame(phase_tab)
@@ -603,28 +610,33 @@ class ResultDialog:
 
         ttk.Label(phase3d_ctrl, text="X:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_x_var = tk.StringVar(value=def_3d_x)
-        ttk.Combobox(
+        phase3d_x_combo = ttk.Combobox(
             phase3d_ctrl, textvariable=self._vec_phase3d_x_var,
-            values=ps_labels, state="readonly", width=12,
-        ).pack(side=tk.LEFT, padx=(0, 6))
+            values=ps_labels, state="readonly", width=6,
+            font=get_font(),
+        )
+        phase3d_x_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
         ttk.Label(phase3d_ctrl, text="Y:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_y_var = tk.StringVar(value=def_3d_y)
-        ttk.Combobox(
+        phase3d_y_combo = ttk.Combobox(
             phase3d_ctrl, textvariable=self._vec_phase3d_y_var,
-            values=ps_labels, state="readonly", width=12,
-        ).pack(side=tk.LEFT, padx=(0, 6))
+            values=ps_labels, state="readonly", width=6,
+            font=get_font(),
+        )
+        phase3d_y_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
         ttk.Label(phase3d_ctrl, text="Z:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_z_var = tk.StringVar(value=def_3d_z)
-        ttk.Combobox(
+        phase3d_z_combo = ttk.Combobox(
             phase3d_ctrl, textvariable=self._vec_phase3d_z_var,
-            values=ps_labels, state="readonly", width=12,
-        ).pack(side=tk.LEFT, padx=(0, 6))
-
-        ttk.Button(
-            phase3d_ctrl, text="Update", command=self._update_vec_phase_3d
-        ).pack(side=tk.LEFT, padx=4)
+            values=ps_labels, state="readonly", width=6,
+            font=get_font(),
+        )
+        phase3d_z_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_z_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
         self._vec_phase3d_plot_frame = ttk.Frame(phase3d_tab)
         self._vec_phase3d_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -640,13 +652,13 @@ class ResultDialog:
         ttk.Label(anim_ctrl, text="Derivative order:").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_order_var = tk.StringVar(value="0")
         orders = [str(k) for k in range(r.vector_order)]
-        ttk.Combobox(
+        anim_order_combo = ttk.Combobox(
             anim_ctrl, textvariable=self._anim_order_var,
-            values=orders, state="readonly", width=6,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(
-            anim_ctrl, text="Update", command=self._update_animation
-        ).pack(side=tk.LEFT, padx=4)
+            values=orders, state="readonly", width=4,
+            font=get_font(),
+        )
+        anim_order_combo.pack(side=tk.LEFT, padx=(0, 8))
+        anim_order_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_animation())
 
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -660,13 +672,13 @@ class ResultDialog:
         ctrl_3d.pack(fill=tk.X, padx=4, pady=4)
         ttk.Label(ctrl_3d, text="Derivative order:").pack(side=tk.LEFT, padx=(0, 4))
         self._3d_order_var = tk.StringVar(value="0")
-        ttk.Combobox(
+        order_3d_combo = ttk.Combobox(
             ctrl_3d, textvariable=self._3d_order_var,
-            values=orders, state="readonly", width=6,
-        ).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(
-            ctrl_3d, text="Update", command=self._update_3d_plot
-        ).pack(side=tk.LEFT, padx=4)
+            values=orders, state="readonly", width=4,
+            font=get_font(),
+        )
+        order_3d_combo.pack(side=tk.LEFT, padx=(0, 8))
+        order_3d_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_3d_plot())
 
         self._3d_plot_frame = ttk.Frame(tab_3d)
         self._3d_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -863,24 +875,29 @@ class ResultDialog:
 
         xlabel, ylabel = self._pde_axis_labels()
 
-        ttk.Label(trans_ctrl, text="Slice along:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(trans_ctrl, text="Slice along:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         self._pde_slice_var = tk.StringVar(value=xlabel)
         ttk.Combobox(
             trans_ctrl, textvariable=self._pde_slice_var,
-            values=[xlabel, ylabel], state="readonly", width=8,
-        ).pack(side=tk.LEFT, padx=(0, 8))
+            values=[xlabel, ylabel], state="readonly", width=2,
+            font=get_font(),
+        ).pack(side=tk.LEFT, padx=(0, 2))
 
         r = self._result
         x_mid = float((r.x[0] + r.x[-1]) / 2) if len(r.x) > 0 else 0.5
         y_mid = float((r.y_grid[0] + r.y_grid[-1]) / 2) if r.y_grid is not None and len(r.y_grid) > 0 else 0.5
 
-        ttk.Label(trans_ctrl, text="at fixed value:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         self._pde_slice_val_var = tk.StringVar(value=str(round(y_mid, 4)))
         ttk.Entry(
-            trans_ctrl, textvariable=self._pde_slice_val_var, width=8,
-        ).pack(side=tk.LEFT, padx=(0, 8))
+            trans_ctrl, textvariable=self._pde_slice_val_var, width=4,
+            font=get_font(),
+        ).pack(side=tk.LEFT, padx=(0, 2))
 
-        self._build_transform_controls(trans_ctrl, self._update_pde_transform, "pde")
+        self._build_transform_controls(
+            trans_ctrl, self._update_pde_transform, "pde",
+            label_style="Small.TLabel",
+        )
 
         ttk.Button(
             trans_ctrl, text="Update", command=self._update_pde_transform,
@@ -889,6 +906,7 @@ class ResultDialog:
         self._pde_trans_frame = ttk.Frame(trans_tab)
         self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_trans_canvas: FigureCanvasTkAgg | None = None
+        self._update_pde_transform()
 
     def _pde_axis_labels(self) -> tuple[str, str]:
         """Return (xlabel, ylabel) from metadata variable names."""

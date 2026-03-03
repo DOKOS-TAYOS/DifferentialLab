@@ -285,8 +285,8 @@ class ParametersDialog:
             ]
             for label_text, free_var in boundaries:
                 row = ttk.Frame(bc_frame)
-                row.pack(fill=tk.X, pady=2)
-                ttk.Label(row, text=f"{label_text}:", width=28).pack(side=tk.LEFT)
+                row.pack(fill=tk.X, pady=1)
+                ttk.Label(row, text=f"{label_text}:", width=16).pack(side=tk.LEFT)
                 bc_var = tk.StringVar(value="0")
                 bc_entry = ttk.Entry(
                     row, textvariable=bc_var, width=20, font=get_font(),
