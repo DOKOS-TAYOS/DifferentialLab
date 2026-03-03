@@ -512,12 +512,17 @@ def validate_expression(expression: str) -> list[str]:
     Returns:
         List of error messages (empty if valid).
     """
+    from solver.notation import preprocess_prime_notation
+
     errors: list[str] = []
     if not expression or not expression.strip():
         errors.append("Expression is empty")
         return errors
     try:
-        validate_expression_ast(normalize_unicode_escapes(expression.strip()), "expression")
+        # Preprocess f'/f'' notation before AST validation so that
+        # Python's parser doesn't confuse f' with an f-string literal.
+        expr = preprocess_prime_notation(normalize_unicode_escapes(expression.strip()))
+        validate_expression_ast(expr, "expression")
     except EquationParseError as exc:
         errors.append(str(exc))
     return errors

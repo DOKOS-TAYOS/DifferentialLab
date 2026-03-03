@@ -43,6 +43,44 @@ class FNotation:
 
 
 # ---------------------------------------------------------------------------
+# f' -> f[k] preprocessing (prime notation)
+# ---------------------------------------------------------------------------
+
+# Matches: f followed by one or more prime chars, optionally followed by [...]
+_F_PRIME_TOKEN = re.compile(
+    r"""
+    \bf                          # word-boundary then literal 'f'
+    (['\u2032]+)                 # one or more primes: ASCII ' or Unicode ′ (group 1)
+    (?:\[([^\]]*)\])?            # optional bracketed content (group 2)
+    """,
+    re.VERBOSE,
+)
+
+
+def preprocess_prime_notation(expression: str) -> str:
+    """Convert ``f'`` notation to ``f[k]`` notation before main rewriting.
+
+    Scalar ODE:  ``f'`` → ``f[1]``,  ``f''`` → ``f[2]``,  ``f'''`` → ``f[3]``
+    Vector ODE:  ``f'[i]`` → ``f[i,1]``,  ``f''[i]`` → ``f[i,2]``
+
+    Bare ``f`` (no primes, no brackets) is left unchanged.
+    """
+
+    def _replace(m: re.Match) -> str:
+        primes = m.group(1)
+        bracket = m.group(2)  # content inside optional [...]
+        deriv_order = len(primes)
+
+        if bracket is not None:
+            # Vector case: f'[i] -> f[i, deriv_order]
+            return f"f[{bracket.strip()},{deriv_order}]"
+        # Scalar case: f'' -> f[deriv_order]
+        return f"f[{deriv_order}]"
+
+    return _F_PRIME_TOKEN.sub(_replace, expression)
+
+
+# ---------------------------------------------------------------------------
 # f[...] -> y[...] rewriting
 # ---------------------------------------------------------------------------
 
@@ -113,13 +151,20 @@ def _rewrite_match_vector_ode(m: re.Match, notation: FNotation) -> str:
 def rewrite_f_expression(expression: str, notation: FNotation) -> str:
     """Rewrite user-facing ``f[...]`` tokens to internal ``y[...]`` form.
 
+    Supports both bracket notation (``f[k]``, ``f[i,k]``) and prime notation
+    (``f'``, ``f''``, ``f'[i]``).  Prime notation is preprocessed first.
+
     Args:
-        expression: Python expression using ``f``, ``f[k]``, ``f[i,k]``, etc.
+        expression: Python expression using ``f``, ``f[k]``, ``f[i,k]``,
+            ``f'``, ``f''``, ``f'[i]``, etc.
         notation: Context describing the equation type and dimensions.
 
     Returns:
         Equivalent expression with ``y[...]`` indexing suitable for the solver.
     """
+    # Preprocess prime notation (f', f'', f'[i], ...) into bracket form first
+    expression = preprocess_prime_notation(expression)
+
     if notation.kind in ("ode", "difference"):
         return _F_TOKEN.sub(lambda m: _rewrite_match_ode_scalar(m, notation.order), expression)
 

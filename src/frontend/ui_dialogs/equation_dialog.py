@@ -766,14 +766,17 @@ class EquationDialog:
             vector_components=vector_components,
         )
 
-    def _parse_custom_params(self) -> dict[str, float] | None:
+    def _parse_custom_params(self) -> dict[str, float | list[float]] | None:
         """Parse custom parameter names from the entry.
 
         Values default to 0; the user sets them in the next dialog.
+        Names of the form ``name[n]`` define a list parameter with *n* components.
         """
+        import re as _re
+
         from utils import normalize_unicode_escapes
 
-        params: dict[str, float] = {}
+        params: dict[str, float | list[float]] = {}
         raw_params = self.custom_params.get().strip()
         if raw_params:
             for name in raw_params.split(","):
@@ -781,7 +784,13 @@ class EquationDialog:
                 if not name:
                     continue
                 normalized_name = normalize_unicode_escapes(name)
-                params[normalized_name] = 0.0
+                # Detect list parameter pattern: name[n]
+                m = _re.match(r"^(.+)\[(\d+)\]$", normalized_name)
+                if m:
+                    n = int(m.group(2))
+                    params[normalized_name] = [0.0] * n
+                else:
+                    params[normalized_name] = 0.0
         return params
 
     def _on_next_custom(self) -> None:

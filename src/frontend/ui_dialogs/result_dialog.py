@@ -337,6 +337,8 @@ class ResultDialog:
             phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
             phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_phase_plot())
 
+            self._build_transform_controls(phase_ctrl, self._update_phase_plot, "phase")
+
             self._phase_options_map = {lbl: idx for lbl, idx in ps_options}
             self._phase_plot_frame = ttk.Frame(phase_tab)
             self._phase_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -451,9 +453,58 @@ class ResultDialog:
 
         self._replace_plot(self._sol_plot_frame, fig, "_sol_canvas")
 
+    def _transform_phase_axes(
+        self,
+        x: np.ndarray,
+        y_2d: np.ndarray,
+        axis_specs: list[tuple[int | None, str]],
+        kind: Any,
+    ) -> list[tuple[np.ndarray, str]] | None:
+        """Transform multiple axis data series for phase-space plots.
+
+        Each element in *axis_specs* is ``(flat_index_or_None, label)``.
+        Returns a list of ``(data_array, display_label)`` per axis, or ``None``
+        if nothing could be computed.
+        """
+        # Collect all unique non-None indices that need transforming
+        unique_indices: list[int] = []
+        for idx, _ in axis_specs:
+            if idx is not None and idx not in unique_indices:
+                unique_indices.append(idx)
+
+        if not unique_indices:
+            # All axes selected the independent variable — nothing to transform
+            return None
+
+        labels_for_transform = [
+            (f"y[{i}]" if i >= y_2d.shape[0] else f"row{i}")
+            for i in unique_indices
+        ]
+        result = self._apply_transform_multi(
+            x, y_2d, unique_indices, labels_for_transform, kind,
+        )
+        if result is None:
+            return None
+        tx, ty_2d, _tlabels, txlabel, _tylabel = result
+
+        # Build a lookup from original index to transformed row index
+        idx_to_row = {orig: row_i for row_i, orig in enumerate(unique_indices)}
+
+        output: list[tuple[np.ndarray, str]] = []
+        for idx, label in axis_specs:
+            if idx is None:
+                # Independent variable becomes the transform domain axis
+                output.append((tx, txlabel))
+            elif idx in idx_to_row:
+                output.append((ty_2d[idx_to_row[idx]], label))
+            else:
+                output.append((tx, txlabel))
+        return output
+
     def _update_phase_plot(self) -> None:
         """Regenerate the phase portrait with selected axes."""
         from plotting import create_phase_plot
+        from transforms import TransformKind
 
         r = self._result
         eq_name = r.metadata.get("equation_name", "Phase")
@@ -467,29 +518,46 @@ class ResultDialog:
         if y_2d.shape[1] != len(r.x):
             y_2d = y_2d.T
 
-        # Build the two data arrays (None index means independent variable x)
-        if x_idx is None:
-            horiz = r.x
-        elif x_idx < y_2d.shape[0]:
-            horiz = y_2d[x_idx]
-        else:
-            horiz = r.x
+        kind = self._get_transform_kind("phase")
 
-        if y_idx is None:
-            vert = r.x
-        elif y_idx < y_2d.shape[0]:
-            vert = y_2d[y_idx]
-        else:
-            vert = y_2d[0]
+        if kind == TransformKind.ORIGINAL:
+            # Build the two data arrays (None index means independent variable x)
+            if x_idx is None:
+                horiz = r.x
+            elif x_idx < y_2d.shape[0]:
+                horiz = y_2d[x_idx]
+            else:
+                horiz = r.x
 
-        # Build a 2-row array for create_phase_plot
+            if y_idx is None:
+                vert = r.x
+            elif y_idx < y_2d.shape[0]:
+                vert = y_2d[y_idx]
+            else:
+                vert = y_2d[0]
+
+            disp_xlabel = x_label
+            disp_ylabel = y_label
+            title = f"{eq_name} \u2014 Phase"
+        else:
+            result = self._transform_phase_axes(
+                r.x, y_2d,
+                [(x_idx, x_label), (y_idx, y_label)],
+                kind,
+            )
+            if result is None:
+                return
+            horiz, disp_xlabel = result[0]
+            vert, disp_ylabel = result[1]
+            title = f"{eq_name} \u2014 Phase \u2014 {kind.value}"
+
         phase_data = np.vstack([horiz, vert])
 
         fig = create_phase_plot(
             phase_data,
-            title=f"{eq_name} — Phase",
-            xlabel=x_label,
-            ylabel=y_label,
+            title=title,
+            xlabel=disp_xlabel,
+            ylabel=disp_ylabel,
         )
         self._replace_plot(self._phase_plot_frame, fig, "_phase_canvas")
 
@@ -579,6 +647,8 @@ class ResultDialog:
         vec_phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
         vec_phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_plot())
 
+        self._build_transform_controls(phase_ctrl, self._update_vec_phase_plot, "vec_phase")
+
         self._vec_phase_options_map = {lbl: idx for lbl, idx in ps_options}
         self._vec_phase_plot_frame = ttk.Frame(phase_tab)
         self._vec_phase_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -641,6 +711,8 @@ class ResultDialog:
         phase3d_z_combo.pack(side=tk.LEFT, padx=(0, 6))
         phase3d_z_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
+        self._build_transform_controls(phase3d_ctrl, self._update_vec_phase_3d, "vec_phase3d")
+
         self._vec_phase3d_plot_frame = ttk.Frame(phase3d_tab)
         self._vec_phase3d_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_phase3d_canvas: FigureCanvasTkAgg | None = None
@@ -663,6 +735,8 @@ class ResultDialog:
         anim_order_combo.pack(side=tk.LEFT, padx=(0, 8))
         anim_order_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_animation())
 
+        self._build_transform_controls(anim_ctrl, self._update_animation, "anim")
+
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_animation()
@@ -682,6 +756,8 @@ class ResultDialog:
         )
         order_3d_combo.pack(side=tk.LEFT, padx=(0, 8))
         order_3d_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_3d_plot())
+
+        self._build_transform_controls(ctrl_3d, self._update_3d_plot, "vec_3d")
 
         self._3d_plot_frame = ttk.Frame(tab_3d)
         self._3d_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -736,6 +812,7 @@ class ResultDialog:
     def _update_vec_phase_plot(self) -> None:
         """Regenerate vector ODE phase portrait."""
         from plotting import create_phase_plot
+        from transforms import TransformKind
 
         r = self._result
         eq_name = r.metadata.get("equation_name", "Phase")
@@ -749,32 +826,51 @@ class ResultDialog:
         if y_2d.shape[1] != len(r.x):
             y_2d = y_2d.T
 
-        if x_idx is None:
-            horiz = r.x
-        elif x_idx < y_2d.shape[0]:
-            horiz = y_2d[x_idx]
-        else:
-            horiz = r.x
+        kind = self._get_transform_kind("vec_phase")
 
-        if y_idx is None:
-            vert = r.x
-        elif y_idx < y_2d.shape[0]:
-            vert = y_2d[y_idx]
+        if kind == TransformKind.ORIGINAL:
+            if x_idx is None:
+                horiz = r.x
+            elif x_idx < y_2d.shape[0]:
+                horiz = y_2d[x_idx]
+            else:
+                horiz = r.x
+
+            if y_idx is None:
+                vert = r.x
+            elif y_idx < y_2d.shape[0]:
+                vert = y_2d[y_idx]
+            else:
+                vert = y_2d[0]
+
+            disp_xlabel = x_label
+            disp_ylabel = y_label
+            title = f"{eq_name} \u2014 Phase"
         else:
-            vert = y_2d[0]
+            result = self._transform_phase_axes(
+                r.x, y_2d,
+                [(x_idx, x_label), (y_idx, y_label)],
+                kind,
+            )
+            if result is None:
+                return
+            horiz, disp_xlabel = result[0]
+            vert, disp_ylabel = result[1]
+            title = f"{eq_name} \u2014 Phase \u2014 {kind.value}"
 
         phase_data = np.vstack([horiz, vert])
         fig = create_phase_plot(
             phase_data,
-            title=f"{eq_name} — Phase",
-            xlabel=x_label,
-            ylabel=y_label,
+            title=title,
+            xlabel=disp_xlabel,
+            ylabel=disp_ylabel,
         )
         self._replace_plot(self._vec_phase_plot_frame, fig, "_vec_phase_canvas")
 
     def _update_vec_phase_3d(self) -> None:
         """Regenerate vector ODE 3D phase-space trajectory."""
         from plotting import create_phase_3d_plot
+        from transforms import TransformKind
 
         r = self._result
         eq_name = r.metadata.get("equation_name", "Phase 3D")
@@ -787,40 +883,119 @@ class ResultDialog:
         if y_2d.shape[1] != len(r.x):
             y_2d = y_2d.T
 
-        def _get_data(label: str) -> np.ndarray:
-            idx = self._vec_phase_options_map.get(label)
-            if idx is None:
+        kind = self._get_transform_kind("vec_phase3d")
+
+        if kind == TransformKind.ORIGINAL:
+            def _get_data(label: str) -> np.ndarray:
+                idx = self._vec_phase_options_map.get(label)
+                if idx is None:
+                    return r.x
+                if idx < y_2d.shape[0]:
+                    return y_2d[idx]
                 return r.x
-            if idx < y_2d.shape[0]:
-                return y_2d[idx]
-            return r.x
+
+            data_x = _get_data(x_label)
+            data_y = _get_data(y_label)
+            data_z = _get_data(z_label)
+            disp_xlabel = x_label
+            disp_ylabel = y_label
+            disp_zlabel = z_label
+            title = f"{eq_name} \u2014 Phase 3D"
+        else:
+            x_idx = self._vec_phase_options_map.get(x_label)
+            y_idx = self._vec_phase_options_map.get(y_label)
+            z_idx = self._vec_phase_options_map.get(z_label)
+
+            result = self._transform_phase_axes(
+                r.x, y_2d,
+                [(x_idx, x_label), (y_idx, y_label), (z_idx, z_label)],
+                kind,
+            )
+            if result is None:
+                return
+            data_x, disp_xlabel = result[0]
+            data_y, disp_ylabel = result[1]
+            data_z, disp_zlabel = result[2]
+            title = f"{eq_name} \u2014 Phase 3D \u2014 {kind.value}"
 
         fig = create_phase_3d_plot(
-            _get_data(x_label),
-            _get_data(y_label),
-            _get_data(z_label),
-            title=f"{eq_name} — Phase 3D",
-            xlabel=x_label,
-            ylabel=y_label,
-            zlabel=z_label,
+            data_x, data_y, data_z,
+            title=title,
+            xlabel=disp_xlabel,
+            ylabel=disp_ylabel,
+            zlabel=disp_zlabel,
         )
         self._replace_plot(self._vec_phase3d_plot_frame, fig, "_vec_phase3d_canvas")
+
+    def _transform_vector_components(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        order: int,
+        vector_components: int,
+        deriv_offset: int,
+        kind: Any,
+    ) -> tuple[np.ndarray, np.ndarray, str] | None:
+        """Transform each vector component independently over x.
+
+        Returns ``(tx, transformed_y, txlabel)`` with the same shape convention
+        as the original data, or ``None`` if transform fails.
+        """
+        y_2d = np.atleast_2d(y)
+        if y_2d.shape[1] != len(x):
+            y_2d = y_2d.T
+
+        # Extract the relevant rows for each component at the given derivative offset
+        indices = [i * order + deriv_offset for i in range(vector_components)]
+        labels = [f"f_{i}" for i in range(vector_components)]
+
+        result = self._apply_transform_multi(x, y_2d, indices, labels, kind)
+        if result is None:
+            return None
+        tx, ty_2d, _labels, txlabel, _tylabel = result
+
+        # Rebuild a full-size y array with the transformed components in the right slots
+        n_state = vector_components * order
+        new_y = np.zeros((n_state, len(tx)))
+        for comp_i, orig_idx in enumerate(indices):
+            if comp_i < ty_2d.shape[0]:
+                new_y[orig_idx] = ty_2d[comp_i]
+
+        return tx, new_y, txlabel
 
     def _update_animation(self) -> None:
         """Regenerate the animation tab."""
         from plotting import create_vector_animation_plot
+        from transforms import TransformKind
 
         r = self._result
         eq_name = r.metadata.get("equation_name", "ODE")
         deriv_k = int(self._anim_order_var.get())
+        kind = self._get_transform_kind("anim")
 
-        fig = create_vector_animation_plot(
-            r.x, r.y,
-            order=r.vector_order,
-            vector_components=r.vector_components,
-            title=f"{eq_name} — f_i(x) (k={deriv_k})",
-            deriv_offset=deriv_k,
-        )
+        if kind == TransformKind.ORIGINAL:
+            fig = create_vector_animation_plot(
+                r.x, r.y,
+                order=r.vector_order,
+                vector_components=r.vector_components,
+                title=f"{eq_name} \u2014 f_i(x) (k={deriv_k})",
+                deriv_offset=deriv_k,
+            )
+        else:
+            result = self._transform_vector_components(
+                r.x, r.y, r.vector_order, r.vector_components, deriv_k, kind,
+            )
+            if result is None:
+                return
+            tx, new_y, txlabel = result
+            fig = create_vector_animation_plot(
+                tx, new_y,
+                order=r.vector_order,
+                vector_components=r.vector_components,
+                title=f"{eq_name} \u2014 {kind.value} (k={deriv_k})",
+                deriv_offset=deriv_k,
+            )
+
         # Clear existing widgets
         for w in self._anim_plot_frame.winfo_children():
             w.destroy()
@@ -833,18 +1008,36 @@ class ResultDialog:
     def _update_3d_plot(self) -> None:
         """Regenerate the 3D surface tab."""
         from plotting import create_vector_animation_3d
+        from transforms import TransformKind
 
         r = self._result
         eq_name = r.metadata.get("equation_name", "ODE")
         deriv_k = int(self._3d_order_var.get())
+        kind = self._get_transform_kind("vec_3d")
 
-        fig = create_vector_animation_3d(
-            r.x, r.y,
-            order=r.vector_order,
-            vector_components=r.vector_components,
-            title=f"{eq_name} — 3D (k={deriv_k})",
-            deriv_offset=deriv_k,
-        )
+        if kind == TransformKind.ORIGINAL:
+            fig = create_vector_animation_3d(
+                r.x, r.y,
+                order=r.vector_order,
+                vector_components=r.vector_components,
+                title=f"{eq_name} \u2014 3D (k={deriv_k})",
+                deriv_offset=deriv_k,
+            )
+        else:
+            result = self._transform_vector_components(
+                r.x, r.y, r.vector_order, r.vector_components, deriv_k, kind,
+            )
+            if result is None:
+                return
+            tx, new_y, txlabel = result
+            fig = create_vector_animation_3d(
+                tx, new_y,
+                order=r.vector_order,
+                vector_components=r.vector_components,
+                title=f"{eq_name} \u2014 {kind.value} 3D (k={deriv_k})",
+                deriv_offset=deriv_k,
+            )
+
         self._replace_plot(self._3d_plot_frame, fig, "_3d_canvas")
 
     # ── PDE ──────────────────────────────────────────────────────────
@@ -852,10 +1045,25 @@ class ResultDialog:
     def _build_pde_tabs(self) -> None:
         """Solution 3D (surface) + Solution 2D (contour) + Phase Space slice."""
         nb = self._notebook
+        xlabel, ylabel = self._pde_axis_labels()
 
         # --- Tab 1: 3D Surface ---
         surf_tab = ttk.Frame(nb)
         nb.add(surf_tab, text="  Solution 3D  ")
+
+        surf_ctrl = ttk.Frame(surf_tab)
+        surf_ctrl.pack(fill=tk.X, padx=4, pady=4)
+
+        ttk.Label(surf_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_axis_var = tk.StringVar(value=xlabel)
+        ttk.Combobox(
+            surf_ctrl, textvariable=self._pde_3d_axis_var,
+            values=[xlabel, ylabel], state="readonly", width=4,
+            font=get_font(),
+        ).pack(side=tk.LEFT, padx=(0, 4))
+
+        self._build_transform_controls(surf_ctrl, self._update_pde_3d, "pde_3d")
+
         self._pde_3d_frame = ttk.Frame(surf_tab)
         self._pde_3d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_canvas: FigureCanvasTkAgg | None = None
@@ -864,6 +1072,20 @@ class ResultDialog:
         # --- Tab 2: 2D Contour ---
         contour_tab = ttk.Frame(nb)
         nb.add(contour_tab, text="  Solution 2D  ")
+
+        contour_ctrl = ttk.Frame(contour_tab)
+        contour_ctrl.pack(fill=tk.X, padx=4, pady=4)
+
+        ttk.Label(contour_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_2d_axis_var = tk.StringVar(value=xlabel)
+        ttk.Combobox(
+            contour_ctrl, textvariable=self._pde_2d_axis_var,
+            values=[xlabel, ylabel], state="readonly", width=4,
+            font=get_font(),
+        ).pack(side=tk.LEFT, padx=(0, 4))
+
+        self._build_transform_controls(contour_ctrl, self._update_pde_2d, "pde_2d")
+
         self._pde_2d_frame = ttk.Frame(contour_tab)
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_2d_canvas: FigureCanvasTkAgg | None = None
@@ -925,13 +1147,104 @@ class ResultDialog:
         ylabel = variables[1] if len(variables) > 1 else "x[1]"
         return xlabel, ylabel
 
+    def _transform_pde_along_axis(
+        self,
+        x: np.ndarray,
+        y_grid: np.ndarray,
+        z: np.ndarray,
+        axis_var: str,
+        kind: Any,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, str, str] | None:
+        """Transform PDE solution along one axis.
+
+        Returns ``(new_x, new_y, new_z, new_xlabel, new_ylabel)`` or
+        ``None`` if the transform cannot be applied.
+
+        Because ``apply_transform`` trims spectra by amplitude and may
+        return different-length arrays for each slice, we interpolate
+        all results onto the domain grid from the first slice.
+        """
+        from scipy.interpolate import interp1d
+
+        from transforms import apply_transform
+
+        xlabel, ylabel = self._pde_axis_labels()
+
+        if axis_var == xlabel:
+            # Transform along x (columns): for each row, transform f vs x
+            raw: list[tuple[np.ndarray, np.ndarray]] = []
+            txlabel = ""
+            for i in range(z.shape[0]):
+                func = interp1d(x, z[i, :], kind="cubic", fill_value="extrapolate")
+                tx, ty, txlabel, _tylabel = apply_transform(
+                    lambda arr, f=func: f(arr), kind,
+                    float(x[0]), float(x[-1]),
+                )
+                raw.append((tx, ty))
+            if not raw:
+                return None
+            # Use first slice's domain as the common grid
+            tx_common = raw[0][0]
+            new_rows: list[np.ndarray] = []
+            for tx_i, ty_i in raw:
+                if len(tx_i) == len(tx_common) and np.allclose(tx_i, tx_common):
+                    new_rows.append(ty_i)
+                else:
+                    resamp = interp1d(tx_i, ty_i, kind="linear",
+                                      fill_value=0.0, bounds_error=False)
+                    new_rows.append(resamp(tx_common))
+            new_z = np.array(new_rows)
+            return tx_common, y_grid, new_z, txlabel, ylabel
+        else:
+            # Transform along y_grid (rows): for each column, transform f vs y
+            raw_c: list[tuple[np.ndarray, np.ndarray]] = []
+            tylabel = ""
+            for j in range(z.shape[1]):
+                func = interp1d(y_grid, z[:, j], kind="cubic", fill_value="extrapolate")
+                ty, tz, tylabel, _tzlabel = apply_transform(
+                    lambda arr, f=func: f(arr), kind,
+                    float(y_grid[0]), float(y_grid[-1]),
+                )
+                raw_c.append((ty, tz))
+            if not raw_c:
+                return None
+            ty_common = raw_c[0][0]
+            new_cols: list[np.ndarray] = []
+            for ty_j, tz_j in raw_c:
+                if len(ty_j) == len(ty_common) and np.allclose(ty_j, ty_common):
+                    new_cols.append(tz_j)
+                else:
+                    resamp = interp1d(ty_j, tz_j, kind="linear",
+                                      fill_value=0.0, bounds_error=False)
+                    new_cols.append(resamp(ty_common))
+            new_z = np.column_stack(new_cols)
+            return x, ty_common, new_z, xlabel, tylabel
+
     def _update_pde_3d(self) -> None:
         """Render the 3D surface plot for PDE."""
         from plotting import create_surface_plot
+        from transforms import TransformKind
 
         r = self._result
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+
+        kind = self._get_transform_kind("pde_3d")
+        if kind != TransformKind.ORIGINAL:
+            axis_var = self._pde_3d_axis_var.get()
+            result = self._transform_pde_along_axis(
+                r.x, r.y_grid, r.y, axis_var, kind,
+            )
+            if result is not None:
+                px, py, pz, pxl, pyl = result
+                fig = create_surface_plot(
+                    px, py, pz,
+                    title=f"{eq_name} — {kind.value}",
+                    xlabel=pxl, ylabel=pyl, zlabel="|F|",
+                )
+                self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
+                return
+
         fig = create_surface_plot(
             r.x, r.y_grid, r.y,
             title=eq_name,
@@ -942,10 +1255,28 @@ class ResultDialog:
     def _update_pde_2d(self) -> None:
         """Render the 2D contour plot for PDE."""
         from plotting import create_contour_plot
+        from transforms import TransformKind
 
         r = self._result
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+
+        kind = self._get_transform_kind("pde_2d")
+        if kind != TransformKind.ORIGINAL:
+            axis_var = self._pde_2d_axis_var.get()
+            result = self._transform_pde_along_axis(
+                r.x, r.y_grid, r.y, axis_var, kind,
+            )
+            if result is not None:
+                px, py, pz, pxl, pyl = result
+                fig = create_contour_plot(
+                    px, py, pz,
+                    title=f"{eq_name} — {kind.value}",
+                    xlabel=pxl, ylabel=pyl,
+                )
+                self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
+                return
+
         fig = create_contour_plot(
             r.x, r.y_grid, r.y,
             title=eq_name,

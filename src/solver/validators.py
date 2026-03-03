@@ -109,18 +109,24 @@ def _validate_method(method: str) -> list[str]:
     return []
 
 
-def _validate_parameters(params: dict[str, float]) -> list[str]:
+def _validate_parameters(params: dict[str, object]) -> list[str]:
     """Validate parameter values.
 
     Args:
-        params: Parameter name-value mapping.
+        params: Parameter name-value mapping.  Values may be scalars or
+            array-like (e.g. ``numpy.ndarray``) for list parameters.
 
     Returns:
         List of error messages (empty if valid).
     """
+    import numpy as _np
+
     errors: list[str] = []
     for name, value in params.items():
-        if not _is_finite(value):
+        if isinstance(value, _np.ndarray):
+            if not _np.all(_np.isfinite(value)):
+                errors.append(f"Parameter '{name}' contains non-finite values")
+        elif not _is_finite(value):
             errors.append(f"Parameter '{name}' = {value} is not a finite number")
     return errors
 

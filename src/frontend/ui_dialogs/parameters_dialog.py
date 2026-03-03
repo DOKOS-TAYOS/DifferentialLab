@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import queue
+import re
 import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -168,6 +169,9 @@ class ParametersDialog:
         if self.equation_type == "difference":
             x_min_label = "n\u2098\u1d62\u2099:"
             x_max_label = "n\u2098\u2090\u2093:"
+        elif self.is_pde:
+            x_min_label = "x[0]\u2098\u1d62\u2099:"
+            x_max_label = "x[0]\u2098\u2090\u2093:"
         else:
             x_min_label = f"{var0}\u2098\u1d62\u2099:"
             x_max_label = f"{var0}\u2098\u2090\u2093:"
@@ -191,22 +195,22 @@ class ParametersDialog:
         self.ymax_var: tk.StringVar | None = None
         self.npoints_y_var: tk.StringVar | None = None
         if self.is_pde and len(default_domain) >= 4:
-            var1 = self.variables[1] if len(self.variables) > 1 else "x[1]"
+            pde_label_1 = "x[1]"
             row_y = ttk.Frame(domain_frame)
             row_y.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_y, text=f"{var1}\u2098\u1d62\u2099:").pack(side=tk.LEFT)
+            ttk.Label(row_y, text=f"{pde_label_1}\u2098\u1d62\u2099:").pack(side=tk.LEFT)
             self.ymin_var = tk.StringVar(value=str(default_domain[2]))
             ttk.Entry(row_y, textvariable=self.ymin_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
-            ttk.Label(row_y, text=f"{var1}\u2098\u2090\u2093:").pack(side=tk.LEFT)
+            ttk.Label(row_y, text=f"{pde_label_1}\u2098\u2090\u2093:").pack(side=tk.LEFT)
             self.ymax_var = tk.StringVar(value=str(default_domain[3]))
             ttk.Entry(row_y, textvariable=self.ymax_var, width=12, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
             row_ny = ttk.Frame(domain_frame)
             row_ny.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_ny, text=f"Grid points ({var1}):").pack(side=tk.LEFT)
+            ttk.Label(row_ny, text=f"Grid points ({pde_label_1}):").pack(side=tk.LEFT)
             self.npoints_y_var = tk.StringVar(value="1000")
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
@@ -214,28 +218,61 @@ class ParametersDialog:
 
         # Equation parameters (ω, γ, etc.) — left column, 2 per row
         if self.parameters:
+            _sub_digits = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
+
+            def _subscript_n(n: int) -> str:
+                """Return subscript digits for integer n (e.g. 12 → '₁₂')."""
+                return "".join(
+                    _sub_digits[int(d)] if d.isdigit() else d for d in str(n)
+                )
+
             eq_params_frame = ttk.LabelFrame(left_col, text="Equation Parameters", padding=pad)
             eq_params_frame.pack(fill=tk.X, pady=(0, pad))
             params_items = list(self.parameters.items())
-            label_width = (
-                max(
-                    len(self.parameters_schema.get(p, {}).get("display", p))
-                    for p in self.parameters
-                )
-                + 1
-            )
+
+            def _display_name_for(pname: str) -> str:
+                pinfo = self.parameters_schema.get(pname, {})
+                m = re.match(r"^(.+)\[(\d+)\]$", pname)
+                if m:
+                    return f"{m.group(1)}{_subscript_n(int(m.group(2)))}"
+                return pinfo.get("display", pname)
+
+            label_width = max(len(_display_name_for(p)) for p in self.parameters) + 1
+
             for i in range(0, len(params_items), 2):
                 row = ttk.Frame(eq_params_frame)
                 row.pack(fill=tk.X, pady=2)
                 for pname, val in params_items[i : i + 2]:
                     pinfo = self.parameters_schema.get(pname, {})
-                    display_name = pinfo.get("display", pname)
-                    ttk.Label(row, text=f"{display_name}:", width=label_width).pack(side=tk.LEFT)
-                    var = tk.StringVar(value=str(val))
-                    entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
-                    entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
-                    self._eq_param_vars[pname] = var
-                    ToolTip(entry, pinfo.get("description", ""))
+                    display_name = _display_name_for(pname)
+
+                    # Detect list parameter
+                    is_list_param = isinstance(val, list)
+                    if is_list_param:
+                        ttk.Label(row, text=f"{display_name}:", width=label_width).pack(
+                            side=tk.LEFT,
+                        )
+                        default_csv = ", ".join(str(v) for v in val)
+                        var = tk.StringVar(value=default_csv)
+                        entry = ttk.Entry(row, textvariable=var, width=20, font=get_font())
+                        entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
+                        self._eq_param_vars[pname] = var
+                        m = re.match(r"^(.+)\[(\d+)\]$", pname)
+                        n = int(m.group(2)) if m else len(val)
+                        ToolTip(
+                            entry,
+                            pinfo.get("description", "")
+                            or f"Comma-separated values ({n} components)",
+                        )
+                    else:
+                        ttk.Label(row, text=f"{display_name}:", width=label_width).pack(
+                            side=tk.LEFT,
+                        )
+                        var = tk.StringVar(value=str(val))
+                        entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
+                        entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
+                        self._eq_param_vars[pname] = var
+                        ToolTip(entry, pinfo.get("description", ""))
 
         if self.equation_type != "difference" and not self.is_pde:
             row_n = ttk.Frame(domain_frame)
@@ -265,7 +302,7 @@ class ParametersDialog:
         elif self.is_pde:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_n, text=f"Grid points ({var0}):").pack(side=tk.LEFT)
+            ttk.Label(row_n, text="Grid points (x[0]):").pack(side=tk.LEFT)
             self.npoints_var = tk.StringVar(value="1000")
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
@@ -279,18 +316,18 @@ class ParametersDialog:
             )
             bc_frame.pack(fill=tk.X, pady=(0, pad))
 
-            v0 = var0
-            v1 = self.variables[1] if len(self.variables) > 1 else "x[1]"
+            idx0 = "x[0]"
+            idx1 = "x[1]"
             boundaries = [
-                (f"{v1} = {v1}" + "\u2098\u1d62\u2099 (bottom)", v0),
-                (f"{v1} = {v1}" + "\u2098\u2090\u2093 (top)", v0),
-                (f"{v0} = {v0}" + "\u2098\u1d62\u2099 (left)", v1),
-                (f"{v0} = {v0}" + "\u2098\u2090\u2093 (right)", v1),
+                (f"{idx1} = {idx1}\u2098\u1d62\u2099 (bottom)", idx0),
+                (f"{idx1} = {idx1}\u2098\u2090\u2093 (top)", idx0),
+                (f"{idx0} = {idx0}\u2098\u1d62\u2099 (left)", idx1),
+                (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
             ]
             for label_text, free_var in boundaries:
                 row = ttk.Frame(bc_frame)
                 row.pack(fill=tk.X, pady=1)
-                ttk.Label(row, text=f"{label_text}:", width=16).pack(side=tk.LEFT)
+                ttk.Label(row, text=f"{label_text}:", width=24).pack(side=tk.LEFT)
                 bc_var = tk.StringVar(value="0")
                 bc_entry = ttk.Entry(
                     row, textvariable=bc_var, width=20, font=get_font(),
@@ -506,17 +543,36 @@ class ParametersDialog:
         """Parse inputs, run the solver pipeline, and open the result dialog."""
         # Equation parameters
         if self._eq_param_vars:
-            params: dict[str, float] = {}
+            import numpy as _np
+
+            params: dict[str, Any] = {}
             for pname, var in self._eq_param_vars.items():
-                try:
-                    params[pname] = float(var.get())
-                except ValueError:
-                    messagebox.showerror(
-                        "Invalid Parameter",
-                        f"Parameter '{pname}' must be a number.",
-                        parent=self.win,
-                    )
-                    return
+                raw = var.get().strip()
+                # Detect list parameter: name[n]
+                m = re.match(r"^(.+)\[(\d+)\]$", pname)
+                if m:
+                    base_name = m.group(1)
+                    try:
+                        values = [float(v.strip()) for v in raw.split(",")]
+                    except ValueError:
+                        messagebox.showerror(
+                            "Invalid Parameter",
+                            f"Parameter '{pname}' must be comma-separated numbers.",
+                            parent=self.win,
+                        )
+                        return
+                    # Store under base name so name[i] works in expressions
+                    params[base_name] = _np.array(values)
+                else:
+                    try:
+                        params[pname] = float(raw)
+                    except ValueError:
+                        messagebox.showerror(
+                            "Invalid Parameter",
+                            f"Parameter '{pname}' must be a number.",
+                            parent=self.win,
+                        )
+                        return
             self.parameters = params
 
         try:
