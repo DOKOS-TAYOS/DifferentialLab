@@ -471,8 +471,10 @@ def get_transform_coefficients(
     z_transform_amp_threshold: float = 0.01,
     laplace_amp_threshold: float = 0.01,
     hilbert_amp_threshold: float = 0.01,
-) -> tuple[np.ndarray, np.ndarray, str, str]:
-    """Return coefficient representation (index i vs a_i) for the transform.
+) -> tuple[np.ndarray, np.ndarray, str, str, dict[str, object]]:
+    """Return coefficient representation with physical axis and metadata.
+
+    Uses frequency ω (or s for Laplace) as x-axis when meaningful for interpretation.
 
     Args:
         func: Vectorized callable f(x) -> y.
@@ -489,42 +491,56 @@ def get_transform_coefficients(
         hilbert_amp_threshold: Amplitude threshold for Hilbert coefficient trimming.
 
     Returns:
-        Tuple of (indices_i, coefficients_a_i, x_label, y_label).
+        Tuple of (x_axis, coefficients, x_label, y_label, metadata).
+        metadata: dict with domain, n_points, and transform-specific params.
 
     Raises:
         ValueError: If *kind* is not a known transform type.
     """
+    base_meta: dict[str, object] = {
+        "kind": kind.value,
+        "domain": (x_min, x_max),
+        "n_points": n_points,
+    }
+
     if kind == TransformKind.ORIGINAL:
         x, y = compute_function_samples(func, x_min, x_max, min(n_points, 200))
         indices = np.arange(len(x))
-        return indices, y, "i (sample)", "f(x_i)"
+        return indices, y, "i (sample)", "f(x_i)", {**base_meta}
 
     if kind == TransformKind.TAYLOR:
         center = taylor_center if taylor_center is not None else (x_min + x_max) / 2
         coeffs = _compute_taylor_coeffs(func, center, taylor_order, x_min, x_max)
-
         indices = np.arange(taylor_order + 1)
-        return indices, coeffs, "i", "a_i"
+        meta = {**base_meta, "taylor_order": taylor_order, "taylor_center": center}
+        return indices, coeffs, "i", "a_i", meta
 
     if kind == TransformKind.FOURIER:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
         fft_mag = np.abs(fft.fft(y)[: n_points // 2])
         freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+        freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
             y, dx, freqs, fft_mag, fourier_amp_threshold, n_points // 2,
             magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
         )
-        return bin_indices, coeffs, "k", "|F[k]|"
+        meta = {**base_meta, "amp_threshold": fourier_amp_threshold}
+        return freqs, coeffs, "ω/(2π)", "|F(ω)|", meta
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
         laplace_vals = _compute_laplace_samples(func, x_min, x_max, s_vals)
-        _, coeffs, sample_indices = _trim_and_refine_laplace(
+        s_vals, coeffs, _ = _trim_and_refine_laplace(
             func, x_min, x_max, s_vals, laplace_vals,
             laplace_amp_threshold, laplace_n_points,
         )
-        return sample_indices, coeffs, "i", "L(s_i)"
+        meta = {
+            **base_meta,
+            "s_range": (laplace_s_min, laplace_s_max),
+            "laplace_n_points": laplace_n_points,
+            "amp_threshold": laplace_amp_threshold,
+        }
+        return s_vals, coeffs, "s", "L(s)", meta
 
     if kind == TransformKind.HILBERT:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
@@ -532,21 +548,23 @@ def get_transform_coefficients(
         fft_vals = fft.fft(y)
         coeffs = np.abs((fft_vals * _hilbert_filter_kernel(len(fft_vals)))[: len(fft_vals) // 2])
         freqs = np.abs(fft.fftfreq(len(fft_vals), dx)[: len(fft_vals) // 2])
-        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+        freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
             y, dx, freqs, coeffs, hilbert_amp_threshold, n_points // 2,
             magnitude_fn=lambda fv, n: np.abs((fv * _hilbert_filter_kernel(n))[: n // 2]),
         )
-        return bin_indices, coeffs, "k", "|H[k]|"
+        meta = {**base_meta, "amp_threshold": hilbert_amp_threshold}
+        return freqs, coeffs, "ω/(2π)", "|H(ω)|", meta
 
     if kind == TransformKind.Z_TRANSFORM:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
         fft_mag = np.abs(fft.fft(y)[: n_points // 2])
         freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
-        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+        freqs, coeffs, _ = _trim_and_refine_fft_spectrum(
             y, dx, freqs, fft_mag, z_transform_amp_threshold, n_points // 2,
             magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
         )
-        return bin_indices, coeffs, "k", "|X[k]|"
+        meta = {**base_meta, "amp_threshold": z_transform_amp_threshold}
+        return freqs, coeffs, "ω/(2π)", "|X(ω)|", meta
 
     raise ValueError(f"Unknown transform kind: {kind}")

@@ -39,6 +39,31 @@ logger = get_logger(__name__)
 _LEFT_WIDTH = 320  # Width of controls panel (similar to ResultDialog layout)
 
 
+def _format_coefficient_title(meta: dict[str, object] | None) -> str:
+    """Build a short title from coefficient metadata."""
+    if not meta:
+        return ""
+    parts: list[str] = []
+    domain = meta.get("domain")
+    if domain and isinstance(domain, (tuple, list)) and len(domain) >= 2:
+        x_min, x_max = float(domain[0]), float(domain[1])
+        parts.append(f"x in [{x_min:.2g}, {x_max:.2g}]")
+    n = meta.get("n_points")
+    if n is not None:
+        parts.append(f"n={n}")
+    if meta.get("taylor_order") is not None:
+        parts.append(f"order={meta['taylor_order']}")
+    if meta.get("taylor_center") is not None:
+        parts.append(f"center={meta['taylor_center']:.2g}")
+    s_range = meta.get("s_range")
+    if s_range and isinstance(s_range, (tuple, list)) and len(s_range) >= 2:
+        s_min, s_max = float(s_range[0]), float(s_range[1])
+        parts.append(f"s in [{s_min:.2g}, {s_max:.2g}]")
+    if not parts:
+        return ""
+    return " | ".join(parts)
+
+
 class TransformDialog:
     """Dialog for entering a function, applying transforms, and exporting data.
 
@@ -59,6 +84,7 @@ class TransformDialog:
         self._current_y: np.ndarray | None = None
         self._current_xlabel: str = "x"
         self._current_ylabel: str = "f"
+        self._current_metadata: dict[str, object] | None = None
         self._y_original: np.ndarray | None = None  # For Taylor overlay
         self._show_coefficients: bool = False  # Display mode: curve vs coefficients
         self._canvas: FigureCanvasTkAgg | None = None
@@ -345,7 +371,7 @@ class TransformDialog:
 
         try:
             if self._show_coefficients:
-                x, y, xlabel, ylabel = get_transform_coefficients(
+                x, y, xlabel, ylabel, metadata = get_transform_coefficients(
                     func,
                     kind,
                     x_min,
@@ -364,6 +390,7 @@ class TransformDialog:
                     taylor_order=taylor_order,
                     taylor_center=taylor_center,
                 )
+                metadata = None
         except Exception as exc:
             logger.exception("Transform failed")
             messagebox.showerror(
@@ -378,6 +405,7 @@ class TransformDialog:
         self._current_y = y
         self._current_xlabel = xlabel
         self._current_ylabel = ylabel
+        self._current_metadata = metadata if self._show_coefficients else None
 
         if kind == TransformKind.TAYLOR and not self._show_coefficients:
             from transforms import compute_function_samples
@@ -445,9 +473,10 @@ class TransformDialog:
         if self._y_original is not None:
             self._ax.legend()
 
+        title = _format_coefficient_title(self._current_metadata) if self._show_coefficients else ""
         _finalize_plot(
             self._ax,
-            title="",
+            title=title,
             xlabel=xlabel,
             ylabel=ylabel,
             legend=(self._y_original is not None),
@@ -484,6 +513,9 @@ class TransformDialog:
         with open(path, "w", newline="", encoding="utf-8") as f:
             import csv
 
+            if self._current_metadata:
+                for k, v in self._current_metadata.items():
+                    f.write(f"# {k}: {v}\n")
             writer = csv.writer(f)
             writer.writerow(headers)
             writer.writerows(data.tolist())
@@ -519,12 +551,12 @@ _TRANSFORM_HELP_TRANSFORMS = (
 
 _TRANSFORM_HELP_DISPLAY = (
     "Curve (f vs x) — Plot the transformed function or spectrum vs its domain.\n\n"
-    "Coefficients (a_i vs i) — Plot coefficients vs index:\n"
-    "    Taylor: a_i = f^(i)(x0)/i!\n"
-    "    Fourier: |F[k]| vs k\n"
-    "    Laplace: L(s_i) vs i\n"
-    "    Hilbert: |H[k]| vs k\n"
-    "    Z-transform: x[n] vs n"
+    "Coefficients — Plot coefficients vs physical axis (with metadata in title):\n"
+    "    Taylor: a_i vs i (degree)\n"
+    "    Fourier: |F(ω)| vs ω/(2π)\n"
+    "    Laplace: L(s) vs s\n"
+    "    Hilbert: |H(ω)| vs ω/(2π)\n"
+    "    Z-transform: |X(ω)| vs ω/(2π)"
 )
 
 _TRANSFORM_HELP_EXPORT = (
