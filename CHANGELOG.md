@@ -5,7 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.3] - Unreleased
+## [0.3.0] - Unreleased
+
+### Added
+
+- **Unified f-notation**: New `solver/notation.py` module with `FNotation` dataclass and `rewrite_f_expression()` translator. Users now write equations using `f[0]` (function), `f[1]` (first derivative), `f[i,k]` (component i, derivative k for vector ODEs) instead of the old `y[0]`/`y[1]` syntax. The notation layer translates to internal `y[j]` arrays for SciPy compatibility.
+- **Interactive result tabs**: The result dialog now generates plots on-the-fly instead of receiving pre-built figures. Users can interactively select which derivatives to plot, choose phase-space axes, and switch between visualization modes — all without re-solving.
+  - **ODE scalar**: "Solution f(x)" tab with multi-select listbox for derivatives; "Phase Space" tab with two axis comboboxes (default: f vs f′).
+  - **ODE vector**: "Solution f(x)" tab with component/derivative listbox; "Phase Space" tab (default: f₀ vs f′₀); "Phase 3D" tab with three axis comboboxes (default: f₀, f₁, f₂); "Animation" and "3D Surface" tabs with derivative order selector.
+  - **PDE**: "Solution 2D" tab with variable and slice selectors; "Solution 3D" tab with axis selectors; "Phase Space" tab.
+  - **Difference**: "Solution f(n)" tab with derivative listbox; "Phase Space" tab.
+- **3D phase-space trajectory**: New `create_phase_3d_plot()` in `plotting/plot_utils.py` for 3D parametric trajectories with start/end markers. Available for vector ODEs with 3+ components.
+- **Per-component order spinboxes**: Vector ODE custom input now allows each component to have its own differential order (1–10). The label dynamically updates with prime notation (e.g., f″₀ =) as the order changes. Heterogeneous orders are propagated through the pipeline via `component_orders`.
+- **Highest derivative display**: The pipeline now augments the solution array with the computed highest derivative (e.g., for a 2nd-order ODE, the result includes f, f′, and f″), enabling visualization of all derivative orders.
+- **General PDE solver**: Extended PDE support beyond Poisson/Laplace with operator-based input. Users select which derivative terms appear in the equation (f_xx, f_yy, f_xy, etc.) via a derivative combination UI, and the solver builds appropriate finite-difference stencils.
+- **Formatted plot legends**: Plot legends and axis labels use Unicode-formatted notation (f, f′, f″, f₀, f′₀) instead of raw bracket syntax (f[0], f[1], f[0,1]).
+- **Unicode tick labels**: Vector animation bar charts display component labels as f₀, f₁, f₂ (Unicode subscripts) instead of f_0, f_1.
+
+### Changed
+
+- **Data-only pipeline**: `SolverResult` no longer contains pre-built matplotlib figures. Instead it carries raw solution data (`x`, `y`, `statistics`, `metadata`, `notation`) and the result dialog creates plots interactively. Removed `fig`, `phase_fig`, `animation_fig`, `animation_3d_fig` fields.
+- **Derivative selection moved to results**: The "Derivatives to Plot" listbox was removed from `ParametersDialog`. Users now select which derivatives to visualize in the result window via multi-select listboxes, with changes reflected immediately.
+- **Multi-select listbox**: Replaced checkboxes with `tk.Listbox(selectmode=EXTENDED)` for derivative selection in solution plot tabs. Supports Ctrl+click and Shift+click for multi-selection.
+- **Predefined equations migrated to f-notation**: All ~30 predefined equations in `equations.yaml` updated from `y[0]`/`y[1]` to `f[0]`/`f[1]` syntax. Vector ODE expressions use `f[i,k]` notation (e.g., `f[0,0]` for component 0 position, `f[0,1]` for component 0 velocity).
+- **Vector ODE reclassification**: Lorenz system, Lotka-Volterra, time-dependent Schrödinger, Euler rigid body, Bloch equations, and Duffing oscillator reclassified from "ODE" to "Vector ODE" type to match their multi-component nature.
+- **Phase space defaults**: Vector ODE 2D phase space now defaults to f₀ vs f′₀ (position vs velocity of first component) instead of x vs f₀. Scalar ODE defaults to f vs f′.
+- **Animation slider default**: Vector animation slider now starts at x_min (beginning) instead of the midpoint.
+- **CSV export headers**: Export now uses f-notation labels (f, f′, f₀, f′₀) instead of y0, y1, etc.
+- **Help dialog**: All help text updated with f-notation syntax and examples.
+- **Statistics descriptions**: Updated to reference f(x) instead of y(x).
+- **Tab naming**: Renamed "3D" tab to "3D Surface" for vector ODEs to distinguish from the new "Phase 3D" tab.
+- **UI hints**: Custom equation input now shows f-notation hints (e.g., "Use f[0] for the function, f[1] for f′, f[2] for f″").
+
+## [0.2.3] - 2026-03-01
 
 ### Fixed
 
