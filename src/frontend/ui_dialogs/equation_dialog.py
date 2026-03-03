@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+from typing import Any
 
 from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
@@ -533,7 +534,9 @@ class EquationDialog:
                 self._vec_label_refs.append(lbl)
 
                 # Bind order spinbox change to update label
-                def _on_order_change(_var: str, _idx: str, _mode: str, comp=i, ov=order_var, lb=lbl) -> None:
+                def _on_order_change(
+                    _var: str, _idx: str, _mode: str, comp=i, ov=order_var, lb=lbl
+                ) -> None:
                     try:
                         val = int(ov.get())
                     except ValueError:

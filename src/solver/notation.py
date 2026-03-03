@@ -8,7 +8,7 @@ operates on a flat state vector ``y``.  This module bridges the two representati
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 EquationKind = Literal["ode", "vector_ode", "difference", "pde"]

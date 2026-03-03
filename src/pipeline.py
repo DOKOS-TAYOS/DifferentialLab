@@ -299,7 +299,6 @@ def run_solver_pipeline(
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
 
-    xlabel = "n" if equation_type == "difference" else "x"
     metadata: dict[str, Any] = {
         "equation_name": equation_name,
         "equation_type": equation_type,

@@ -1,6 +1,5 @@
 """Tests for the f-notation translation layer."""
 
-import pytest
 
 from solver.notation import (
     FNotation,
@@ -9,7 +8,6 @@ from solver.notation import (
     generate_phase_space_options,
     rewrite_f_expression,
 )
-
 
 # ── rewrite_f_expression: ODE scalar ──────────────────────────────────
 

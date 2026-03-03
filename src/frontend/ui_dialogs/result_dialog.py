@@ -66,7 +66,6 @@ class ResultDialog:
 
         self._build_ui()
 
-        pad: int = get_env_from_schema("UI_PADDING")
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
         win_w = int(screen_w * 0.88)
@@ -664,8 +663,10 @@ class ResultDialog:
         for w in self._anim_plot_frame.winfo_children():
             w.destroy()
 
-        export_cb = lambda dur: self._on_export_animation_mp4(dur, deriv_k)
-        embed_animation_plot_in_tk(fig, self._anim_plot_frame, on_export_mp4=export_cb)
+        def _export_cb(dur: float) -> None:
+            self._on_export_animation_mp4(dur, deriv_k)
+
+        embed_animation_plot_in_tk(fig, self._anim_plot_frame, on_export_mp4=_export_cb)
 
     def _update_3d_plot(self) -> None:
         """Regenerate the 3D surface tab."""
@@ -688,7 +689,6 @@ class ResultDialog:
 
     def _build_pde_tabs(self) -> None:
         """Solution 3D (surface) + Solution 2D (contour) + Phase Space slice."""
-        r = self._result
         nb = self._notebook
 
         # --- Tab 1: 3D Surface ---
