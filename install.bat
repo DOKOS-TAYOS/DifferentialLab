@@ -72,25 +72,24 @@ if errorlevel 1 (
 
 echo.
 echo [4/4] Creating desktop shortcut...
-set "DESKTOP=%USERPROFILE%\Desktop"
+for /f "delims=" %%D in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('Desktop')"') do set "DESKTOP=%%D"
+if not exist "%DESKTOP%" set "DESKTOP=%USERPROFILE%\Desktop"
 if not exist "%DESKTOP%" set "DESKTOP=%USERPROFILE%\Escritorio"
 set "SHORTCUT=%DESKTOP%\DifferentialLab.lnk"
 set "PROJECT_DIR=%CD%"
 set "ICON_PATH=%PROJECT_DIR%\images\DifferentialLab_icon.ico"
 
-powershell -NoProfile -Command ^
-    "$ws = New-Object -ComObject WScript.Shell; ^
-     $sc = $ws.CreateShortcut($args[0]); ^
-     $sc.TargetPath = $args[1]; ^
-     $sc.WorkingDirectory = $args[2]; ^
-     $sc.Description = 'Launch DifferentialLab'; ^
-     if (Test-Path $args[3]) { $sc.IconLocation = $args[3] }; ^
-     $sc.Save()" "%SHORTCUT%" "%PROJECT_DIR%\bin\run.bat" "%PROJECT_DIR%" "%ICON_PATH%" 2>nul
+powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%SHORTCUT%'); $sc.TargetPath = '%PROJECT_DIR%\bin\run.bat'; $sc.WorkingDirectory = '%PROJECT_DIR%'; $sc.Description = 'Launch DifferentialLab'; if (Test-Path '%ICON_PATH%') { $sc.IconLocation = '%ICON_PATH%' }; $sc.Save()"
 
 if exist "%SHORTCUT%" (
     echo        Desktop shortcut created: %SHORTCUT%
 ) else (
     echo        WARNING: Could not create desktop shortcut
+    if not exist "%DESKTOP%" (
+        echo        Desktop folder not found: %DESKTOP%
+    ) else (
+        echo        Target: %PROJECT_DIR%\bin\run.bat
+    )
 )
 
 echo.
