@@ -1,8 +1,13 @@
 """PDE solver for multivariate scalar fields using finite differences.
 
-Supports 2D elliptic PDEs of the form L[u] = f, where L involves u, u_x, u_y,
-u_xx, u_xy, u_yy. Uses 5-point stencil for the Laplacian and central differences
-for first derivatives.
+Supports 2D elliptic PDEs of the general form:
+
+    a(x,y)*f_xx + b(x,y)*f_xy + c(x,y)*f_yy + d(x,y)*f_x + e(x,y)*f_y + g(x,y)*f = rhs(x,y)
+
+The solver probes the user-supplied residual function at each grid point to
+extract local coefficients, then assembles a sparse linear system using central
+differences (5-point stencil for the Laplacian, central differences for first
+derivatives and mixed derivative).
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ class PDESolution:
 
     Attributes:
         grid: Tuple of 1D arrays, one per variable (e.g. (x_vals, y_vals)).
-        u: Solution array. For 2D: shape (ny, nx). For 3D: (nz, ny, nx).
+        u: Solution array. For 2D: shape (ny, nx).
         success: Whether the solver converged.
         message: Solver status message.
         n_eval: Number of iterations (if applicable).
@@ -34,6 +39,36 @@ class PDESolution:
     success: bool
     message: str
     n_eval: int = 0
+
+
+def _probe_coefficients(
+    residual_func: Callable[..., float],
+    xi: float,
+    yj: float,
+    params: dict,
+) -> tuple[float, float, float, float, float, float, float]:
+    """Probe the residual function to extract linear PDE coefficients.
+
+    Given residual R(x,y,f,fx,fy,fxx,fxy,fyy) which should equal zero,
+    we assume R is affine in (f, fx, fy, fxx, fxy, fyy):
+        R = a*fxx + b*fxy + c*fyy + d*fx + e*fy + g*f + rhs_const
+    We extract a,b,c,d,e,g by probing with unit perturbations.
+
+    Returns:
+        (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, rhs_const)
+    """
+    # R(all zeros) gives the constant part (negated RHS)
+    r0 = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params)
+
+    # Probe each derivative direction
+    g_f = residual_func(xi, yj, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params) - r0
+    d_fx = residual_func(xi, yj, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, **params) - r0
+    e_fy = residual_func(xi, yj, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, **params) - r0
+    a_fxx = residual_func(xi, yj, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, **params) - r0
+    b_fxy = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, **params) - r0
+    c_fyy = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, **params) - r0
+
+    return (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, r0)
 
 
 def solve_pde_2d(
@@ -47,13 +82,19 @@ def solve_pde_2d(
     bc_values: np.ndarray | None = None,
     parameters: dict[str, float] | None = None,
 ) -> PDESolution:
-    """Solve a 2D elliptic PDE using finite differences.
+    """Solve a general 2D linear elliptic PDE using finite differences.
 
     The residual_func is called as
     ``residual_func(x, y, f, f_x, f_y, f_xx, f_xy, f_yy, **params)``
-    and should return the residual (LHS - RHS) that must be zero.
+    and should return the value that must be zero at the solution.
 
-    For linear Poisson -u_xx - u_yy = f(x,y), the residual is -u_xx - u_yy - f.
+    For example, for the equation ``-f_xx - f_yy = sin(pi*x)*sin(pi*y)``,
+    the residual is ``-f_xx - f_yy - sin(pi*x)*sin(pi*y)``.
+
+    The solver probes the residual function at each grid point to extract
+    local coefficients for the general operator
+    ``a*f_xx + b*f_xy + c*f_yy + d*f_x + e*f_y + g*f = rhs``,
+    then assembles a sparse linear system using central differences.
 
     Args:
         residual_func: Callable returning residual at (x,y) with derivatives.
@@ -85,21 +126,20 @@ def solve_pde_2d(
     u = np.zeros((ny, nx))
     if bc_values is not None:
         u[:] = bc_values
-    # else: zero Dirichlet BC (u=0 on boundary)
 
     n_interior = (nx - 2) * (ny - 2)
     if n_interior <= 0:
         return PDESolution(
-            grid=(x, y),
-            u=u,
-            success=True,
-            message="No interior points",
-            n_eval=0,
+            grid=(x, y), u=u, success=True,
+            message="No interior points", n_eval=0,
         )
 
-    cx = 1.0 / (hx * hx)
-    cy = 1.0 / (hy * hy)
-    diag = 2.0 * (cx + cy)
+    # Finite difference weights
+    inv_hx2 = 1.0 / (hx * hx)
+    inv_hy2 = 1.0 / (hy * hy)
+    inv_2hx = 1.0 / (2.0 * hx)
+    inv_2hy = 1.0 / (2.0 * hy)
+    inv_4hxhy = 1.0 / (4.0 * hx * hy)
 
     def k_idx(i: int, j: int) -> int:
         return (j - 1) * (nx - 2) + (i - 1)
@@ -112,48 +152,59 @@ def solve_pde_2d(
     for j in range(1, ny - 1):
         for i in range(1, nx - 1):
             k = k_idx(i, j)
-            # Interior: -u_xx - u_yy = f => diag*u - cx*(u[i±1]) - cy*(u[j±1]) = f
+
+            try:
+                a, bxy, c, d, e, g, r0 = _probe_coefficients(
+                    residual_func, x[i], y[j], params
+                )
+            except Exception as exc:
+                logger.error(
+                    "PDE coefficient probe failed at (%g, %g): %s", x[i], y[j], exc
+                )
+                raise SolverFailedError(f"Coefficient probe failed: {exc}") from exc
+
+            # RHS: -r0 (since R = operator(f) + r0 = 0  =>  operator(f) = -r0)
+            b[k] = -r0
+
+            # Central point coefficient:
+            #   a*(-2/hx²) + c*(-2/hy²) + g  for the center
+            center_coeff = -2.0 * a * inv_hx2 - 2.0 * c * inv_hy2 + g
             rows.append(k)
             cols.append(k)
-            data.append(diag)
+            data.append(center_coeff)
 
-            if i > 1:
-                rows.append(k)
-                cols.append(k_idx(i - 1, j))
-                data.append(-cx)
-            else:
-                b[k] += cx * u[j, i - 1]
+            # Helper: add matrix entry or move to RHS if neighbor is on boundary
+            def _add(ni: int, nj: int, coeff: float) -> None:
+                if 1 <= ni <= nx - 2 and 1 <= nj <= ny - 2:
+                    rows.append(k)
+                    cols.append(k_idx(ni, nj))
+                    data.append(coeff)
+                else:
+                    # Boundary value: move to RHS
+                    b[k] -= coeff * u[nj, ni]
 
-            if i < nx - 2:
-                rows.append(k)
-                cols.append(k_idx(i + 1, j))
-                data.append(-cx)
-            else:
-                b[k] += cx * u[j, i + 1]
+            # f_xx stencil: (f[i-1] - 2f[i] + f[i+1]) / hx²
+            # Left neighbor (i-1,j)
+            _add(i - 1, j, a * inv_hx2 - d * inv_2hx)  # fxx + fx contribution
+            # Right neighbor (i+1,j)
+            _add(i + 1, j, a * inv_hx2 + d * inv_2hx)
 
-            if j > 1:
-                rows.append(k)
-                cols.append(k_idx(i, j - 1))
-                data.append(-cy)
-            else:
-                b[k] += cy * u[j - 1, i]
+            # f_yy stencil: (f[j-1] - 2f[j] + f[j+1]) / hy²
+            # Bottom neighbor (i,j-1)
+            _add(i, j - 1, c * inv_hy2 - e * inv_2hy)  # fyy + fy contribution
+            # Top neighbor (i,j+1)
+            _add(i, j + 1, c * inv_hy2 + e * inv_2hy)
 
-            if j < ny - 2:
-                rows.append(k)
-                cols.append(k_idx(i, j + 1))
-                data.append(-cy)
-            else:
-                b[k] += cy * u[j + 1, i]
+            # f_xy stencil: (f[i+1,j+1] - f[i-1,j+1] - f[i+1,j-1] + f[i-1,j-1]) / (4*hx*hy)
+            if abs(bxy) > 1e-15:
+                _add(i + 1, j + 1, bxy * inv_4hxhy)
+                _add(i - 1, j + 1, -bxy * inv_4hxhy)
+                _add(i + 1, j - 1, -bxy * inv_4hxhy)
+                _add(i - 1, j - 1, bxy * inv_4hxhy)
 
-            # RHS f(x,y) for -u_xx - u_yy = f
-            try:
-                f_val = residual_func(x[i], y[j], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params)
-                b[k] += f_val
-            except Exception as exc:
-                logger.error("PDE residual evaluation failed at (%g, %g): %s", x[i], y[j], exc)
-                raise SolverFailedError(f"Residual evaluation failed: {exc}") from exc
-
-    A = sparse.coo_matrix((data, (rows, cols)), shape=(n_interior, n_interior)).tocsr()
+    A = sparse.coo_matrix(
+        (data, (rows, cols)), shape=(n_interior, n_interior)
+    ).tocsr()
 
     try:
         u_flat = spsolve(A, b)

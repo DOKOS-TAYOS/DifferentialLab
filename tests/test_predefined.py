@@ -46,7 +46,8 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         has_defn = eq.expression or eq.function_name or (vec_exprs and len(vec_exprs) > 0)
         assert has_defn
         is_pde = getattr(eq, "equation_type", "ode") == "pde"
-        is_vector = vec_exprs is not None and len(vec_exprs) > 0
+        eq_type = getattr(eq, "equation_type", "ode")
+        is_vector = (vec_exprs is not None and len(vec_exprs) > 0) or eq_type == "vector_ode"
         if not is_pde:
             vec_comp = getattr(eq, "vector_components", 1)
             expected_ic_len = eq.order * vec_comp if is_vector else eq.order

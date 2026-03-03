@@ -59,9 +59,9 @@ LOG_LEVELS: Final[tuple[str, ...]] = (
 )
 
 AVAILABLE_STATISTICS: Final[dict[str, str]] = {
-    "mean": "Mean value of y(x)",
-    "rms": "Root mean square of y(x)",
-    "std": "Standard deviation of y(x)",
+    "mean": "Mean value of f(x)",
+    "rms": "Root mean square of f(x)",
+    "std": "Standard deviation of f(x)",
     "max": "Maximum value and its location",
     "min": "Minimum value and its location",
     "integral": "Definite integral (area under curve)",

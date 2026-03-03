@@ -103,11 +103,12 @@ def _finalize_plot(
 def create_solution_plot(
     x: np.ndarray,
     y: np.ndarray,
-    title: str = "y(x)",
+    title: str = "f(x)",
     xlabel: str = "x",
-    ylabel: str = "y",
+    ylabel: str = "f",
     show_markers: bool = False,
     selected_derivatives: list[int] | None = None,
+    labels: list[str] | None = None,
 ) -> Figure:
     """Create a publication-ready plot of the ODE solution.
 
@@ -119,6 +120,7 @@ def create_solution_plot(
         ylabel: Label for y-axis.
         show_markers: Whether to overlay data-point markers.
         selected_derivatives: Indices of solution components to plot.
+        labels: Custom legend labels for each derivative (f-notation).
 
     Returns:
         A matplotlib :class:`Figure`.
@@ -139,7 +141,8 @@ def create_solution_plot(
     if selected_derivatives is None:
         selected_derivatives = list(range(y_2d.shape[0]))
 
-    labels = ["y"] if y_2d.shape[0] == 1 else [f"y[{i}]" for i in range(y_2d.shape[0])]
+    if labels is None:
+        labels = ["f"] if y_2d.shape[0] == 1 else [f"f[{i}]" for i in range(y_2d.shape[0])]
 
     n_colors = max(1, len(selected_derivatives) - 1)
     colors = [line_color] + _get_colors(color_scheme, n_colors)
@@ -184,8 +187,8 @@ def create_solution_plot(
 def create_phase_plot(
     y: np.ndarray,
     title: str = "Phase Portrait",
-    xlabel: str = "y",
-    ylabel: str = "y'",
+    xlabel: str = "f",
+    ylabel: str = "f'",
     x: np.ndarray | None = None,
 ) -> Figure:
     """Create a phase portrait for an ODE.
@@ -225,6 +228,58 @@ def create_phase_plot(
     ax.plot(horiz[-1], vert[-1], "s", color="red", markersize=8, label="End")
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=True)
+    fig.tight_layout()
+    return fig
+
+
+def create_phase_3d_plot(
+    data_x: np.ndarray,
+    data_y: np.ndarray,
+    data_z: np.ndarray,
+    title: str = "Phase Space 3D",
+    xlabel: str = "f\u2080",
+    ylabel: str = "f\u2081",
+    zlabel: str = "f\u2082",
+) -> Figure:
+    """Create a 3D phase-space trajectory plot.
+
+    Args:
+        data_x: Values for the x-axis.
+        data_y: Values for the y-axis.
+        data_z: Values for the z-axis.
+        title: Plot title.
+        xlabel: Label for x-axis.
+        ylabel: Label for y-axis.
+        zlabel: Label for z-axis.
+
+    Returns:
+        A matplotlib :class:`Figure`.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+
+    fig = plt.figure(figsize=(width, height), dpi=dpi)
+    ax = fig.add_subplot(111, projection="3d")
+
+    line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
+    line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
+
+    ax.plot(data_x, data_y, data_z, color=line_color, linewidth=line_width)
+    ax.plot([data_x[0]], [data_y[0]], [data_z[0]], "o", color="green", markersize=8, label="Start")
+    ax.plot([data_x[-1]], [data_y[-1]], [data_z[-1]], "s", color="red", markersize=8, label="End")
+
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    axis_style: str = get_env_from_schema("FONT_AXIS_STYLE")
+    ax.set_xlabel(xlabel, fontstyle=axis_style)
+    ax.set_ylabel(ylabel, fontstyle=axis_style)
+    ax.set_zlabel(zlabel, fontstyle=axis_style)
+    ax.legend()
     fig.tight_layout()
     return fig
 
@@ -297,7 +352,7 @@ def create_contour_plot(
     z: np.ndarray,
     title: str = "f(x, y)",
     xlabel: str = "x",
-    ylabel: str = "y",
+    ylabel: str = "f",
 ) -> Figure:
     """Create a 2D contour plot for 2D scalar field data.
 
@@ -343,6 +398,7 @@ def create_vector_animation_plot(
     order: int,
     vector_components: int,
     title: str = "f_i(x) vs component",
+    deriv_offset: int = 0,
 ) -> Figure:
     """Create an interactive plot: x-axis = component index i, y-axis = f_i(x).
 
@@ -356,6 +412,7 @@ def create_vector_animation_plot(
         order: Order per component.
         vector_components: Number of components.
         title: Plot title.
+        deriv_offset: Derivative order to display (0=value, 1=first derivative, etc.).
 
     Returns:
         A matplotlib Figure (use with embed_animation_plot_in_tk).
@@ -375,9 +432,9 @@ def create_vector_animation_plot(
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
-    f_values = np.array([y_2d[i * order] for i in range(vector_components)])
+    f_values = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
     n_points = len(x)
-    time_index = min(n_points // 2, n_points - 1) if n_points else 0
+    time_index = 0
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
     colors = _get_colors(color_scheme, vector_components)
@@ -398,7 +455,11 @@ def create_vector_animation_plot(
     )
     vlines_coll = ax_main.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
     ax_main.set_xticks(indices)
-    ax_main.set_xticklabels([f"f_{i}" for i in range(vector_components)])
+    _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
+    ax_main.set_xticklabels([
+        f"f{_sub_digs[i]}" if i < len(_sub_digs) else f"f_{i}"
+        for i in range(vector_components)
+    ])
 
     def update(idx: int) -> None:
         i = max(0, min(idx, n_points - 1))
@@ -433,6 +494,7 @@ def create_vector_animation_3d(
     order: int,
     vector_components: int,
     title: str = "f_i(x) — 3D",
+    deriv_offset: int = 0,
 ) -> Figure:
     """Create a 3D plot: x (independent), component index i, f_i(x).
 
@@ -442,6 +504,7 @@ def create_vector_animation_3d(
         order: Order per component.
         vector_components: Number of components.
         title: Plot title.
+        deriv_offset: Derivative order to display (0=value, 1=first derivative, etc.).
 
     Returns:
         A matplotlib Figure with 3D surface.
@@ -466,7 +529,7 @@ def create_vector_animation_3d(
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
     X_grid, I_grid = np.meshgrid(x, np.arange(vector_components))
-    Z_grid = np.array([y_2d[i * order] for i in range(vector_components)])
+    Z_grid = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
     ax.plot_surface(X_grid, I_grid, Z_grid, cmap="viridis", alpha=0.9, edgecolor="none")
 
     if get_env_from_schema("PLOT_SHOW_TITLE") and title:
@@ -491,6 +554,7 @@ def export_animation_to_mp4(
     *,
     title: str = "f_i(x) vs component",
     duration_seconds: float = 10.0,
+    deriv_offset: int = 0,
 ) -> Path:
     """Export vector animation as MP4 video.
 
@@ -523,7 +587,7 @@ def export_animation_to_mp4(
     if y_2d.shape[1] != len(x):
         y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
 
-    f_values = np.array([y_2d[i * order] for i in range(vector_components)])
+    f_values = np.array([y_2d[i * order + deriv_offset] for i in range(vector_components)])
     n_points = len(x)
 
     frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
@@ -549,7 +613,11 @@ def export_animation_to_mp4(
     (line_chain,) = ax.plot(indices, vals, "o-", color=colors[0], markersize=8, linewidth=2)
     vlines_coll = ax.vlines(indices, 0, vals, colors=colors, linewidth=1.5, alpha=0.6)
     ax.set_xticks(indices)
-    ax.set_xticklabels([f"f_{i}" for i in range(vector_components)])
+    _sub_digs = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
+    ax.set_xticklabels([
+        f"f{_sub_digs[i]}" if i < len(_sub_digs) else f"f_{i}"
+        for i in range(vector_components)
+    ])
 
     def _frame(idx: int) -> None:
         new_vals = np.array([f_values[j][idx] for j in range(vector_components)])

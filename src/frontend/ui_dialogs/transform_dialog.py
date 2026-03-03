@@ -58,7 +58,7 @@ class TransformDialog:
         self._current_x: np.ndarray | None = None
         self._current_y: np.ndarray | None = None
         self._current_xlabel: str = "x"
-        self._current_ylabel: str = "y"
+        self._current_ylabel: str = "f"
         self._y_original: np.ndarray | None = None  # For Taylor overlay
         self._show_coefficients: bool = False  # Display mode: curve vs coefficients
         self._canvas: FigureCanvasTkAgg | None = None

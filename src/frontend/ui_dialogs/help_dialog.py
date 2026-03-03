@@ -49,16 +49,18 @@ _HOW_TO_USE = (
 
 _CUSTOM_EXPRESSIONS = (
     "Use Python / NumPy syntax. The independent variable is  x .\n"
-    "The state vector is  y :\n"
-    "    y[0] = y        (the function itself)\n"
-    "    y[1] = y'       (first derivative)\n"
-    "    y[2] = y''      (second derivative)  ...\n\n"
+    "The state vector uses  f  notation:\n"
+    "    f[0] = f        (the function itself)\n"
+    "    f[1] = f'       (first derivative)\n"
+    "    f[2] = f''      (second derivative)  ...\n\n"
+    "For vector ODEs use  f[i, k]  where i = component, k = derivative:\n"
+    "    f[0,0] = first component, f[1,0] = second component, etc.\n\n"
     "Available math functions:\n"
     "    sin, cos, tan, exp, log, log10, sqrt, abs,\n"
     "    sinh, cosh, tanh, arcsin, arccos, arctan,\n"
     "    floor, ceil, sign, heaviside, pi, e\n\n"
     "Example — damped oscillator (order 2):\n"
-    "    Expression:   -2*gamma*y[1] - omega**2*y[0]\n"
+    "    Expression:   -2*gamma*f[1] - omega**2*f[0]\n"
     "    Parameters:   omega=1.0, gamma=0.1"
 )
 
@@ -76,7 +78,7 @@ _PREDEFINED_EQUATIONS = (
 _OUTPUT_FILES = (
     "Every time you solve an equation three files are created inside the "
     "output/ folder (configurable):\n\n"
-    "\u2022 Solution  — tabular x, y data columns ready for spreadsheets.\n"
+    "\u2022 Solution  — tabular x, f data columns ready for spreadsheets.\n"
     "\u2022 Metadata — full metadata and all computed statistics.\n"
     "\u2022 Plot — image of the solution curve (PNG, JPG or PDF per your "
     "configuration)."

@@ -1,4 +1,9 @@
-"""Safe parsing and evaluation of user-written ODE expressions."""
+"""Safe parsing and evaluation of user-written ODE expressions.
+
+Expressions may use either the legacy ``y[k]`` notation or the unified
+``f[...]`` notation.  When ``f`` tokens are present they are automatically
+rewritten to ``y[...]`` via :mod:`solver.notation` before compilation.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from solver.notation import FNotation, rewrite_f_expression
 from utils import (
     SAFE_MATH,
     EquationParseError,
@@ -15,6 +21,13 @@ from utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def _maybe_rewrite(expression: str, notation: FNotation | None) -> str:
+    """Rewrite f-notation to y-notation if a notation context is provided."""
+    if notation is not None:
+        return rewrite_f_expression(expression, notation)
+    return expression
 
 
 def _compile_and_test(
@@ -94,20 +107,19 @@ def _parse_expression(
     expression: str,
     order: int,
     parameters: dict[str, float] | None = None,
+    notation: FNotation | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Parse an ODE expression into a callable ``f(x, y) -> dy/dx``.
 
-    The expression should give the *highest derivative* in terms of ``x``,
-    ``y[0]`` (the function), ``y[1]`` (first derivative), etc.
-
-    For a first-order ODE ``y' = expr``, *order* = 1 and ``y[0]`` is ``y``.
-    For a second-order ODE ``y'' = expr``, *order* = 2, ``y[0]`` is ``y``
-    and ``y[1]`` is ``y'``.
+    The expression may use ``f[k]`` notation (rewritten automatically)
+    or legacy ``y[k]`` notation.
 
     Args:
         expression: Python expression string for the highest derivative.
         order: Order of the ODE (1, 2, …).
         parameters: Named parameter values (e.g. ``{"omega": 2.0}``).
+        notation: Notation context for ``f[...]`` rewriting. If ``None``,
+            a default scalar ODE notation is created automatically.
 
     Returns:
         A callable ``f(x, y)`` that returns ``dy/dx`` as a 1-D array
@@ -117,6 +129,9 @@ def _parse_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
+    if notation is None:
+        notation = FNotation(kind="ode", n_components=1, order=order)
+    expression = _maybe_rewrite(expression, notation)
     validate_expression_ast(expression, "ODE expression")
     params = dict(parameters) if parameters else {}
     logger.debug("Parsing expression (order=%d): %s, params=%s", order, expression, params)
@@ -188,16 +203,18 @@ def _parse_difference_expression(
     expression: str,
     order: int,
     parameters: dict[str, float] | None = None,
+    notation: FNotation | None = None,
 ) -> Callable[[int, np.ndarray], float]:
     """Parse a difference equation expression into a callable ``f(n, y) -> y_next``.
 
-    The expression gives y_{n+order} in terms of n and y[0], y[1], ..., y[order-1].
-    Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.
+    The expression may use ``f[k]`` notation (rewritten automatically)
+    or legacy ``y[k]`` notation.
 
     Args:
         expression: Python expression string for the next value.
         order: Order of the recurrence (1, 2, …).
         parameters: Named parameter values.
+        notation: Notation context for ``f[...]`` rewriting.
 
     Returns:
         A callable ``f(n, y)`` that returns the next value (scalar).
@@ -206,6 +223,9 @@ def _parse_difference_expression(
         EquationParseError: If the expression is invalid.
     """
     expression = normalize_unicode_escapes(expression)
+    if notation is None:
+        notation = FNotation(kind="difference", n_components=1, order=order)
+    expression = _maybe_rewrite(expression, notation)
     validate_expression_ast(expression, "difference expression")
     params = dict(parameters) if parameters else {}
     logger.debug(
@@ -345,22 +365,18 @@ def _parse_vector_expression(
     expressions: list[str],
     order: int,
     parameters: dict[str, float] | None = None,
+    notation: FNotation | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Parse a list of ODE expressions into a vector ODE callable.
 
-    For [f_0(x), f_1(x), ...] with f_i'' = h_i(x, f_0, f_1, ..., f_0', f_1', ...):
-    - State y = [f_0, f_1, ..., f_0', f_1', ...] (size = n_components * order)
-    - y[0..n-1] = f_0, f_1, ... (the functions)
-    - y[n..2n-1] = f_0', f_1', ... (first derivatives, if order >= 2)
-    - etc.
-
-    Each expression i gives the highest derivative h_i for component i.
-    In expression i, use y[j] for f_j and y[n+j] for f_j' (when order=2).
+    Expressions may use ``f[i,k]`` notation (rewritten automatically)
+    or legacy ``y[j]`` flat indexing.
 
     Args:
         expressions: List of Python expressions, one per component.
         order: Order of each ODE (1, 2, …).
         parameters: Named parameter values.
+        notation: Notation context for ``f[...]`` rewriting.
 
     Returns:
         A callable f(x, y) that returns dy/dx as a 1-D array.
@@ -369,12 +385,18 @@ def _parse_vector_expression(
     if n_components == 0:
         raise EquationParseError("vector_expressions must have at least one expression")
 
+    if notation is None:
+        notation = FNotation(
+            kind="vector_ode", n_components=n_components, order=order
+        )
+
     params = dict(parameters) if parameters else {}
     namespace: dict[str, Any] = {**SAFE_MATH, **params}
 
     compiled_list: list[Any] = []
     for i, expr in enumerate(expressions):
         expr = normalize_unicode_escapes(expr)
+        expr = _maybe_rewrite(expr, notation)
         validate_expression_ast(expr, f"vector expression {i}")
         compiled_list.append(compile(expr, f"<vector_ode_{i}>", "eval"))
 

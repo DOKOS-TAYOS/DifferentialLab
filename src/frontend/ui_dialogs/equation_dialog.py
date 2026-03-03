@@ -95,6 +95,13 @@ class EquationDialog:
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
+            text="Vector ODE",
+            variable=self._equation_type_var,
+            value="vector_ode",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
             text="PDE (multivariate)",
             variable=self._equation_type_var,
             value="pde",
@@ -199,91 +206,15 @@ class EquationDialog:
         self._populate_category_list()
 
         # --- Tab 2: Custom ---
-        custom_frame = ttk.Frame(self._notebook, padding=pad)
-        self._notebook.add(custom_frame, text="  Custom  ")
-        ci = custom_frame
+        self._custom_outer = ttk.Frame(self._notebook, padding=pad)
+        self._notebook.add(self._custom_outer, text="  Custom  ")
 
-        self.custom_hint_label = ttk.Label(
-            ci,
-            text="Write the highest derivative as a Python expression.",
-            style="Subtitle.TLabel",
-        )
-        self.custom_hint_label.pack(anchor=tk.W, pady=(0, pad))
-
-        self.custom_hint_text = tk.StringVar(
-            value=(
-                "Use y[0] for y, y[1] for y', y[2] for y'', etc. "
-                "Use x for the independent variable.\n"
-                "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
-            )
-        )
-        self.custom_hint_detail = ttk.Label(
-            ci,
-            textvariable=self.custom_hint_text,
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        )
-        self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
-
-        bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
-
-        unicode_frame = ttk.LabelFrame(ci, text="Unicode symbols — select and copy", padding=pad)
-        unicode_frame.pack(fill=tk.X, pady=(0, pad))
-
-        # Each entry shows the escape code (copyable) followed by '=' and the rendered character.
-        _unicode_hint_display = (
-            "\\u03B1=\u03b1  \\u03B2=\u03b2  \\u03B3=\u03b3  \\u03B4=\u03b4  \\u03B5=\u03b5\n"
-            "\\u03B6=\u03b6  \\u03B7=\u03b7  \\u03B8=\u03b8  \\u03BB=\u03bb  \\u03BC=\u03bc\n"
-            "\\u03BE=\u03be  \\u03C0=\u03c0  \\u03C1=\u03c1  \\u03C3=\u03c3  \\u03C6=\u03c6\n"
-            "\\u03C9=\u03c9  \\u0394=\u0394  \\u03A3=\u03a3  \\u03A6=\u03a6  \\u03A9=\u03a9"
-        )
-        _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-        _fg: str = get_env_from_schema("UI_FOREGROUND")
-        unicode_text = tk.Text(
-            unicode_frame,
-            height=4,
-            bg=_btn_bg,
-            fg=_fg,
-            font=get_font(),
-            borderwidth=0,
-            highlightthickness=0,
-            wrap="none",
-        )
-        unicode_text.insert("1.0", _unicode_hint_display)
-        unicode_text.config(state="disabled")
-        unicode_text.pack(fill=tk.X)
-
-        row_order = ttk.Frame(ci)
-        row_order.pack(fill=tk.X, pady=(pad, pad))
-        self.custom_order_label = ttk.Label(row_order, text="Order:")
-        self.custom_order_label.pack(side=tk.LEFT)
-        self.custom_order_var = tk.StringVar(value="2")
-        _font = get_font()
-        spinbox = ttk.Spinbox(
-            row_order, from_=1, to=10, width=5, textvariable=self.custom_order_var, font=_font
-        )
-        spinbox.pack(side=tk.LEFT, padx=(pad, 0))
-
-        self.custom_expr_label = ttk.Label(ci, text="Expression for highest derivative:")
-        self.custom_expr_label.pack(anchor=tk.W)
-        self.custom_expr = tk.Text(
-            ci,
-            height=3,
-            width=60,
-            bg=_btn_bg,
-            fg=_fg,
-            insertbackground=_fg,
-            font=get_font(),
-        )
-        self.custom_expr.pack(fill=tk.X, pady=(4, pad))
-
-        ttk.Label(ci, text="Parameters (name=value, comma-separated):").pack(anchor=tk.W)
-        self.custom_params = ttk.Entry(ci, width=50, font=get_font())
-        self.custom_params.pack(fill=tk.X, pady=(4, pad))
-        ToolTip(self.custom_params, "E.g.: \u03c9=1.0, \u03b3=0.1")
+        # The custom content is rebuilt dynamically when equation type changes.
+        self._custom_inner: ttk.Frame | None = None
+        self._vec_expr_widgets: list[tk.Text] = []
 
         self.category_listbox.focus_set()
-        self._update_custom_hints()
+        self._rebuild_custom_tab()
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -343,29 +274,335 @@ class EquationDialog:
             self._on_select_equation(None)
 
     def _on_type_change(self) -> None:
-        """When equation type changes, refresh predefined list and custom hints."""
+        """When equation type changes, refresh predefined list and custom tab."""
         self._populate_category_list()
-        self._update_custom_hints()
+        self._rebuild_custom_tab()
 
-    def _update_custom_hints(self) -> None:
-        """Update custom tab hints based on equation type."""
-        if self._equation_type_var.get() == "difference":
-            self.custom_hint_label.config(text="Write y_{n+order} as a Python expression.")
-            self.custom_hint_text.set(
-                "Use n for the index, y[0] for y_n, y[1] for y_{n+1}, etc.\n"
-                "Example (geometric growth):  r * y[0]"
+    def _rebuild_custom_tab(self) -> None:
+        """Destroy and recreate the custom tab contents for the current equation type."""
+        if self._custom_inner is not None:
+            self._custom_inner.destroy()
+
+        pad: int = get_env_from_schema("UI_PADDING")
+        _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        _fg: str = get_env_from_schema("UI_FOREGROUND")
+        _font = get_font()
+
+        ci = ttk.Frame(self._custom_outer)
+        ci.pack(fill=tk.BOTH, expand=True)
+        self._custom_inner = ci
+        self._vec_expr_widgets = []
+
+        eq_type = self._equation_type_var.get()
+
+        # -- Hint --
+        if eq_type == "difference":
+            hint_title = "Write f_{n+order} as a Python expression."
+            hint_detail = (
+                "Use n for the index, f[0] for f_n, f[1] for f_{n+1}, etc.\n"
+                "Example (geometric growth):  r * f[0]"
             )
-            self.custom_expr_label.config(text="Expression for y_{n+order}:")
+        elif eq_type == "vector_ode":
+            hint_title = "Write the highest derivative for each component."
+            hint_detail = (
+                "Use f[i,k] where i = component index, k = derivative order.\n"
+                "f[i,0] = component i, f[i,1] = its first derivative, etc.\n"
+                "Example (coupled oscillators):  -\u03c9**2 * f[0,0] + k * (f[1,0] - f[0,0])"
+            )
+        elif eq_type == "pde":
+            hint_title = "Select the LHS operator and write the RHS expression."
+            hint_detail = (
+                "Choose which derivative operator equals the expression.\n"
+                "Use x, y for spatial variables. Use parameters by name.\n"
+                "Example: operator = -\u2207\u00b2f, expression = sin(pi*x)*sin(pi*y)"
+            )
         else:
-            self.custom_hint_label.config(
-                text="Write the highest derivative as a Python expression."
-            )
-            self.custom_hint_text.set(
-                "Use y[0] for y, y[1] for y', y[2] for y'', etc. "
+            hint_title = "Write the highest derivative as a Python expression."
+            hint_detail = (
+                "Use f[0] or f for the function, f[1] for f\u2032, f[2] for f\u2033, etc. "
                 "Use x for the independent variable.\n"
-                "Example (harmonic oscillator):  -\u03c9**2 * y[0]"
+                "Example (harmonic oscillator):  -\u03c9**2 * f[0]"
             )
-            self.custom_expr_label.config(text="Expression for highest derivative:")
+
+        self.custom_hint_label = ttk.Label(ci, text=hint_title, style="Subtitle.TLabel")
+        self.custom_hint_label.pack(anchor=tk.W, pady=(0, pad))
+
+        self.custom_hint_text = tk.StringVar(value=hint_detail)
+        self.custom_hint_detail = ttk.Label(
+            ci, textvariable=self.custom_hint_text, style="Small.TLabel", justify=tk.LEFT
+        )
+        self.custom_hint_detail.pack(anchor=tk.W, pady=(0, pad), fill=tk.X)
+        bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
+
+        # -- Unicode reference --
+        unicode_frame = ttk.LabelFrame(ci, text="Unicode symbols — select and copy", padding=pad)
+        unicode_frame.pack(fill=tk.X, pady=(0, pad))
+        _unicode_hint = (
+            "\\u03B1=\u03b1  \\u03B2=\u03b2  \\u03B3=\u03b3  \\u03B4=\u03b4  \\u03B5=\u03b5\n"
+            "\\u03B6=\u03b6  \\u03B7=\u03b7  \\u03B8=\u03b8  \\u03BB=\u03bb  \\u03BC=\u03bc\n"
+            "\\u03BE=\u03be  \\u03C0=\u03c0  \\u03C1=\u03c1  \\u03C3=\u03c3  \\u03C6=\u03c6\n"
+            "\\u03C9=\u03c9  \\u0394=\u0394  \\u03A3=\u03a3  \\u03A6=\u03a6  \\u03A9=\u03a9"
+        )
+        unicode_text = tk.Text(
+            unicode_frame, height=4, bg=_btn_bg, fg=_fg,
+            font=_font, borderwidth=0, highlightthickness=0, wrap="none",
+        )
+        unicode_text.insert("1.0", _unicode_hint)
+        unicode_text.config(state="disabled")
+        unicode_text.pack(fill=tk.X)
+
+        # -- Type-specific controls --
+        if eq_type == "vector_ode":
+            self._build_custom_vector_ode(ci, pad, _btn_bg, _fg, _font)
+        elif eq_type == "pde":
+            self._build_custom_pde(ci, pad, _btn_bg, _fg, _font)
+        else:
+            self._build_custom_scalar(ci, pad, _btn_bg, _fg, _font, eq_type)
+
+    def _build_custom_scalar(
+        self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any, eq_type: str
+    ) -> None:
+        """Build the custom tab for scalar ODE / difference."""
+        row_order = ttk.Frame(ci)
+        row_order.pack(fill=tk.X, pady=(pad, pad))
+        ttk.Label(row_order, text="Order:").pack(side=tk.LEFT)
+        self.custom_order_var = tk.StringVar(value="2")
+        ttk.Spinbox(
+            row_order, from_=1, to=10, width=5,
+            textvariable=self.custom_order_var, font=font,
+        ).pack(side=tk.LEFT, padx=(pad, 0))
+
+        expr_label = (
+            "Expression for f_{n+order}:" if eq_type == "difference"
+            else "Expression for highest derivative:"
+        )
+        ttk.Label(ci, text=expr_label).pack(anchor=tk.W)
+        self.custom_expr = tk.Text(
+            ci, height=3, width=60, bg=btn_bg, fg=fg, insertbackground=fg, font=font,
+        )
+        self.custom_expr.pack(fill=tk.X, pady=(4, pad))
+
+        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        ToolTip(self.custom_params, "E.g.: \u03c9, \u03b3")
+
+    def _build_custom_vector_ode(
+        self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any
+    ) -> None:
+        """Build the custom tab for vector ODE (per-component expressions)."""
+        top_row = ttk.Frame(ci)
+        top_row.pack(fill=tk.X, pady=(pad, pad))
+
+        ttk.Label(top_row, text="Components:").pack(side=tk.LEFT)
+        self._vec_n_var = tk.StringVar(value="2")
+        ttk.Spinbox(
+            top_row, from_=2, to=100, width=5,
+            textvariable=self._vec_n_var, font=font,
+        ).pack(side=tk.LEFT, padx=(pad, pad * 2))
+
+        # Dummy order var for compatibility (actual orders come from per-component spinboxes)
+        self.custom_order_var = tk.StringVar(value="2")
+
+        # Mode: per-component boxes or bulk expression
+        mode_frame = ttk.Frame(ci)
+        mode_frame.pack(fill=tk.X, pady=(0, pad))
+        self._vec_mode_var = tk.StringVar(value="per_component")
+        ttk.Radiobutton(
+            mode_frame, text="Per-component expressions",
+            variable=self._vec_mode_var, value="per_component",
+            command=self._on_vec_mode_change,
+        ).pack(side=tk.LEFT, padx=(0, pad))
+        ttk.Radiobutton(
+            mode_frame, text="Bulk expression (use i as loop variable)",
+            variable=self._vec_mode_var, value="bulk",
+            command=self._on_vec_mode_change,
+        ).pack(side=tk.LEFT)
+
+        # Container that switches between per-component and bulk
+        self._vec_content_frame = ttk.Frame(ci)
+        self._vec_content_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Per-component order spinbox variables
+        self._vec_order_vars: list[tk.StringVar] = []
+
+        ttk.Button(
+            ci, text="Refresh component boxes",
+            command=self._refresh_vec_boxes,
+        ).pack(anchor=tk.W, pady=(pad, 0))
+
+        ttk.Label(ci, text="Parameter names (comma-separated):").pack(
+            anchor=tk.W, pady=(pad, 0)
+        )
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        ToolTip(self.custom_params, "E.g.: \u03c9, k")
+
+        self._refresh_vec_boxes()
+
+    def _on_vec_mode_change(self) -> None:
+        """Switch between per-component and bulk expression modes."""
+        self._refresh_vec_boxes()
+
+    def _refresh_vec_boxes(self) -> None:
+        """Rebuild the per-component or bulk expression widgets."""
+        for w in self._vec_content_frame.winfo_children():
+            w.destroy()
+        self._vec_expr_widgets = []
+        self._vec_order_vars = []
+        self._vec_label_refs: list[ttk.Label] = []
+
+        _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        _fg: str = get_env_from_schema("UI_FOREGROUND")
+        _font = get_font()
+        pad: int = get_env_from_schema("UI_PADDING")
+
+        try:
+            n = int(self._vec_n_var.get())
+        except ValueError:
+            n = 2
+
+        mode = self._vec_mode_var.get()
+
+        if mode == "bulk":
+            # Bulk mode: single order spinbox + single expression template
+            bulk_top = ttk.Frame(self._vec_content_frame)
+            bulk_top.pack(fill=tk.X, pady=(0, pad))
+            ttk.Label(bulk_top, text="Order per component:").pack(side=tk.LEFT)
+            bulk_order_var = tk.StringVar(value="2")
+            self._vec_order_vars.append(bulk_order_var)
+            ttk.Spinbox(
+                bulk_top, from_=1, to=10, width=5,
+                textvariable=bulk_order_var, font=_font,
+            ).pack(side=tk.LEFT, padx=(pad, 0))
+
+            ttk.Label(
+                self._vec_content_frame,
+                text="Expression for component i (use i as variable, evaluated for i=0..N-1):",
+            ).pack(anchor=tk.W)
+            self._vec_bulk_expr = tk.Text(
+                self._vec_content_frame, height=3, width=60,
+                bg=_btn_bg, fg=_fg, insertbackground=_fg, font=_font,
+            )
+            self._vec_bulk_expr.pack(fill=tk.X, pady=(4, pad))
+        else:
+            # Per-component: each row has an order spinbox + label + expression box
+            _primes = ["", "\u2032", "\u2033", "\u2034"]
+
+            canvas = tk.Canvas(self._vec_content_frame, highlightthickness=0, height=150)
+            scrollbar = ttk.Scrollbar(
+                self._vec_content_frame, orient=tk.VERTICAL, command=canvas.yview
+            )
+            inner = ttk.Frame(canvas)
+            canvas.create_window((0, 0), window=inner, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+            canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            _sub_digits = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
+
+            def _sub(idx: int) -> str:
+                if 0 <= idx < len(_sub_digits):
+                    return _sub_digits[idx]
+                return "".join(
+                    _sub_digits[int(d)] if d.isdigit() else d for d in str(idx)
+                )
+
+            def _make_label_text(comp_idx: int, order_val: int) -> str:
+                prime = _primes[order_val] if order_val < len(_primes) else f"({order_val})"
+                return f"f{prime}{_sub(comp_idx)} ="
+
+            for i in range(n):
+                row = ttk.Frame(inner)
+                row.pack(fill=tk.X, pady=2)
+
+                # Order spinbox for this component
+                order_var = tk.StringVar(value="2")
+                self._vec_order_vars.append(order_var)
+
+                ttk.Label(row, text="ord:", width=4).pack(side=tk.LEFT)
+                spin = ttk.Spinbox(
+                    row, from_=1, to=10, width=3,
+                    textvariable=order_var, font=_font,
+                )
+                spin.pack(side=tk.LEFT, padx=(0, pad))
+
+                # Label showing f″₀ = etc., updates when order changes
+                lbl = ttk.Label(row, text=_make_label_text(i, 2), width=7)
+                lbl.pack(side=tk.LEFT)
+                self._vec_label_refs.append(lbl)
+
+                # Bind order spinbox change to update label
+                def _on_order_change(_var: str, _idx: str, _mode: str, comp=i, ov=order_var, lb=lbl) -> None:
+                    try:
+                        val = int(ov.get())
+                    except ValueError:
+                        val = 1
+                    lb.config(text=_make_label_text(comp, val))
+
+                order_var.trace_add("write", _on_order_change)
+
+                # Expression text box
+                txt = tk.Text(
+                    row, height=1, width=45,
+                    bg=_btn_bg, fg=_fg, insertbackground=_fg, font=_font,
+                )
+                txt.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(pad, 0))
+                self._vec_expr_widgets.append(txt)
+
+            inner.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def _build_custom_pde(
+        self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any
+    ) -> None:
+        """Build the custom tab for PDE."""
+        top_row = ttk.Frame(ci)
+        top_row.pack(fill=tk.X, pady=(pad, pad))
+
+        ttk.Label(top_row, text="Independent variables:").pack(side=tk.LEFT)
+        self._pde_vars_var = tk.StringVar(value="x, y")
+        ttk.Entry(
+            top_row, textvariable=self._pde_vars_var, width=20, font=font,
+        ).pack(side=tk.LEFT, padx=(pad, 0))
+        ToolTip(
+            top_row.winfo_children()[-1],
+            "Comma-separated variable names, e.g.: x, y"
+        )
+
+        self.custom_order_var = tk.StringVar(value="2")
+
+        # Operator selector (LHS of the PDE)
+        op_row = ttk.Frame(ci)
+        op_row.pack(fill=tk.X, pady=(0, pad))
+        ttk.Label(op_row, text="Left-hand side operator:").pack(side=tk.LEFT)
+        self._pde_op_var = tk.StringVar(value="-\u2207\u00b2f (Poisson)")
+        _pde_operators = [
+            "-\u2207\u00b2f (Poisson)",
+            "\u2207\u00b2f (Laplacian)",
+            "f_xx",
+            "f_yy",
+            "f_xy",
+            "f_x",
+            "f_y",
+        ]
+        ttk.Combobox(
+            op_row, textvariable=self._pde_op_var,
+            values=_pde_operators, state="readonly", width=22, font=font,
+        ).pack(side=tk.LEFT, padx=(pad, 0))
+
+        ttk.Label(ci, text="Right-hand side expression (what the operator equals):").pack(
+            anchor=tk.W
+        )
+        self.custom_expr = tk.Text(
+            ci, height=3, width=60, bg=btn_bg, fg=fg, insertbackground=fg, font=font,
+        )
+        self.custom_expr.pack(fill=tk.X, pady=(4, pad))
+
+        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        ToolTip(self.custom_params, "E.g.: k, \u03b1")
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
@@ -414,7 +651,7 @@ class EquationDialog:
             equation_name=eq.name,
             default_y0=eq.default_initial_conditions,
             default_domain=eq.default_domain,
-            selected_derivatives=None,
+
             display_formula=eq.formula,
             equation_type=eq_type,
             variables=variables,
@@ -422,13 +659,40 @@ class EquationDialog:
             vector_components=vector_components,
         )
 
+    def _parse_custom_params(self) -> dict[str, float] | None:
+        """Parse custom parameter names from the entry.
+
+        Values default to 0; the user sets them in the next dialog.
+        """
+        from utils import normalize_unicode_escapes
+
+        params: dict[str, float] = {}
+        raw_params = self.custom_params.get().strip()
+        if raw_params:
+            for name in raw_params.split(","):
+                name = name.strip()
+                if not name:
+                    continue
+                normalized_name = normalize_unicode_escapes(name)
+                params[normalized_name] = 0.0
+        return params
+
     def _on_next_custom(self) -> None:
+        eq_type = self._equation_type_var.get()
+        if eq_type == "vector_ode":
+            self._on_next_custom_vector()
+        elif eq_type == "pde":
+            self._on_next_custom_pde()
+        else:
+            self._on_next_custom_scalar()
+
+    def _on_next_custom_scalar(self) -> None:
         from utils import normalize_unicode_escapes
 
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
             messagebox.showwarning(
-                "Empty Expression", "Please enter an ODE expression.", parent=self.win
+                "Empty Expression", "Please enter an expression.", parent=self.win
             )
             return
 
@@ -436,33 +700,13 @@ class EquationDialog:
             order = int(self.custom_order_var.get())
         except ValueError:
             messagebox.showerror(
-                "Invalid Order", "ODE order must be a positive integer.", parent=self.win
+                "Invalid Order", "Order must be a positive integer.", parent=self.win
             )
             return
 
-        params: dict[str, float] = {}
-        raw_params = self.custom_params.get().strip()
-        if raw_params:
-            for pair in raw_params.split(","):
-                pair = pair.strip()
-                if "=" not in pair:
-                    messagebox.showerror(
-                        "Invalid Parameters",
-                        f"Cannot parse '{pair}'. Use name=value format.",
-                        parent=self.win,
-                    )
-                    return
-                name, val_str = pair.split("=", 1)
-                normalized_name = normalize_unicode_escapes(name.strip())
-                try:
-                    params[normalized_name] = float(val_str.strip())
-                except ValueError:
-                    messagebox.showerror(
-                        "Invalid Parameters",
-                        f"Value for '{normalized_name}' is not a number.",
-                        parent=self.win,
-                    )
-                    return
+        params = self._parse_custom_params()
+        if params is None:
+            return
 
         eq_type = self._equation_type_var.get()
         self.win.destroy()
@@ -475,10 +719,158 @@ class EquationDialog:
             function_name=None,
             order=order,
             parameters=params,
-            parameters_schema=None,
-            equation_name="Custom difference" if eq_type == "difference" else "Custom ODE",
+            equation_name="Custom Difference" if eq_type == "difference" else "Custom ODE",
             default_y0=[1.0] * order,
             default_domain=default_domain,
-            selected_derivatives=None,
             equation_type=eq_type,
+        )
+
+    def _on_next_custom_vector(self) -> None:
+        import re
+
+        from utils import normalize_unicode_escapes
+
+        try:
+            n_components = int(self._vec_n_var.get())
+        except ValueError:
+            messagebox.showerror(
+                "Invalid Input", "Number of components must be an integer.", parent=self.win
+            )
+            return
+
+        mode = self._vec_mode_var.get()
+
+        # Read per-component orders
+        component_orders: list[int] = []
+        for idx, ov in enumerate(self._vec_order_vars):
+            try:
+                component_orders.append(int(ov.get()))
+            except ValueError:
+                messagebox.showerror(
+                    "Invalid Order",
+                    f"Order for component {idx} must be a positive integer.",
+                    parent=self.win,
+                )
+                return
+
+        if mode == "bulk":
+            # Bulk mode: single order applies to all components
+            order = component_orders[0] if component_orders else 2
+            component_orders = [order] * n_components
+
+            bulk_expr = normalize_unicode_escapes(
+                self._vec_bulk_expr.get("1.0", tk.END).strip()
+            )
+            if not bulk_expr:
+                messagebox.showwarning(
+                    "Empty Expression", "Please enter a bulk expression.", parent=self.win
+                )
+                return
+            # Expand bulk expression for each component index
+            vector_expressions = []
+            for i in range(n_components):
+                expanded = re.sub(r'\bi\b', str(i), bulk_expr)
+                vector_expressions.append(expanded)
+        else:
+            if len(self._vec_expr_widgets) != n_components:
+                messagebox.showerror(
+                    "Mismatch",
+                    "Number of expression boxes doesn't match components. "
+                    "Click 'Refresh component boxes'.",
+                    parent=self.win,
+                )
+                return
+            vector_expressions = []
+            for idx, widget in enumerate(self._vec_expr_widgets):
+                expr = normalize_unicode_escapes(widget.get("1.0", tk.END).strip())
+                if not expr:
+                    messagebox.showwarning(
+                        "Empty Expression",
+                        f"Expression for component {idx} is empty.",
+                        parent=self.win,
+                    )
+                    return
+                vector_expressions.append(expr)
+
+        params = self._parse_custom_params()
+        if params is None:
+            return
+
+        # Use max order for the pipeline (uniform assumption), pass component_orders for notation
+        order = max(component_orders) if component_orders else 2
+        all_same = len(set(component_orders)) == 1
+        n_state = sum(component_orders)
+        default_y0 = [0.0] * n_state
+
+        self.win.destroy()
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            self.parent,
+            expression=None,
+            function_name=None,
+            order=order,
+            parameters=params,
+            equation_name="Custom Vector ODE",
+            default_y0=default_y0,
+            default_domain=[0.0, 10.0],
+            equation_type="vector_ode",
+            vector_expressions=vector_expressions,
+            vector_components=n_components,
+            component_orders=tuple(component_orders) if not all_same else None,
+        )
+
+    def _on_next_custom_pde(self) -> None:
+        from utils import normalize_unicode_escapes
+
+        expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
+        if not expr:
+            messagebox.showwarning(
+                "Empty Expression", "Please enter a PDE expression.", parent=self.win
+            )
+            return
+
+        raw_vars = self._pde_vars_var.get().strip()
+        variables = [v.strip() for v in raw_vars.split(",") if v.strip()]
+        if len(variables) < 2:
+            messagebox.showerror(
+                "Invalid Variables",
+                "PDE requires at least 2 independent variables (e.g.: x, y).",
+                parent=self.win,
+            )
+            return
+
+        params = self._parse_custom_params()
+        if params is None:
+            return
+
+        # Map UI operator label to internal operator key
+        op_label = self._pde_op_var.get()
+        _op_map = {
+            "-\u2207\u00b2f (Poisson)": "neg_laplacian",
+            "\u2207\u00b2f (Laplacian)": "laplacian",
+            "f_xx": "fxx",
+            "f_yy": "fyy",
+            "f_xy": "fxy",
+            "f_x": "fx",
+            "f_y": "fy",
+        }
+        pde_operator = _op_map.get(op_label, "neg_laplacian")
+
+        self.win.destroy()
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        default_domain = [0.0, 1.0, 0.0, 1.0]
+        ParametersDialog(
+            self.parent,
+            expression=expr,
+            function_name=None,
+            order=2,
+            parameters=params,
+            equation_name="Custom PDE",
+            default_y0=[],
+            default_domain=default_domain,
+            equation_type="pde",
+            variables=variables,
+            pde_operator=pde_operator,
         )

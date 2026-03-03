@@ -187,7 +187,10 @@ def validate_all_inputs(
         List of all error messages (empty if everything is valid).
     """
     errors: list[str] = []
-    is_vector = vector_expressions is not None and len(vector_expressions) > 0
+    is_vector = (
+        (vector_expressions is not None and len(vector_expressions) > 0)
+        or equation_type == "vector_ode"
+    )
     expected_order = order * vector_components if is_vector else order
 
     if is_vector:
@@ -198,6 +201,7 @@ def validate_all_inputs(
         elif vector_expressions:
             for i, expr in enumerate(vector_expressions):
                 errors.extend(f"Vector expression {i}: {e}" for e in validate_expression(expr))
+        # else: function_name only — no expression validation needed
     else:
         if expression is not None and function_name is not None:
             errors.append("Provide either expression or function_name, not both")

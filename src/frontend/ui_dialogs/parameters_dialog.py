@@ -47,13 +47,14 @@ class ParametersDialog:
         equation_name: str,
         default_y0: list[float],
         default_domain: list[float],
-        selected_derivatives: list[int] | None = None,
         parameters_schema: dict[str, dict[str, Any]] | None = None,
         display_formula: str | None = None,
         equation_type: str = "ode",
         variables: list[str] | None = None,
         vector_expressions: list[str] | None = None,
         vector_components: int = 1,
+        pde_operator: str = "neg_laplacian",
+        component_orders: tuple[int, ...] | None = None,
     ) -> None:
         self.parent = parent
         self.expression = expression
@@ -67,17 +68,6 @@ class ParametersDialog:
             else (expression or f"<function:{function_name}>")
         )
         self.parameters_schema = parameters_schema or {}
-        n_derivs = (
-            vector_components
-            if (
-                (vector_expressions and len(vector_expressions) > 0)
-                or equation_type == "vector_ode"
-            )
-            else order
-        )
-        self.selected_derivatives = (
-            selected_derivatives if selected_derivatives is not None else list(range(n_derivs))
-        )
         self.equation_type = equation_type
         self.variables = variables if variables else ["x"]
         self.vector_expressions = vector_expressions
@@ -85,7 +75,9 @@ class ParametersDialog:
         self.is_vector = (
             vector_expressions is not None and len(vector_expressions) > 0
         ) or equation_type == "vector_ode"
+        self.pde_operator = pde_operator
         self.is_pde = equation_type == "pde" or len(self.variables) > 1
+        self.component_orders = component_orders
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Parameters — {equation_name}")
@@ -96,7 +88,6 @@ class ParametersDialog:
         self._y0_vars: list[tk.StringVar] = []
         self._x0_vars: list[tk.StringVar] = []
         self._eq_param_vars: dict[str, tk.StringVar] = {}
-        self._derivatives_listbox: tk.Listbox | None = None
 
         self._build_ui(default_y0, default_domain)
 
@@ -185,7 +176,6 @@ class ParametersDialog:
         self.ymin_var: tk.StringVar | None = None
         self.ymax_var: tk.StringVar | None = None
         self.npoints_y_var: tk.StringVar | None = None
-        self.plot_3d_var: tk.BooleanVar | None = None
         if self.is_pde and len(default_domain) >= 4:
             row_y = ttk.Frame(domain_frame)
             row_y.pack(fill=tk.X, pady=(pad, 0))
@@ -206,14 +196,6 @@ class ParametersDialog:
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
-            plot_frame = ttk.Frame(domain_frame)
-            plot_frame.pack(fill=tk.X, pady=(pad, 0))
-            self.plot_3d_var = tk.BooleanVar(value=True)
-            ttk.Checkbutton(
-                plot_frame,
-                text="3D surface plot (uncheck for 2D contour)",
-                variable=self.plot_3d_var,
-            ).pack(anchor=tk.W)
 
         # Equation parameters (ω, γ, etc.) — left column
         if self.parameters:
@@ -222,60 +204,15 @@ class ParametersDialog:
             for pname, val in self.parameters.items():
                 row = ttk.Frame(eq_params_frame)
                 row.pack(fill=tk.X, pady=2)
-                ttk.Label(row, text=f"{pname}:", width=12).pack(side=tk.LEFT)
+                pinfo = self.parameters_schema.get(pname, {})
+                display_name = pinfo.get("display", pname)
+                ttk.Label(row, text=f"{display_name}:", width=12).pack(side=tk.LEFT)
                 var = tk.StringVar(value=str(val))
                 entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
                 entry.pack(side=tk.LEFT, padx=(pad, 0))
                 self._eq_param_vars[pname] = var
                 pinfo = self.parameters_schema.get(pname, {})
                 ToolTip(entry, pinfo.get("description", ""))
-
-        # Derivatives to plot — right column (skip for PDE)
-        if not self.is_pde:
-            deriv_frame = ttk.LabelFrame(right_col, text="Derivatives to Plot", padding=pad)
-            deriv_frame.pack(fill=tk.X, pady=(0, pad))
-            vec_exprs = self.vector_expressions
-            is_vec = (
-                vec_exprs is not None and len(vec_exprs) > 0
-            ) or self.equation_type == "vector_ode"
-            if is_vec and self.vector_components > 1:
-                subscripts = "₀₁₂₃₄₅₆₇₈₉"
-
-                def _sub(i: int) -> str:
-                    return subscripts[i] if i < len(subscripts) else str(i)
-
-                derivative_labels = [f"f_{_sub(i)}" for i in range(self.vector_components)]
-            else:
-                derivative_labels = (
-                    ["y"] if self.order == 1 else [f"y[{i}]" for i in range(self.order)]
-                )
-            deriv_list_frame = ttk.Frame(deriv_frame)
-            deriv_list_frame.pack(fill=tk.X)
-            deriv_scrollbar = ttk.Scrollbar(deriv_list_frame, orient=tk.VERTICAL)
-            _btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-            _fg: str = get_env_from_schema("UI_FOREGROUND")
-            _select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-            _select_fg: str = "#000000"
-            self._derivatives_listbox = tk.Listbox(
-                deriv_list_frame,
-                selectmode=tk.EXTENDED,
-                height=min(len(derivative_labels), 6),
-                bg=_btn_bg,
-                fg=_fg,
-                selectbackground=_select_bg,
-                selectforeground=_select_fg,
-                font=get_font(),
-                exportselection=False,
-                yscrollcommand=deriv_scrollbar.set,
-            )
-            deriv_scrollbar.config(command=self._derivatives_listbox.yview)
-            self._derivatives_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            deriv_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            for label in derivative_labels:
-                self._derivatives_listbox.insert(tk.END, label)
-            for i in self.selected_derivatives:
-                if 0 <= i < len(derivative_labels):
-                    self._derivatives_listbox.select_set(i)
 
         if self.equation_type != "difference" and not self.is_pde:
             row_n = ttk.Frame(domain_frame)
@@ -318,7 +255,12 @@ class ParametersDialog:
 
             _subscripts = "₀₁₂₃₄₅₆₇₈₉"
             ic_labels = self._ic_labels()
-            n_ic = self.order * self.vector_components if self.is_vector else self.order
+            if self.component_orders:
+                n_ic = sum(self.component_orders)
+            elif self.is_vector:
+                n_ic = self.order * self.vector_components
+            else:
+                n_ic = self.order
             x0_val = int(default_domain[0]) if is_diff else default_domain[0]
             default_x0_val = str(x0_val)
             for i in range(n_ic):
@@ -441,28 +383,31 @@ class ParametersDialog:
 
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
+
+        def _sub(i: int) -> str:
+            return subscripts[i] if i < len(subscripts) else str(i)
+
         if self.equation_type == "difference":
-
-            def _sub(i: int) -> str:
-                return subscripts[i] if i < len(subscripts) else str(i)
-
-            return [f"y{_sub(i)}" for i in range(self.order)]
+            return [f"f{_sub(i)}" for i in range(self.order)]
         if self.is_vector:
             labels: list[str] = []
-            for c in range(self.vector_components):
-                comp_sub = subscripts[c] if c < len(subscripts) else str(c)
-                for k in range(self.order):
+            orders = self.component_orders or tuple(
+                self.order for _ in range(self.vector_components)
+            )
+            for c, comp_order in enumerate(orders):
+                comp_sub = _sub(c)
+                for k in range(comp_order):
                     if k == 0:
-                        labels.append(f"f_{comp_sub}")
+                        labels.append(f"f{comp_sub}")
                     else:
-                        primes = "'" * k
-                        labels.append(f"f_{comp_sub}{primes}")
+                        primes = "\u2032" * k
+                        labels.append(f"f{primes}{comp_sub}")
             return labels
-        labels = [f"y(x{subscripts[0]})"]
+        labels = [f"f(x{subscripts[0]})"]
         for i in range(1, self.order):
-            primes = "'" * i
+            primes = "\u2032" * i
             sub = subscripts[i] if i < len(subscripts) else str(i)
-            labels.append(f"y{primes}(x{sub})")
+            labels.append(f"f{primes}(x{sub})")
         return labels
 
     def _change_npoints(self, factor: float) -> None:
@@ -514,18 +459,6 @@ class ParametersDialog:
                     return
             self.parameters = params
 
-        # Derivatives to plot
-        if self._derivatives_listbox is not None:
-            selected = list(self._derivatives_listbox.curselection())
-            if not selected:
-                messagebox.showwarning(
-                    "No Derivatives Selected",
-                    "Please select at least one derivative to plot.",
-                    parent=self.win,
-                )
-                return
-            self.selected_derivatives = selected
-
         try:
             x_min = float(self.xmin_var.get())
             x_max = float(self.xmax_var.get())
@@ -570,7 +503,6 @@ class ParametersDialog:
             y0 = []
             x0_list = None
             method = "fdm"
-            plot_3d = self.plot_3d_var.get() if self.plot_3d_var else True
         elif self.equation_type == "difference":
             n_points = int(x_max) - int(x_min) + 1
             x0_list = None
@@ -578,7 +510,6 @@ class ParametersDialog:
             y_min = None
             y_max = None
             n_points_y = None
-            plot_3d = True
         else:
             try:
                 n_points = int(self.npoints_var.get())
@@ -604,7 +535,6 @@ class ParametersDialog:
             y_min = None
             y_max = None
             n_points_y = None
-            plot_3d = True
 
         y0_list: list[float] = []
         if not self.is_pde:
@@ -638,16 +568,16 @@ class ParametersDialog:
                 n_points=n_points,
                 method=method,
                 selected_stats=selected_stats,
-                selected_derivatives=self.selected_derivatives,
                 x0_list=x0_list,
                 equation_type=self.equation_type,
                 variables=self.variables,
                 y_min=y_min,
                 y_max=y_max,
                 n_points_y=n_points_y,
-                plot_3d=plot_3d,
                 vector_expressions=self.vector_expressions,
                 vector_components=self.vector_components,
+                pde_operator=self.pde_operator,
+                component_orders=self.component_orders,
             )
         except DifferentialLabError as exc:
             logger.warning("Solver pipeline failed (user-facing): %s", exc)
@@ -671,25 +601,4 @@ class ParametersDialog:
 
         from frontend.ui_dialogs.result_dialog import ResultDialog
 
-        animation_data: dict | None = None
-        if getattr(result, "is_vector", False) and getattr(result, "animation_fig", None):
-            animation_data = {
-                "x": result.x,
-                "y": result.y,
-                "order": getattr(result, "vector_order", 2),
-                "vector_components": getattr(result, "vector_components", 1),
-                "title": result.metadata.get("equation_name", "ODE") + " — f_i(x)",
-            }
-        ResultDialog(
-            self.parent,
-            fig=result.fig,
-            phase_fig=result.phase_fig,
-            statistics=result.statistics,
-            metadata=result.metadata,
-            x=result.x,
-            y=result.y,
-            y_grid=getattr(result, "y_grid", None),
-            animation_fig=getattr(result, "animation_fig", None),
-            animation_3d_fig=getattr(result, "animation_3d_fig", None),
-            animation_data=animation_data,
-        )
+        ResultDialog(self.parent, result=result)

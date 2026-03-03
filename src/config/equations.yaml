@@ -1,22 +1,22 @@
 harmonic_oscillator:
   category: Oscillators
   name: "Simple Harmonic Oscillator"
-  formula: "y'' + ω²y = 0"
-  description: "y'' + ω²y = 0\nModels a mass on a spring with no friction."
+  formula: "f'' + ω²f = 0"
+  description: "f'' + ω²f = 0\nModels a mass on a spring with no friction."
   order: 2
   parameters:
     "ω":
       default: 1.0
       description: "Angular frequency (rad/s)"
-  expression: "-ω**2 * y[0]"
+  expression: "-ω**2 * f[0]"
   default_initial_conditions: [1.0, 0.0]
   default_domain: [0.0, 20.0]
 
 damped_oscillator:
   category: Oscillators
   name: "Damped Oscillator"
-  formula: "y'' + 2γy' + ω²y = 0"
-  description: "y'' + 2γy' + ω²y = 0\nMass-spring-damper system."
+  formula: "f'' + 2γf' + ω²f = 0"
+  description: "f'' + 2γf' + ω²f = 0\nMass-spring-damper system."
   order: 2
   parameters:
     "ω":
@@ -25,29 +25,29 @@ damped_oscillator:
     "γ":
       default: 0.1
       description: "Damping coefficient"
-  expression: "-2*γ*y[1] - ω**2*y[0]"
+  expression: "-2*γ*f[1] - ω**2*f[0]"
   default_initial_conditions: [1.0, 0.0]
   default_domain: [0.0, 40.0]
 
 exponential_growth:
   category: Population
   name: "Exponential Growth / Decay"
-  formula: "y' = ky"
-  description: "y' = ky\nGrowth (k>0) or decay (k<0)."
+  formula: "f' = kf"
+  description: "f' = kf\nGrowth (k>0) or decay (k<0)."
   order: 1
   parameters:
     k:
       default: 0.5
       description: "Growth rate constant"
-  expression: "k * y[0]"
+  expression: "k * f[0]"
   default_initial_conditions: [1.0]
   default_domain: [0.0, 10.0]
 
 logistic_equation:
   category: Population
   name: "Logistic Equation"
-  formula: "y' = ry(1 - y/K)"
-  description: "y' = ry(1 - y/K)\nPopulation growth with carrying capacity."
+  formula: "f' = rf(1 - f/K)"
+  description: "f' = rf(1 - f/K)\nPopulation growth with carrying capacity."
   order: 1
   parameters:
     r:
@@ -56,29 +56,29 @@ logistic_equation:
     K:
       default: 10.0
       description: "Carrying capacity"
-  expression: "r * y[0] * (1 - y[0] / K)"
+  expression: "r * f[0] * (1 - f[0] / K)"
   default_initial_conditions: [0.5]
   default_domain: [0.0, 15.0]
 
 van_der_pol:
   category: Oscillators
   name: "Van der Pol Oscillator"
-  formula: "y'' - μ(1 - y²)y' + y = 0"
-  description: "y'' - μ(1 - y²)y' + y = 0\nNonlinear oscillator with self-sustained oscillations."
+  formula: "f'' - μ(1 - f²)f' + f = 0"
+  description: "f'' - μ(1 - f²)f' + f = 0\nNonlinear oscillator with self-sustained oscillations."
   order: 2
   parameters:
     "μ":
       default: 1.0
       description: "Nonlinearity parameter"
-  expression: "μ * (1 - y[0]**2) * y[1] - y[0]"
+  expression: "μ * (1 - f[0]**2) * f[1] - f[0]"
   default_initial_conditions: [2.0, 0.0]
   default_domain: [0.0, 30.0]
 
 simple_pendulum:
   category: Oscillators
   name: "Simple Pendulum"
-  formula: "y'' + (g/L)sin(y) = 0"
-  description: "y'' + (g/L)sin(y) = 0\nNonlinear pendulum with gravity."
+  formula: "f'' + (g/L)sin(f) = 0"
+  description: "f'' + (g/L)sin(f) = 0\nNonlinear pendulum with gravity."
   order: 2
   parameters:
     g:
@@ -87,15 +87,15 @@ simple_pendulum:
     L:
       default: 1.0
       description: "Pendulum length (m)"
-  expression: "-(g / L) * sin(y[0])"
+  expression: "-(g / L) * sin(f[0])"
   default_initial_conditions: [0.5, 0.0]
   default_domain: [0.0, 15.0]
 
 rc_circuit:
   category: Physics
   name: "RC Circuit (Discharge)"
-  formula: "y' = -y/(RC)"
-  description: "y' = -y/(RC)\nCapacitor voltage during discharge."
+  formula: "f' = -f/(RC)"
+  description: "f' = -f/(RC)\nCapacitor voltage during discharge."
   order: 1
   parameters:
     R:
@@ -104,15 +104,15 @@ rc_circuit:
     C:
       default: 0.001
       description: "Capacitance (F)"
-  expression: "-y[0] / (R * C)"
+  expression: "-f[0] / (R * C)"
   default_initial_conditions: [5.0]
   default_domain: [0.0, 5.0]
 
 free_fall_drag:
   category: Physics
   name: "Free Fall with Drag"
-  formula: "y'' = g - (b/m)y'"
-  description: "y'' = g - (b/m)y'\nFalling object with linear air resistance."
+  formula: "f'' = g - (b/m)f'"
+  description: "f'' = g - (b/m)f'\nFalling object with linear air resistance."
   order: 2
   parameters:
     g:
@@ -124,7 +124,7 @@ free_fall_drag:
     m:
       default: 1.0
       description: "Mass (kg)"
-  expression: "g - (b / m) * y[1]"
+  expression: "g - (b / m) * f[1]"
   default_initial_conditions: [0.0, 0.0]
   default_domain: [0.0, 10.0]
 
@@ -137,8 +137,10 @@ schrodinger_equation:
   description: |
     iℏ ∂ψ/∂t = Ĥ(t)ψ
     Time-dependent Schrödinger equation with Hamiltonian H(t) and potential V(t).
-    y = [Re(ψ), Im(ψ)]. Parameters a, b tune the default H and V.
-  order: 2
+    f₀ = Re(ψ), f₁ = Im(ψ). Parameters a, b tune the default H and V.
+  equation_type: vector_ode
+  vector_components: 2
+  order: 1
   parameters:
     a:
       default: 1.0
@@ -153,21 +155,26 @@ schrodinger_equation:
 lorentz_system:
   category: Chaos
   name: "Lorenz System"
-  formula: "dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz"
+  formula: "f₀' = σ(f₁-f₀), f₁' = f₀(ρ-f₂)-f₁, f₂' = f₀f₁-βf₂"
   description: |
-    dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz
+    f₀' = σ(f₁-f₀), f₁' = f₀(ρ-f₂)-f₁, f₂' = f₀f₁-βf₂
     Classic chaotic attractor (Lorenz 1963).
-  order: 3
+  equation_type: vector_ode
+  vector_components: 3
+  order: 1
   parameters:
     sigma:
       default: 10.0
       description: "Prandtl number"
+      display: "σ"
     rho:
       default: 28.0
       description: "Rayleigh number"
+      display: "ρ"
     beta:
       default: 2.667
       description: "Geometry factor"
+      display: "β"
   function_name: lorentz_system
   default_initial_conditions: [1.0, 1.0, 1.0]
   default_domain: [0.0, 25.0]
@@ -175,27 +182,32 @@ lorentz_system:
 duffing_oscillator:
   category: Oscillators
   name: "Duffing Oscillator"
-  formula: "y'' + δy' + αy + βy³ = γcos(ωt)"
+  formula: "f'' + δf' + αf + βf³ = γcos(ωt)"
   description: |
-    y'' + δy' + αy + βy³ = γcos(ωt)
+    f'' + δf' + αf + βf³ = γcos(ωt)
     Nonlinear oscillator with cubic stiffness and forcing.
   order: 2
   parameters:
     delta:
       default: 0.5
       description: "Damping"
+      display: "δ"
     alpha:
       default: -1.0
       description: "Linear stiffness"
+      display: "α"
     beta:
       default: 1.0
       description: "Cubic stiffness"
+      display: "β"
     gamma:
       default: 0.3
       description: "Forcing amplitude"
+      display: "γ"
     omega:
       default: 1.2
       description: "Forcing frequency"
+      display: "ω"
   function_name: duffing_oscillator
   default_initial_conditions: [0.0, 0.0]
   default_domain: [0.0, 50.0]
@@ -203,24 +215,30 @@ duffing_oscillator:
 lotka_volterra:
   category: Population
   name: "Lotka-Volterra (Predator-Prey)"
-  formula: "dx/dt = αx - βxy, dy/dt = δxy - γy"
+  formula: "f₀' = αf₀ - βf₀f₁, f₁' = δf₀f₁ - γf₁"
   description: |
-    dx/dt = αx - βxy, dy/dt = δxy - γy
+    f₀' = αf₀ - βf₀f₁, f₁' = δf₀f₁ - γf₁
     Classic predator-prey population dynamics.
-  order: 2
+  equation_type: vector_ode
+  vector_components: 2
+  order: 1
   parameters:
     alpha:
       default: 1.0
       description: "Prey growth rate"
+      display: "α"
     beta:
       default: 0.1
       description: "Predation rate"
+      display: "β"
     gamma:
       default: 1.5
       description: "Predator death rate"
+      display: "γ"
     delta:
       default: 0.075
       description: "Predator growth from prey"
+      display: "δ"
   function_name: lotka_volterra
   default_initial_conditions: [10.0, 5.0]
   default_domain: [0.0, 50.0]
@@ -228,11 +246,14 @@ lotka_volterra:
 rigid_body_euler:
   category: Physics
   name: "Rigid Body (Euler Equations)"
-  formula: "dω/dt = I⁻¹(τ - ω×(Iω)), τ=0"
+  formula: "ω₀' = (I₂-I₃)/I₁·ω₁ω₂, ω₁' = (I₃-I₁)/I₂·ω₂ω₀, ω₂' = (I₁-I₂)/I₃·ω₀ω₁"
   description: |
-    dω/dt = I⁻¹(τ - ω×(Iω)), τ=0
-    Free rotation of a rigid body (Euler equations).
-  order: 3
+    Euler equations for torque-free rigid body rotation.
+    I₁, I₂, I₃ are principal moments of inertia (diagonal of inertia tensor).
+    f₀=ω₁, f₁=ω₂, f₂=ω₃ are angular velocities about principal axes.
+  equation_type: vector_ode
+  vector_components: 3
+  order: 1
   parameters:
     I1:
       default: 1.0
@@ -250,17 +271,21 @@ rigid_body_euler:
 bloch_equations:
   category: Physics
   name: "Bloch Equations"
-  formula: "dM/dt = γ(M×B) - relaxation"
+  formula: "Mₓ' = γ(M×B)ₓ - Mₓ/T₂, Mᵧ' = γ(M×B)ᵧ - Mᵧ/T₂, M_z' = γ(M×B)_z - (M_z-1)/T₁"
   description: |
-    dM/dt = γ(M×B) - relaxation
-    Magnetization dynamics in a magnetic field.
-  order: 3
+    Bloch equations for magnetization dynamics in a magnetic field.
+    f₀=Mₓ, f₁=Mᵧ, f₂=Mz. Relaxation: T₁ (longitudinal), T₂ (transverse).
+    Equilibrium magnetization M₀=1 along z.
+  equation_type: vector_ode
+  vector_components: 3
+  order: 1
   parameters:
     gamma:
       default: 1.0
       description: "Gyromagnetic ratio"
+      display: "γ"
     Bx:
-      default: 0.0
+      default: 0.1
       description: "B-field x"
     By:
       default: 0.0
@@ -269,29 +294,29 @@ bloch_equations:
       default: 1.0
       description: "B-field z"
     T1:
-      default: 1e6
+      default: 2.0
       description: "Longitudinal relaxation time"
     T2:
-      default: 1e6
+      default: 1.0
       description: "Transverse relaxation time"
   function_name: bloch_equations
-  default_initial_conditions: [0.0, 0.0, 1.0]
+  default_initial_conditions: [1.0, 0.0, 0.0]
   default_domain: [0.0, 10.0]
 
-# --- Vector ODEs ([f_0, f_1, ...] with f_i'' = h_i) ---
+# --- Vector ODEs (vec{f}(x) = [f_0(x), f_1(x), ...]) ---
 
 coupled_harmonic_oscillators:
   category: Oscillators
   name: "Coupled Harmonic Oscillators"
-  formula: "f₀'' = -ω²f₀ + k(f₁-f₀), f₁'' = -ω²f₁ + k(f₀-f₁)"
+  formula: "f[0,2] = -ω²f[0,0] + k(f[1,0]-f[0,0]), f[1,2] = -ω²f[1,0] + k(f[0,0]-f[1,0])"
   description: |
-    Two masses connected by springs. f₀, f₁ are positions.
-    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
-  equation_type: ode
+    Two masses connected by springs. f[0,0], f[1,0] are positions.
+    f[i,k] = component i, derivative order k.
+  equation_type: vector_ode
   order: 2
   vector_expressions:
-    - "-ω**2 * y[0] + k * (y[2] - y[0])"
-    - "-ω**2 * y[2] + k * (y[0] - y[2])"
+    - "-ω**2 * f[0,0] + k * (f[1,0] - f[0,0])"
+    - "-ω**2 * f[1,0] + k * (f[0,0] - f[1,0])"
   vector_components: 2
   parameters:
     "ω":
@@ -306,15 +331,15 @@ coupled_harmonic_oscillators:
 double_pendulum_linearized:
   category: Oscillators
   name: "Double Pendulum (Linearized)"
-  formula: "f₀'' = -2ω²f₀ + ω²f₁, f₁'' = 2ω²f₀ - 2ω²f₁"
+  formula: "f[0,2] = -2ω²f[0,0] + ω²f[1,0], f[1,2] = 2ω²f[0,0] - 2ω²f[1,0]"
   description: |
-    Linearized double pendulum. f₀, f₁ are small angles.
-    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
-  equation_type: ode
+    Linearized double pendulum. f[0,0], f[1,0] are small angles.
+    f[i,k] = component i, derivative order k.
+  equation_type: vector_ode
   order: 2
   vector_expressions:
-    - "-2*ω**2*y[0] + ω**2*y[2]"
-    - "2*ω**2*y[0] - 2*ω**2*y[2]"
+    - "-2*ω**2*f[0,0] + ω**2*f[1,0]"
+    - "2*ω**2*f[0,0] - 2*ω**2*f[1,0]"
   vector_components: 2
   parameters:
     "ω":
@@ -326,17 +351,17 @@ double_pendulum_linearized:
 three_coupled_oscillators:
   category: Oscillators
   name: "Three Coupled Oscillators"
-  formula: "f_i'' = -ω²f_i + k(f_{i+1} + f_{i-1} - 2f_i)"
+  formula: "f[i,2] = -ω²f[i,0] + k(f[i+1,0] + f[i-1,0] - 2f[i,0])"
   description: |
     Chain of three masses with nearest-neighbor coupling.
-    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁', y[4]=f₂, y[5]=f₂'.
-    Boundary: f_{-1}=f₃=0.
-  equation_type: ode
+    f[i,k] = component i, derivative order k.
+    Boundary: f[-1]=f[3]=0.
+  equation_type: vector_ode
   order: 2
   vector_expressions:
-    - "-ω**2*y[0] + k*(y[2] - 2*y[0])"
-    - "-ω**2*y[2] + k*(y[0] + y[4] - 2*y[2])"
-    - "-ω**2*y[4] + k*(y[2] - 2*y[4])"
+    - "-ω**2*f[0,0] + k*(f[1,0] - 2*f[0,0])"
+    - "-ω**2*f[1,0] + k*(f[0,0] + f[2,0] - 2*f[1,0])"
+    - "-ω**2*f[2,0] + k*(f[1,0] - 2*f[2,0])"
   vector_components: 3
   parameters:
     "ω":
@@ -351,33 +376,33 @@ three_coupled_oscillators:
 twenty_coupled_oscillators:
   category: Oscillators
   name: "20 Coupled Harmonic Oscillators"
-  formula: "f_i'' = -ω²f_i + k(f_{i+1} + f_{i-1} - 2f_i)"
+  formula: "f[i,2] = -ω²f[i,0] + k(f[i+1,0] + f[i-1,0] - 2f[i,0])"
   description: |
     Linear chain of 20 masses with nearest-neighbor coupling.
-    y[2i]=f_i, y[2i+1]=f_i'. Boundary: f_{-1}=f₂₀=0.
-  equation_type: ode
+    f[i,k] = component i, derivative order k. Boundary: f[-1]=f[20]=0.
+  equation_type: vector_ode
   order: 2
   vector_expressions:
-    - "-ω**2*y[0] + k*(y[2] - 2*y[0])"
-    - "-ω**2*y[2] + k*(y[0] + y[4] - 2*y[2])"
-    - "-ω**2*y[4] + k*(y[2] + y[6] - 2*y[4])"
-    - "-ω**2*y[6] + k*(y[4] + y[8] - 2*y[6])"
-    - "-ω**2*y[8] + k*(y[6] + y[10] - 2*y[8])"
-    - "-ω**2*y[10] + k*(y[8] + y[12] - 2*y[10])"
-    - "-ω**2*y[12] + k*(y[10] + y[14] - 2*y[12])"
-    - "-ω**2*y[14] + k*(y[12] + y[16] - 2*y[14])"
-    - "-ω**2*y[16] + k*(y[14] + y[18] - 2*y[16])"
-    - "-ω**2*y[18] + k*(y[16] + y[20] - 2*y[18])"
-    - "-ω**2*y[20] + k*(y[18] + y[22] - 2*y[20])"
-    - "-ω**2*y[22] + k*(y[20] + y[24] - 2*y[22])"
-    - "-ω**2*y[24] + k*(y[22] + y[26] - 2*y[24])"
-    - "-ω**2*y[26] + k*(y[24] + y[28] - 2*y[26])"
-    - "-ω**2*y[28] + k*(y[26] + y[30] - 2*y[28])"
-    - "-ω**2*y[30] + k*(y[28] + y[32] - 2*y[30])"
-    - "-ω**2*y[32] + k*(y[30] + y[34] - 2*y[32])"
-    - "-ω**2*y[34] + k*(y[32] + y[36] - 2*y[34])"
-    - "-ω**2*y[36] + k*(y[34] + y[38] - 2*y[36])"
-    - "-ω**2*y[38] + k*(y[36] - 2*y[38])"
+    - "-ω**2*f[0,0] + k*(f[1,0] - 2*f[0,0])"
+    - "-ω**2*f[1,0] + k*(f[0,0] + f[2,0] - 2*f[1,0])"
+    - "-ω**2*f[2,0] + k*(f[1,0] + f[3,0] - 2*f[2,0])"
+    - "-ω**2*f[3,0] + k*(f[2,0] + f[4,0] - 2*f[3,0])"
+    - "-ω**2*f[4,0] + k*(f[3,0] + f[5,0] - 2*f[4,0])"
+    - "-ω**2*f[5,0] + k*(f[4,0] + f[6,0] - 2*f[5,0])"
+    - "-ω**2*f[6,0] + k*(f[5,0] + f[7,0] - 2*f[6,0])"
+    - "-ω**2*f[7,0] + k*(f[6,0] + f[8,0] - 2*f[7,0])"
+    - "-ω**2*f[8,0] + k*(f[7,0] + f[9,0] - 2*f[8,0])"
+    - "-ω**2*f[9,0] + k*(f[8,0] + f[10,0] - 2*f[9,0])"
+    - "-ω**2*f[10,0] + k*(f[9,0] + f[11,0] - 2*f[10,0])"
+    - "-ω**2*f[11,0] + k*(f[10,0] + f[12,0] - 2*f[11,0])"
+    - "-ω**2*f[12,0] + k*(f[11,0] + f[13,0] - 2*f[12,0])"
+    - "-ω**2*f[13,0] + k*(f[12,0] + f[14,0] - 2*f[13,0])"
+    - "-ω**2*f[14,0] + k*(f[13,0] + f[15,0] - 2*f[14,0])"
+    - "-ω**2*f[15,0] + k*(f[14,0] + f[16,0] - 2*f[15,0])"
+    - "-ω**2*f[16,0] + k*(f[15,0] + f[17,0] - 2*f[16,0])"
+    - "-ω**2*f[17,0] + k*(f[16,0] + f[18,0] - 2*f[17,0])"
+    - "-ω**2*f[18,0] + k*(f[17,0] + f[19,0] - 2*f[18,0])"
+    - "-ω**2*f[19,0] + k*(f[18,0] - 2*f[19,0])"
   vector_components: 20
   parameters:
     "ω":
@@ -392,15 +417,15 @@ twenty_coupled_oscillators:
 damped_coupled_system:
   category: Oscillators
   name: "Damped Coupled System"
-  formula: "f₀'' = -γf₀' - ω²f₀ + cf₁, f₁'' = -γf₁' - ω²f₁ + cf₀"
+  formula: "f[0,2] = -γf[0,1] - ω²f[0,0] + cf[1,0], f[1,2] = -γf[1,1] - ω²f[1,0] + cf[0,0]"
   description: |
     Two damped oscillators with linear coupling.
-    y[0]=f₀, y[1]=f₀', y[2]=f₁, y[3]=f₁'.
-  equation_type: ode
+    f[i,k] = component i, derivative order k.
+  equation_type: vector_ode
   order: 2
   vector_expressions:
-    - "-γ*y[1] - ω**2*y[0] + c*y[2]"
-    - "-γ*y[3] - ω**2*y[2] + c*y[0]"
+    - "-γ*f[0,1] - ω**2*f[0,0] + c*f[1,0]"
+    - "-γ*f[1,1] - ω**2*f[1,0] + c*f[0,0]"
   vector_components: 2
   parameters:
     "ω":
@@ -420,26 +445,26 @@ damped_coupled_system:
 geometric_growth_diff:
   category: Discrete Population
   name: "Geometric Growth (Discrete)"
-  formula: "y_{n+1} = r·y_n"
+  formula: "f_{n+1} = r·f_n"
   description: |
-    y_{n+1} = r·y_n
-    Discrete exponential growth. Use n for index, y[0] for y_n.
+    f_{n+1} = r·f_n
+    Discrete exponential growth. Use n for index, f[0] for f_n.
   equation_type: difference
   order: 1
   parameters:
     r:
       default: 1.5
       description: "Growth factor"
-  expression: "r * y[0]"
+  expression: "r * f[0]"
   default_initial_conditions: [1.0]
   default_domain: [0, 50]
 
 logistic_map_diff:
   category: Discrete Population
   name: "Logistic Map"
-  formula: "y_{n+1} = r·y_n·(1 - y_n)"
+  formula: "f_{n+1} = r·f_n·(1 - f_n)"
   description: |
-    y_{n+1} = r·y_n·(1 - y_n)
+    f_{n+1} = r·f_n·(1 - f_n)
     Classic chaotic map. For r≈3.57 exhibits chaos.
   equation_type: difference
   order: 1
@@ -447,50 +472,50 @@ logistic_map_diff:
     r:
       default: 3.5
       description: "Growth parameter"
-  expression: "r * y[0] * (1 - y[0])"
+  expression: "r * f[0] * (1 - f[0])"
   default_initial_conditions: [0.5]
   default_domain: [0, 100]
 
 fibonacci_diff:
   category: Linear Recurrence
   name: "Fibonacci Recurrence"
-  formula: "y_{n+2} = y_{n+1} + y_n"
+  formula: "f_{n+2} = f_{n+1} + f_n"
   description: |
-    y_{n+2} = y_{n+1} + y_n
-    Classic Fibonacci sequence. y[0]=y_n, y[1]=y_{n+1}.
+    f_{n+2} = f_{n+1} + f_n
+    Classic Fibonacci sequence. f[0]=f_n, f[1]=f_{n+1}.
   equation_type: difference
   order: 2
   parameters: {}
-  expression: "y[1] + y[0]"
+  expression: "f[1] + f[0]"
   default_initial_conditions: [0.0, 1.0]
   default_domain: [0, 30]
 
 linear_recurrence_2_diff:
   category: Linear Recurrence
   name: "Second-Order Linear Recurrence"
-  formula: "y_{n+2} = a·y_{n+1} + b·y_n"
+  formula: "f_{n+2} = a·f_{n+1} + b·f_n"
   description: |
-    y_{n+2} = a·y_{n+1} + b·y_n
+    f_{n+2} = a·f_{n+1} + b·f_n
     General second-order linear recurrence.
   equation_type: difference
   order: 2
   parameters:
     a:
       default: 1.0
-      description: "Coefficient of y_{n+1}"
+      description: "Coefficient of f_{n+1}"
     b:
       default: 1.0
-      description: "Coefficient of y_n"
-  expression: "a * y[1] + b * y[0]"
+      description: "Coefficient of f_n"
+  expression: "a * f[1] + b * f[0]"
   default_initial_conditions: [0.0, 1.0]
   default_domain: [0, 30]
 
 cobweb_model_diff:
   category: Discrete Population
   name: "Discrete Logistic (Cobweb)"
-  formula: "y_{n+1} = r·y_n·(1 - y_n/K)"
+  formula: "f_{n+1} = r·f_n·(1 - f_n/K)"
   description: |
-    y_{n+1} = r·y_n·(1 - y_n/K)
+    f_{n+1} = r·f_n·(1 - f_n/K)
     Discrete population model with carrying capacity.
   equation_type: difference
   order: 1
@@ -510,11 +535,11 @@ cobweb_model_diff:
 poisson_2d:
   category: Poisson
   name: "Poisson Equation (2D)"
-  formula: "-∇²u = f(x,y)"
+  formula: "-∇²f = g(x[0],x[1])"
   description: |
-    -u_xx - u_yy = f(x,y)
-    Elliptic PDE. Solves for u(x,y) with zero Dirichlet boundary conditions.
-    Use expression for the RHS f(x,y). Example: k for constant, or x*y.
+    -f[0,0] - f[1,1] = g(x[0],x[1])
+    Elliptic PDE. Solves for f(x[0],x[1]) with zero Dirichlet boundary conditions.
+    Use expression for the RHS g(x[0],x[1]). Example: k for constant, or x*y.
   equation_type: pde
   variables: ["x", "y"]
   order: 1
@@ -529,9 +554,9 @@ poisson_2d:
 laplace_2d:
   category: Laplace
   name: "Laplace Equation (2D)"
-  formula: "∇²u = 0"
+  formula: "∇²f = 0"
   description: |
-    u_xx + u_yy = 0
+    f[0,0] + f[1,1] = 0
     Harmonic function. Zero Dirichlet BC.
   equation_type: pde
   variables: ["x", "y"]
@@ -543,10 +568,10 @@ laplace_2d:
 
 poisson_xy:
   category: Poisson
-  name: "Poisson: -∇²u = xy"
-  formula: "-∇²u = xy"
+  name: "Poisson: -∇²f = x[0]·x[1]"
+  formula: "-∇²f = x[0]·x[1]"
   description: |
-    -u_xx - u_yy = x*y
+    -f[0,0] - f[1,1] = x[0]*x[1]
     Poisson equation with bilinear source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -558,11 +583,11 @@ poisson_xy:
 
 poisson_sin:
   category: Poisson
-  name: "Poisson: -∇²u = sin(πx)sin(πy)"
-  formula: "-∇²u = sin(πx)sin(πy)"
+  name: "Poisson: -∇²f = sin(πx[0])sin(πx[1])"
+  formula: "-∇²f = sin(πx[0])sin(πx[1])"
   description: |
-    -u_xx - u_yy = sin(πx)sin(πy)
-    Classic test case with known analytical solution u = sin(πx)sin(πy)/(2π²).
+    -f[0,0] - f[1,1] = sin(πx[0])sin(πx[1])
+    Classic test case with known analytical solution f = sin(πx[0])sin(πx[1])/(2π²).
   equation_type: pde
   variables: ["x", "y"]
   order: 1
@@ -573,10 +598,10 @@ poisson_sin:
 
 poisson_linear:
   category: Poisson
-  name: "Poisson: -∇²u = x + y"
-  formula: "-∇²u = x + y"
+  name: "Poisson: -∇²f = x[0] + x[1]"
+  formula: "-∇²f = x[0] + x[1]"
   description: |
-    -u_xx - u_yy = x + y
+    -f[0,0] - f[1,1] = x[0] + x[1]
     Poisson with linear source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -588,10 +613,10 @@ poisson_linear:
 
 poisson_quadratic:
   category: Poisson
-  name: "Poisson: -∇²u = x² + y²"
-  formula: "-∇²u = x² + y²"
+  name: "Poisson: -∇²f = x[0]² + x[1]²"
+  formula: "-∇²f = x[0]² + x[1]²"
   description: |
-    -u_xx - u_yy = x² + y²
+    -f[0,0] - f[1,1] = x[0]² + x[1]²
     Poisson with quadratic source term.
   equation_type: pde
   variables: ["x", "y"]
@@ -603,10 +628,10 @@ poisson_quadratic:
 
 poisson_gaussian:
   category: Poisson
-  name: "Poisson: -∇²u = exp(-(x²+y²)/σ²)"
-  formula: "-∇²u = exp(-(x²+y²)/σ²)"
+  name: "Poisson: -∇²f = exp(-(x[0]²+x[1]²)/σ²)"
+  formula: "-∇²f = exp(-(x[0]²+x[1]²)/σ²)"
   description: |
-    -u_xx - u_yy = exp(-(x²+y²)/σ²)
+    -f[0,0] - f[1,1] = exp(-(x[0]²+x[1]²)/σ²)
     Poisson with Gaussian source. Parameter σ controls the width.
   equation_type: pde
   variables: ["x", "y"]
@@ -615,6 +640,7 @@ poisson_gaussian:
     sigma:
       default: 0.3
       description: "Gaussian width"
+      display: "σ"
   expression: "exp(-(x**2 + y**2) / sigma**2)"
   default_initial_conditions: []
   default_domain: [-1.0, 1.0, -1.0, 1.0]

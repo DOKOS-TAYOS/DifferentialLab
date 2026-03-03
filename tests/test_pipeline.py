@@ -52,7 +52,8 @@ def test_run_solver_pipeline_success(
 
     assert isinstance(result, SolverResult)
     assert result.x.shape == (100,)
-    assert result.y.shape == (1, 100)
+    # Augmented with highest derivative: (order+1, n_points) = (2, 100)
+    assert result.y.shape == (2, 100)
     assert "mean" in result.statistics
     assert result.metadata["equation_name"] == "Exponential"
 
@@ -111,7 +112,8 @@ def test_run_solver_pipeline_multipoint(
         selected_stats={"mean"},
         x0_list=[0.0, 0.0],
     )
-    assert result.y.shape[0] == 2
+    # Augmented with highest derivative: (order+1, n_points) = (3, 50)
+    assert result.y.shape[0] == 3
     np.testing.assert_allclose(result.y[0, 0], 1.0)
     np.testing.assert_allclose(result.y[1, 0], 0.0)
 

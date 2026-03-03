@@ -45,7 +45,7 @@ class TestExportCsv:
         result = _export_csv(x, y, filepath)
         assert result == filepath
         content = filepath.read_text()
-        assert "x" in content and "y" in content
+        assert "x" in content and "f" in content
         lines = content.strip().split("\n")
         assert len(lines) == 4  # header + 3 rows
 
@@ -55,7 +55,7 @@ class TestExportCsv:
         filepath = tmp_path / "out.csv"
         _export_csv(x, y, filepath)
         content = filepath.read_text()
-        assert "y0" in content and "y1" in content
+        assert "f0" in content and "f1" in content
 
 
 class TestExportJson:

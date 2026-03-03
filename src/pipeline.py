@@ -1,4 +1,4 @@
-"""Solver pipeline — orchestrates validation, solving, plotting, and export."""
+"""Solver pipeline — orchestrates validation, solving, and statistics."""
 
 from __future__ import annotations
 
@@ -6,18 +6,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from matplotlib.figure import Figure
 
 from config import get_env_from_schema
-from plotting import (
-    create_contour_plot,
-    create_phase_plot,
-    create_solution_plot,
-    create_surface_plot,
-    create_vector_animation_3d,
-    create_vector_animation_plot,
-)
 from solver import (
+    FNotation,
     ODESolution,
     compute_ode_residual_error,
     compute_statistics,
@@ -54,20 +46,18 @@ def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
 
 @dataclass
 class SolverResult:
-    """Bundles every artefact produced by a solver run."""
+    """Data-only bundle produced by a solver run (no pre-generated plots)."""
 
     x: np.ndarray
     y: np.ndarray
     statistics: dict[str, Any]
     metadata: dict[str, Any]
-    fig: Figure
-    phase_fig: Figure | None
+    equation_type: str = "ode"
     y_grid: np.ndarray | None = None  # For 2D PDE: y-axis grid
-    animation_fig: Figure | None = None
-    animation_3d_fig: Figure | None = None
     is_vector: bool = False
     vector_components: int = 1
     vector_order: int = 1
+    notation: FNotation | None = None
 
 
 def run_solver_pipeline(
@@ -83,20 +73,21 @@ def run_solver_pipeline(
     n_points: int,
     method: str,
     selected_stats: set[str],
-    selected_derivatives: list[int] | None = None,
     x0_list: list[float] | None = None,
     equation_type: EquationType = "ode",
     variables: list[str] | None = None,
     y_min: float | None = None,
     y_max: float | None = None,
     n_points_y: int | None = None,
-    plot_3d: bool = True,
     vector_expressions: list[str] | None = None,
     vector_components: int = 1,
+    pde_operator: str = "neg_laplacian",
+    component_orders: tuple[int, ...] | None = None,
 ) -> SolverResult:
-    """Execute the full solve workflow and return all results.
+    """Execute the full solve workflow and return data results.
 
-    Stages: validate → resolve ODE function → solve → statistics → plot → export.
+    Stages: validate → resolve function → solve → statistics.
+    Plot generation is deferred to the ResultDialog for interactive control.
 
     Args:
         expression: ODE expression string (optional).
@@ -106,12 +97,11 @@ def run_solver_pipeline(
         equation_name: Display name for plots/metadata.
         x_min: Domain start.
         x_max: Domain end.
-        y0: Initial condition values ``[y(x_0), y'(x_1), …]``.
+        y0: Initial condition values ``[f(x₀), f'(x₁), …]``.
         n_points: Number of evaluation points.
         method: Solver method name.
         selected_stats: Set of statistic keys to compute.
-        selected_derivatives: Indices of derivatives to plot.
-        x0_list: Per-derivative condition points ``[x_0, x_1, …]``.
+        x0_list: Per-derivative condition points ``[x₀, x₁, …]``.
             If ``None`` or all equal to ``x_min``, uses standard IVP.
 
     Raises:
@@ -168,7 +158,24 @@ def run_solver_pipeline(
             fyy: float,
             **kw: Any,
         ) -> float:
-            return rhs_func(x, y, **kw)
+            rhs = rhs_func(x, y, **kw)
+            # Residual = LHS_operator(f) - rhs = 0
+            if pde_operator == "neg_laplacian":
+                return -fxx - fyy - rhs
+            if pde_operator == "laplacian":
+                return fxx + fyy - rhs
+            if pde_operator == "fxx":
+                return fxx - rhs
+            if pde_operator == "fyy":
+                return fyy - rhs
+            if pde_operator == "fx":
+                return fx - rhs
+            if pde_operator == "fy":
+                return fy - rhs
+            if pde_operator == "fxy":
+                return fxy - rhs
+            # Default: neg_laplacian
+            return -fxx - fyy - rhs
 
         pde_sol = solve_pde_2d(
             residual,
@@ -255,6 +262,38 @@ def run_solver_pipeline(
         error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
         solver_quality = _build_solver_quality(solution)
 
+    # ── Compute highest derivative and augment y ──────────────────────
+    # For ODE/vector_ode, evaluate the ODE function to get f^(n) and
+    # interleave it into y so the notation can display it.
+    display_order = order
+    if not is_2d_pde and equation_type != "difference":
+        try:
+            y_2d = np.atleast_2d(solution_y)
+            if y_2d.shape[1] != len(solution_x):
+                y_2d = y_2d.T
+            n_pts = len(solution_x)
+            n_comp = vector_components if is_vector else 1
+
+            # Evaluate ODE function at each time point
+            dydt_all = np.column_stack(
+                [ode_func(solution_x[j], y_2d[:, j]) for j in range(n_pts)]
+            )  # shape (n_state, n_pts)
+
+            # Build augmented y with order+1 per component
+            new_order = order + 1
+            new_rows = n_comp * new_order
+            augmented = np.empty((new_rows, n_pts))
+            for comp_i in range(n_comp):
+                for k in range(order):
+                    augmented[comp_i * new_order + k] = y_2d[comp_i * order + k]
+                # Highest derivative: dydt[comp_i * order + order - 1]
+                augmented[comp_i * new_order + order] = dydt_all[comp_i * order + order - 1]
+
+            solution_y = augmented
+            display_order = new_order
+        except Exception:
+            logger.debug("Could not compute highest derivative; using raw y", exc_info=True)
+
     if is_2d_pde:
         stats = compute_statistics_2d(solution_x, solution_y_grid, solution_y, selected_stats)
     else:
@@ -287,66 +326,25 @@ def run_solver_pipeline(
         "n_jacobian_evals": solver_quality.get("n_jacobian_evals"),
     }
 
-    if is_2d_pde:
-        if plot_3d:
-            fig = create_surface_plot(
-                solution_x,
-                solution_y_grid,
-                solution_y,
-                title=equation_name,
-                xlabel="x",
-                ylabel="y",
-                zlabel="u",
-            )
-        else:
-            fig = create_contour_plot(
-                solution_x,
-                solution_y_grid,
-                solution_y,
-                title=equation_name,
-                xlabel="x",
-                ylabel="y",
-            )
-        phase_fig = None
-        animation_fig = None
-        animation_3d_fig = None
-    else:
-        plot_derivs = selected_derivatives
-        if is_vector and vector_components > 1:
-            sel = selected_derivatives or list(range(vector_components))
-            plot_derivs = [i * order for i in sel if i < vector_components]
-        fig = create_solution_plot(
-            solution_x,
-            solution_y,
-            title=equation_name,
-            xlabel=xlabel,
-            ylabel="y",
-            selected_derivatives=plot_derivs,
+    # Build notation descriptor for f-notation labels
+    if equation_type == "difference":
+        notation = FNotation(kind="difference", order=order)
+    elif is_vector:
+        # If component_orders provided, augment each with +1 for display
+        display_comp_orders: tuple[int, ...] | None = None
+        if component_orders:
+            display_comp_orders = tuple(co + 1 for co in component_orders)
+        notation = FNotation(
+            kind="vector_ode", n_components=vector_components, order=display_order,
+            component_orders=display_comp_orders or (),
         )
-        phase_fig = None
-        animation_fig = None
-        animation_3d_fig = None
-        if not is_pde and not is_vector:
-            phase_fig = create_phase_plot(
-                solution_y,
-                title=f"{equation_name} — Phase",
-                x=solution_x if order == 1 else None,
-            )
-        if is_vector and vector_components > 1:
-            animation_fig = create_vector_animation_plot(
-                solution_x,
-                solution_y,
-                order=order,
-                vector_components=vector_components,
-                title=f"{equation_name} — f_i(x) vs component",
-            )
-            animation_3d_fig = create_vector_animation_3d(
-                solution_x,
-                solution_y,
-                order=order,
-                vector_components=vector_components,
-                title=f"{equation_name} — 3D",
-            )
+    elif is_pde:
+        notation = FNotation(
+            kind="pde", n_independent_vars=len(vars_list), order=order
+        )
+    else:
+        notation = FNotation(kind="ode", order=display_order)
+
     logger.info("Pipeline complete for '%s'", equation_name)
 
     y_grid_result: np.ndarray | None = solution_y_grid if is_2d_pde else None
@@ -355,12 +353,10 @@ def run_solver_pipeline(
         y=solution_y,
         statistics=stats,
         metadata=metadata,
-        fig=fig,
-        phase_fig=phase_fig,
+        equation_type=equation_type,
         y_grid=y_grid_result,
-        animation_fig=animation_fig,
-        animation_3d_fig=animation_3d_fig,
         is_vector=is_vector,
         vector_components=vector_components if is_vector else 1,
-        vector_order=order,
+        vector_order=display_order,
+        notation=notation,
     )
