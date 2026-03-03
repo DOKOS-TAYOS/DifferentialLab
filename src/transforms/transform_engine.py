@@ -110,6 +110,165 @@ def _compute_taylor_coeffs(
     return coeffs
 
 
+def _hilbert_filter_kernel(n: int) -> np.ndarray:
+    """Build Hilbert transform filter for FFT of length n."""
+    h = np.zeros(n, dtype=complex)
+    h[0] = 1
+    h[1 : (n + 1) // 2] = 2
+    if n % 2 == 0:
+        h[n // 2] = 1
+    return h
+
+
+def _trim_indices_by_amplitude(
+    magnitudes: np.ndarray,
+    threshold_fraction: float,
+    use_nanmax: bool = False,
+) -> tuple[int, int] | None:
+    """Find indices where magnitude is above threshold (fraction of max).
+
+    Args:
+        magnitudes: Array of magnitudes.
+        threshold_fraction: Fraction of max amplitude to use as threshold.
+        use_nanmax: If True, use np.nanmax (for Laplace with possible NaN).
+
+    Returns:
+        (i_min, i_max) if any point above threshold, else None.
+    """
+    if threshold_fraction <= 0 or len(magnitudes) == 0:
+        return None
+    max_amp = float(np.nanmax(magnitudes) if use_nanmax else np.max(magnitudes))
+    if max_amp <= 0 or not np.isfinite(max_amp):
+        return None
+    threshold = max_amp * threshold_fraction
+    above = np.where(magnitudes >= threshold)[0]
+    if len(above) == 0:
+        return None
+    return int(above[0]), int(above[-1])
+
+
+def _refine_fft_spectrum_in_range(
+    y: np.ndarray,
+    dx: float,
+    f_low: float,
+    f_high: float,
+    n_target: int,
+    magnitude_fn: Callable[[np.ndarray, int], np.ndarray],
+    fallback: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Refine FFT spectrum via zero-padding and extract range [f_low, f_high].
+
+    Args:
+        y: Real signal samples.
+        dx: Sample spacing.
+        f_low: Lower frequency bound.
+        f_high: Upper frequency bound.
+        n_target: Target number of points for refinement.
+        magnitude_fn: Callable(fft_vals, n) -> magnitudes of length n//2.
+        fallback: If mask is empty, return this (freqs, mag, bin_indices) instead.
+
+    Returns:
+        (freqs, magnitudes, bin_indices) in the requested range.
+    """
+    n_points = len(y)
+    f_span = max(f_high - f_low, 1.0 / (n_points * dx))
+    n_refined = int(np.ceil(n_target / (f_span * dx)))
+    n_refined = min(max(n_refined, n_points), 65536)
+
+    y_padded = np.zeros(n_refined, dtype=complex)
+    y_padded[:n_points] = y
+    fft_ref = fft.fft(y_padded)
+    mag_ref = magnitude_fn(fft_ref, n_refined)
+    freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
+    freqs_ref = np.abs(freqs_ref)
+
+    mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
+    if np.any(mask):
+        bin_indices = np.where(mask)[0]
+        return freqs_ref[mask], mag_ref[mask], bin_indices
+    if fallback is not None:
+        return fallback
+    return freqs_ref, mag_ref, np.arange(len(freqs_ref))
+
+
+def _trim_and_refine_fft_spectrum(
+    y: np.ndarray,
+    dx: float,
+    freqs: np.ndarray,
+    magnitudes: np.ndarray,
+    threshold_fraction: float,
+    n_target: int,
+    magnitude_fn: Callable[[np.ndarray, int], np.ndarray],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Trim spectrum by amplitude threshold and refine via zero-padding.
+
+    Args:
+        y: Real signal samples.
+        dx: Sample spacing.
+        freqs: Frequency axis.
+        magnitudes: Magnitude values.
+        threshold_fraction: Relative amplitude threshold.
+        n_target: Target number of points after refinement.
+        magnitude_fn: Callable(fft_vals, n) -> magnitudes for refined FFT.
+
+    Returns:
+        (freqs, magnitudes, bin_indices) trimmed and refined.
+        bin_indices are the actual FFT bin indices (k) for coefficient display.
+    """
+    trimmed = _trim_indices_by_amplitude(magnitudes, threshold_fraction)
+    if trimmed is None:
+        return freqs, magnitudes, np.arange(len(freqs))
+
+    i_min, i_max = trimmed
+    f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
+    fallback = (
+        freqs[i_min : i_max + 1],
+        magnitudes[i_min : i_max + 1],
+        np.arange(i_min, i_max + 1),
+    )
+    return _refine_fft_spectrum_in_range(
+        y, dx, f_low, f_high, n_target, magnitude_fn, fallback=fallback
+    )
+
+
+def _trim_and_refine_laplace(
+    func: Callable[[np.ndarray], np.ndarray],
+    x_min: float,
+    x_max: float,
+    s_vals: np.ndarray,
+    laplace_vals: np.ndarray,
+    threshold_fraction: float,
+    n_target: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Trim Laplace spectrum by amplitude and recompute in refined s range.
+
+    Args:
+        func: Vectorized callable f(x) -> y.
+        x_min: Lower integration bound.
+        x_max: Upper integration bound.
+        s_vals: Original s values.
+        laplace_vals: Laplace transform values.
+        threshold_fraction: Relative amplitude threshold.
+        n_target: Target number of points.
+
+    Returns:
+        (s_vals, laplace_vals, sample_indices) trimmed and refined.
+        sample_indices are the original sample indices (i) for L(s_i) display.
+    """
+    laplace_mag = np.abs(laplace_vals)
+    trimmed = _trim_indices_by_amplitude(laplace_mag, threshold_fraction, use_nanmax=True)
+    if trimmed is None:
+        return s_vals, laplace_vals, np.arange(len(s_vals))
+
+    i_min, i_max = trimmed
+    s_low, s_high = float(s_vals[i_min]), float(s_vals[i_max])
+    s_refined = np.linspace(s_low, s_high, n_target)
+    laplace_refined = _compute_laplace_samples(func, x_min, x_max, s_refined)
+    # Indices map refined points to original grid (i_min..i_max)
+    sample_indices = np.linspace(i_min, i_max, n_target)
+    return s_refined, laplace_refined, sample_indices
+
+
 def _compute_laplace_samples(
     func: Callable[[np.ndarray], np.ndarray],
     x_min: float,
@@ -246,55 +405,20 @@ def apply_transform(
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
         fft_vals = fft.fft(y)
         fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = fft.fftfreq(n_points, dx)[: n_points // 2]
-        freqs = np.abs(freqs)
-        n_target = n_points // 2  # Desired number of points in the displayed spectrum
-        # Trim spectrum to frequencies with amplitude above threshold (relative to max)
-        f_low, f_high = float(freqs[0]), float(freqs[-1])
-        max_amp = float(np.max(fft_mag))
-        if max_amp > 0 and fourier_amp_threshold > 0:
-            threshold = max_amp * fourier_amp_threshold
-            above = np.where(fft_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
-                # Zero-pad to get n_target points in [f_low, f_high].
-                # FFT bin spacing df = 1/(n_refined*dx); bins in [f_low,f_high] ≈ (f_high-f_low)*n_refined*dx
-                f_span = max(f_high - f_low, 1.0 / (n_points * dx))
-                n_refined = int(np.ceil(n_target / (f_span * dx)))
-                n_refined = min(max(n_refined, n_points), 65536)  # Cap to avoid huge FFTs
-                # Zero-pad: keep original y, pad with zeros to length n_refined
-                y_padded = np.zeros(n_refined, dtype=complex)
-                y_padded[:n_points] = y
-                fft_ref = fft.fft(y_padded)
-                fft_mag_ref = np.abs(fft_ref[: n_refined // 2])
-                freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
-                freqs_ref = np.abs(freqs_ref)
-                mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
-                if np.any(mask):
-                    freqs = freqs_ref[mask]
-                    fft_mag = fft_mag_ref[mask]
-                else:
-                    freqs = freqs[i_min : i_max + 1]
-                    fft_mag = fft_mag[i_min : i_max + 1]
+        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+        freqs, fft_mag, _ = _trim_and_refine_fft_spectrum(
+            y, dx, freqs, fft_mag, fourier_amp_threshold, n_points // 2,
+            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        )
         return freqs, fft_mag, "ω/(2π)", "|F(ω)|"
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
         laplace_vals = _compute_laplace_samples(func, x_min, x_max, s_vals)
-        laplace_mag = np.abs(laplace_vals)
-        n_target = laplace_n_points
-        s_low, s_high = float(laplace_s_min), float(laplace_s_max)
-        max_amp = float(np.nanmax(laplace_mag))
-        if max_amp > 0 and laplace_amp_threshold > 0:
-            threshold = max_amp * laplace_amp_threshold
-            above = np.where(laplace_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                s_low, s_high = float(s_vals[i_min]), float(s_vals[i_max])
-                s_refined = np.linspace(s_low, s_high, n_target)
-                laplace_vals = _compute_laplace_samples(func, x_min, x_max, s_refined)
-                s_vals = s_refined
+        s_vals, laplace_vals, _ = _trim_and_refine_laplace(
+            func, x_min, x_max, s_vals, laplace_vals,
+            laplace_amp_threshold, laplace_n_points,
+        )
         return s_vals, laplace_vals, "s (real)", "L(s)"
 
     if kind == TransformKind.TAYLOR:
@@ -311,55 +435,21 @@ def apply_transform(
 
     if kind == TransformKind.HILBERT:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
-        # Discrete Hilbert transform: H[f] = Im(analytic signal)
         fft_vals = fft.fft(y)
-        n = len(fft_vals)
-        h = np.zeros(n, dtype=complex)
-        h[0] = 1
-        h[1 : (n + 1) // 2] = 2
-        if n % 2 == 0:
-            h[n // 2] = 1
-        h[(n + 1) // 2 :] = 0
-        analytic_fft = fft_vals * h
-        analytic_signal = fft.ifft(analytic_fft)
-        hilbert_signal = np.imag(analytic_signal)
+        analytic_fft = fft_vals * _hilbert_filter_kernel(len(fft_vals))
+        hilbert_signal = np.imag(fft.ifft(analytic_fft))
         return x, hilbert_signal, "x", "H[f](x)"
 
     if kind == TransformKind.Z_TRANSFORM:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        # Z-transform evaluated on unit circle = DFT; show magnitude spectrum
         fft_vals = fft.fft(y)
         fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = fft.fftfreq(n_points, dx)[: n_points // 2]
-        freqs = np.abs(freqs)
-        n_target = n_points // 2
-        # Trim spectrum to frequencies with amplitude above threshold (relative to max)
-        f_low, f_high = float(freqs[0]), float(freqs[-1])
-        max_amp = float(np.max(fft_mag))
-        if max_amp > 0 and z_transform_amp_threshold > 0:
-            threshold = max_amp * z_transform_amp_threshold
-            above = np.where(fft_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
-                # Zero-pad to get n_target points in [f_low, f_high]
-                f_span = max(f_high - f_low, 1.0 / (n_points * dx))
-                n_refined = int(np.ceil(n_target / (f_span * dx)))
-                n_refined = min(max(n_refined, n_points), 65536)
-                y_padded = np.zeros(n_refined, dtype=complex)
-                y_padded[:n_points] = y
-                fft_ref = fft.fft(y_padded)
-                fft_mag_ref = np.abs(fft_ref[: n_refined // 2])
-                freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
-                freqs_ref = np.abs(freqs_ref)
-                mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
-                if np.any(mask):
-                    freqs = freqs_ref[mask]
-                    fft_mag = fft_mag_ref[mask]
-                else:
-                    freqs = freqs[i_min : i_max + 1]
-                    fft_mag = fft_mag[i_min : i_max + 1]
+        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+        freqs, fft_mag, _ = _trim_and_refine_fft_spectrum(
+            y, dx, freqs, fft_mag, z_transform_amp_threshold, n_points // 2,
+            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        )
         return freqs, fft_mag, "ω/(2π)", "|X[k]|"
 
     raise ValueError(f"Unknown transform kind: {kind}")
@@ -419,140 +509,44 @@ def get_transform_coefficients(
     if kind == TransformKind.FOURIER:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_vals = fft.fft(y)
-        fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = fft.fftfreq(n_points, dx)[: n_points // 2]
-        freqs = np.abs(freqs)
-        n_target = n_points // 2
-        f_low, f_high = float(freqs[0]), float(freqs[-1])
-        max_amp = float(np.max(fft_mag))
-        if max_amp > 0 and fourier_amp_threshold > 0:
-            threshold = max_amp * fourier_amp_threshold
-            above = np.where(fft_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
-                f_span = max(f_high - f_low, 1.0 / (n_points * dx))
-                n_refined = int(np.ceil(n_target / (f_span * dx)))
-                n_refined = min(max(n_refined, n_points), 65536)
-                y_padded = np.zeros(n_refined, dtype=complex)
-                y_padded[:n_points] = y
-                fft_ref = fft.fft(y_padded)
-                fft_mag_ref = np.abs(fft_ref[: n_refined // 2])
-                freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
-                freqs_ref = np.abs(freqs_ref)
-                mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
-                if np.any(mask):
-                    coeffs = fft_mag_ref[mask]
-                else:
-                    coeffs = fft_mag[i_min : i_max + 1]
-            else:
-                coeffs = fft_mag
-        else:
-            coeffs = fft_mag
-        indices = np.arange(len(coeffs))
-        return indices, coeffs, "k", "|F[k]|"
+        fft_mag = np.abs(fft.fft(y)[: n_points // 2])
+        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+            y, dx, freqs, fft_mag, fourier_amp_threshold, n_points // 2,
+            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        )
+        return bin_indices, coeffs, "k", "|F[k]|"
 
     if kind == TransformKind.LAPLACE:
         s_vals = np.linspace(laplace_s_min, laplace_s_max, laplace_n_points)
-        coeffs = _compute_laplace_samples(func, x_min, x_max, s_vals)
-        laplace_mag = np.abs(coeffs)
-        n_target = laplace_n_points
-        s_low, s_high = float(laplace_s_min), float(laplace_s_max)
-        max_amp = float(np.nanmax(laplace_mag))
-        if max_amp > 0 and laplace_amp_threshold > 0:
-            threshold = max_amp * laplace_amp_threshold
-            above = np.where(laplace_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                s_low, s_high = float(s_vals[i_min]), float(s_vals[i_max])
-                s_refined = np.linspace(s_low, s_high, n_target)
-                coeffs = _compute_laplace_samples(func, x_min, x_max, s_refined)
-        indices = np.arange(len(coeffs))
-        return indices, coeffs, "i", "L(s_i)"
+        laplace_vals = _compute_laplace_samples(func, x_min, x_max, s_vals)
+        _, coeffs, sample_indices = _trim_and_refine_laplace(
+            func, x_min, x_max, s_vals, laplace_vals,
+            laplace_amp_threshold, laplace_n_points,
+        )
+        return sample_indices, coeffs, "i", "L(s_i)"
 
     if kind == TransformKind.HILBERT:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
         fft_vals = fft.fft(y)
-        n = len(fft_vals)
-        h = np.zeros(n, dtype=complex)
-        h[0] = 1
-        h[1 : (n + 1) // 2] = 2
-        if n % 2 == 0:
-            h[n // 2] = 1
-        analytic_fft = fft_vals * h
-        coeffs = np.abs(analytic_fft[: n // 2])
-        freqs = fft.fftfreq(n, dx)[: n // 2]
-        freqs = np.abs(freqs)
-        n_target = n_points // 2
-        f_low, f_high = float(freqs[0]), float(freqs[-1])
-        max_amp = float(np.max(coeffs))
-        if max_amp > 0 and hilbert_amp_threshold > 0:
-            threshold = max_amp * hilbert_amp_threshold
-            above = np.where(coeffs >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
-                f_span = max(f_high - f_low, 1.0 / (n_points * dx))
-                n_refined = int(np.ceil(n_target / (f_span * dx)))
-                n_refined = min(max(n_refined, n_points), 65536)
-                y_padded = np.zeros(n_refined, dtype=complex)
-                y_padded[:n_points] = y
-                fft_ref = fft.fft(y_padded)
-                n_r = len(fft_ref)
-                h_ref = np.zeros(n_r, dtype=complex)
-                h_ref[0] = 1
-                h_ref[1 : (n_r + 1) // 2] = 2
-                if n_r % 2 == 0:
-                    h_ref[n_r // 2] = 1
-                analytic_fft_ref = fft_ref * h_ref
-                coeffs_ref = np.abs(analytic_fft_ref[: n_r // 2])
-                freqs_ref = fft.fftfreq(n_r, dx)[: n_r // 2]
-                freqs_ref = np.abs(freqs_ref)
-                mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
-                if np.any(mask):
-                    coeffs = coeffs_ref[mask]
-                else:
-                    coeffs = coeffs[i_min : i_max + 1]
-        indices = np.arange(len(coeffs))
-        return indices, coeffs, "k", "|H[k]|"
+        coeffs = np.abs((fft_vals * _hilbert_filter_kernel(len(fft_vals)))[: len(fft_vals) // 2])
+        freqs = np.abs(fft.fftfreq(len(fft_vals), dx)[: len(fft_vals) // 2])
+        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+            y, dx, freqs, coeffs, hilbert_amp_threshold, n_points // 2,
+            magnitude_fn=lambda fv, n: np.abs((fv * _hilbert_filter_kernel(n))[: n // 2]),
+        )
+        return bin_indices, coeffs, "k", "|H[k]|"
 
     if kind == TransformKind.Z_TRANSFORM:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_vals = fft.fft(y)
-        fft_mag = np.abs(fft_vals[: n_points // 2])
-        freqs = fft.fftfreq(n_points, dx)[: n_points // 2]
-        freqs = np.abs(freqs)
-        n_target = n_points // 2
-        f_low, f_high = float(freqs[0]), float(freqs[-1])
-        max_amp = float(np.max(fft_mag))
-        if max_amp > 0 and z_transform_amp_threshold > 0:
-            threshold = max_amp * z_transform_amp_threshold
-            above = np.where(fft_mag >= threshold)[0]
-            if len(above) > 0:
-                i_min, i_max = int(above[0]), int(above[-1])
-                f_low, f_high = float(freqs[i_min]), float(freqs[i_max])
-                f_span = max(f_high - f_low, 1.0 / (n_points * dx))
-                n_refined = int(np.ceil(n_target / (f_span * dx)))
-                n_refined = min(max(n_refined, n_points), 65536)
-                y_padded = np.zeros(n_refined, dtype=complex)
-                y_padded[:n_points] = y
-                fft_ref = fft.fft(y_padded)
-                fft_mag_ref = np.abs(fft_ref[: n_refined // 2])
-                freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
-                freqs_ref = np.abs(freqs_ref)
-                mask = (freqs_ref >= f_low) & (freqs_ref <= f_high)
-                if np.any(mask):
-                    coeffs = fft_mag_ref[mask]
-                else:
-                    coeffs = fft_mag[i_min : i_max + 1]
-            else:
-                coeffs = fft_mag
-        else:
-            coeffs = fft_mag
-        indices = np.arange(len(coeffs))
-        return indices, coeffs, "k", "|X[k]|"
+        fft_mag = np.abs(fft.fft(y)[: n_points // 2])
+        freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
+        _, coeffs, bin_indices = _trim_and_refine_fft_spectrum(
+            y, dx, freqs, fft_mag, z_transform_amp_threshold, n_points // 2,
+            magnitude_fn=lambda fv, n: np.abs(fv[: n // 2]),
+        )
+        return bin_indices, coeffs, "k", "|X[k]|"
 
     raise ValueError(f"Unknown transform kind: {kind}")

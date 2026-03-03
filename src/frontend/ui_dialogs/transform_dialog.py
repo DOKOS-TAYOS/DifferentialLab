@@ -214,7 +214,7 @@ class TransformDialog:
         # Taylor options (shown only when Taylor is selected)
         self._taylor_frame = ttk.Frame(trans_lf)
         self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
-        ttk.Label(self._taylor_frame, text="Order:").pack(side=tk.LEFT)
+        ttk.Label(self._taylor_frame, text="Taylor Order:").pack(side=tk.LEFT)
         self._taylor_order_var = tk.StringVar(value="5")
         ttk.Spinbox(
             self._taylor_frame,
