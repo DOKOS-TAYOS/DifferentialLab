@@ -162,9 +162,8 @@ def perform_git_pull() -> tuple[bool, str]:
         )
 
         # Only pop the stash if something was actually stashed
-        stash_ok = (
-            stash_result.returncode == 0
-            and "Saved working directory" in (stash_result.stdout or "")
+        stash_ok = stash_result.returncode == 0 and "Saved working directory" in (
+            stash_result.stdout or ""
         )
         if stash_ok:
             subprocess.run(

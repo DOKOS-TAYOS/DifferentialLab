@@ -105,9 +105,7 @@ def ricker_model(n: int, y: np.ndarray, r: float = 2.5, **kwargs: Any) -> float:
     return r * y[0] * np.exp(-y[0])
 
 
-def beverton_holt(
-    n: int, y: np.ndarray, r: float = 2.0, K: float = 100.0, **kwargs: Any
-) -> float:
+def beverton_holt(n: int, y: np.ndarray, r: float = 2.0, K: float = 100.0, **kwargs: Any) -> float:
     """y_{n+1} = r * y_n / (1 + (r-1)*y_n/K) — Beverton-Holt (stock recruitment).
 
     Args:

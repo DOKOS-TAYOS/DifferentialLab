@@ -199,9 +199,7 @@ def _subscript(n: int) -> str:
     """Return subscript digits for integer n (e.g. 12 → '₁₂')."""
     if 0 <= n < len(_SUBSCRIPT_DIGITS):
         return _SUBSCRIPT_DIGITS[n]
-    return "".join(
-        _SUBSCRIPT_DIGITS[int(d)] if d.isdigit() else d for d in str(n)
-    )
+    return "".join(_SUBSCRIPT_DIGITS[int(d)] if d.isdigit() else d for d in str(n))
 
 
 def flat_index_to_label(j: int, notation: FNotation) -> str:

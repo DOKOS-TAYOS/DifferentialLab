@@ -324,7 +324,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     )
     style.map("TSpinbox", fieldbackground=[("focus", focus_field_bg)])
 
-    # --- Combobox ---
+    # --- Combobox (arrowsize scales with font for visibility) ---
     style.configure(
         "TCombobox",
         fieldbackground=btn_bg,
@@ -333,6 +333,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         selectforeground=select_fg,
         padding=6,
         font=font,
+        arrowsize=font_size + padding * 2,
     )
     style.map(
         "TCombobox",

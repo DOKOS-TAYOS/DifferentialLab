@@ -28,8 +28,15 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 _MAGNITUDE_KEYS = {
-    "mean", "rms", "std", "integral", "l2_norm", "half_life",
-    "time_constant", "doubling_time", "angular_frequency",
+    "mean",
+    "rms",
+    "std",
+    "integral",
+    "l2_norm",
+    "half_life",
+    "time_constant",
+    "doubling_time",
+    "angular_frequency",
 }
 
 _LEFT_MIN_WIDTH = 580
@@ -146,23 +153,17 @@ class ResultDialog:
         other_stats = {k: v for k, v in statistics.items() if k not in _MAGNITUDE_KEYS}
 
         if magnitudes:
-            mag_section = CollapsibleSection(
-                inner, scroll, "Magnitudes", expanded=True, pad=pad
-            )
+            mag_section = CollapsibleSection(inner, scroll, "Magnitudes", expanded=True, pad=pad)
             for key, val in magnitudes.items():
                 self._render_stat_entry(mag_section.content, key, val, pad)
 
         if other_stats:
-            stat_section = CollapsibleSection(
-                inner, scroll, "Statistics", expanded=True, pad=pad
-            )
+            stat_section = CollapsibleSection(inner, scroll, "Statistics", expanded=True, pad=pad)
             for key, val in other_stats.items():
                 self._render_stat_entry(stat_section.content, key, val, pad)
 
         # Solver info
-        info_section = CollapsibleSection(
-            inner, scroll, "Solver Info", expanded=True, pad=pad
-        )
+        info_section = CollapsibleSection(inner, scroll, "Solver Info", expanded=True, pad=pad)
         info_items: list[tuple[str, Any]] = [
             ("Method", metadata.get("method", "?")),
             ("Success", "Yes" if metadata.get("solver_success") else "No"),
@@ -188,17 +189,13 @@ class ResultDialog:
             ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
 
         # Export
-        export_section = CollapsibleSection(
-            inner, scroll, "Export Data", expanded=True, pad=pad
-        )
+        export_section = CollapsibleSection(inner, scroll, "Export Data", expanded=True, pad=pad)
         btn_row = ttk.Frame(export_section.content)
         btn_row.pack(fill=tk.X, pady=2)
         ttk.Button(btn_row, text="Save CSV...", command=self._on_save_csv).pack(
             side=tk.LEFT, padx=(0, pad)
         )
-        ttk.Button(btn_row, text="Save JSON...", command=self._on_save_json).pack(
-            side=tk.LEFT
-        )
+        ttk.Button(btn_row, text="Save JSON...", command=self._on_save_json).pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Transform controls helper
@@ -260,6 +257,7 @@ class ResultDialog:
             fg=fg,
             selectbackground=select_bg,
             selectforeground=select_fg,
+            font=get_font(),
             exportselection=False,
         )
         for lbl in labels:
@@ -343,8 +341,11 @@ class ResultDialog:
                 default_y_ax = ps_labels[0] if ps_labels else "f"
             self._phase_x_var = tk.StringVar(value=default_x)
             phase_x_combo = ttk.Combobox(
-                phase_ctrl, textvariable=self._phase_x_var,
-                values=ps_labels, state="readonly", width=6,
+                phase_ctrl,
+                textvariable=self._phase_x_var,
+                values=ps_labels,
+                state="readonly",
+                width=6,
                 font=get_font(),
             )
             phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -353,8 +354,11 @@ class ResultDialog:
             ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
             self._phase_y_var = tk.StringVar(value=default_y_ax)
             phase_y_combo = ttk.Combobox(
-                phase_ctrl, textvariable=self._phase_y_var,
-                values=ps_labels, state="readonly", width=6,
+                phase_ctrl,
+                textvariable=self._phase_y_var,
+                values=ps_labels,
+                state="readonly",
+                width=6,
                 font=get_font(),
             )
             phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -394,7 +398,10 @@ class ResultDialog:
                 continue
             func = interp1d(x, y_2d[idx], kind="cubic", fill_value="extrapolate")
             tx, ty, txlabel, tylabel = apply_transform(
-                lambda arr, f=func: f(arr), kind, x_min_t, x_max_t,
+                lambda arr, f=func: f(arr),
+                kind,
+                x_min_t,
+                x_max_t,
             )
             lbl = labels[idx] if idx < len(labels) else f"f[{idx}]"
             raw.append((tx, ty, lbl))
@@ -410,8 +417,7 @@ class ResultDialog:
             if len(tx_i) == len(ref_tx) and np.allclose(tx_i, ref_tx):
                 aligned_rows.append(ty_i)
             else:
-                f_interp = interp1d(tx_i, ty_i, kind="linear",
-                                    bounds_error=False, fill_value=0.0)
+                f_interp = interp1d(tx_i, ty_i, kind="linear", bounds_error=False, fill_value=0.0)
                 aligned_rows.append(f_interp(ref_tx))
             trans_labels.append(lbl)
 
@@ -446,7 +452,8 @@ class ResultDialog:
 
         if kind == TransformKind.ORIGINAL:
             fig = create_solution_plot(
-                r.x, r.y,
+                r.x,
+                r.y,
                 title=eq_name,
                 xlabel=xlabel,
                 ylabel="f",
@@ -459,14 +466,19 @@ class ResultDialog:
                 y_2d = y_2d.T
 
             result = self._apply_transform_multi(
-                r.x, y_2d, selected, self._sol_labels, kind,
+                r.x,
+                y_2d,
+                selected,
+                self._sol_labels,
+                kind,
             )
             if result is None:
                 return
             tx, ty_2d, trans_labels, txlabel, tylabel = result
 
             fig = create_solution_plot(
-                tx, ty_2d,
+                tx,
+                ty_2d,
                 title=f"{eq_name} \u2014 {kind.value}",
                 xlabel=txlabel,
                 ylabel=tylabel,
@@ -500,11 +512,14 @@ class ResultDialog:
             return None
 
         labels_for_transform = [
-            (f"y[{i}]" if i >= y_2d.shape[0] else f"row{i}")
-            for i in unique_indices
+            (f"y[{i}]" if i >= y_2d.shape[0] else f"row{i}") for i in unique_indices
         ]
         result = self._apply_transform_multi(
-            x, y_2d, unique_indices, labels_for_transform, kind,
+            x,
+            y_2d,
+            unique_indices,
+            labels_for_transform,
+            kind,
         )
         if result is None:
             return None
@@ -564,7 +579,8 @@ class ResultDialog:
             title = f"{eq_name} \u2014 Phase"
         else:
             result = self._transform_phase_axes(
-                r.x, y_2d,
+                r.x,
+                y_2d,
                 [(x_idx, x_label), (y_idx, y_label)],
                 kind,
             )
@@ -626,11 +642,11 @@ class ResultDialog:
         # Default: f₀ vs f′₀ (component 0 value vs its first derivative)
         # ps_labels[0] = "x", ps_labels[1] = "f₀", ps_labels[2] = "f′₀" (for order >= 2)
         if r.vector_order >= 2 and len(ps_labels) >= 3:
-            default_x_phase = ps_labels[1]   # f₀
-            default_y_phase = ps_labels[2]   # f′₀
+            default_x_phase = ps_labels[1]  # f₀
+            default_y_phase = ps_labels[2]  # f′₀
         elif len(ps_labels) >= 2:
-            default_x_phase = ps_labels[0]   # x
-            default_y_phase = ps_labels[1]   # f₀
+            default_x_phase = ps_labels[0]  # x
+            default_y_phase = ps_labels[1]  # f₀
         else:
             default_x_phase = ps_labels[0] if ps_labels else "f"
             default_y_phase = ps_labels[0] if ps_labels else "f"
@@ -638,8 +654,11 @@ class ResultDialog:
         ttk.Label(phase_ctrl, text="X-axis:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase_x_var = tk.StringVar(value=default_x_phase)
         vec_phase_x_combo = ttk.Combobox(
-            phase_ctrl, textvariable=self._vec_phase_x_var,
-            values=ps_labels, state="readonly", width=6,
+            phase_ctrl,
+            textvariable=self._vec_phase_x_var,
+            values=ps_labels,
+            state="readonly",
+            width=6,
             font=get_font(),
         )
         vec_phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -648,8 +667,11 @@ class ResultDialog:
         ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase_y_var = tk.StringVar(value=default_y_phase)
         vec_phase_y_combo = ttk.Combobox(
-            phase_ctrl, textvariable=self._vec_phase_y_var,
-            values=ps_labels, state="readonly", width=6,
+            phase_ctrl,
+            textvariable=self._vec_phase_y_var,
+            values=ps_labels,
+            state="readonly",
+            width=6,
             font=get_font(),
         )
         vec_phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -676,14 +698,14 @@ class ResultDialog:
             # ps_labels: x, f₀, f′₀, f₁, f′₁, f₂, f′₂, ...
             # Find the first 3 "base" component labels (derivative 0 of each)
             order = r.vector_order
-            def_3d_x = ps_labels[1]                    # f₀
-            def_3d_y = ps_labels[1 + order]             # f₁
-            def_3d_z = ps_labels[1 + 2 * order]         # f₂
+            def_3d_x = ps_labels[1]  # f₀
+            def_3d_y = ps_labels[1 + order]  # f₁
+            def_3d_z = ps_labels[1 + 2 * order]  # f₂
         elif n_comp >= 2 and len(ps_labels) >= 3:
             order = r.vector_order
-            def_3d_x = ps_labels[0]                     # x
-            def_3d_y = ps_labels[1]                     # f₀
-            def_3d_z = ps_labels[1 + order]              # f₁
+            def_3d_x = ps_labels[0]  # x
+            def_3d_y = ps_labels[1]  # f₀
+            def_3d_z = ps_labels[1 + order]  # f₁
         else:
             def_3d_x = ps_labels[0] if ps_labels else "x"
             def_3d_y = ps_labels[1] if len(ps_labels) > 1 else def_3d_x
@@ -692,8 +714,11 @@ class ResultDialog:
         ttk.Label(phase3d_ctrl, text="X:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_x_var = tk.StringVar(value=def_3d_x)
         phase3d_x_combo = ttk.Combobox(
-            phase3d_ctrl, textvariable=self._vec_phase3d_x_var,
-            values=ps_labels, state="readonly", width=6,
+            phase3d_ctrl,
+            textvariable=self._vec_phase3d_x_var,
+            values=ps_labels,
+            state="readonly",
+            width=6,
             font=get_font(),
         )
         phase3d_x_combo.pack(side=tk.LEFT, padx=(0, 6))
@@ -702,8 +727,11 @@ class ResultDialog:
         ttk.Label(phase3d_ctrl, text="Y:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_y_var = tk.StringVar(value=def_3d_y)
         phase3d_y_combo = ttk.Combobox(
-            phase3d_ctrl, textvariable=self._vec_phase3d_y_var,
-            values=ps_labels, state="readonly", width=6,
+            phase3d_ctrl,
+            textvariable=self._vec_phase3d_y_var,
+            values=ps_labels,
+            state="readonly",
+            width=6,
             font=get_font(),
         )
         phase3d_y_combo.pack(side=tk.LEFT, padx=(0, 6))
@@ -712,8 +740,11 @@ class ResultDialog:
         ttk.Label(phase3d_ctrl, text="Z:").pack(side=tk.LEFT, padx=(0, 2))
         self._vec_phase3d_z_var = tk.StringVar(value=def_3d_z)
         phase3d_z_combo = ttk.Combobox(
-            phase3d_ctrl, textvariable=self._vec_phase3d_z_var,
-            values=ps_labels, state="readonly", width=6,
+            phase3d_ctrl,
+            textvariable=self._vec_phase3d_z_var,
+            values=ps_labels,
+            state="readonly",
+            width=6,
             font=get_font(),
         )
         phase3d_z_combo.pack(side=tk.LEFT, padx=(0, 6))
@@ -736,8 +767,11 @@ class ResultDialog:
         self._anim_order_var = tk.StringVar(value="0")
         orders = [str(k) for k in range(r.vector_order)]
         anim_order_combo = ttk.Combobox(
-            anim_ctrl, textvariable=self._anim_order_var,
-            values=orders, state="readonly", width=4,
+            anim_ctrl,
+            textvariable=self._anim_order_var,
+            values=orders,
+            state="readonly",
+            width=4,
             font=get_font(),
         )
         anim_order_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -758,8 +792,11 @@ class ResultDialog:
         ttk.Label(ctrl_3d, text="Derivative order:").pack(side=tk.LEFT, padx=(0, 4))
         self._3d_order_var = tk.StringVar(value="0")
         order_3d_combo = ttk.Combobox(
-            ctrl_3d, textvariable=self._3d_order_var,
-            values=orders, state="readonly", width=4,
+            ctrl_3d,
+            textvariable=self._3d_order_var,
+            values=orders,
+            state="readonly",
+            width=4,
             font=get_font(),
         )
         order_3d_combo.pack(side=tk.LEFT, padx=(0, 8))
@@ -787,7 +824,8 @@ class ResultDialog:
 
         if kind == TransformKind.ORIGINAL:
             fig = create_solution_plot(
-                r.x, r.y,
+                r.x,
+                r.y,
                 title=eq_name,
                 xlabel="x",
                 ylabel="f",
@@ -800,14 +838,19 @@ class ResultDialog:
                 y_2d = y_2d.T
 
             result = self._apply_transform_multi(
-                r.x, y_2d, selected, self._vec_sol_labels, kind,
+                r.x,
+                y_2d,
+                selected,
+                self._vec_sol_labels,
+                kind,
             )
             if result is None:
                 return
             tx, ty_2d, trans_labels, txlabel, tylabel = result
 
             fig = create_solution_plot(
-                tx, ty_2d,
+                tx,
+                ty_2d,
                 title=f"{eq_name} \u2014 {kind.value}",
                 xlabel=txlabel,
                 ylabel=tylabel,
@@ -856,7 +899,8 @@ class ResultDialog:
             title = f"{eq_name} \u2014 Phase"
         else:
             result = self._transform_phase_axes(
-                r.x, y_2d,
+                r.x,
+                y_2d,
                 [(x_idx, x_label), (y_idx, y_label)],
                 kind,
             )
@@ -894,6 +938,7 @@ class ResultDialog:
         kind = self._get_transform_kind("vec_phase3d")
 
         if kind == TransformKind.ORIGINAL:
+
             def _get_data(label: str) -> np.ndarray:
                 idx = self._vec_phase_options_map.get(label)
                 if idx is None:
@@ -915,7 +960,8 @@ class ResultDialog:
             z_idx = self._vec_phase_options_map.get(z_label)
 
             result = self._transform_phase_axes(
-                r.x, y_2d,
+                r.x,
+                y_2d,
                 [(x_idx, x_label), (y_idx, y_label), (z_idx, z_label)],
                 kind,
             )
@@ -927,7 +973,9 @@ class ResultDialog:
             title = f"{eq_name} \u2014 Phase 3D \u2014 {kind.value}"
 
         fig = create_phase_3d_plot(
-            data_x, data_y, data_z,
+            data_x,
+            data_y,
+            data_z,
             title=title,
             xlabel=disp_xlabel,
             ylabel=disp_ylabel,
@@ -983,7 +1031,8 @@ class ResultDialog:
 
         if kind == TransformKind.ORIGINAL:
             fig = create_vector_animation_plot(
-                r.x, r.y,
+                r.x,
+                r.y,
                 order=r.vector_order,
                 vector_components=r.vector_components,
                 title=f"{eq_name} \u2014 f_i(x) (k={deriv_k})",
@@ -991,13 +1040,19 @@ class ResultDialog:
             )
         else:
             result = self._transform_vector_components(
-                r.x, r.y, r.vector_order, r.vector_components, deriv_k, kind,
+                r.x,
+                r.y,
+                r.vector_order,
+                r.vector_components,
+                deriv_k,
+                kind,
             )
             if result is None:
                 return
             tx, new_y, txlabel = result
             fig = create_vector_animation_plot(
-                tx, new_y,
+                tx,
+                new_y,
                 order=r.vector_order,
                 vector_components=r.vector_components,
                 title=f"{eq_name} \u2014 {kind.value} (k={deriv_k})",
@@ -1025,7 +1080,8 @@ class ResultDialog:
 
         if kind == TransformKind.ORIGINAL:
             fig = create_vector_animation_3d(
-                r.x, r.y,
+                r.x,
+                r.y,
                 order=r.vector_order,
                 vector_components=r.vector_components,
                 title=f"{eq_name} \u2014 3D (k={deriv_k})",
@@ -1033,13 +1089,19 @@ class ResultDialog:
             )
         else:
             result = self._transform_vector_components(
-                r.x, r.y, r.vector_order, r.vector_components, deriv_k, kind,
+                r.x,
+                r.y,
+                r.vector_order,
+                r.vector_components,
+                deriv_k,
+                kind,
             )
             if result is None:
                 return
             tx, new_y, txlabel = result
             fig = create_vector_animation_3d(
-                tx, new_y,
+                tx,
+                new_y,
                 order=r.vector_order,
                 vector_components=r.vector_components,
                 title=f"{eq_name} \u2014 {kind.value} 3D (k={deriv_k})",
@@ -1065,8 +1127,11 @@ class ResultDialog:
         ttk.Label(surf_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
         self._pde_3d_axis_var = tk.StringVar(value=xlabel)
         ttk.Combobox(
-            surf_ctrl, textvariable=self._pde_3d_axis_var,
-            values=[xlabel, ylabel], state="readonly", width=4,
+            surf_ctrl,
+            textvariable=self._pde_3d_axis_var,
+            values=[xlabel, ylabel],
+            state="readonly",
+            width=4,
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 4))
 
@@ -1087,8 +1152,11 @@ class ResultDialog:
         ttk.Label(contour_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
         self._pde_2d_axis_var = tk.StringVar(value=xlabel)
         ttk.Combobox(
-            contour_ctrl, textvariable=self._pde_2d_axis_var,
-            values=[xlabel, ylabel], state="readonly", width=4,
+            contour_ctrl,
+            textvariable=self._pde_2d_axis_var,
+            values=[xlabel, ylabel],
+            state="readonly",
+            width=4,
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 4))
 
@@ -1108,13 +1176,16 @@ class ResultDialog:
 
         xlabel, ylabel = self._pde_axis_labels()
 
-        ttk.Label(
-            trans_ctrl, text="Slice along:", style="Small.TLabel"
-        ).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(trans_ctrl, text="Slice along:", style="Small.TLabel").pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
         self._pde_slice_var = tk.StringVar(value=xlabel)
         ttk.Combobox(
-            trans_ctrl, textvariable=self._pde_slice_var,
-            values=[xlabel, ylabel], state="readonly", width=2,
+            trans_ctrl,
+            textvariable=self._pde_slice_var,
+            values=[xlabel, ylabel],
+            state="readonly",
+            width=2,
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 2))
 
@@ -1125,22 +1196,28 @@ class ResultDialog:
             else 0.5
         )
 
-        ttk.Label(
-            trans_ctrl, text="at fixed value:", style="Small.TLabel"
-        ).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
         self._pde_slice_val_var = tk.StringVar(value=str(round(y_mid, 4)))
         ttk.Entry(
-            trans_ctrl, textvariable=self._pde_slice_val_var, width=4,
+            trans_ctrl,
+            textvariable=self._pde_slice_val_var,
+            width=4,
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 2))
 
         self._build_transform_controls(
-            trans_ctrl, self._update_pde_transform, "pde",
+            trans_ctrl,
+            self._update_pde_transform,
+            "pde",
             label_style="Small.TLabel",
         )
 
         ttk.Button(
-            trans_ctrl, text="Update", command=self._update_pde_transform,
+            trans_ctrl,
+            text="Update",
+            command=self._update_pde_transform,
         ).pack(side=tk.LEFT, padx=4)
 
         self._pde_trans_frame = ttk.Frame(trans_tab)
@@ -1185,8 +1262,10 @@ class ResultDialog:
             for i in range(z.shape[0]):
                 func = interp1d(x, z[i, :], kind="cubic", fill_value="extrapolate")
                 tx, ty, txlabel, _tylabel = apply_transform(
-                    lambda arr, f=func: f(arr), kind,
-                    float(x[0]), float(x[-1]),
+                    lambda arr, f=func: f(arr),
+                    kind,
+                    float(x[0]),
+                    float(x[-1]),
                 )
                 raw.append((tx, ty))
             if not raw:
@@ -1198,8 +1277,7 @@ class ResultDialog:
                 if len(tx_i) == len(tx_common) and np.allclose(tx_i, tx_common):
                     new_rows.append(ty_i)
                 else:
-                    resamp = interp1d(tx_i, ty_i, kind="linear",
-                                      fill_value=0.0, bounds_error=False)
+                    resamp = interp1d(tx_i, ty_i, kind="linear", fill_value=0.0, bounds_error=False)
                     new_rows.append(resamp(tx_common))
             new_z = np.array(new_rows)
             return tx_common, y_grid, new_z, txlabel, ylabel
@@ -1210,8 +1288,10 @@ class ResultDialog:
             for j in range(z.shape[1]):
                 func = interp1d(y_grid, z[:, j], kind="cubic", fill_value="extrapolate")
                 ty, tz, tylabel, _tzlabel = apply_transform(
-                    lambda arr, f=func: f(arr), kind,
-                    float(y_grid[0]), float(y_grid[-1]),
+                    lambda arr, f=func: f(arr),
+                    kind,
+                    float(y_grid[0]),
+                    float(y_grid[-1]),
                 )
                 raw_c.append((ty, tz))
             if not raw_c:
@@ -1222,8 +1302,7 @@ class ResultDialog:
                 if len(ty_j) == len(ty_common) and np.allclose(ty_j, ty_common):
                     new_cols.append(tz_j)
                 else:
-                    resamp = interp1d(ty_j, tz_j, kind="linear",
-                                      fill_value=0.0, bounds_error=False)
+                    resamp = interp1d(ty_j, tz_j, kind="linear", fill_value=0.0, bounds_error=False)
                     new_cols.append(resamp(ty_common))
             new_z = np.column_stack(new_cols)
             return x, ty_common, new_z, xlabel, tylabel
@@ -1241,22 +1320,34 @@ class ResultDialog:
         if kind != TransformKind.ORIGINAL:
             axis_var = self._pde_3d_axis_var.get()
             result = self._transform_pde_along_axis(
-                r.x, r.y_grid, r.y, axis_var, kind,
+                r.x,
+                r.y_grid,
+                r.y,
+                axis_var,
+                kind,
             )
             if result is not None:
                 px, py, pz, pxl, pyl = result
                 fig = create_surface_plot(
-                    px, py, pz,
+                    px,
+                    py,
+                    pz,
                     title=f"{eq_name} — {kind.value}",
-                    xlabel=pxl, ylabel=pyl, zlabel="|F|",
+                    xlabel=pxl,
+                    ylabel=pyl,
+                    zlabel="|F|",
                 )
                 self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
                 return
 
         fig = create_surface_plot(
-            r.x, r.y_grid, r.y,
+            r.x,
+            r.y_grid,
+            r.y,
             title=eq_name,
-            xlabel=xlabel, ylabel=ylabel, zlabel="f",
+            xlabel=xlabel,
+            ylabel=ylabel,
+            zlabel="f",
         )
         self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
 
@@ -1273,22 +1364,32 @@ class ResultDialog:
         if kind != TransformKind.ORIGINAL:
             axis_var = self._pde_2d_axis_var.get()
             result = self._transform_pde_along_axis(
-                r.x, r.y_grid, r.y, axis_var, kind,
+                r.x,
+                r.y_grid,
+                r.y,
+                axis_var,
+                kind,
             )
             if result is not None:
                 px, py, pz, pxl, pyl = result
                 fig = create_contour_plot(
-                    px, py, pz,
+                    px,
+                    py,
+                    pz,
                     title=f"{eq_name} — {kind.value}",
-                    xlabel=pxl, ylabel=pyl,
+                    xlabel=pxl,
+                    ylabel=pyl,
                 )
                 self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
                 return
 
         fig = create_contour_plot(
-            r.x, r.y_grid, r.y,
+            r.x,
+            r.y_grid,
+            r.y,
             title=eq_name,
-            xlabel=xlabel, ylabel=ylabel,
+            xlabel=xlabel,
+            ylabel=ylabel,
         )
         self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
 
@@ -1326,10 +1427,13 @@ class ResultDialog:
 
         if kind == TransformKind.ORIGINAL:
             fig = create_solution_plot(
-                x_1d, np.atleast_2d(data_1d),
+                x_1d,
+                np.atleast_2d(data_1d),
                 title=f"{eq_name} \u2014 slice at {slice_label}",
-                xlabel=axis_label, ylabel="f",
-                selected_derivatives=[0], labels=["f"],
+                xlabel=axis_label,
+                ylabel="f",
+                selected_derivatives=[0],
+                labels=["f"],
             )
         else:
             from scipy.interpolate import interp1d
@@ -1337,13 +1441,19 @@ class ResultDialog:
             func = interp1d(x_1d, data_1d, kind="cubic", fill_value="extrapolate")
             x_min_t, x_max_t = float(x_1d[0]), float(x_1d[-1])
             tx, ty, txlabel, tylabel = apply_transform(
-                lambda arr: func(arr), kind, x_min_t, x_max_t,
+                lambda arr: func(arr),
+                kind,
+                x_min_t,
+                x_max_t,
             )
             fig = create_solution_plot(
-                tx, np.atleast_2d(ty),
+                tx,
+                np.atleast_2d(ty),
                 title=f"{eq_name} \u2014 {kind.value} [slice {slice_label}]",
-                xlabel=txlabel, ylabel=tylabel,
-                selected_derivatives=[0], labels=[tylabel],
+                xlabel=txlabel,
+                ylabel=tylabel,
+                selected_derivatives=[0],
+                labels=[tylabel],
             )
 
         self._replace_plot(self._pde_trans_frame, fig, "_pde_trans_canvas")
@@ -1438,7 +1548,8 @@ class ResultDialog:
             export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid)
 
         self._save_export_file(
-            export_fn, ".csv",
+            export_fn,
+            ".csv",
             [("CSV files", "*.csv"), ("All files", "*.*")],
             "CSV",
         )
@@ -1450,7 +1561,8 @@ class ResultDialog:
             export_json_to_path(r.statistics, r.metadata, path)
 
         self._save_export_file(
-            export_fn, ".json",
+            export_fn,
+            ".json",
             [("JSON files", "*.json"), ("All files", "*.*")],
             "JSON",
         )
@@ -1472,7 +1584,8 @@ class ResultDialog:
             from plotting import export_animation_to_mp4
 
             export_animation_to_mp4(
-                r.x, r.y,
+                r.x,
+                r.y,
                 r.vector_order,
                 r.vector_components,
                 filepath,

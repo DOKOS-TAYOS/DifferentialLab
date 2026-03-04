@@ -104,9 +104,8 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
         vector_components: int = int(data.get("vector_components", 1))
         eq_type_str: str = data.get("equation_type", "ode")
         has_vector = (
-            (vector_expressions is not None and len(vector_expressions) > 0)
-            or eq_type_str == "vector_ode"
-        )
+            vector_expressions is not None and len(vector_expressions) > 0
+        ) or eq_type_str == "vector_ode"
         if not expression and not function_name and not has_vector:
             logger.warning(
                 "Equation '%s' has neither expression, function_name, nor vector_expressions; "

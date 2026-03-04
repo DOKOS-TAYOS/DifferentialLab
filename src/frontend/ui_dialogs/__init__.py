@@ -27,14 +27,18 @@ def __getattr__(name: str):
     """
     if name == "ConfigDialog":
         from frontend.ui_dialogs.config_dialog import ConfigDialog
+
         return ConfigDialog
     if name == "EquationDialog":
         from frontend.ui_dialogs.equation_dialog import EquationDialog
+
         return EquationDialog
     if name == "HelpDialog":
         from frontend.ui_dialogs.help_dialog import HelpDialog
+
         return HelpDialog
     if name == "TransformDialog":
         from frontend.ui_dialogs.transform_dialog import TransformDialog
+
         return TransformDialog
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

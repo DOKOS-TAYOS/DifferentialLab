@@ -229,6 +229,85 @@ def create_solution_plot(
     return fig
 
 
+def create_energy_evolution_plot(
+    t: np.ndarray,
+    E_kin: np.ndarray,
+    E_pot: np.ndarray,
+    E_tot: np.ndarray,
+    title: str = "Energy vs time",
+    xlabel: str = "t",
+) -> Figure:
+    """Create a plot of kinetic, potential, and total energy vs time.
+
+    Args:
+        t: Time values (1D).
+        E_kin: Kinetic energy at each time step.
+        E_pot: Potential energy at each time step.
+        E_tot: Total energy at each time step.
+        title: Plot title.
+        xlabel: Label for x-axis.
+
+    Returns:
+        A matplotlib :class:`Figure`.
+    """
+
+    fig, ax = _new_figure()
+    line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
+    line_style: str = get_env_from_schema("PLOT_LINE_STYLE")
+
+    ax.plot(t, E_kin, linewidth=line_width, linestyle=line_style, label="Kinetic")
+    ax.plot(t, E_pot, linewidth=line_width, linestyle=line_style, label="Potential")
+    ax.plot(t, E_tot, linewidth=line_width, linestyle=line_style, label="Total")
+
+    _finalize_plot(ax, title, xlabel, "Energy", legend=True)
+    fig.tight_layout()
+    return fig
+
+
+def create_energy_per_mode_plot(
+    t: np.ndarray,
+    E_modes: np.ndarray,
+    selected_indices: list[int],
+    labels: list[str],
+    title: str = "Energy per mode",
+    xlabel: str = "t",
+) -> Figure:
+    """Create a multi-line plot of energy per mode (or oscillator) vs time.
+
+    Args:
+        t: Time values (1D).
+        E_modes: Energy array shape (n_modes, n_points).
+        selected_indices: Indices of modes/oscillators to plot.
+        labels: Legend labels for each selected index.
+        title: Plot title.
+        xlabel: Label for x-axis.
+
+    Returns:
+        A matplotlib :class:`Figure`.
+    """
+
+    fig, ax = _new_figure()
+    line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
+    line_style: str = get_env_from_schema("PLOT_LINE_STYLE")
+    color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
+
+    colors = _get_colors(color_scheme, len(selected_indices))
+    for idx, (mode_idx, lbl) in enumerate(zip(selected_indices, labels)):
+        if mode_idx < E_modes.shape[0]:
+            ax.plot(
+                t,
+                E_modes[mode_idx],
+                color=colors[idx],
+                linewidth=line_width,
+                linestyle=line_style,
+                label=lbl,
+            )
+
+    _finalize_plot(ax, title, xlabel, "Energy", legend=True)
+    fig.tight_layout()
+    return fig
+
+
 def create_phase_plot(
     y: np.ndarray,
     title: str = "Phase Portrait",
@@ -450,6 +529,7 @@ def create_vector_animation_plot(
     vector_components: int,
     title: str = "f_i(x) vs component",
     deriv_offset: int = 0,
+    component_labels: list[str] | None = None,
 ) -> Figure:
     """Create an interactive plot: x-axis = component index i, y-axis = f_i(x).
 
@@ -514,7 +594,9 @@ def create_vector_animation_plot(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
     ax_main.set_xticks(indices)
-    ax_main.set_xticklabels(_component_labels(vector_components))
+    ax_main.set_xticklabels(
+        component_labels if component_labels is not None else _component_labels(vector_components)
+    )
     j_vals = indices  # Reuse for segment construction in update
 
     def update(idx: int) -> None:

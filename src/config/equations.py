@@ -501,9 +501,7 @@ def bessel_ode(x: float, y: np.ndarray, n: float = 0.0, **kwargs: Any) -> np.nda
     return dydt
 
 
-def stationary_schrodinger_ho(
-    x: float, y: np.ndarray, E: float = 1.5, **kwargs: Any
-) -> np.ndarray:
+def stationary_schrodinger_ho(x: float, y: np.ndarray, E: float = 1.5, **kwargs: Any) -> np.ndarray:
     """y'' + (E - x²)y = 0 — 1D Schrödinger in harmonic well (ℏ=m=ω=1).
 
     Args:
@@ -805,9 +803,7 @@ def riccati_ode(
     return dydt
 
 
-def rayleigh_oscillator(
-    x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def rayleigh_oscillator(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y'' - μ(1 - y'²)y' + y = 0 — Rayleigh oscillator (self-excited).
 
     Args:
@@ -848,7 +844,7 @@ def forced_harmonic_oscillator(
     """
     dydt = np.empty(2)
     dydt[0] = y[1]
-    dydt[1] = -omega**2 * y[0] + F * np.cos(Omega * x)
+    dydt[1] = -(omega**2) * y[0] + F * np.cos(Omega * x)
     return dydt
 
 
@@ -1132,49 +1128,39 @@ def aizawa_attractor(
 # --- 20+ additional scalar ODEs ---
 
 
-def cubic_decay(
-    x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def cubic_decay(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y' = -k·y³ — Cubic decay (nonlinear)."""
     dydt = np.empty(1)
     dydt[0] = -k * y[0] ** 3
     return dydt
 
 
-def sqrt_growth(
-    x: float, y: np.ndarray, k: float = 0.5, **kwargs: Any
-) -> np.ndarray:
+def sqrt_growth(x: float, y: np.ndarray, k: float = 0.5, **kwargs: Any) -> np.ndarray:
     """y' = k·√y — Square-root growth (e.g. droplet)."""
     dydt = np.empty(1)
     dydt[0] = k * np.sqrt(np.maximum(y[0], 0))
     return dydt
 
 
-def bistable(
-    x: float, y: np.ndarray, a: float = 0.5, **kwargs: Any
-) -> np.ndarray:
+def bistable(x: float, y: np.ndarray, a: float = 0.5, **kwargs: Any) -> np.ndarray:
     """y' = y(1-y)(y-a) — Bistable (cubic with 3 equilibria)."""
     dydt = np.empty(1)
     dydt[0] = y[0] * (1 - y[0]) * (y[0] - a)
     return dydt
 
 
-def landau(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def landau(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """y' = y - y³ — Landau potential (pitchfork)."""
     dydt = np.empty(1)
     dydt[0] = y[0] - y[0] ** 3
     return dydt
 
 
-def cubic_oscillator(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def cubic_oscillator(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """y'' = -y³ — Pure cubic oscillator."""
     dydt = np.empty(2)
     dydt[0] = y[1]
-    dydt[1] = -y[0] ** 3
+    dydt[1] = -(y[0] ** 3)
     return dydt
 
 
@@ -1220,18 +1206,14 @@ def quadratic_decay(
     return dydt
 
 
-def cubic_landau(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def cubic_landau(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """y' = y(1-y²) — Cubic (symmetric bistable)."""
     dydt = np.empty(1)
     dydt[0] = y[0] * (1 - y[0] ** 2)
     return dydt
 
 
-def smooth_decay(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def smooth_decay(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """y' = -y/(1+y²) — Smooth decay."""
     dydt = np.empty(1)
     dydt[0] = -y[0] / (1 + y[0] ** 2)
@@ -1262,9 +1244,7 @@ def damped_pendulum(
     return dydt
 
 
-def lienard(
-    x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def lienard(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y'' + μ(y²-1)y' + y = 0 — Liénard (Van der Pol-like)."""
     dydt = np.empty(2)
     dydt[0] = y[1]
@@ -1282,9 +1262,7 @@ def matthew_equation(
     return dydt
 
 
-def legendre_ode(
-    x: float, y: np.ndarray, n: float = 2.0, **kwargs: Any
-) -> np.ndarray:
+def legendre_ode(x: float, y: np.ndarray, n: float = 2.0, **kwargs: Any) -> np.ndarray:
     """(1-x²)y'' - 2xy' + n(n+1)y = 0 — Legendre."""
     dydt = np.empty(2)
     dydt[0] = y[1]
@@ -1292,9 +1270,7 @@ def legendre_ode(
     return dydt
 
 
-def blasius_type(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def blasius_type(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """y''' = -y·y''/2 — Blasius (simplified). y=[f,f',f'']."""
     dydt = np.empty(3)
     dydt[0] = y[1]
@@ -1303,9 +1279,7 @@ def blasius_type(
     return dydt
 
 
-def emden_fowler(
-    x: float, y: np.ndarray, n: float = 5.0, **kwargs: Any
-) -> np.ndarray:
+def emden_fowler(x: float, y: np.ndarray, n: float = 5.0, **kwargs: Any) -> np.ndarray:
     """y'' + (2/x)y' + y^n = 0 — Emden-Fowler (polytropic)."""
     xx = max(x, 1e-8)
     dydt = np.empty(2)
@@ -1314,9 +1288,7 @@ def emden_fowler(
     return dydt
 
 
-def fisher_kpp(
-    x: float, y: np.ndarray, r: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def fisher_kpp(x: float, y: np.ndarray, r: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y' = r·y(1-y) — Fisher-KPP (spatial would need diffusion)."""
     dydt = np.empty(1)
     dydt[0] = r * y[0] * (1 - y[0])
@@ -1332,18 +1304,14 @@ def malthus_harvesting(
     return dydt
 
 
-def relu_activation(
-    x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def relu_activation(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y' = k·max(0, y) — ReLU-like activation (linear for y>0)."""
     dydt = np.empty(1)
     dydt[0] = k * np.maximum(0, y[0])
     return dydt
 
 
-def tanh_decay(
-    x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any
-) -> np.ndarray:
+def tanh_decay(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
     """y' = -k·tanh(y) — Tanh decay (smooth)."""
     dydt = np.empty(1)
     dydt[0] = -k * np.tanh(y[0])
@@ -1353,9 +1321,7 @@ def tanh_decay(
 # --- 20+ additional vector ODEs ---
 
 
-def halvorsen_attractor(
-    x: float, y: np.ndarray, a: float = 1.89, **kwargs: Any
-) -> np.ndarray:
+def halvorsen_attractor(x: float, y: np.ndarray, a: float = 1.89, **kwargs: Any) -> np.ndarray:
     """Halvorsen attractor: chaotic 3D."""
     dydt = np.empty(3)
     dydt[0] = -a * y[0] - 4 * y[1] - 4 * y[2] - y[1] ** 2
@@ -1382,9 +1348,7 @@ def dadras_attractor(
     return dydt
 
 
-def sprott_s(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def sprott_s(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """Sprott S system: chaotic 3D."""
     dydt = np.empty(3)
     dydt[0] = y[1] * y[2]
@@ -1393,9 +1357,7 @@ def sprott_s(
     return dydt
 
 
-def sprott_a(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def sprott_a(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """Sprott A system: chaotic 3D."""
     dydt = np.empty(3)
     dydt[0] = y[1]
@@ -1606,9 +1568,7 @@ def bouali_attractor(
     return dydt
 
 
-def nose_hoover(
-    x: float, y: np.ndarray, **kwargs: Any
-) -> np.ndarray:
+def nose_hoover(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     """Nose-Hoover: thermostat (Hamiltonian-like)."""
     dydt = np.empty(3)
     dydt[0] = y[1]

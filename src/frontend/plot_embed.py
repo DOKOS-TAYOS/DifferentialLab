@@ -30,6 +30,7 @@ def _bind_resize_handler(
         canvas: The FigureCanvasTkAgg object.
         fig: The Matplotlib figure.
     """
+
     def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
         try:
             with warnings.catch_warnings():
@@ -159,9 +160,9 @@ def embed_animation_plot_in_tk(
         scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
         ttk.Label(ctrl_frame, text="Duration (s):").pack(side=tk.LEFT, padx=(8, 2))
-        ttk.Entry(
-            ctrl_frame, textvariable=duration_var, width=5, font=get_font()
-        ).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(ctrl_frame, textvariable=duration_var, width=5, font=get_font()).pack(
+            side=tk.LEFT, padx=2
+        )
 
         ttk.Button(
             ctrl_frame,

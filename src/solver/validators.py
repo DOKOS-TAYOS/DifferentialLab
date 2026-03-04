@@ -194,9 +194,8 @@ def validate_all_inputs(
     """
     errors: list[str] = []
     is_vector = (
-        (vector_expressions is not None and len(vector_expressions) > 0)
-        or equation_type == "vector_ode"
-    )
+        vector_expressions is not None and len(vector_expressions) > 0
+    ) or equation_type == "vector_ode"
     expected_order = order * vector_components if is_vector else order
 
     if is_vector:

@@ -348,8 +348,14 @@ class EquationDialog:
         )
         _font_small = (_font[0], max(9, _font[1] - 4))
         unicode_text = tk.Text(
-            unicode_frame, height=1, bg=_btn_bg, fg=_fg,
-            font=_font_small, borderwidth=0, highlightthickness=0, wrap="none",
+            unicode_frame,
+            height=1,
+            bg=_btn_bg,
+            fg=_fg,
+            font=_font_small,
+            borderwidth=0,
+            highlightthickness=0,
+            wrap="none",
         )
         unicode_text.insert("1.0", _unicode_hint)
         unicode_text.config(state="disabled")
@@ -372,8 +378,12 @@ class EquationDialog:
         ttk.Label(row_order, text="Order:").pack(side=tk.LEFT)
         self.custom_order_var = tk.StringVar(value="2")
         ttk.Spinbox(
-            row_order, from_=1, to=10, width=5,
-            textvariable=self.custom_order_var, font=font,
+            row_order,
+            from_=1,
+            to=10,
+            width=5,
+            textvariable=self.custom_order_var,
+            font=font,
         ).pack(side=tk.LEFT, padx=(pad, 0))
 
         _primes = ["", "\u2032", "\u2033", "\u2034"]
@@ -404,15 +414,20 @@ class EquationDialog:
             self._custom_expr_label.config(text=text)
 
         expr_label_text = (
-            _difference_label(2) if eq_type == "difference"
-            else _ode_derivative_label(2)
+            _difference_label(2) if eq_type == "difference" else _ode_derivative_label(2)
         )
         self._custom_expr_label = ttk.Label(ci, text=expr_label_text)
         self._custom_expr_label.pack(anchor=tk.W)
         self.custom_order_var.trace_add("write", _update_expr_label)
 
         self.custom_expr = tk.Text(
-            ci, height=3, width=60, bg=btn_bg, fg=fg, insertbackground=fg, font=font,
+            ci,
+            height=3,
+            width=60,
+            bg=btn_bg,
+            fg=fg,
+            insertbackground=fg,
+            font=font,
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
@@ -431,8 +446,12 @@ class EquationDialog:
         ttk.Label(top_row, text="Components:").pack(side=tk.LEFT)
         self._vec_n_var = tk.StringVar(value="2")
         vec_spin = ttk.Spinbox(
-            top_row, from_=2, to=100, width=5,
-            textvariable=self._vec_n_var, font=font,
+            top_row,
+            from_=2,
+            to=100,
+            width=5,
+            textvariable=self._vec_n_var,
+            font=font,
         )
         vec_spin.pack(side=tk.LEFT, padx=(pad, pad))
         self._vec_n_refresh_id: str | None = None
@@ -446,13 +465,17 @@ class EquationDialog:
         mode_frame.pack(fill=tk.X, pady=(0, pad))
         self._vec_mode_var = tk.StringVar(value="per_component")
         ttk.Radiobutton(
-            mode_frame, text="Per-component expressions",
-            variable=self._vec_mode_var, value="per_component",
+            mode_frame,
+            text="Per-component expressions",
+            variable=self._vec_mode_var,
+            value="per_component",
             command=self._on_vec_mode_change,
         ).pack(side=tk.LEFT, padx=(0, pad))
         ttk.Radiobutton(
-            mode_frame, text="Bulk expression (use i as loop variable)",
-            variable=self._vec_mode_var, value="bulk",
+            mode_frame,
+            text="Bulk expression (use i as loop variable)",
+            variable=self._vec_mode_var,
+            value="bulk",
             command=self._on_vec_mode_change,
         ).pack(side=tk.LEFT)
 
@@ -463,9 +486,7 @@ class EquationDialog:
         # Per-component order spinbox variables
         self._vec_order_vars: list[tk.StringVar] = []
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(
-            anchor=tk.W, pady=(pad, 0)
-        )
+        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W, pady=(pad, 0))
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, k")
@@ -532,8 +553,12 @@ class EquationDialog:
             bulk_order_var = tk.StringVar(value="2")
             self._vec_order_vars.append(bulk_order_var)
             ttk.Spinbox(
-                bulk_top, from_=1, to=10, width=5,
-                textvariable=bulk_order_var, font=_font,
+                bulk_top,
+                from_=1,
+                to=10,
+                width=5,
+                textvariable=bulk_order_var,
+                font=_font,
             ).pack(side=tk.LEFT, padx=(pad, 0))
 
             self._vec_bulk_expr_label = ttk.Label(
@@ -552,8 +577,13 @@ class EquationDialog:
 
             bulk_order_var.trace_add("write", _on_bulk_order_change)
             self._vec_bulk_expr = tk.Text(
-                self._vec_content_frame, height=3, width=60,
-                bg=_btn_bg, fg=_fg, insertbackground=_fg, font=_font,
+                self._vec_content_frame,
+                height=3,
+                width=60,
+                bg=_btn_bg,
+                fg=_fg,
+                insertbackground=_fg,
+                font=_font,
             )
             self._vec_bulk_expr.pack(fill=tk.X, pady=(4, pad))
         else:
@@ -581,9 +611,7 @@ class EquationDialog:
             def _sub(idx: int) -> str:
                 if 0 <= idx < len(_sub_digits):
                     return _sub_digits[idx]
-                return "".join(
-                    _sub_digits[int(d)] if d.isdigit() else d for d in str(idx)
-                )
+                return "".join(_sub_digits[int(d)] if d.isdigit() else d for d in str(idx))
 
             def _make_label_text(comp_idx: int, order_val: int) -> str:
                 if order_val < len(_primes):
@@ -603,8 +631,12 @@ class EquationDialog:
 
                 ttk.Label(row, text="ord:", width=4).pack(side=tk.LEFT)
                 spin = ttk.Spinbox(
-                    row, from_=1, to=10, width=3,
-                    textvariable=order_var, font=_font,
+                    row,
+                    from_=1,
+                    to=10,
+                    width=3,
+                    textvariable=order_var,
+                    font=_font,
                 )
                 spin.pack(side=tk.LEFT, padx=(0, pad))
 
@@ -627,8 +659,13 @@ class EquationDialog:
 
                 # Expression text box
                 txt = tk.Text(
-                    row, height=1, width=45,
-                    bg=_btn_bg, fg=_fg, insertbackground=_fg, font=_font,
+                    row,
+                    height=1,
+                    width=45,
+                    bg=_btn_bg,
+                    fg=_fg,
+                    insertbackground=_fg,
+                    font=_font,
                 )
                 txt.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(pad, 0))
                 self._vec_expr_widgets.append(txt)
@@ -657,9 +694,7 @@ class EquationDialog:
             _bind_mousewheel(scrollbar)
             _bind_mousewheel(inner)
 
-    def _build_custom_pde(
-        self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any
-    ) -> None:
+    def _build_custom_pde(self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any) -> None:
         """Build the custom tab for PDE."""
         top_row = ttk.Frame(ci)
         top_row.pack(fill=tk.X, pady=(pad, pad))
@@ -667,13 +702,20 @@ class EquationDialog:
         ttk.Label(top_row, text="Independent variables:").pack(side=tk.LEFT)
         self._pde_nvars_var = tk.StringVar(value="2")
         nvars_spin = ttk.Spinbox(
-            top_row, from_=2, to=2, width=5,
-            textvariable=self._pde_nvars_var, font=font, state="readonly",
+            top_row,
+            from_=2,
+            to=2,
+            width=5,
+            textvariable=self._pde_nvars_var,
+            font=font,
+            state="readonly",
         )
         nvars_spin.pack(side=tk.LEFT, padx=(pad, 0))
         ToolTip(nvars_spin, "Number of independent variables (limited to 2)")
         self._pde_vars_label = ttk.Label(
-            top_row, text="  x[0], x[1]", style="Small.TLabel",
+            top_row,
+            text="  x[0], x[1]",
+            style="Small.TLabel",
         )
         self._pde_vars_label.pack(side=tk.LEFT, padx=(pad, 0))
 
@@ -687,15 +729,19 @@ class EquationDialog:
         _pde_operators = [
             "-\u2207\u00b2f (Poisson)",
             "\u2207\u00b2f (Laplacian)",
-            "f\u2080\u2080",   # f_00 (second deriv wrt x[0])
-            "f\u2081\u2081",   # f_11 (second deriv wrt x[1])
-            "f\u2080\u2081",   # f_01 (mixed partial)
-            "f\u2080",         # f_0  (first deriv wrt x[0])
-            "f\u2081",         # f_1  (first deriv wrt x[1])
+            "f\u2080\u2080",  # f_00 (second deriv wrt x[0])
+            "f\u2081\u2081",  # f_11 (second deriv wrt x[1])
+            "f\u2080\u2081",  # f_01 (mixed partial)
+            "f\u2080",  # f_0  (first deriv wrt x[0])
+            "f\u2081",  # f_1  (first deriv wrt x[1])
         ]
         ttk.Combobox(
-            op_row, textvariable=self._pde_op_var,
-            values=_pde_operators, state="readonly", width=22, font=font,
+            op_row,
+            textvariable=self._pde_op_var,
+            values=_pde_operators,
+            state="readonly",
+            width=22,
+            font=font,
         ).pack(side=tk.LEFT, padx=(pad, 0))
 
         ttk.Label(
@@ -703,7 +749,13 @@ class EquationDialog:
             text="Right-hand side expression (use x[0], x[1] or x, y for variables):",
         ).pack(anchor=tk.W)
         self.custom_expr = tk.Text(
-            ci, height=3, width=60, bg=btn_bg, fg=fg, insertbackground=fg, font=font,
+            ci,
+            height=3,
+            width=60,
+            bg=btn_bg,
+            fg=fg,
+            insertbackground=fg,
+            font=font,
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
@@ -759,7 +811,6 @@ class EquationDialog:
             equation_name=eq.name,
             default_y0=eq.default_initial_conditions,
             default_domain=eq.default_domain,
-
             display_formula=eq.formula,
             equation_type=eq_type,
             variables=variables,
@@ -875,9 +926,7 @@ class EquationDialog:
             order = component_orders[0] if component_orders else 2
             component_orders = [order] * n_components
 
-            bulk_expr = normalize_unicode_escapes(
-                self._vec_bulk_expr.get("1.0", tk.END).strip()
-            )
+            bulk_expr = normalize_unicode_escapes(self._vec_bulk_expr.get("1.0", tk.END).strip())
             if not bulk_expr:
                 messagebox.showwarning(
                     "Empty Expression", "Please enter a bulk expression.", parent=self.win
@@ -886,7 +935,7 @@ class EquationDialog:
             # Expand bulk expression for each component index
             vector_expressions = []
             for i in range(n_components):
-                expanded = re.sub(r'\bi\b', str(i), bulk_expr)
+                expanded = re.sub(r"\bi\b", str(i), bulk_expr)
                 vector_expressions.append(expanded)
         else:
             if len(self._vec_expr_widgets) != n_components:

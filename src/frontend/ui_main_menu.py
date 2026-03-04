@@ -124,7 +124,20 @@ class MainMenu:
             "Enter a function, apply Fourier/Laplace/Taylor transforms, and export data.",
         )
 
-        # Row 2: Information
+        # Row 2: Complex Problems | Information
+        self.btn_complex = ttk.Button(
+            btn_frame,
+            text="Complex\nProblems",
+            width=btn_width,
+            style="Accent2.TButton",
+            command=self._on_complex_problems,
+        )
+        self.btn_complex.grid(row=2, column=0, padx=padding, pady=padding)
+        ToolTip(
+            self.btn_complex,
+            "Solve special cases: coupled oscillators, etc.",
+        )
+
         self.btn_info = ttk.Button(
             btn_frame,
             text="Information",
@@ -132,7 +145,7 @@ class MainMenu:
             style="Accent2.TButton",
             command=self._on_info,
         )
-        self.btn_info.grid(row=2, column=0, columnspan=2, padx=padding, pady=padding)
+        self.btn_info.grid(row=2, column=1, padx=padding, pady=padding)
         ToolTip(self.btn_info, "View help, usage instructions, and app information.")
 
         # Row 3: Configuration | Quit (sized to text)
@@ -159,7 +172,7 @@ class MainMenu:
         setup_arrow_enter_navigation(
             [
                 [self.btn_solve, self.btn_transforms],
-                [self.btn_info],
+                [self.btn_complex, self.btn_info],
                 [self.btn_config, self.btn_quit],
             ]
         )
@@ -188,6 +201,13 @@ class MainMenu:
         from frontend.ui_dialogs import TransformDialog
 
         TransformDialog(self.root)
+
+    def _on_complex_problems(self) -> None:
+        """Open the complex problems selection dialog."""
+        logger.info("User clicked Complex Problems")
+        from complex_problems import ComplexProblemsDialog
+
+        ComplexProblemsDialog(self.root)
 
     def _on_config(self) -> None:
         """Open the configuration dialog; restart the app if saved."""

@@ -330,6 +330,7 @@ def _rewrite_pde_f_notation(expression: str) -> str:
     Notation: f[k] = f_{x[k]}, f[i,j] = f_{x[i],x[j]}.
     Bare f (no brackets) = solution value.
     """
+
     # Replace f[i,j] first (longer pattern)
     def _replace_double(m: re.Match) -> str:
         i, j = int(m.group(1)), int(m.group(2))

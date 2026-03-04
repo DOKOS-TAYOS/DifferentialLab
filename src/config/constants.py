@@ -14,6 +14,7 @@ SOLVER_METHODS: Final[tuple[str, ...]] = (
     "LSODA",
 )
 
+
 def get_default_solver_method() -> str:
     """Return the default ODE integration method (first in available list)."""
     return SOLVER_METHODS[0]

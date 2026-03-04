@@ -131,11 +131,7 @@ def bind_wraplength(
         min_wrap: Minimum wraplength in pixels.
         debounce_ms: Debounce delay for Configure events (0 = no debounce).
     """
-    labels = (
-        [label_or_labels]
-        if isinstance(label_or_labels, tk.Widget)
-        else list(label_or_labels)
-    )
+    labels = [label_or_labels] if isinstance(label_or_labels, tk.Widget) else list(label_or_labels)
 
     def _update(event: object | None = None) -> None:
         w = frame.winfo_width()
