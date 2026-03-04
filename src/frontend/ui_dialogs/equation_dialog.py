@@ -314,8 +314,9 @@ class EquationDialog:
             hint_title = "Select the LHS operator and write the RHS expression."
             hint_detail = (
                 "Choose which derivative operator equals the expression.\n"
-                "Use x, y for spatial variables. Use parameters by name.\n"
-                "Example: operator = -\u2207\u00b2f, expression = sin(pi*x)*sin(pi*y)"
+                "Spatial: x, y (or x[0], x[1]). Solution: f. Derivatives: "
+                "f[0]=f_x, f[1]=f_y, f[0,0]=f_xx, f[0,1]=f_xy, f[1,1]=f_yy.\n"
+                "Example: -\u2207\u00b2f = sin(pi*x)*sin(pi*y) or Helmholtz: expression = f"
             )
         else:
             hint_title = "Write the highest derivative as a Python expression."

@@ -223,9 +223,7 @@ class ParametersDialog:
 
             def _subscript_n(n: int) -> str:
                 """Return subscript digits for integer n (e.g. 12 → '₁₂')."""
-                return "".join(
-                    _sub_digits[int(d)] if d.isdigit() else d for d in str(n)
-                )
+                return "".join(_sub_digits[int(d)] if d.isdigit() else d for d in str(n))
 
             eq_params_frame = ttk.LabelFrame(left_col, text="Equation Parameters", padding=pad)
             eq_params_frame.pack(fill=tk.X, pady=(0, pad))
@@ -311,11 +309,56 @@ class ParametersDialog:
 
         # Initial conditions (skip for PDE) — left column
         self._bc_vars: list[tk.StringVar] = []
+        self._bc_type_vars: list[tk.StringVar] = []
+        self._domain_shape_var: tk.StringVar | None = None
+        self._mask_expr_var: tk.StringVar | None = None
+        self._contour_bc_expr_var: tk.StringVar | None = None
+        self._contour_bc_type_var: tk.StringVar | None = None
+        self._rect_bc_frame: ttk.LabelFrame | None = None
+        self._contour_bc_frame: ttk.LabelFrame | None = None
         if self.is_pde:
-            bc_frame = ttk.LabelFrame(
-                left_col, text="Boundary Conditions (Dirichlet)", padding=pad,
+            # Domain shape selector
+            shape_frame = ttk.LabelFrame(left_col, text="Domain Shape", padding=pad)
+            shape_frame.pack(fill=tk.X, pady=(0, pad))
+
+            row_shape = ttk.Frame(shape_frame)
+            row_shape.pack(fill=tk.X)
+            ttk.Label(row_shape, text="Shape:").pack(side=tk.LEFT)
+            self._domain_shape_var = tk.StringVar(value="Rectangle")
+            shape_combo = ttk.Combobox(
+                row_shape,
+                textvariable=self._domain_shape_var,
+                values=["Rectangle", "Custom contour"],
+                state="readonly",
+                width=18,
+                font=get_font(),
             )
-            bc_frame.pack(fill=tk.X, pady=(0, pad))
+            shape_combo.pack(side=tk.LEFT, padx=pad)
+            shape_combo.bind("<<ComboboxSelected>>", self._on_domain_shape_change)
+
+            # Mask expression entry (hidden by default)
+            self._mask_row = ttk.Frame(shape_frame)
+            ttk.Label(self._mask_row, text="Mask expr:").pack(side=tk.LEFT)
+            self._mask_expr_var = tk.StringVar(value="x**2 + y**2 <= 1")
+            mask_entry = ttk.Entry(
+                self._mask_row,
+                textvariable=self._mask_expr_var,
+                width=30,
+                font=get_font(),
+            )
+            mask_entry.pack(side=tk.LEFT, padx=pad)
+            ToolTip(
+                mask_entry,
+                "Boolean expression defining the domain, e.g. x**2 + y**2 <= 1",
+            )
+
+            # Rectangular boundary conditions
+            self._rect_bc_frame = ttk.LabelFrame(
+                left_col,
+                text="Boundary Conditions",
+                padding=pad,
+            )
+            self._rect_bc_frame.pack(fill=tk.X, pady=(0, pad))
 
             idx0 = "x[0]"
             idx1 = "x[1]"
@@ -326,19 +369,70 @@ class ParametersDialog:
                 (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
             ]
             for label_text, free_var in boundaries:
-                row = ttk.Frame(bc_frame)
+                row = ttk.Frame(self._rect_bc_frame)
                 row.pack(fill=tk.X, pady=1)
                 ttk.Label(row, text=f"{label_text}:", width=24).pack(side=tk.LEFT)
+                bc_type_var = tk.StringVar(value="Dirichlet")
+                bc_type_combo = ttk.Combobox(
+                    row,
+                    textvariable=bc_type_var,
+                    values=["Dirichlet", "Neumann"],
+                    state="readonly",
+                    width=10,
+                    font=get_font(),
+                )
+                bc_type_combo.pack(side=tk.LEFT, padx=(pad, 2))
+                self._bc_type_vars.append(bc_type_var)
                 bc_var = tk.StringVar(value="0")
                 bc_entry = ttk.Entry(
-                    row, textvariable=bc_var, width=20, font=get_font(),
+                    row,
+                    textvariable=bc_var,
+                    width=16,
+                    font=get_font(),
                 )
-                bc_entry.pack(side=tk.LEFT, padx=(pad, 0))
+                bc_entry.pack(side=tk.LEFT, padx=(2, 0))
                 ToolTip(
                     bc_entry,
-                    f"Expression as a function of {free_var}, e.g. sin(pi*{free_var})",
+                    f"Expression as a function of {free_var}, e.g. sin(pi*{free_var}). "
+                    "For Dirichlet: value. For Neumann: normal derivative.",
                 )
                 self._bc_vars.append(bc_var)
+
+            # Contour boundary conditions (hidden by default)
+            self._contour_bc_frame = ttk.LabelFrame(
+                left_col,
+                text="Contour Boundary Conditions",
+                padding=pad,
+            )
+            row_cbc_type = ttk.Frame(self._contour_bc_frame)
+            row_cbc_type.pack(fill=tk.X, pady=1)
+            ttk.Label(row_cbc_type, text="BC type:").pack(side=tk.LEFT)
+            self._contour_bc_type_var = tk.StringVar(value="Dirichlet")
+            ttk.Combobox(
+                row_cbc_type,
+                textvariable=self._contour_bc_type_var,
+                values=["Dirichlet", "Neumann"],
+                state="readonly",
+                width=10,
+                font=get_font(),
+            ).pack(side=tk.LEFT, padx=pad)
+
+            row_cbc_expr = ttk.Frame(self._contour_bc_frame)
+            row_cbc_expr.pack(fill=tk.X, pady=1)
+            ttk.Label(row_cbc_expr, text="Value:").pack(side=tk.LEFT)
+            self._contour_bc_expr_var = tk.StringVar(value="0")
+            contour_bc_entry = ttk.Entry(
+                row_cbc_expr,
+                textvariable=self._contour_bc_expr_var,
+                width=25,
+                font=get_font(),
+            )
+            contour_bc_entry.pack(side=tk.LEFT, padx=pad)
+            ToolTip(
+                contour_bc_entry,
+                "Expression for boundary value (Dirichlet) or normal derivative (Neumann), "
+                "as a function of x and y.",
+            )
         else:
             ic_frame = ttk.LabelFrame(left_col, text="Initial Conditions", padding=pad)
             ic_frame.pack(fill=tk.X, pady=(0, pad))
@@ -513,6 +607,30 @@ class ParametersDialog:
             # If invalid, reset to default
             self.npoints_var.set(str(get_env_from_schema("SOLVER_NUM_POINTS")))
 
+    def _on_domain_shape_change(self, _event: Any) -> None:
+        """Toggle visibility between rectangular and custom contour BC sections."""
+        is_custom = self._domain_shape_var and self._domain_shape_var.get() == "Custom contour"
+        if is_custom:
+            self._mask_row.pack(fill=tk.X, pady=(4, 0))
+            if self._rect_bc_frame:
+                self._rect_bc_frame.pack_forget()
+            if self._contour_bc_frame:
+                self._contour_bc_frame.pack(fill=tk.X, pady=(0, 4))
+            # Suggest symmetric domain for custom contours (e.g. circles)
+            if self.xmin_var and float(self.xmin_var.get() or 0) >= 0:
+                self.xmin_var.set("-1.0")
+                self.xmax_var.set("1.0")
+            if self.ymin_var and float(self.ymin_var.get() or 0) >= 0:
+                self.ymin_var.set("-1.0")
+            if self.ymax_var:
+                self.ymax_var.set("1.0")
+        else:
+            self._mask_row.pack_forget()
+            if self._contour_bc_frame:
+                self._contour_bc_frame.pack_forget()
+            if self._rect_bc_frame:
+                self._rect_bc_frame.pack(fill=tk.X, pady=(0, 4))
+
     def _on_method_change(self, _event: Any) -> None:
         method = self.method_var.get()
         desc = SOLVER_METHOD_DESCRIPTIONS.get(method, "")
@@ -668,10 +786,44 @@ class ParametersDialog:
         selected_indices = self._stats_listbox.curselection()
         selected_stats = {self._stat_keys[i] for i in selected_indices}
 
-        # Collect PDE boundary condition expressions
+        # Collect PDE boundary condition expressions and new parameters
         bc_expressions: list[str] | None = None
-        if self.is_pde and self._bc_vars:
-            bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
+        bc_types: list[str] | None = None
+        mask_expression: str | None = None
+        contour_bc_expression: str | None = None
+        contour_bc_type: str | None = None
+
+        if self.is_pde:
+            is_custom_contour = (
+                self._domain_shape_var is not None
+                and self._domain_shape_var.get() == "Custom contour"
+            )
+
+            if is_custom_contour:
+                mask_expression = self._mask_expr_var.get().strip() if self._mask_expr_var else None
+                if not mask_expression:
+                    messagebox.showerror(
+                        "Missing Mask",
+                        "Custom contour requires a mask expression.",
+                        parent=self.win,
+                    )
+                    return
+                contour_bc_type = (
+                    self._contour_bc_type_var.get().strip().lower()
+                    if self._contour_bc_type_var
+                    else "dirichlet"
+                )
+                contour_bc_expression = (
+                    self._contour_bc_expr_var.get().strip() or "0"
+                    if self._contour_bc_expr_var
+                    else "0"
+                )
+            else:
+                # Rectangular: collect per-edge expressions and types
+                if self._bc_vars:
+                    bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
+                if self._bc_type_vars:
+                    bc_types = [var.get().strip().lower() for var in self._bc_type_vars]
 
         result_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
 
@@ -702,15 +854,17 @@ class ParametersDialog:
                     pde_operator=self.pde_operator,
                     component_orders=self.component_orders,
                     bc_expressions=bc_expressions,
+                    bc_types=bc_types,
+                    mask_expression=mask_expression,
+                    contour_bc_expression=contour_bc_expression,
+                    contour_bc_type=contour_bc_type,
                 )
                 result_queue.put(("success", result))
             except DifferentialLabError as exc:
                 logger.warning("Solver pipeline failed (user-facing): %s", exc)
                 result_queue.put(("error", ("DifferentialLabError", str(exc))))
             except (MemoryError, OSError) as exc:
-                logger.error(
-                    "Solver pipeline: memory/system error: %s", exc, exc_info=True
-                )
+                logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
                 result_queue.put(
                     (
                         "error",
@@ -737,6 +891,50 @@ class ParametersDialog:
 
         threading.Thread(target=_run_solver, daemon=True).start()
 
+        def _release_tk_vars() -> None:
+            """Clear all tk.StringVar references so GC doesn't call __del__ off-thread.
+
+            Variables are collected into a list and dropped in a deferred after(0)
+            callback. This ensures they are garbage-collected on the main thread,
+            avoiding "RuntimeError: main thread is not in main loop" in Variable.__del__
+            when the worker thread triggers GC.
+            """
+            d = dialog_ref
+            vars_to_discard: list[tk.StringVar] = []
+            vars_to_discard.extend(d._y0_vars)
+            vars_to_discard.extend(d._x0_vars)
+            vars_to_discard.extend(d._eq_param_vars.values())
+            vars_to_discard.extend(d._bc_vars)
+            vars_to_discard.extend(d._bc_type_vars)
+            for attr in (
+                "xmin_var",
+                "xmax_var",
+                "ymin_var",
+                "ymax_var",
+                "npoints_var",
+                "npoints_y_var",
+                "method_var",
+                "_domain_shape_var",
+                "_mask_expr_var",
+                "_contour_bc_expr_var",
+                "_contour_bc_type_var",
+            ):
+                if hasattr(d, attr):
+                    v = getattr(d, attr)
+                    if v is not None:
+                        vars_to_discard.append(v)
+                    setattr(d, attr, None)
+            d._y0_vars.clear()
+            d._x0_vars.clear()
+            d._eq_param_vars.clear()
+            d._bc_vars.clear()
+            d._bc_type_vars.clear()
+
+            def _discard_on_main() -> None:
+                vars_to_discard.clear()
+
+            d.parent.after(0, _discard_on_main)
+
         def _check_result() -> None:
             _ = dialog_ref  # Closure keeps dialog_ref alive until this callback runs
             try:
@@ -745,6 +943,7 @@ class ParametersDialog:
                     loading.destroy()
                 except tk.TclError:
                     pass
+                _release_tk_vars()
                 if not self.parent.winfo_exists():
                     return
                 if status == "success":

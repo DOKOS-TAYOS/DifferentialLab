@@ -25,8 +25,9 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
+from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN
 from solver.predefined import EquationType
-from utils import ValidationError, get_logger
+from utils import ValidationError, build_eval_namespace, get_logger, safe_eval
 
 logger = get_logger(__name__)
 
@@ -105,6 +106,113 @@ def _build_bc_array(
     return bc
 
 
+def _build_mask(
+    mask_expression: str | None,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    parameters: dict[str, float],
+) -> np.ndarray | None:
+    """Evaluate a mask expression on the grid, or return None for rectangular."""
+    if not mask_expression or not mask_expression.strip():
+        return None
+    X, Y = np.meshgrid(x_grid, y_grid)
+    ns = build_eval_namespace(parameters)
+    ns.update({"x": X, "y": Y, "X": X, "Y": Y})
+    compiled = compile(mask_expression.strip(), "<mask>", "eval")
+    result = safe_eval(compiled, ns)
+    return np.asarray(result, dtype=bool)
+
+
+def _build_bc_type_array(
+    bc_types: list[str] | None,
+    nx: int,
+    ny: int,
+    mask: np.ndarray | None,
+    contour_bc_type: str | None,
+) -> np.ndarray | None:
+    """Build a (ny, nx) BC type array from per-edge types or contour type.
+
+    bc_types order: [bottom, top, left, right] — each "dirichlet" or "neumann".
+    For custom contour domains, contour_bc_type is used for all boundary points.
+    """
+    if bc_types is None and contour_bc_type is None:
+        return None
+
+    arr = np.full((ny, nx), BC_DIRICHLET, dtype=object)
+
+    if mask is not None and contour_bc_type:
+        # Custom contour: uniform BC type on all boundary
+        arr[:] = contour_bc_type
+    elif bc_types:
+        # Rectangular: per-edge types
+        types = bc_types + [BC_DIRICHLET] * (4 - len(bc_types))
+        arr[0, :] = types[0]  # bottom
+        arr[ny - 1, :] = types[1]  # top
+        arr[:, 0] = types[2]  # left
+        arr[:, nx - 1] = types[3]  # right
+
+    return arr
+
+
+def _build_neumann_array(
+    bc_types: list[str] | None,
+    bc_expressions: list[str] | None,
+    variables: list[str],
+    parameters: dict[str, float],
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    nx: int,
+    ny: int,
+    mask: np.ndarray | None,
+    contour_bc_type: str | None,
+    contour_bc_expression: str | None,
+) -> np.ndarray | None:
+    """Build a (ny, nx) Neumann derivative values array.
+
+    Only fills values where bc_type is "neumann". Returns None if no Neumann.
+    """
+    has_neumann = False
+    if bc_types and any(t == BC_NEUMANN for t in bc_types):
+        has_neumann = True
+    if contour_bc_type == BC_NEUMANN:
+        has_neumann = True
+    if not has_neumann:
+        return None
+
+    arr = np.zeros((ny, nx))
+
+    if mask is not None and contour_bc_type == BC_NEUMANN and contour_bc_expression:
+        # Custom contour: evaluate expression on full grid
+        func = parse_pde_rhs_expression(contour_bc_expression, variables, parameters)
+        for j in range(ny):
+            for i in range(nx):
+                arr[j, i] = func(x_grid[i], y_grid[j])
+    elif bc_types and bc_expressions:
+        types = bc_types + [BC_DIRICHLET] * (4 - len(bc_types))
+        # Bottom (row 0)
+        if types[0] == BC_NEUMANN and len(bc_expressions) > 0:
+            func = parse_pde_rhs_expression(bc_expressions[0], [variables[0]], parameters)
+            for i in range(nx):
+                arr[0, i] = func(x_grid[i])
+        # Top (row ny-1)
+        if types[1] == BC_NEUMANN and len(bc_expressions) > 1:
+            func = parse_pde_rhs_expression(bc_expressions[1], [variables[0]], parameters)
+            for i in range(nx):
+                arr[ny - 1, i] = func(x_grid[i])
+        # Left (col 0)
+        if types[2] == BC_NEUMANN and len(bc_expressions) > 2:
+            func = parse_pde_rhs_expression(bc_expressions[2], [variables[1]], parameters)
+            for j in range(ny):
+                arr[j, 0] = func(y_grid[j])
+        # Right (col nx-1)
+        if types[3] == BC_NEUMANN and len(bc_expressions) > 3:
+            func = parse_pde_rhs_expression(bc_expressions[3], [variables[1]], parameters)
+            for j in range(ny):
+                arr[j, nx - 1] = func(y_grid[j])
+
+    return arr
+
+
 def _dispatch_2d_pde(
     *,
     expression: str | None,
@@ -118,6 +226,10 @@ def _dispatch_2d_pde(
     n_points_y: int | None,
     pde_operator: str,
     bc_expressions: list[str] | None,
+    bc_types: list[str] | None = None,
+    mask_expression: str | None = None,
+    contour_bc_expression: str | None = None,
+    contour_bc_type: str | None = None,
 ) -> _DispatchResult:
     """Dispatch a 2D PDE solve."""
     ny = n_points_y if n_points_y is not None else n_points
@@ -134,7 +246,17 @@ def _dispatch_2d_pde(
         fyy: float,
         **kw: Any,
     ) -> float:
-        rhs = rhs_func(x, y, **kw)
+        rhs = rhs_func(
+            x,
+            y,
+            f=f,
+            fx=fx,
+            fy=fy,
+            fxx=fxx,
+            fxy=fxy,
+            fyy=fyy,
+            **kw,
+        )
         if pde_operator == "neg_laplacian":
             return -fxx - fyy - rhs
         if pde_operator == "laplacian":
@@ -151,10 +273,22 @@ def _dispatch_2d_pde(
             return fxy - rhs
         return -fxx - fyy - rhs
 
+    x_grid = np.linspace(x_min, x_max, n_points)
+    y_grid_bc = np.linspace(y_min, y_max, ny)
+
+    # Build mask
+    mask = _build_mask(mask_expression, x_grid, y_grid_bc, parameters)
+
+    # Build Dirichlet BC values
     bc_values: np.ndarray | None = None
-    if bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
-        x_grid = np.linspace(x_min, x_max, n_points)
-        y_grid_bc = np.linspace(y_min, y_max, ny)
+    if mask is not None and contour_bc_type != BC_NEUMANN and contour_bc_expression:
+        # Custom contour with Dirichlet BC: evaluate expression on grid
+        bc_values = np.zeros((ny, n_points))
+        func = parse_pde_rhs_expression(contour_bc_expression, vars_list, parameters)
+        for j in range(ny):
+            for i in range(n_points):
+                bc_values[j, i] = func(x_grid[i], y_grid_bc[j])
+    elif bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
         bc_values = _build_bc_array(
             bc_expressions,
             vars_list,
@@ -164,6 +298,22 @@ def _dispatch_2d_pde(
             n_points,
             ny,
         )
+
+    # Build BC type and Neumann arrays
+    bc_type_arr = _build_bc_type_array(bc_types, n_points, ny, mask, contour_bc_type)
+    neumann_arr = _build_neumann_array(
+        bc_types,
+        bc_expressions,
+        vars_list,
+        parameters,
+        x_grid,
+        y_grid_bc,
+        n_points,
+        ny,
+        mask,
+        contour_bc_type,
+        contour_bc_expression,
+    )
 
     pde_sol = solve_pde_2d(
         residual,
@@ -175,6 +325,9 @@ def _dispatch_2d_pde(
         ny,
         bc_values=bc_values,
         parameters=parameters,
+        mask=mask,
+        bc_type=bc_type_arr,
+        bc_neumann_value=neumann_arr,
     )
     return _DispatchResult(
         x=pde_sol.grid[0],
@@ -354,6 +507,10 @@ def run_solver_pipeline(
     pde_operator: str = "neg_laplacian",
     component_orders: tuple[int, ...] | None = None,
     bc_expressions: list[str] | None = None,
+    bc_types: list[str] | None = None,
+    mask_expression: str | None = None,
+    contour_bc_expression: str | None = None,
+    contour_bc_type: str | None = None,
 ) -> SolverResult:
     """Execute the full solve workflow and return data results.
 
@@ -438,6 +595,10 @@ def run_solver_pipeline(
             n_points_y=n_points_y,
             pde_operator=pde_operator,
             bc_expressions=bc_expressions,
+            bc_types=bc_types,
+            mask_expression=mask_expression,
+            contour_bc_expression=contour_bc_expression,
+            contour_bc_type=contour_bc_type,
         )
     elif equation_type == "difference":
         dr = _dispatch_difference(

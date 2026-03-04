@@ -142,10 +142,7 @@ def _finalize_3d_plot(
 
 def _component_labels(n: int) -> list[str]:
     """Generate f₀, f₁, ... labels for component indices."""
-    return [
-        f"f{_SUB_DIGS[i]}" if i < len(_SUB_DIGS) else f"f_{i}"
-        for i in range(n)
-    ]
+    return [f"f{_SUB_DIGS[i]}" if i < len(_SUB_DIGS) else f"f_{i}" for i in range(n)]
 
 
 def create_solution_plot(
@@ -276,12 +273,20 @@ def create_phase_plot(
     phase_end_color: str = get_env_from_schema("PLOT_PHASE_END_COLOR")
     phase_marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
     ax.plot(
-        horiz[0], vert[0], "o",
-        color=phase_start_color, markersize=phase_marker_size, label="Start",
+        horiz[0],
+        vert[0],
+        "o",
+        color=phase_start_color,
+        markersize=phase_marker_size,
+        label="Start",
     )
     ax.plot(
-        horiz[-1], vert[-1], "s",
-        color=phase_end_color, markersize=phase_marker_size, label="End",
+        horiz[-1],
+        vert[-1],
+        "s",
+        color=phase_end_color,
+        markersize=phase_marker_size,
+        label="End",
     )
 
     _finalize_plot(ax, title, xlabel, ylabel, legend=True)
@@ -321,12 +326,22 @@ def create_phase_3d_plot(
     phase_marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
     ax.plot(data_x, data_y, data_z, color=line_color, linewidth=line_width)
     ax.plot(
-        [data_x[0]], [data_y[0]], [data_z[0]], "o",
-        color=phase_start_color, markersize=phase_marker_size, label="Start",
+        [data_x[0]],
+        [data_y[0]],
+        [data_z[0]],
+        "o",
+        color=phase_start_color,
+        markersize=phase_marker_size,
+        label="Start",
     )
     ax.plot(
-        [data_x[-1]], [data_y[-1]], [data_z[-1]], "s",
-        color=phase_end_color, markersize=phase_marker_size, label="End",
+        [data_x[-1]],
+        [data_y[-1]],
+        [data_z[-1]],
+        "s",
+        color=phase_end_color,
+        markersize=phase_marker_size,
+        label="End",
     )
     _finalize_3d_plot(ax, title, xlabel, ylabel, zlabel, legend=True)
     fig.tight_layout()
@@ -365,13 +380,16 @@ def create_surface_plot(
         if z.shape != X.shape:
             raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
+    # Mask NaN values (e.g. exterior points in non-rectangular PDE domains)
+    z_masked = np.ma.masked_invalid(z)
+
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     surface_alpha: float = get_env_from_schema("PLOT_SURFACE_ALPHA")
     colorbar_shrink: float = get_env_from_schema("PLOT_COLORBAR_SHRINK")
     surf = ax.plot_surface(
         X,
         Y,
-        z,
+        z_masked,
         cmap=surface_cmap,
         alpha=surface_alpha,
         edgecolor="none",
@@ -413,9 +431,12 @@ def create_contour_plot(
         if z.shape != X.shape:
             raise ValueError(f"z shape {z.shape} does not match grid {X.shape}")
 
+    # Mask NaN values (e.g. exterior points in non-rectangular PDE domains)
+    z_masked = np.ma.masked_invalid(z)
+
     contour_levels: int = get_env_from_schema("PLOT_CONTOUR_LEVELS")
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
-    contour = ax.contourf(X, Y, z, levels=contour_levels, cmap=surface_cmap)
+    contour = ax.contourf(X, Y, z_masked, levels=contour_levels, cmap=surface_cmap)
     fig.colorbar(contour, ax=ax)
     _finalize_plot(ax, title, xlabel, ylabel)
     fig.tight_layout()
@@ -500,10 +521,13 @@ def create_vector_animation_plot(
         i = max(0, min(idx, n_points - 1))
         new_vals = f_values[:, i]
         line_chain.set_ydata(new_vals)
-        segments = np.stack([
-            np.column_stack([j_vals, np.zeros(vector_components)]),
-            np.column_stack([j_vals, new_vals]),
-        ], axis=1)
+        segments = np.stack(
+            [
+                np.column_stack([j_vals, np.zeros(vector_components)]),
+                np.column_stack([j_vals, new_vals]),
+            ],
+            axis=1,
+        )
         vlines_coll.set_segments(segments)
         fig.canvas.draw_idle()
 
@@ -645,8 +669,12 @@ def export_animation_to_mp4(
     indices = np.arange(vector_components)
     vals = f_values[:, frame_indices[0]]
     (line_chain,) = ax.plot(
-        indices, vals, "o-",
-        color=colors[0], markersize=marker_size, linewidth=anim_line_width,
+        indices,
+        vals,
+        "o-",
+        color=colors[0],
+        markersize=marker_size,
+        linewidth=anim_line_width,
     )
     vlines_coll = ax.vlines(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
@@ -658,10 +686,13 @@ def export_animation_to_mp4(
     def _frame(idx: int) -> None:
         new_vals = f_values[:, idx]
         line_chain.set_ydata(new_vals)
-        segments = np.stack([
-            np.column_stack([j_vals, np.zeros(vector_components)]),
-            np.column_stack([j_vals, new_vals]),
-        ], axis=1)
+        segments = np.stack(
+            [
+                np.column_stack([j_vals, np.zeros(vector_components)]),
+                np.column_stack([j_vals, new_vals]),
+            ],
+            axis=1,
+        )
         vlines_coll.set_segments(segments)
 
     anim = FuncAnimation(

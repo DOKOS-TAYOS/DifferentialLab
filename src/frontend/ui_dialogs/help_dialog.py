@@ -82,8 +82,9 @@ _CUSTOM_EXPRESSIONS = (
     "    f[0] = f\u2099,  f[1] = f\u2099\u208A\u2081,  f[2] = f\u2099\u208A\u2082, ...\n"
     "    Write f\u2099\u208Aorder as an expression of previous terms.\n\n"
     "PDE (2-D elliptic):\n"
-    "    Spatial variables: x, y.  Select the LHS operator from the dropdown "
-    "and write the RHS expression.\n\n"
+    "    Spatial: x, y (or x[0], x[1]). Solution: f. Derivatives: f[0]=f_x, "
+    "f[1]=f_y, f[0,0]=f_xx, f[0,1]=f_xy, f[1,1]=f_yy.\n"
+    "    Select the LHS operator and write the RHS expression.\n\n"
     "Available math functions:\n"
     "    sin  cos  tan  exp  log  log10  sqrt  abs\n"
     "    sinh  cosh  tanh  arcsin  arccos  arctan\n"
@@ -119,11 +120,10 @@ _OUTPUT_FILES = (
     "\u2022 Save JSON  \u2014  full metadata, equation definition, and all computed "
     "statistics in a structured format.\n"
     "\u2022 Matplotlib toolbar  \u2014  use the floppy-disk icon below any plot to "
-    "save it as PNG, JPG, SVG, or PDF.\n"
+    "save it.\n"
     "\u2022 MP4 animation  \u2014  export a video of the time evolution for vector "
     "ODE systems (requires ffmpeg in your PATH).\n\n"
-    "The default output directory is  output/  and can be changed in "
-    "Configuration \u2192 File Paths."
+    "The default output directory is  output/."
 )
 
 _FUNCTION_TRANSFORMS = (

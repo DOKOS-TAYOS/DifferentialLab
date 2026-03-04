@@ -310,6 +310,38 @@ _INDEXED_VAR_NAMES = ["x", "y", "z", "w"]
 
 _INDEXED_VAR_RE = re.compile(r"\bx\[([0-3])\]")
 
+# PDE RHS notation: f[k] = f_{x[k]}, f[i,j] = f_{x[i],x[j]}
+# x[0]=x, x[1]=y. So f[0]=fx, f[1]=fy, f[0,0]=fxx, f[0,1]=fxy, f[1,0]=fxy, f[1,1]=fyy
+# Bare f (no brackets) = solution value
+_PDE_F_SINGLE: dict[int, str] = {0: "fx", 1: "fy"}
+_PDE_F_DOUBLE: dict[tuple[int, int], str] = {
+    (0, 0): "fxx",
+    (0, 1): "fxy",
+    (1, 0): "fxy",
+    (1, 1): "fyy",
+}
+_PDE_F_DOUBLE_RE = re.compile(r"\bf\[([0-1]),([0-1])\]")
+_PDE_F_SINGLE_RE = re.compile(r"\bf\[([0-1])\]")
+
+
+def _rewrite_pde_f_notation(expression: str) -> str:
+    """Rewrite f[k], f[i,j] to fx, fy, fxx, fxy, fyy in PDE RHS context.
+
+    Notation: f[k] = f_{x[k]}, f[i,j] = f_{x[i],x[j]}.
+    Bare f (no brackets) = solution value.
+    """
+    # Replace f[i,j] first (longer pattern)
+    def _replace_double(m: re.Match) -> str:
+        i, j = int(m.group(1)), int(m.group(2))
+        return _PDE_F_DOUBLE.get((i, j), m.group(0))
+
+    def _replace_single(m: re.Match) -> str:
+        idx = int(m.group(1))
+        return _PDE_F_SINGLE.get(idx, m.group(0))
+
+    expr = _PDE_F_DOUBLE_RE.sub(_replace_double, expression)
+    return _PDE_F_SINGLE_RE.sub(_replace_single, expr)
+
 
 def _rewrite_indexed_vars(expression: str) -> str:
     """Rewrite indexed variable notation ``x[0]``, ``x[1]``, ... to named variables.
@@ -348,6 +380,7 @@ def parse_pde_rhs_expression(
     """
     expression = normalize_unicode_escapes(expression)
     expression = _rewrite_indexed_vars(expression)
+    expression = _rewrite_pde_f_notation(expression)
     # Ensure internal variable names are plain (x, y, ...) for evaluation
     internal_vars = [
         _INDEXED_VAR_NAMES[i] if v.startswith("x[") else v
@@ -367,11 +400,13 @@ def parse_pde_rhs_expression(
     )
 
     namespace = build_eval_namespace(params)
-    test_values = {var: 0.0 for var in internal_vars}
+    pde_solution_vars = ("f", "fx", "fy", "fxx", "fxy", "fyy")
+    test_values: dict[str, Any] = {var: 0.0 for var in internal_vars}
+    test_values.update({v: 0.0 for v in pde_solution_vars})
     compiled = _compile_and_test(
         expression,
         namespace,
-        var_names=tuple(internal_vars),
+        var_names=tuple(internal_vars) + pde_solution_vars,
         test_values=test_values,
     )
 
