@@ -210,6 +210,125 @@ airy_equation:
   default_initial_conditions: [0.355028, -0.258819]
   default_domain: [0.0, 5.0]
 
+hermite_ode:
+  category: Quantum
+  name: "Hermite Equation"
+  formula: "f'' - 2xf' + 2nf = 0"
+  description: "f'' - 2xf' + 2nf = 0\nHermite polynomials; eigenfunctions of quantum harmonic oscillator."
+  order: 2
+  parameters:
+    n:
+      default: 2.0
+      description: "Quantum number / eigenvalue"
+  function_name: hermite_ode
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [-2.0, 2.0]
+
+laguerre_ode:
+  category: Quantum
+  name: "Laguerre Equation"
+  formula: "xf'' + (1-x)f' + nf = 0"
+  description: "xf'' + (1-x)f' + nf = 0\nLaguerre polynomials; hydrogen atom radial wave functions."
+  order: 2
+  parameters:
+    n:
+      default: 1.0
+      description: "Parameter (integer for Laguerre polynomials)"
+  function_name: laguerre_ode
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [0.01, 10.0]
+
+bessel_ode:
+  category: Quantum
+  name: "Bessel Equation"
+  formula: "f'' + f'/x + (1 - n²/x²)f = 0"
+  description: "f'' + f'/x + (1 - n²/x²)f = 0\nRadial equation in QM; spherical Bessel, hydrogen."
+  order: 2
+  parameters:
+    n:
+      default: 0.0
+      description: "Order (integer for Bessel J_n)"
+  function_name: bessel_ode
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [0.1, 10.0]
+
+stationary_schrodinger_ho:
+  category: Quantum
+  name: "Stationary Schrödinger (Harmonic Well)"
+  formula: "f'' + (E - x²)f = 0"
+  description: "f'' + (E - x²)f = 0\n1D Schrödinger in V(x)=x²/2; ℏ=m=ω=1. f = ψ(x)."
+  order: 2
+  parameters:
+    E:
+      default: 1.5
+      description: "Energy eigenvalue"
+  function_name: stationary_schrodinger_ho
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [-3.0, 3.0]
+
+stationary_schrodinger_well:
+  category: Quantum
+  name: "Stationary Schrödinger (Square Well)"
+  formula: "f'' + (E - V(x))f = 0"
+  description: "f'' + (E - V(x))f = 0\nFinite square well: V=V₀ for |x|>a, 0 inside."
+  order: 2
+  parameters:
+    E:
+      default: 2.0
+      description: "Energy"
+    V0:
+      default: 10.0
+      description: "Well depth"
+    a:
+      default: 1.0
+      description: "Half-width"
+  function_name: stationary_schrodinger_well
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [-2.0, 2.0]
+
+kummer_ode:
+  category: Quantum
+  name: "Kummer Equation"
+  formula: "xf'' + (b-x)f' - af = 0"
+  description: "xf'' + (b-x)f' - af = 0\nConfluent hypergeometric; hydrogen atom radial."
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+      description: "Parameter a"
+    b:
+      default: 1.0
+      description: "Parameter b"
+  function_name: kummer_ode
+  default_initial_conditions: [1.0, 0.0]
+  default_domain: [0.01, 5.0]
+
+rabi_oscillations:
+  category: Quantum
+  name: "Rabi Oscillations"
+  formula: "Two-level system under driving"
+  description: |
+    Rabi oscillations: two-level atom driven by resonant/near-resonant field.
+    y = [Re(c_g), Im(c_g), Re(c_e), Im(c_e)] for ground and excited amplitudes.
+  equation_type: vector_ode
+  vector_components: 4
+  order: 1
+  parameters:
+    Omega:
+      default: 1.0
+      description: "Rabi frequency"
+      display: "Ω"
+    delta:
+      default: 0.0
+      description: "Detuning"
+      display: "Δ"
+    omega_drive:
+      default: 1.0
+      description: "Drive frequency"
+  function_name: rabi_oscillations
+  default_initial_conditions: [1.0, 0.0, 0.0, 0.0]
+  default_domain: [0.0, 20.0]
+
 michaelis_menten:
   category: Physics
   name: "Michaelis-Menten Kinetics"

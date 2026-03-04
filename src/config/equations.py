@@ -442,6 +442,141 @@ def airy_equation(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
     return dydt
 
 
+# --- Additional quantum equations ---
+
+
+def hermite_ode(x: float, y: np.ndarray, n: float = 2.0, **kwargs: Any) -> np.ndarray:
+    """y'' - 2xy' + 2ny = 0 — Hermite equation (QHO eigenfunctions).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        n: Quantum number / eigenvalue parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = 2 * x * y[1] - 2 * n * y[0]
+    return dydt
+
+
+def laguerre_ode(x: float, y: np.ndarray, n: float = 1.0, **kwargs: Any) -> np.ndarray:
+    """xy'' + (1-x)y' + ny = 0 — Laguerre equation (hydrogen radial).
+
+    Args:
+        x: Independent variable (r).
+        y: State vector ``[y, y']``.
+        n: Parameter (integer for Laguerre polynomials).
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
+    xx = max(x, 1e-8)
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = (-(1 - xx) * y[1] - n * y[0]) / xx
+    return dydt
+
+
+def bessel_ode(x: float, y: np.ndarray, n: float = 0.0, **kwargs: Any) -> np.ndarray:
+    """y'' + y'/x + (1 - n²/x²)y = 0 — Bessel equation (radial QM).
+
+    Args:
+        x: Independent variable (x > 0).
+        y: State vector ``[y, y']``.
+        n: Order (integer for Bessel functions).
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
+    xx = max(x, 1e-8)
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = -y[1] / xx - (1 - n**2 / xx**2) * y[0]
+    return dydt
+
+
+def stationary_schrodinger_ho(
+    x: float, y: np.ndarray, E: float = 1.5, **kwargs: Any
+) -> np.ndarray:
+    """y'' + (E - x²)y = 0 — 1D Schrödinger in harmonic well (ℏ=m=ω=1).
+
+    Args:
+        x: Position.
+        y: State vector ``[ψ, ψ']`` (wave function).
+        E: Energy eigenvalue.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = -(E - x**2) * y[0]
+    return dydt
+
+
+def stationary_schrodinger_well(
+    x: float, y: np.ndarray, E: float = 2.0, V0: float = 10.0, a: float = 1.0, **kwargs: Any
+) -> np.ndarray:
+    """y'' + (E - V(x))y = 0 — 1D Schrödinger, finite square well.
+
+    V(x) = V0 for |x| > a, 0 otherwise. Units ℏ²/(2m)=1.
+    """
+    v_x = V0 if abs(x) > a else 0.0
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = -(E - v_x) * y[0]
+    return dydt
+
+
+def kummer_ode(
+    x: float, y: np.ndarray, a: float = 1.0, b: float = 1.0, **kwargs: Any
+) -> np.ndarray:
+    """xy'' + (b-x)y' - ay = 0 — Kummer (confluent hypergeometric); hydrogen.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        a, b: Kummer parameters.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
+    xx = max(x, 1e-8)
+    dydt = np.empty(2)
+    dydt[0] = y[1]
+    dydt[1] = ((xx - b) * y[1] + a * y[0]) / xx
+    return dydt
+
+
+def rabi_oscillations(
+    x: float,
+    y: np.ndarray,
+    Omega: float = 1.0,
+    delta: float = 0.0,
+    omega_drive: float = 1.0,
+    **kwargs: Any,
+) -> np.ndarray:
+    """Rabi oscillations: two-level system. y = [Re(c_g), Im(c_g), Re(c_e), Im(c_e)].
+
+    dc_g/dt = -i(Ω/2)cos(ωt)c_e, dc_e/dt = -i(Ω/2)cos(ωt)c_g - iΔ·c_e.
+    """
+    drive = (Omega / 2) * np.cos(omega_drive * x)
+    dydt = np.empty(4)
+    dydt[0] = drive * y[3]  # d(Re(c_g))/dt = (Ω/2)cos(ωt) Im(c_e)
+    dydt[1] = -drive * y[2]  # d(Im(c_g))/dt = -(Ω/2)cos(ωt) Re(c_e)
+    dydt[2] = drive * y[1] + delta * y[3]  # d(Re(c_e))/dt
+    dydt[3] = -drive * y[0] - delta * y[2]  # d(Im(c_e))/dt
+    return dydt
+
+
 def bloch_equations(
     x: float,
     y: np.ndarray,
