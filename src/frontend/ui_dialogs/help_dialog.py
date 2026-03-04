@@ -17,7 +17,7 @@ from config import (
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from utils import get_logger
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
@@ -257,15 +257,7 @@ class HelpDialog:
 
         self._scroll.bind_new_children()
 
-        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = inner.winfo_width()
-            if w > 100:
-                wrap = max(200, w - 48)
-                for lbl in self._body_labels:
-                    lbl.configure(wraplength=wrap)
-
-        inner.bind("<Configure>", _update_wraplength)
-        self.win.after(50, lambda: _update_wraplength(None))
+        bind_wraplength(inner, self._body_labels, pad=48, min_wrap=200)
 
     def _add_section(
         self,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 
@@ -237,6 +237,38 @@ class ResultDialog:
         combo.pack(side=tk.LEFT, padx=(0, 4))
         combo.bind("<<ComboboxSelected>>", lambda _e: callback())
 
+    def _create_styled_listbox(
+        self,
+        parent: tk.Widget,
+        labels: list[str],
+        on_select: Callable[[], None],
+        *,
+        height: int = 4,
+        width: int = 12,
+    ) -> tk.Listbox:
+        """Create a themed multi-select Listbox for derivative/component selection."""
+        bg: str = get_env_from_schema("UI_BUTTON_BG")
+        fg: str = get_env_from_schema("UI_FOREGROUND")
+        select_bg: str = get_env_from_schema("UI_BUTTON_FG")
+        select_fg: str = get_contrast_foreground(select_bg)
+        lb = tk.Listbox(
+            parent,
+            selectmode=tk.EXTENDED,
+            height=min(len(labels), height),
+            width=width,
+            bg=bg,
+            fg=fg,
+            selectbackground=select_bg,
+            selectforeground=select_fg,
+            exportselection=False,
+        )
+        for lbl in labels:
+            lb.insert(tk.END, lbl)
+        lb.select_set(0)
+        lb.pack(side=tk.LEFT, padx=4)
+        lb.bind("<<ListboxSelect>>", lambda _e: on_select())
+        return lb
+
     # ------------------------------------------------------------------
     # Plot tab construction
     # ------------------------------------------------------------------
@@ -275,21 +307,9 @@ class ResultDialog:
         self._sol_labels = generate_derivative_labels(notation)
         ttk.Label(ctrl, text="Show:").pack(side=tk.LEFT, padx=(0, 4))
 
-        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
-        select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-        select_fg: str = get_contrast_foreground(select_bg)
-
-        self._sol_listbox = tk.Listbox(
-            ctrl, selectmode=tk.EXTENDED, height=min(len(self._sol_labels), 4),
-            width=12, bg=btn_bg, fg=fg, selectbackground=select_bg,
-            selectforeground=select_fg, exportselection=False,
+        self._sol_listbox = self._create_styled_listbox(
+            ctrl, self._sol_labels, self._update_solution_plot, height=4
         )
-        for lbl in self._sol_labels:
-            self._sol_listbox.insert(tk.END, lbl)
-        self._sol_listbox.select_set(0)
-        self._sol_listbox.pack(side=tk.LEFT, padx=4)
-        self._sol_listbox.bind("<<ListboxSelect>>", lambda _e: self._update_solution_plot())
 
         self._build_transform_controls(ctrl, self._update_solution_plot, "sol")
 
@@ -582,23 +602,8 @@ class ResultDialog:
         self._vec_sol_labels = generate_derivative_labels(notation)
         ttk.Label(ctrl, text="Show:").pack(side=tk.LEFT, padx=(0, 4))
 
-        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
-        select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-        select_fg: str = get_contrast_foreground(select_bg)
-
-        self._vec_sol_listbox = tk.Listbox(
-            ctrl, selectmode=tk.EXTENDED,
-            height=min(len(self._vec_sol_labels), 6), width=12,
-            bg=btn_bg, fg=fg, selectbackground=select_bg,
-            selectforeground=select_fg, exportselection=False,
-        )
-        for lbl in self._vec_sol_labels:
-            self._vec_sol_listbox.insert(tk.END, lbl)
-        self._vec_sol_listbox.select_set(0)
-        self._vec_sol_listbox.pack(side=tk.LEFT, padx=4)
-        self._vec_sol_listbox.bind(
-            "<<ListboxSelect>>", lambda _e: self._update_vec_solution_plot()
+        self._vec_sol_listbox = self._create_styled_listbox(
+            ctrl, self._vec_sol_labels, self._update_vec_solution_plot, height=6
         )
 
         self._build_transform_controls(ctrl, self._update_vec_solution_plot, "vec_sol")

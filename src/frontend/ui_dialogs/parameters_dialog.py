@@ -20,7 +20,7 @@ from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from utils import DifferentialLabError, get_logger
 
 logger = get_logger(__name__)
@@ -456,23 +456,14 @@ class ParametersDialog:
         self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
         self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
 
-        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = scroll_frame.winfo_width()
-            if w > 100:
-                formula_wrap = max(200, w - 2 * pad)
-                formula_lbl.configure(wraplength=formula_wrap)
-            # Use actual width of stats_frame for solver text (always visible)
-            mw = stats_frame.winfo_width()
-            if mw > 100:
-                col_wrap = max(150, mw - 2 * pad)
-                self.method_desc.configure(wraplength=col_wrap)
-                self._stats_desc_label.configure(wraplength=col_wrap)
-
-        scroll_frame.bind("<Configure>", _update_wraplength)
-        stats_frame.bind("<Configure>", _update_wraplength)
+        bind_wraplength(scroll_frame, formula_lbl, pad=2 * pad, min_wrap=200)
+        bind_wraplength(
+            stats_frame,
+            [self.method_desc, self._stats_desc_label],
+            pad=2 * pad,
+            min_wrap=150,
+        )
         scroll.bind_new_children()
-        self.win.after(50, _update_wraplength)
-        self.win.after(150, _update_wraplength)
         btn_solve.focus_set()
 
     # ------------------------------------------------------------------

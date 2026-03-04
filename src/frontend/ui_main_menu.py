@@ -9,7 +9,7 @@ from tkinter import ttk
 from config import APP_NAME, APP_VERSION, get_env_from_schema
 from frontend.theme import configure_ttk_styles
 from frontend.ui_dialogs import ToolTip, setup_arrow_enter_navigation
-from frontend.window_utils import fit_and_center
+from frontend.window_utils import bind_wraplength, fit_and_center
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -84,13 +84,7 @@ class MainMenu:
         )
         desc_lbl.pack(pady=(0, padding * 2))
 
-        def _update_desc_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = main_frame.winfo_width()
-            if w > 100:
-                desc_lbl.configure(wraplength=max(200, w - 6 * padding))
-
-        main_frame.bind("<Configure>", _update_desc_wrap)
-        self.root.after(50, lambda: _update_desc_wrap(None))
+        bind_wraplength(main_frame, desc_lbl, pad=6 * padding, min_wrap=200)
 
         # Buttons
         btn_frame = ttk.Frame(main_frame)

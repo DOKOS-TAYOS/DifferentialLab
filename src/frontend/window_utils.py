@@ -113,23 +113,58 @@ def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
 
 def bind_wraplength(
     frame: tk.Widget,
-    label: tk.Widget,
+    label_or_labels: tk.Widget | list[tk.Widget],
     pad: int = 20,
+    min_wrap: int = 200,
+    debounce_ms: int = 50,
 ) -> None:
-    """Bind a label's wraplength to the width of a frame.
+    """Bind label(s) wraplength to the width of a frame.
 
-    Automatically adjusts the label's wraplength when the frame is resized,
-    ensuring text wraps nicely within the available space.
+    Automatically adjusts wraplength when the frame is resized, ensuring text
+    wraps nicely within the available space. Supports debouncing to avoid
+    excessive updates during rapid resize.
 
     Args:
-        frame: The frame whose width determines the label's wraplength.
-        label: The label widget to update.
+        frame: The frame whose width determines the wraplength.
+        label_or_labels: Single label widget or list of labels to update.
         pad: Padding in pixels to subtract from frame width.
+        min_wrap: Minimum wraplength in pixels.
+        debounce_ms: Debounce delay for Configure events (0 = no debounce).
     """
-    def _update(event=None) -> None:
+    labels = (
+        [label_or_labels]
+        if isinstance(label_or_labels, tk.Widget)
+        else list(label_or_labels)
+    )
+
+    def _update(event: object | None = None) -> None:
         w = frame.winfo_width()
         if w > 100:
-            label.configure(wraplength=w - pad)
+            wrap = max(min_wrap, w - pad)
+            for lbl in labels:
+                if lbl.winfo_exists():
+                    lbl.configure(wraplength=wrap)
 
-    frame.bind("<Configure>", _update)
+    if debounce_ms > 0:
+        _job: str | None = None
+
+        def _debounced(event: object | None = None) -> None:
+            nonlocal _job
+            if _job is not None:
+                try:
+                    frame.after_cancel(_job)
+                except tk.TclError:
+                    pass
+
+            def _run() -> None:
+                nonlocal _job
+                _job = None
+                _update(event)
+
+            _job = frame.after(debounce_ms, _run)
+
+        frame.bind("<Configure>", _debounced)
+    else:
+        frame.bind("<Configure>", _update)
+
     frame.after(100, _update)

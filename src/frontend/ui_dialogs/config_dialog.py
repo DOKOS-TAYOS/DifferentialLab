@@ -18,7 +18,7 @@ from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -223,15 +223,7 @@ class ConfigDialog:
 
         self._scroll.bind_new_children()
 
-        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = form.winfo_width()
-            if w > 100:
-                wrap = max(200, w - 60)
-                for lbl in self._desc_labels:
-                    lbl.configure(wraplength=wrap)
-
-        form.bind("<Configure>", _update_wraplength)
-        self.win.after(50, _update_wraplength)
+        bind_wraplength(form, self._desc_labels, pad=60, min_wrap=200)
 
         btn_save.focus_set()
 

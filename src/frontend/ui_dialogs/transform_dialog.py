@@ -20,7 +20,7 @@ from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import bind_wraplength, center_window, make_modal
 from transforms import (
     DisplayMode,
     TransformKind,
@@ -191,13 +191,8 @@ class TransformDialog:
         unicode_text.config(state="disabled")
         unicode_text.pack(fill=tk.X, pady=(2, 4))
 
-        def _update_func_hint_wrap(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = func_lf.winfo_width()
-            if w > 100:
-                func_hint_lbl.configure(wraplength=max(150, w - 2 * pad))
+        bind_wraplength(func_lf, func_hint_lbl, pad=2 * pad, min_wrap=150)
 
-        func_lf.bind("<Configure>", _update_func_hint_wrap)
-        self.win.after(50, lambda: _update_func_hint_wrap(None))
         self._func_entry = tk.Text(
             func_lf,
             height=2,
@@ -689,15 +684,7 @@ class _TransformHelpDialog:
 
         self._scroll.bind_new_children()
 
-        def _update_wraplength(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            w = inner.winfo_width()
-            if w > 100:
-                wrap = max(200, w - 48)
-                for lbl in self._body_labels:
-                    lbl.configure(wraplength=wrap)
-
-        inner.bind("<Configure>", _update_wraplength)
-        self.win.after(50, lambda: _update_wraplength(None))
+        bind_wraplength(inner, self._body_labels, pad=48, min_wrap=200)
 
     def _add_section(
         self,
