@@ -20,7 +20,7 @@ class TestParseVersion:
         assert _parse_version("5") == (5,)
 
     def test_with_dev_suffix(self) -> None:
-        assert _parse_version("0.3.2.dev1") == (0, 3, 1)
+        assert _parse_version("0.3.2.dev1") == (0, 3, 2)
 
     def test_with_whitespace(self) -> None:
         assert _parse_version("  2.0.0  ") == (2, 0, 0)
