@@ -89,7 +89,8 @@ class TestGetContrastForeground:
     def test_light_bg_returns_black(self) -> None:
         assert get_contrast_foreground("#ffffff") == "#000000"
         assert get_contrast_foreground("#cccccc") == "#000000"
-        assert get_contrast_foreground("lime green") == "#000000"
+        # Use hex to avoid platform differences (tkinter/matplotlib parse "lime green" differently on Linux CI)
+        assert get_contrast_foreground("#32cd32") == "#000000"  # lime green
 
     def test_dark_bg_returns_white(self) -> None:
         assert get_contrast_foreground("#000000") == "#ffffff"
