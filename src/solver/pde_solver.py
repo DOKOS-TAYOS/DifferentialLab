@@ -17,7 +17,7 @@ from typing import Callable
 
 import numpy as np
 
-from utils import SolverFailedError, get_logger
+from utils import SolverFailedError, get_logger, normalize_params
 
 logger = get_logger(__name__)
 
@@ -113,7 +113,7 @@ def solve_pde_2d(
     from scipy import sparse
     from scipy.sparse.linalg import spsolve
 
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
 
     if nx < 3 or ny < 3:
         raise SolverFailedError("Grid must have at least 3 points per dimension")
@@ -130,8 +130,11 @@ def solve_pde_2d(
     n_interior = (nx - 2) * (ny - 2)
     if n_interior <= 0:
         return PDESolution(
-            grid=(x, y), u=u, success=True,
-            message="No interior points", n_eval=0,
+            grid=(x, y),
+            u=u,
+            success=True,
+            message="No interior points",
+            n_eval=0,
         )
 
     # Finite difference weights
@@ -154,13 +157,9 @@ def solve_pde_2d(
             k = k_idx(i, j)
 
             try:
-                a, bxy, c, d, e, g, r0 = _probe_coefficients(
-                    residual_func, x[i], y[j], params
-                )
+                a, bxy, c, d, e, g, r0 = _probe_coefficients(residual_func, x[i], y[j], params)
             except Exception as exc:
-                logger.error(
-                    "PDE coefficient probe failed at (%g, %g): %s", x[i], y[j], exc
-                )
+                logger.error("PDE coefficient probe failed at (%g, %g): %s", x[i], y[j], exc)
                 raise SolverFailedError(f"Coefficient probe failed: {exc}") from exc
 
             # RHS: -r0 (since R = operator(f) + r0 = 0  =>  operator(f) = -r0)
@@ -202,9 +201,7 @@ def solve_pde_2d(
                 _add(i + 1, j - 1, -bxy * inv_4hxhy)
                 _add(i - 1, j - 1, bxy * inv_4hxhy)
 
-    A = sparse.coo_matrix(
-        (data, (rows, cols)), shape=(n_interior, n_interior)
-    ).tocsr()
+    A = sparse.coo_matrix((data, (rows, cols)), shape=(n_interior, n_interior)).tocsr()
 
     try:
         u_flat = spsolve(A, b)

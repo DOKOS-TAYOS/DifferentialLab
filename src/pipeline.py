@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 import numpy as np
 
@@ -29,6 +29,21 @@ from solver.predefined import EquationType
 from utils import ValidationError, get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class _DispatchResult:
+    """Intermediate result from a solver dispatch function."""
+
+    x: np.ndarray
+    y: np.ndarray
+    success: bool
+    message: str
+    n_eval: int
+    error_metrics: dict[str, float] = field(default_factory=dict)
+    solver_quality: dict[str, Any] = field(default_factory=dict)
+    y_grid: np.ndarray | None = None
+    ode_func: Callable | None = None
 
 
 def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
@@ -88,6 +103,202 @@ def _build_bc_array(
             bc[j, nx - 1] = func(y_grid[j])
 
     return bc
+
+
+def _dispatch_2d_pde(
+    *,
+    expression: str | None,
+    vars_list: list[str],
+    parameters: dict[str, float],
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    n_points: int,
+    n_points_y: int | None,
+    pde_operator: str,
+    bc_expressions: list[str] | None,
+) -> _DispatchResult:
+    """Dispatch a 2D PDE solve."""
+    ny = n_points_y if n_points_y is not None else n_points
+    rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kw: Any,
+    ) -> float:
+        rhs = rhs_func(x, y, **kw)
+        if pde_operator == "neg_laplacian":
+            return -fxx - fyy - rhs
+        if pde_operator == "laplacian":
+            return fxx + fyy - rhs
+        if pde_operator == "fxx":
+            return fxx - rhs
+        if pde_operator == "fyy":
+            return fyy - rhs
+        if pde_operator == "fx":
+            return fx - rhs
+        if pde_operator == "fy":
+            return fy - rhs
+        if pde_operator == "fxy":
+            return fxy - rhs
+        return -fxx - fyy - rhs
+
+    bc_values: np.ndarray | None = None
+    if bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
+        x_grid = np.linspace(x_min, x_max, n_points)
+        y_grid_bc = np.linspace(y_min, y_max, ny)
+        bc_values = _build_bc_array(
+            bc_expressions,
+            vars_list,
+            parameters,
+            x_grid,
+            y_grid_bc,
+            n_points,
+            ny,
+        )
+
+    pde_sol = solve_pde_2d(
+        residual,
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+        n_points,
+        ny,
+        bc_values=bc_values,
+        parameters=parameters,
+    )
+    return _DispatchResult(
+        x=pde_sol.grid[0],
+        y=pde_sol.u,
+        success=pde_sol.success,
+        message=pde_sol.message,
+        n_eval=pde_sol.n_eval,
+        y_grid=pde_sol.grid[1],
+    )
+
+
+def _dispatch_difference(
+    *,
+    expression: str | None,
+    function_name: str | None,
+    order: int,
+    parameters: dict[str, float],
+    x_min: float,
+    x_max: float,
+    y0: list[float],
+) -> _DispatchResult:
+    """Dispatch a difference equation solve."""
+    recur_func = get_difference_function(
+        expression=expression,
+        function_name=function_name,
+        order=order,
+        parameters=parameters,
+    )
+    diff_sol = solve_difference(recur_func, int(x_min), int(x_max), y0, order)
+    if not diff_sol.success:
+        from utils import SolverFailedError
+
+        logger.error("Difference equation solver failed: %s", diff_sol.message)
+        raise SolverFailedError(diff_sol.message)
+    return _DispatchResult(
+        x=diff_sol.n,
+        y=diff_sol.y,
+        success=diff_sol.success,
+        message=diff_sol.message,
+        n_eval=0,
+    )
+
+
+def _dispatch_vector_ode(
+    *,
+    vector_expressions: list[str] | None,
+    function_name: str | None,
+    order: int,
+    vector_components: int,
+    parameters: dict[str, float],
+    x_min: float,
+    x_max: float,
+    y0: list[float],
+    n_points: int,
+    method: str,
+) -> _DispatchResult:
+    """Dispatch a vector ODE solve."""
+    vec_exprs = vector_expressions if vector_expressions else None
+    ode_func = get_vector_ode_function(
+        vector_expressions=vec_exprs,
+        function_name=function_name if not vec_exprs else None,
+        order=order,
+        vector_components=vector_components,
+        parameters=parameters,
+    )
+    t_eval = np.linspace(x_min, x_max, n_points)
+    solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+    return _DispatchResult(
+        x=solution.x,
+        y=solution.y,
+        success=solution.success,
+        message=solution.message,
+        n_eval=solution.n_eval,
+        error_metrics=compute_ode_residual_error(ode_func, solution.x, solution.y),
+        solver_quality=_build_solver_quality(solution),
+        ode_func=ode_func,
+    )
+
+
+def _dispatch_scalar_ode(
+    *,
+    expression: str | None,
+    function_name: str | None,
+    order: int,
+    parameters: dict[str, float],
+    x_min: float,
+    x_max: float,
+    y0: list[float],
+    n_points: int,
+    method: str,
+    x0_list: list[float] | None,
+) -> _DispatchResult:
+    """Dispatch a scalar ODE solve (IVP or multipoint BVP)."""
+    ode_func = get_ode_function(
+        expression=expression,
+        function_name=function_name,
+        order=order,
+        parameters=parameters,
+    )
+    t_eval = np.linspace(x_min, x_max, n_points)
+    use_multipoint = x0_list is not None and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
+    if use_multipoint:
+        conditions = [(k, xi, ai) for k, (xi, ai) in enumerate(zip(x0_list, y0))]  # type: ignore[arg-type]
+        solution = solve_multipoint(
+            ode_func,
+            conditions=conditions,
+            order=order,
+            x_min=x_min,
+            x_max=x_max,
+            method=method,
+            t_eval=t_eval,
+        )
+    else:
+        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+    return _DispatchResult(
+        x=solution.x,
+        y=solution.y,
+        success=solution.success,
+        message=solution.message,
+        n_eval=solution.n_eval,
+        error_metrics=compute_ode_residual_error(ode_func, solution.x, solution.y),
+        solver_quality=_build_solver_quality(solution),
+        ode_func=ode_func,
+    )
 
 
 @dataclass
@@ -184,12 +395,11 @@ def run_solver_pipeline(
     vars_list = variables if variables else ["x"]
     is_pde = equation_type == "pde" or is_multivariate(vars_list)
     is_2d_pde = is_pde and len(vars_list) >= 2
-    error_metrics: dict[str, float] = {}
-    solver_quality: dict[str, Any] = {}
     is_vector = (
         vector_expressions is not None and len(vector_expressions) > 0
     ) or equation_type == "vector_ode"
 
+    # ── Validate ──────────────────────────────────────────────────────
     if not is_pde:
         errors = validate_all_inputs(
             expression=expression if not is_vector else None,
@@ -211,144 +421,67 @@ def run_solver_pipeline(
             logger.warning("Validation failed: %s", msg)
             raise ValidationError(msg)
 
+    # ── Dispatch to equation-type-specific solver ─────────────────────
     if is_2d_pde:
-        # PDE path: 2D (or more) variables
         if y_min is None or y_max is None:
             logger.warning("PDE validation failed: y_min and y_max required")
             raise ValidationError("PDE requires y_min and y_max for 2D domain")
-        ny = n_points_y if n_points_y is not None else n_points
-        rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
-
-        def residual(
-            x: float,
-            y: float,
-            f: float,
-            fx: float,
-            fy: float,
-            fxx: float,
-            fxy: float,
-            fyy: float,
-            **kw: Any,
-        ) -> float:
-            rhs = rhs_func(x, y, **kw)
-            # Residual = LHS_operator(f) - rhs = 0
-            if pde_operator == "neg_laplacian":
-                return -fxx - fyy - rhs
-            if pde_operator == "laplacian":
-                return fxx + fyy - rhs
-            if pde_operator == "fxx":
-                return fxx - rhs
-            if pde_operator == "fyy":
-                return fyy - rhs
-            if pde_operator == "fx":
-                return fx - rhs
-            if pde_operator == "fy":
-                return fy - rhs
-            if pde_operator == "fxy":
-                return fxy - rhs
-            # Default: neg_laplacian
-            return -fxx - fyy - rhs
-
-        # Build boundary condition values from function expressions
-        bc_values: np.ndarray | None = None
-        if bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
-            x_grid = np.linspace(x_min, x_max, n_points)
-            y_grid_bc = np.linspace(float(y_min), float(y_max), ny)
-            bc_values = _build_bc_array(
-                bc_expressions, vars_list, parameters, x_grid, y_grid_bc, n_points, ny,
-            )
-
-        pde_sol = solve_pde_2d(
-            residual,
-            x_min,
-            x_max,
-            float(y_min),
-            float(y_max),
-            n_points,
-            ny,
-            bc_values=bc_values,
+        dr = _dispatch_2d_pde(
+            expression=expression,
+            vars_list=vars_list,
             parameters=parameters,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=float(y_min),
+            y_max=float(y_max),
+            n_points=n_points,
+            n_points_y=n_points_y,
+            pde_operator=pde_operator,
+            bc_expressions=bc_expressions,
         )
-        solution_x = pde_sol.grid[0]
-        solution_y_grid = pde_sol.grid[1]
-        solution_y = pde_sol.u  # shape (ny, nx)
-        solution_success = pde_sol.success
-        solution_message = pde_sol.message
-        solution_n_eval = pde_sol.n_eval
     elif equation_type == "difference":
-        recur_func = get_difference_function(
+        dr = _dispatch_difference(
             expression=expression,
             function_name=function_name,
             order=order,
             parameters=parameters,
+            x_min=x_min,
+            x_max=x_max,
+            y0=y0,
         )
-        n_min = int(x_min)
-        n_max = int(x_max)
-        diff_sol = solve_difference(recur_func, n_min, n_max, y0, order)
-        if not diff_sol.success:
-            from utils import SolverFailedError
-
-            logger.error("Difference equation solver failed: %s", diff_sol.message)
-            raise SolverFailedError(diff_sol.message)
-        solution_x = diff_sol.n
-        solution_y = diff_sol.y
-        solution_success = diff_sol.success
-        solution_message = diff_sol.message
-        solution_n_eval = 0
     elif is_vector:
-        vec_exprs = vector_expressions if vector_expressions else None
-        ode_func = get_vector_ode_function(
-            vector_expressions=vec_exprs,
-            function_name=function_name if not vec_exprs else None,
+        dr = _dispatch_vector_ode(
+            vector_expressions=vector_expressions,
+            function_name=function_name,
             order=order,
             vector_components=vector_components,
             parameters=parameters,
+            x_min=x_min,
+            x_max=x_max,
+            y0=y0,
+            n_points=n_points,
+            method=method,
         )
-        t_eval = np.linspace(x_min, x_max, n_points)
-        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
-        solution_x = solution.x
-        solution_y = solution.y
-        solution_success = solution.success
-        solution_message = solution.message
-        solution_n_eval = solution.n_eval
-        error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
-        solver_quality = _build_solver_quality(solution)
     else:
-        ode_func = get_ode_function(
+        dr = _dispatch_scalar_ode(
             expression=expression,
             function_name=function_name,
             order=order,
             parameters=parameters,
+            x_min=x_min,
+            x_max=x_max,
+            y0=y0,
+            n_points=n_points,
+            method=method,
+            x0_list=x0_list,
         )
-        t_eval = np.linspace(x_min, x_max, n_points)
-        use_multipoint = x0_list is not None and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
-        if use_multipoint:
-            conditions = list(enumerate(zip(x0_list, y0)))  # type: ignore[arg-type]
-            conditions_flat = [(k, xi, ai) for k, (xi, ai) in conditions]
-            solution = solve_multipoint(
-                ode_func,
-                conditions=conditions_flat,
-                order=order,
-                x_min=x_min,
-                x_max=x_max,
-                method=method,
-                t_eval=t_eval,
-            )
-        else:
-            solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
-        solution_x = solution.x
-        solution_y = solution.y
-        solution_success = solution.success
-        solution_message = solution.message
-        solution_n_eval = solution.n_eval
-        error_metrics = compute_ode_residual_error(ode_func, solution_x, solution_y)
-        solver_quality = _build_solver_quality(solution)
+
+    solution_x = dr.x
+    solution_y = dr.y
 
     # ── Compute highest derivative and augment y ──────────────────────
-    # For ODE/vector_ode, evaluate the ODE function to get f^(n) and
-    # interleave it into y so the notation can display it.
     display_order = order
-    if not is_2d_pde and equation_type != "difference":
+    if not is_2d_pde and equation_type != "difference" and dr.ode_func is not None:
         try:
             y_2d = np.atleast_2d(solution_y)
             if y_2d.shape[1] != len(solution_x):
@@ -356,19 +489,15 @@ def run_solver_pipeline(
             n_pts = len(solution_x)
             n_comp = vector_components if is_vector else 1
 
-            # Evaluate ODE function at each time point
             dydt_all = np.column_stack(
-                [ode_func(solution_x[j], y_2d[:, j]) for j in range(n_pts)]
-            )  # shape (n_state, n_pts)
+                [dr.ode_func(solution_x[j], y_2d[:, j]) for j in range(n_pts)]
+            )
 
-            # Build augmented y with order+1 per component
             new_order = order + 1
-            new_rows = n_comp * new_order
-            augmented = np.empty((new_rows, n_pts))
+            augmented = np.empty((n_comp * new_order, n_pts))
             for comp_i in range(n_comp):
                 for k in range(order):
                     augmented[comp_i * new_order + k] = y_2d[comp_i * order + k]
-                # Highest derivative: dydt[comp_i * order + order - 1]
                 augmented[comp_i * new_order + order] = dydt_all[comp_i * order + order - 1]
 
             solution_y = augmented
@@ -376,11 +505,13 @@ def run_solver_pipeline(
         except Exception:
             logger.debug("Could not compute highest derivative; using raw y", exc_info=True)
 
+    # ── Statistics ────────────────────────────────────────────────────
     if is_2d_pde:
-        stats = compute_statistics_2d(solution_x, solution_y_grid, solution_y, selected_stats)
+        stats = compute_statistics_2d(solution_x, dr.y_grid, solution_y, selected_stats)
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
 
+    # ── Metadata ──────────────────────────────────────────────────────
     metadata: dict[str, Any] = {
         "equation_name": equation_name,
         "equation_type": equation_type,
@@ -396,48 +527,46 @@ def run_solver_pipeline(
         "ic_points": x0_list if x0_list is not None else [x_min] * order,
         "method": method if equation_type == "ode" else "fdm",
         "num_points": n_points,
-        "solver_success": solution_success,
-        "solver_message": solution_message,
-        "n_evaluations": solution_n_eval,
-        "rtol": solver_quality.get("rtol"),
-        "atol": solver_quality.get("atol"),
-        "residual_max": error_metrics.get("residual_max"),
-        "residual_mean": error_metrics.get("residual_mean"),
-        "residual_rms": error_metrics.get("residual_rms"),
-        "n_jacobian_evals": solver_quality.get("n_jacobian_evals"),
+        "solver_success": dr.success,
+        "solver_message": dr.message,
+        "n_evaluations": dr.n_eval,
+        "rtol": dr.solver_quality.get("rtol"),
+        "atol": dr.solver_quality.get("atol"),
+        "residual_max": dr.error_metrics.get("residual_max"),
+        "residual_mean": dr.error_metrics.get("residual_mean"),
+        "residual_rms": dr.error_metrics.get("residual_rms"),
+        "n_jacobian_evals": dr.solver_quality.get("n_jacobian_evals"),
         "variables": vars_list,
         "boundary_conditions": bc_expressions,
     }
 
-    # Build notation descriptor for f-notation labels
+    # ── Notation ──────────────────────────────────────────────────────
     if equation_type == "difference":
         notation = FNotation(kind="difference", order=order)
     elif is_vector:
-        # If component_orders provided, augment each with +1 for display
         display_comp_orders: tuple[int, ...] | None = None
         if component_orders:
             display_comp_orders = tuple(co + 1 for co in component_orders)
         notation = FNotation(
-            kind="vector_ode", n_components=vector_components, order=display_order,
+            kind="vector_ode",
+            n_components=vector_components,
+            order=display_order,
             component_orders=display_comp_orders or (),
         )
     elif is_pde:
-        notation = FNotation(
-            kind="pde", n_independent_vars=len(vars_list), order=order
-        )
+        notation = FNotation(kind="pde", n_independent_vars=len(vars_list), order=order)
     else:
         notation = FNotation(kind="ode", order=display_order)
 
     logger.info("Pipeline complete for '%s'", equation_name)
 
-    y_grid_result: np.ndarray | None = solution_y_grid if is_2d_pde else None
     return SolverResult(
         x=solution_x,
         y=solution_y,
         statistics=stats,
         metadata=metadata,
         equation_type=equation_type,
-        y_grid=y_grid_result,
+        y_grid=dr.y_grid if is_2d_pde else None,
         is_vector=is_vector,
         vector_components=vector_components if is_vector else 1,
         vector_order=display_order,

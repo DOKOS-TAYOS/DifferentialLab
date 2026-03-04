@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 
 from utils import (
-    SAFE_MATH,
     EquationParseError,
+    build_eval_namespace,
     get_logger,
+    normalize_params,
     normalize_unicode_escapes,
+    safe_eval,
     validate_expression_ast,
 )
 
@@ -39,26 +41,23 @@ def parse_scalar_function(
     """
     expression = normalize_unicode_escapes(expression.strip())
     validate_expression_ast(expression, "scalar function")
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
     logger.debug("Parsing scalar function: %s, params=%s", expression, params)
 
-    namespace: dict[str, Any] = {**SAFE_MATH, **params}
+    namespace = build_eval_namespace(params)
     compiled = compile(expression, "<scalar_function>", "eval")
 
-    def _test_eval() -> None:
-        test_ns = {**namespace, "x": 0.0}
-        try:
-            eval(compiled, {"__builtins__": {}}, test_ns)
-        except Exception as exc:
-            raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
-
-    _test_eval()
+    # Test evaluation at x=0
+    try:
+        safe_eval(compiled, {**namespace, "x": 0.0})
+    except Exception as exc:
+        raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     def scalar_func(x: np.ndarray) -> np.ndarray:
         """Evaluate the compiled expression over a vectorized array."""
         x_arr = np.asarray(x, dtype=float)
         ns = {**namespace, "x": x_arr}
-        result = eval(compiled, {"__builtins__": {}}, ns)
+        result = safe_eval(compiled, ns)
         return np.asarray(result, dtype=float)
 
     return scalar_func

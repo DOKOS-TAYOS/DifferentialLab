@@ -59,41 +59,75 @@ SAFE_MATH: dict[str, Any] = {
     "heaviside": np.heaviside,
 }
 
-_ALLOWED_NODE_TYPES: frozenset[type[ast.AST]] = frozenset((
-    ast.Module,
-    ast.Expr,
-    ast.Expression,
-    ast.BinOp,
-    ast.UnaryOp,
-    ast.Call,
-    ast.Name,
-    ast.Constant,
-    ast.Load,
-    ast.Add,
-    ast.Sub,
-    ast.Mult,
-    ast.Div,
-    ast.Pow,
-    ast.USub,
-    ast.UAdd,
-    ast.Subscript,
-    ast.Attribute,
-    ast.FloorDiv,
-    ast.Mod,
-    ast.Compare,
-    ast.IfExp,
-    ast.BoolOp,
-    ast.And,
-    ast.Or,
-    ast.Eq,
-    ast.NotEq,
-    ast.Lt,
-    ast.LtE,
-    ast.Gt,
-    ast.GtE,
-    ast.Tuple,
-    ast.List,
-))
+_ALLOWED_NODE_TYPES: frozenset[type[ast.AST]] = frozenset(
+    (
+        ast.Module,
+        ast.Expr,
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Call,
+        ast.Name,
+        ast.Constant,
+        ast.Load,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.Pow,
+        ast.USub,
+        ast.UAdd,
+        ast.Subscript,
+        ast.Attribute,
+        ast.FloorDiv,
+        ast.Mod,
+        ast.Compare,
+        ast.IfExp,
+        ast.BoolOp,
+        ast.And,
+        ast.Or,
+        ast.Eq,
+        ast.NotEq,
+        ast.Lt,
+        ast.LtE,
+        ast.Gt,
+        ast.GtE,
+        ast.Tuple,
+        ast.List,
+    )
+)
+
+
+def normalize_params(parameters: dict[str, float] | None) -> dict[str, float]:
+    """Return a mutable copy of *parameters*, or an empty dict if ``None``."""
+    return dict(parameters) if parameters else {}
+
+
+def build_eval_namespace(params: dict[str, float]) -> dict[str, Any]:
+    """Build the safe evaluation namespace combining SAFE_MATH and user params."""
+    return {**SAFE_MATH, **params}
+
+
+def safe_eval(compiled: Any, namespace: dict[str, Any]) -> Any:
+    """Evaluate a compiled expression in a sandboxed namespace."""
+    return eval(compiled, {"__builtins__": {}}, namespace)  # noqa: S307
+
+
+def validate_exclusive_args(
+    arg_a: object | None,
+    arg_b: object | None,
+    name_a: str,
+    name_b: str,
+) -> None:
+    """Ensure exactly one of two mutually exclusive arguments is provided.
+
+    Raises:
+        ValueError: If both or neither argument is provided.
+    """
+    if arg_a is not None and arg_b is not None:
+        raise ValueError(f"Provide either {name_a} or {name_b}, not both")
+    if arg_a is None and arg_b is None:
+        raise ValueError(f"Provide either {name_a} or {name_b}")
 
 
 def validate_expression_ast(expression: str, context: str = "expression") -> None:
@@ -114,6 +148,4 @@ def validate_expression_ast(expression: str, context: str = "expression") -> Non
 
     for node in ast.walk(tree):
         if type(node) not in _ALLOWED_NODE_TYPES:
-            raise EquationParseError(
-                f"Disallowed construct in {context}: {type(node).__name__}"
-            )
+            raise EquationParseError(f"Disallowed construct in {context}: {type(node).__name__}")

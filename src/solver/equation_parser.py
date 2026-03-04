@@ -7,16 +7,20 @@ rewritten to ``y[...]`` via :mod:`solver.notation` before compilation.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 import numpy as np
 
 from solver.notation import FNotation, rewrite_f_expression
 from utils import (
-    SAFE_MATH,
     EquationParseError,
+    build_eval_namespace,
     get_logger,
+    normalize_params,
     normalize_unicode_escapes,
+    safe_eval,
+    validate_exclusive_args,
     validate_expression_ast,
 )
 
@@ -67,7 +71,7 @@ def _compile_and_test(
             test_ns[var_name] = np.zeros(test_values.get("y_size", 1) if test_values else 1)
 
     try:
-        eval(compiled, {"__builtins__": {}}, test_ns)
+        safe_eval(compiled, test_ns)
     except Exception as exc:
         raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
@@ -89,6 +93,7 @@ def _load_config_function(function_name: str, module_name: str = "config.equatio
     """
     try:
         import importlib
+
         module = importlib.import_module(module_name)
     except ImportError as exc:
         raise EquationParseError(f"Cannot import {module_name}: {exc}") from exc
@@ -133,10 +138,10 @@ def _parse_expression(
         notation = FNotation(kind="ode", n_components=1, order=order)
     expression = _maybe_rewrite(expression, notation)
     validate_expression_ast(expression, "ODE expression")
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
     logger.debug("Parsing expression (order=%d): %s, params=%s", order, expression, params)
 
-    namespace: dict[str, Any] = {**SAFE_MATH, **params}
+    namespace = build_eval_namespace(params)
 
     compiled = _compile_and_test(
         expression,
@@ -147,7 +152,7 @@ def _parse_expression(
 
     def ode_func(x: float, y: np.ndarray) -> np.ndarray:
         local_ns = {**namespace, "x": x, "y": y}
-        highest = eval(compiled, {"__builtins__": {}}, local_ns)
+        highest = safe_eval(compiled, local_ns)
         dydt = np.empty(order)
         for i in range(order - 1):
             dydt[i] = y[i + 1]
@@ -181,11 +186,8 @@ def get_ode_function(
         EquationParseError: If expression is invalid or function cannot be resolved.
         ValueError: If neither or both expression and function_name are provided.
     """
-    params = dict(parameters) if parameters else {}
-    if expression is not None and function_name is not None:
-        raise ValueError("Provide either expression or function_name, not both")
-    if expression is None and function_name is None:
-        raise ValueError("Provide either expression or function_name")
+    params = normalize_params(parameters)
+    validate_exclusive_args(expression, function_name, "expression", "function_name")
 
     if expression is not None:
         return _parse_expression(expression, order, params)
@@ -227,7 +229,7 @@ def _parse_difference_expression(
         notation = FNotation(kind="difference", n_components=1, order=order)
     expression = _maybe_rewrite(expression, notation)
     validate_expression_ast(expression, "difference expression")
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
     logger.debug(
         "Parsing difference expression (order=%d): %s, params=%s",
         order,
@@ -235,7 +237,7 @@ def _parse_difference_expression(
         params,
     )
 
-    namespace: dict[str, Any] = {**SAFE_MATH, **params}
+    namespace = build_eval_namespace(params)
     compiled = _compile_and_test(
         expression,
         namespace,
@@ -245,7 +247,7 @@ def _parse_difference_expression(
 
     def recur_func(n: int, y: np.ndarray) -> float:
         local_ns = {**namespace, "n": n, "y": y}
-        return float(eval(compiled, {"__builtins__": {}}, local_ns))
+        return float(safe_eval(compiled, local_ns))
 
     return recur_func
 
@@ -274,11 +276,8 @@ def get_difference_function(
         EquationParseError: If expression is invalid or function cannot be resolved.
         ValueError: If neither or both expression and function_name are provided.
     """
-    params = dict(parameters) if parameters else {}
-    if expression is not None and function_name is not None:
-        raise ValueError("Provide either expression or function_name, not both")
-    if expression is None and function_name is None:
-        raise ValueError("Provide either expression or function_name")
+    params = normalize_params(parameters)
+    validate_exclusive_args(expression, function_name, "expression", "function_name")
 
     if expression is not None:
         return _parse_difference_expression(expression, order, params)
@@ -309,6 +308,8 @@ def get_difference_function(
 
 _INDEXED_VAR_NAMES = ["x", "y", "z", "w"]
 
+_INDEXED_VAR_RE = re.compile(r"\bx\[([0-3])\]")
+
 
 def _rewrite_indexed_vars(expression: str) -> str:
     """Rewrite indexed variable notation ``x[0]``, ``x[1]``, ... to named variables.
@@ -317,11 +318,10 @@ def _rewrite_indexed_vars(expression: str) -> str:
     This allows users to write PDE expressions using indexed notation while
     the internal solver still uses named variables.
     """
-    import re
-
-    for i, name in enumerate(_INDEXED_VAR_NAMES):
-        expression = re.sub(rf"\bx\[{i}\]", name, expression)
-    return expression
+    return _INDEXED_VAR_RE.sub(
+        lambda m: _INDEXED_VAR_NAMES[int(m.group(1))],
+        expression,
+    )
 
 
 def parse_pde_rhs_expression(
@@ -357,7 +357,7 @@ def parse_pde_rhs_expression(
     if not internal_vars:
         internal_vars = list(variables)
     validate_expression_ast(expression, "PDE RHS")
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
     logger.debug(
         "Parsing PDE RHS expression: %s, variables=%s, internal_vars=%s, params=%s",
         expression,
@@ -366,25 +366,21 @@ def parse_pde_rhs_expression(
         params,
     )
 
-    namespace: dict[str, Any] = {**SAFE_MATH, **params}
-    compiled = compile(expression, "<pde_rhs>", "eval")
+    namespace = build_eval_namespace(params)
+    test_values = {var: 0.0 for var in internal_vars}
+    compiled = _compile_and_test(
+        expression,
+        namespace,
+        var_names=tuple(internal_vars),
+        test_values=test_values,
+    )
 
     def rhs_func(*args: float, **kwargs: Any) -> float:
         local_ns = {**namespace, **kwargs}
         for i, var in enumerate(internal_vars):
             if i < len(args):
                 local_ns[var] = args[i]
-        return float(eval(compiled, {"__builtins__": {}}, local_ns))
-
-    # Test evaluation
-    test_ns = {**namespace}
-    for i, var in enumerate(internal_vars):
-        test_ns[var] = 0.0
-    try:
-        eval(compiled, {"__builtins__": {}}, test_ns)
-    except Exception as exc:
-        logger.debug("PDE expression evaluation failed: %s — %s", expression[:80], exc)
-        raise EquationParseError(f"PDE expression evaluation failed: {exc}") from exc
+        return float(safe_eval(compiled, local_ns))
 
     return rhs_func
 
@@ -414,12 +410,10 @@ def _parse_vector_expression(
         raise EquationParseError("vector_expressions must have at least one expression")
 
     if notation is None:
-        notation = FNotation(
-            kind="vector_ode", n_components=n_components, order=order
-        )
+        notation = FNotation(kind="vector_ode", n_components=n_components, order=order)
 
-    params = dict(parameters) if parameters else {}
-    namespace: dict[str, Any] = {**SAFE_MATH, **params}
+    params = normalize_params(parameters)
+    namespace = build_eval_namespace(params)
 
     compiled_list: list[Any] = []
     for i, expr in enumerate(expressions):
@@ -435,7 +429,7 @@ def _parse_vector_expression(
     test_ns = {**namespace, "x": 0.0, "y": test_y}
     for i, compiled in enumerate(compiled_list):
         try:
-            eval(compiled, {"__builtins__": {}}, test_ns)
+            safe_eval(compiled, test_ns)
         except Exception as exc:
             raise EquationParseError(f"Expression {i} evaluation failed: {exc}") from exc
 
@@ -446,7 +440,7 @@ def _parse_vector_expression(
         for i in range(n_components):
             for k in range(order - 1):
                 dydt[i * order + k] = y[i * order + k + 1]
-            highest = eval(compiled_list[i], {"__builtins__": {}}, local_ns)
+            highest = safe_eval(compiled_list[i], local_ns)
             dydt[i * order + order - 1] = float(highest)
 
         return dydt
@@ -480,7 +474,7 @@ def get_vector_ode_function(
         ValueError: If both or neither of vector_expressions and function_name provided.
         EquationParseError: If expressions are invalid or function not found.
     """
-    params = dict(parameters) if parameters else {}
+    params = normalize_params(parameters)
     if vector_expressions and function_name:
         raise ValueError("Provide either vector_expressions or function_name, not both")
     if not vector_expressions and not function_name:

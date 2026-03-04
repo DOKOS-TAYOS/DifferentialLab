@@ -12,7 +12,11 @@ from utils.export import (
 )
 from utils.expression_parser_shared import (
     SAFE_MATH,
+    build_eval_namespace,
+    normalize_params,
     normalize_unicode_escapes,
+    safe_eval,
+    validate_exclusive_args,
     validate_expression_ast,
 )
 from utils.logger import get_logger
@@ -28,11 +32,15 @@ __all__ = [
     "EquationParseError",
     "SolverFailedError",
     "ValidationError",
+    "build_eval_namespace",
     "export_csv_to_path",
     "export_json_to_path",
     "get_logger",
-    "SAFE_MATH",
+    "normalize_params",
     "normalize_unicode_escapes",
+    "safe_eval",
+    "SAFE_MATH",
+    "validate_exclusive_args",
     "validate_expression_ast",
     "is_update_available",
     "perform_git_pull",
