@@ -89,7 +89,7 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
             or default.
 
     Returns:
-        Version string (e.g. '0.3.1') or None if fetch failed.
+        Version string (e.g. '0.3.2') or None if fetch failed.
     """
     url = version_url or get_env_from_schema("UPDATE_CHECK_URL")
 
