@@ -2,13 +2,11 @@ poisson_2d:
   category: Poisson
   name: Poisson Equation (2D)
   formula: -∇²f = g(x,y)
-  description: '-fₓₓ - fᵧᵧ = g(x,y)
+  description: "-fₓₓ - fᵧᵧ = g(x,y)
 
     Elliptic PDE. Solves for f(x,y) with zero Dirichlet boundary conditions.
 
-    Use expression for the RHS g(x,y). Example: k for constant, or x*y.
-
-    '
+    Use expression for the RHS g(x,y). Example: k for constant, or x*y."
   variables:
   - x
   - y
@@ -28,11 +26,9 @@ laplace_2d:
   category: Laplace
   name: Laplace Equation (2D)
   formula: ∇²f = 0
-  description: 'fₓₓ + fᵧᵧ = 0
+  description: "fₓₓ + fᵧᵧ = 0
 
-    Harmonic function. Zero Dirichlet BC.
-
-    '
+    Harmonic function. Zero Dirichlet BC."
   variables:
   - x
   - y
@@ -49,11 +45,9 @@ poisson_xy:
   category: Poisson
   name: 'Poisson: -∇²f = x·y'
   formula: -∇²f = x·y
-  description: '-fₓₓ - fᵧᵧ = x·y
+  description: "-fₓₓ - fᵧᵧ = x·y
 
-    Poisson equation with bilinear source term.
-
-    '
+    Poisson equation with bilinear source term."
   variables:
   - x
   - y
@@ -70,11 +64,9 @@ poisson_sin:
   category: Poisson
   name: 'Poisson: -∇²f = sin(πx)sin(πy)'
   formula: -∇²f = sin(πx)sin(πy)
-  description: '-fₓₓ - fᵧᵧ = sin(πx)sin(πy)
+  description: "-fₓₓ - fᵧᵧ = sin(πx)sin(πy)
 
-    Classic test case with known analytical solution f = sin(πx)sin(πy)/(2π²).
-
-    '
+    Classic test case with known analytical solution f = sin(πx)sin(πy)/(2π²)."
   variables:
   - x
   - y
@@ -91,11 +83,9 @@ poisson_linear:
   category: Poisson
   name: 'Poisson: -∇²f = x + y'
   formula: -∇²f = x + y
-  description: '-fₓₓ - fᵧᵧ = x + y
+  description: "-fₓₓ - fᵧᵧ = x + y
 
-    Poisson with linear source term.
-
-    '
+    Poisson with linear source term."
   variables:
   - x
   - y
@@ -112,11 +102,9 @@ poisson_quadratic:
   category: Poisson
   name: 'Poisson: -∇²f = x² + y²'
   formula: -∇²f = x² + y²
-  description: '-fₓₓ - fᵧᵧ = x² + y²
+  description: "-fₓₓ - fᵧᵧ = x² + y²
 
-    Poisson with quadratic source term.
-
-    '
+    Poisson with quadratic source term."
   variables:
   - x
   - y
@@ -133,11 +121,9 @@ poisson_gaussian:
   category: Poisson
   name: 'Poisson: -∇²f = exp(-(x²+y²)/σ²)'
   formula: -∇²f = exp(-(x²+y²)/σ²)
-  description: '-fₓₓ - fᵧᵧ = exp(-(x²+y²)/σ²)
+  description: "-fₓₓ - fᵧᵧ = exp(-(x²+y²)/σ²)
 
-    Poisson with Gaussian source. Parameter σ controls the width.
-
-    '
+    Poisson with Gaussian source. Parameter σ controls the width."
   variables:
   - x
   - y
@@ -158,11 +144,9 @@ poisson_cos:
   category: Poisson
   name: 'Poisson: -∇²f = cos(πx)cos(πy)'
   formula: -∇²f = cos(πx)cos(πy)
-  description: '-fₓₓ - fᵧᵧ = cos(πx)cos(πy)
+  description: "-fₓₓ - fᵧᵧ = cos(πx)cos(πy)
 
-    Poisson with cosine source term.
-
-    '
+    Poisson with cosine source term."
   variables:
   - x
   - y
@@ -179,11 +163,9 @@ poisson_exp_sin:
   category: Poisson
   name: 'Poisson: -∇²f = exp(-x)sin(y)'
   formula: -∇²f = exp(-x)sin(y)
-  description: '-fₓₓ - fᵧᵧ = exp(-x)sin(y)
+  description: "-fₓₓ - fᵧᵧ = exp(-x)sin(y)
 
-    Poisson with exponential-decay and sinusoidal source.
-
-    '
+    Poisson with exponential-decay and sinusoidal source."
   variables:
   - x
   - y
@@ -200,11 +182,9 @@ poisson_rational:
   category: Poisson
   name: 'Poisson: -∇²f = 1/(1+x²+y²)'
   formula: -∇²f = 1/(1+x²+y²)
-  description: '-fₓₓ - fᵧᵧ = 1/(1+x²+y²)
+  description: "-fₓₓ - fᵧᵧ = 1/(1+x²+y²)
 
-    Poisson with rational (Lorentzian-type) source.
-
-    '
+    Poisson with rational (Lorentzian-type) source."
   variables:
   - x
   - y
@@ -221,11 +201,9 @@ poisson_cos2pi:
   category: Poisson
   name: 'Poisson: -∇²f = cos(2πx)'
   formula: -∇²f = cos(2πx)
-  description: '-fₓₓ - fᵧᵧ = cos(2πx)
+  description: "-fₓₓ - fᵧᵧ = cos(2πx)
 
-    Poisson with x-only periodic source.
-
-    '
+    Poisson with x-only periodic source."
   variables:
   - x
   - y
@@ -242,11 +220,9 @@ poisson_xy2:
   category: Poisson
   name: 'Poisson: -∇²f = x²y + xy²'
   formula: -∇²f = x²y + xy²
-  description: '-fₓₓ - fᵧᵧ = x²y + xy²
+  description: "-fₓₓ - fᵧᵧ = x²y + xy²
 
-    Poisson with cubic mixed source term.
-
-    '
+    Poisson with cubic mixed source term."
   variables:
   - x
   - y

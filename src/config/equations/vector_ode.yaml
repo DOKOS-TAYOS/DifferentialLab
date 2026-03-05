@@ -2,12 +2,10 @@ rabi_oscillations:
   category: Quantum
   name: Rabi Oscillations
   formula: Two-level system under driving
-  description: 'Rabi oscillations: two-level atom driven by resonant/near-resonant
+  description: "Rabi oscillations: two-level atom driven by resonant/near-resonant
     field.
 
-    y = [Re(c_g), Im(c_g), Re(c_e), Im(c_e)] for ground and excited amplitudes.
-
-    '
+    y = [Re(c_g), Im(c_g), Re(c_e), Im(c_e)] for ground and excited amplitudes."
   vector_components: 4
   order: 1
   parameters:
@@ -35,13 +33,11 @@ schrodinger_equation:
   category: Quantum
   name: Time-Dependent Schrödinger Equation
   formula: iℏ ∂ψ/∂t = Ĥ(t)ψ
-  description: 'iℏ ∂ψ/∂t = Ĥ(t)ψ
+  description: "iℏ ∂ψ/∂t = Ĥ(t)ψ
 
     Time-dependent Schrödinger equation with Hamiltonian H(t) and potential V(t).
 
-    f₀ = Re(ψ), f₁ = Im(ψ). Parameters a, b tune the default H and V.
-
-    '
+    f₀ = Re(ψ), f₁ = Im(ψ). Parameters a, b tune the default H and V."
   vector_components: 2
   order: 1
   parameters:
@@ -62,11 +58,9 @@ lorentz_system:
   category: Chaos
   name: Lorenz System
   formula: f₀' = σ(f₁-f₀), f₁' = f₀(ρ-f₂)-f₁, f₂' = f₀f₁-βf₂
-  description: 'f₀'' = σ(f₁-f₀), f₁'' = f₀(ρ-f₂)-f₁, f₂'' = f₀f₁-βf₂
+  description: "f₀' = σ(f₁-f₀), f₁' = f₀(ρ-f₂)-f₁, f₂' = f₀f₁-βf₂
 
-    Classic chaotic attractor (Lorenz 1963).
-
-    '
+    Classic chaotic attractor (Lorenz 1963)."
   vector_components: 3
   order: 1
   parameters:
@@ -94,11 +88,9 @@ lotka_volterra:
   category: Population
   name: Lotka-Volterra (Predator-Prey)
   formula: f₀' = αf₀ - βf₀f₁, f₁' = δf₀f₁ - γf₁
-  description: 'f₀'' = αf₀ - βf₀f₁, f₁'' = δf₀f₁ - γf₁
+  description: "f₀' = αf₀ - βf₀f₁, f₁' = δf₀f₁ - γf₁
 
-    Classic predator-prey population dynamics.
-
-    '
+    Classic predator-prey population dynamics."
   vector_components: 2
   order: 1
   parameters:
@@ -129,13 +121,11 @@ rigid_body_euler:
   category: Physics
   name: Rigid Body (Euler Equations)
   formula: ω₀' = (I₂-I₃)/I₁·ω₁ω₂, ω₁' = (I₃-I₁)/I₂·ω₂ω₀, ω₂' = (I₁-I₂)/I₃·ω₀ω₁
-  description: 'Euler equations for torque-free rigid body rotation.
+  description: "Euler equations for torque-free rigid body rotation.
 
     I₁, I₂, I₃ are principal moments of inertia (diagonal of inertia tensor).
 
-    f₀=ω₁, f₁=ω₂, f₂=ω₃ are angular velocities about principal axes.
-
-    '
+    f₀=ω₁, f₁=ω₂, f₂=ω₃ are     angular velocities about principal axes."
   vector_components: 3
   order: 1
   parameters:
@@ -160,13 +150,11 @@ bloch_equations:
   category: Physics
   name: Bloch Equations
   formula: Mₓ' = γ(M×B)ₓ - Mₓ/T₂, Mᵧ' = γ(M×B)ᵧ - Mᵧ/T₂, M_z' = γ(M×B)_z - (M_z-1)/T₁
-  description: 'Bloch equations for magnetization dynamics in a magnetic field.
+  description: "Bloch equations for magnetization dynamics in a magnetic field.
 
     f₀=Mₓ, f₁=Mᵧ, f₂=Mz. Relaxation: T₁ (longitudinal), T₂ (transverse).
 
-    Equilibrium magnetization M₀=1 along z.
-
-    '
+    Equilibrium magnetization M₀=1 along z."
   vector_components: 3
   order: 1
   parameters:
@@ -201,11 +189,9 @@ rossler_attractor:
   category: Chaos
   name: Rössler Attractor
   formula: f₀' = -f₁-f₂, f₁' = f₀+af₁, f₂' = b+f₂(f₀-c)
-  description: 'Rössler attractor: classic chaotic system.
+  description: "Rössler attractor: classic chaotic system.
 
-    Simpler than Lorenz, single scroll.
-
-    '
+    Simpler than Lorenz, single scroll."
   vector_components: 3
   order: 1
   parameters:
@@ -230,11 +216,9 @@ sir_epidemic:
   category: Population
   name: SIR Epidemic Model
   formula: S' = -βSI, I' = βSI - γI, R' = γI
-  description: 'SIR model: Susceptible, Infected, Recovered.
+  description: "SIR model: Susceptible, Infected, Recovered.
 
-    β = transmission rate, γ = recovery rate.
-
-    '
+    β = transmission rate, γ = recovery rate."
   vector_components: 3
   order: 1
   parameters:
@@ -258,11 +242,9 @@ fitzhugh_nagumo:
   category: Physics
   name: FitzHugh-Nagumo (Neuron)
   formula: v' = v - v³/3 - w + I, w' = (v + a - bw)/a
-  description: 'Simplified Hodgkin-Huxley model for neuron dynamics.
+  description: "Simplified Hodgkin-Huxley model for neuron dynamics.
 
-    v = membrane potential, w = recovery variable.
-
-    '
+    v = membrane potential, w = recovery variable."
   vector_components: 2
   order: 1
   parameters:
@@ -286,11 +268,9 @@ chen_system:
   category: Chaos
   name: Chen System
   formula: f₀' = a(f₁-f₀), f₁' = (c-a)f₀ - f₀f₂ + cf₁, f₂' = f₀f₁ - bf₂
-  description: 'Chen attractor: chaotic system dual to Lorenz.
+  description: "Chen attractor: chaotic system dual to Lorenz.
 
-    Different topology from Lorenz.
-
-    '
+    Different topology from Lorenz."
   vector_components: 3
   order: 1
   parameters:
@@ -315,11 +295,9 @@ brusselator:
   category: Physics
   name: Brusselator
   formula: u' = A - (B+1)u + u²v, v' = Bu - u²v
-  description: 'Autocatalytic chemical reaction with limit cycle.
+  description: "Autocatalytic chemical reaction with limit cycle.
 
-    Classic model for oscillating reactions.
-
-    '
+    Classic model for oscillating reactions."
   vector_components: 2
   order: 1
   parameters:
@@ -340,11 +318,9 @@ thomas_attractor:
   category: Chaos
   name: Thomas Attractor
   formula: f₀' = sin(f₁) - bf₀, f₁' = sin(f₂) - bf₁, f₂' = sin(f₀) - bf₂
-  description: 'Thomas'' cyclically symmetric attractor.
+  description: "Thomas' cyclically symmetric attractor.
 
-    Chaotic 3D system with rotational symmetry.
-
-    '
+    Chaotic 3D system with rotational symmetry."
   vector_components: 3
   order: 1
   parameters:
@@ -363,11 +339,9 @@ hindmarsh_rose:
   category: Physics
   name: Hindmarsh-Rose (Neuron)
   formula: x' = y - ax³ + bx² - z + I, y' = c - dx² - y, z' = r(s(x-x₁) - z)
-  description: 'Hindmarsh-Rose: 3D neuron model with bursting.
+  description: "Hindmarsh-Rose: 3D neuron model with bursting.
 
-    Models spike and burst dynamics.
-
-    '
+    Models spike and burst dynamics."
   vector_components: 3
   order: 1
   parameters:
@@ -407,11 +381,9 @@ rabinovich_fabrikant:
   category: Chaos
   name: Rabinovich-Fabrikant
   formula: f₀' = f₁(f₂-1+f₀²)+γf₀, f₁' = f₀(3f₂+1-f₀²)+γf₁, f₂' = -2f₂(α+f₀f₁)
-  description: 'Rabinovich-Fabrikant chaotic attractor.
+  description: "Rabinovich-Fabrikant chaotic attractor.
 
-    Describes plasma waves.
-
-    '
+    Describes plasma waves."
   vector_components: 3
   order: 1
   parameters:
@@ -435,11 +407,9 @@ chua_circuit:
   category: Chaos
   name: Chua Circuit
   formula: v₁' = α(v₂-v₁-h(v₁)), v₂' = v₁-v₂+i₃, i₃' = -βv₂
-  description: 'Chua circuit: electronic chaotic oscillator.
+  description: "Chua circuit: electronic chaotic oscillator.
 
-    Piecewise-linear nonlinearity.
-
-    '
+    Piecewise-linear nonlinearity."
   vector_components: 3
   order: 1
   parameters:
@@ -469,11 +439,9 @@ selkov_glycolysis:
   category: Physics
   name: Sel'kov Glycolysis
   formula: f₀' = -f₀ + f₁ + f₀²f₁, f₁' = a - f₁ - f₀²f₁
-  description: 'Sel''kov model: glycolysis oscillations.
+  description: "Sel'kov model: glycolysis oscillations.
 
-    Biochemical oscillator.
-
-    '
+    Biochemical oscillator."
   vector_components: 2
   order: 1
   parameters:
@@ -494,11 +462,9 @@ competitive_lotka_volterra_3:
   category: Population
   name: Competitive Lotka-Volterra (3 Species)
   formula: Nᵢ' = rᵢNᵢ(1 - Nᵢ - ΣaᵢⱼNⱼ)
-  description: 'Three species competing for resources.
+  description: "Three species competing for resources.
 
-    f₀=N₁, f₁=N₂, f₂=N₃.
-
-    '
+    f₀=N₁, f₁=N₂, f₂=N₃."
   vector_components: 3
   order: 1
   parameters:
@@ -541,11 +507,9 @@ lu_chen:
   category: Chaos
   name: Lü-Chen System
   formula: f₀' = a(f₁-f₀), f₁' = -f₀f₂ + cf₁, f₂' = f₀f₁ - bf₂
-  description: 'Lü-Chen: bridge between Lorenz and Chen attractors.
+  description: "Lü-Chen: bridge between Lorenz and Chen attractors.
 
-    Chaotic 3D system.
-
-    '
+    Chaotic 3D system."
   vector_components: 3
   order: 1
   parameters:
@@ -570,11 +534,9 @@ aizawa_attractor:
   category: Chaos
   name: Aizawa Attractor
   formula: f₀' = (f₂-b)f₀ - df₁, f₁' = df₀ + (f₂-b)f₁, f₂' = c + af₂ - f₂³/3 - ...
-  description: 'Aizawa attractor: 3D chaotic system.
+  description: "Aizawa attractor: 3D chaotic system.
 
-    Complex dynamics.
-
-    '
+    Complex dynamics."
   vector_components: 3
   order: 1
   parameters:
@@ -610,7 +572,7 @@ halvorsen_attractor:
   vector_components: 3
   order: 1
   formula: f₀' = -af₀ - 4f₁ - 4f₂ - f₁², ...
-  description: 'Halvorsen attractor: chaotic 3D system with cyclic symmetry.'
+  description: "Halvorsen attractor: chaotic 3D system with cyclic symmetry."
   parameters:
     a:
       default: 1.89
@@ -628,7 +590,7 @@ dadras_attractor:
   vector_components: 3
   order: 1
   formula: f₀' = f₁ - af₀ + bf₁f₂, ...
-  description: 'Dadras attractor: chaotic 3D system with complex dynamics.'
+  description: "Dadras attractor: chaotic 3D system with complex dynamics."
   parameters:
     a:
       default: 3.0
@@ -654,7 +616,7 @@ sprott_s:
   vector_components: 3
   order: 1
   formula: f₀' = f₁f₂, f₁' = f₀-f₁, f₂' = 1-f₀f₁
-  description: 'Sprott S system: simple chaotic 3D flow with few terms.'
+  description: "Sprott S system: simple chaotic 3D flow with few terms."
   parameters: {}
   function_name: sprott_s
   default_initial_conditions:
@@ -670,7 +632,7 @@ sprott_a:
   vector_components: 3
   order: 1
   formula: f₀' = f₁, f₁' = -f₀+f₁f₂, f₂' = 1-f₁²
-  description: 'Sprott A system: chaotic 3D with quadratic nonlinearities.'
+  description: "Sprott A system: chaotic 3D with quadratic nonlinearities."
   parameters: {}
   function_name: sprott_a
   default_initial_conditions:
@@ -686,8 +648,8 @@ three_species_food_chain:
   vector_components: 3
   order: 1
   formula: 'Rosenzweig-MacArthur: prey→pred1→pred2'
-  description: 'Rosenzweig-MacArthur: prey, intermediate predator, top predator. Holling
-    type II.'
+  description: "Rosenzweig-MacArthur: prey, intermediate predator, top predator. Holling
+    type II."
   parameters:
     r:
       default: 1.0
@@ -717,8 +679,8 @@ sirs_epidemic:
   vector_components: 3
   order: 1
   formula: S→I→R→S with waning immunity
-  description: 'SIRS: Susceptible→Infected→Recovered→Susceptible. Waning immunity
-    (ξ) allows reinfection.'
+  description: "SIRS: Susceptible→Infected→Recovered→Susceptible. Waning immunity
+    (ξ) allows reinfection."
   parameters:
     beta:
       default: 0.5
@@ -740,8 +702,8 @@ seir_epidemic:
   vector_components: 4
   order: 1
   formula: S→E→I→R (Exposed compartment)
-  description: 'SEIR: Susceptible→Exposed→Infected→Recovered. Latent period (1/σ)
-    before infectious.'
+  description: "SEIR: Susceptible→Exposed→Infected→Recovered. Latent period (1/σ)
+    before infectious."
   parameters:
     beta:
       default: 0.5
@@ -764,8 +726,8 @@ oregonator:
   vector_components: 3
   order: 1
   formula: Belousov-Zhabotinsky oscillating reaction
-  description: 'Oregonator: Belousov-Zhabotinsky chemical oscillator; periodic color
-    changes.'
+  description: "Oregonator: Belousov-Zhabotinsky chemical oscillator; periodic color
+    changes."
   parameters:
     q:
       default: 0.0008
@@ -787,8 +749,8 @@ morris_lecar:
   vector_components: 2
   order: 1
   formula: Two-variable neuron model
-  description: 'Morris-Lecar: two-variable neuron model; barnacle muscle fiber, spike
-    generation.'
+  description: "Morris-Lecar: two-variable neuron model; barnacle muscle fiber, spike
+    generation."
   parameters:
     phi:
       default: 0.04
@@ -807,8 +769,8 @@ wilson_cowan:
   vector_components: 2
   order: 1
   formula: Excitatory-inhibitory neural populations
-  description: 'Wilson-Cowan: excitatory and inhibitory neural populations; cortical
-    dynamics.'
+  description: "Wilson-Cowan: excitatory and inhibitory neural populations; cortical
+    dynamics."
   parameters:
     I_e:
       default: 1.0
@@ -827,7 +789,7 @@ goodwin_oscillator:
   vector_components: 3
   order: 1
   formula: Gene regulation feedback
-  description: 'Goodwin: negative feedback in gene regulation; circadian rhythms.'
+  description: "Goodwin: negative feedback in gene regulation; circadian rhythms."
   parameters:
     k:
       default: 1.0
@@ -849,7 +811,7 @@ t_system:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'T system: chaotic 3D attractor; similar structure to Lorenz.'
+  description: "T system: chaotic 3D attractor; similar structure to Lorenz."
   parameters:
     a:
       default: 2.0
@@ -871,8 +833,8 @@ finance_chaos:
   vector_components: 3
   order: 1
   formula: Chaotic economic model
-  description: 'Finance system: chaotic model for interest rate, investment, price
-    index.'
+  description: "Finance system: chaotic model for interest rate, investment, price
+    index."
   parameters:
     a:
       default: 0.001
@@ -894,7 +856,7 @@ arneodo:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Arneodo system: chaotic 3D; third-order ODE in disguise.'
+  description: "Arneodo system: chaotic 3D; third-order ODE in disguise."
   parameters:
     a:
       default: -5.5
@@ -916,7 +878,7 @@ bouali_attractor:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Bouali attractor: chaotic 3D with multiscroll structure.'
+  description: "Bouali attractor: chaotic 3D with multiscroll structure."
   parameters:
     a:
       default: 0.3
@@ -936,7 +898,7 @@ nose_hoover:
   vector_components: 3
   order: 1
   formula: Thermostat (Hamiltonian-like)
-  description: 'Nose-Hoover: deterministic thermostat for molecular dynamics; chaotic.'
+  description: "Nose-Hoover: deterministic thermostat for molecular dynamics; chaotic."
   parameters: {}
   function_name: nose_hoover
   default_initial_conditions:
@@ -952,7 +914,7 @@ dee_attractor:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Dee attractor: chaotic 3D system with quadratic nonlinearity.'
+  description: "Dee attractor: chaotic 3D system with quadratic nonlinearity."
   parameters:
     a:
       default: 1.0
@@ -972,7 +934,7 @@ four_wing:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Four-wing attractor: chaotic 3D with four symmetric wings.'
+  description: "Four-wing attractor: chaotic 3D with four symmetric wings."
   parameters:
     a:
       default: 4.0
@@ -994,7 +956,7 @@ genesi_attractor:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Genesiş attractor: chaotic 3D; Rössler-like structure.'
+  description: "Genesiş attractor: chaotic 3D; Rössler-like structure."
   parameters:
     a:
       default: 0.44
@@ -1016,7 +978,7 @@ qi_chaos:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Qi system: chaotic 3D with cross-product nonlinearities.'
+  description: "Qi system: chaotic 3D with cross-product nonlinearities."
   parameters:
     a:
       default: 14.0
@@ -1038,7 +1000,7 @@ wang_sun_chaos:
   vector_components: 3
   order: 1
   formula: Chaotic 3D
-  description: 'Wang-Sun: chaotic 3D system; modified Lorenz-type.'
+  description: "Wang-Sun: chaotic 3D system; modified Lorenz-type."
   parameters:
     a:
       default: 10.0
@@ -1062,8 +1024,8 @@ predator_prey_ratio:
   vector_components: 2
   order: 1
   formula: f₀' = rf₀(1-f₀) - af₀f₁/(f₀+bf₁), ...
-  description: 'Ratio-dependent: predation depends on prey/predator ratio; more realistic
-    at low densities.'
+  description: "Ratio-dependent: predation depends on prey/predator ratio; more realistic
+    at low densities."
   parameters:
     r:
       default: 1.0
@@ -1088,8 +1050,8 @@ leslie_gower:
   vector_components: 2
   order: 1
   formula: Predator-prey with modified carrying capacity
-  description: 'Leslie-Gower: predator carrying capacity proportional to prey; stabilizes
-    dynamics.'
+  description: "Leslie-Gower: predator carrying capacity proportional to prey; stabilizes
+    dynamics."
   parameters:
     r:
       default: 1.0
@@ -1112,7 +1074,7 @@ holling_tanner:
   vector_components: 2
   order: 1
   formula: Predator-prey with prey-dependent growth
-  description: 'Holling-Tanner: predator-prey with Holling type II and logistic prey.'
+  description: "Holling-Tanner: predator-prey with Holling type II and logistic prey."
   parameters:
     r:
       default: 1.0
@@ -1137,7 +1099,7 @@ rossler_hyperchaos:
   vector_components: 4
   order: 1
   formula: 4D hyperchaotic
-  description: 'Rössler hyperchaos: 4D extension; two positive Lyapunov exponents.'
+  description: "Rössler hyperchaos: 4D extension; two positive Lyapunov exponents."
   parameters:
     a:
       default: 0.25
@@ -1162,7 +1124,7 @@ hyperchaos_lorenz:
   vector_components: 4
   order: 1
   formula: 4D Lorenz hyperchaos
-  description: 'Lorenz 4D hyperchaos: extended Lorenz with second unstable direction.'
+  description: "Lorenz 4D hyperchaos: extended Lorenz with second unstable direction."
   parameters:
     a:
       default: 10.0
@@ -1185,11 +1147,9 @@ coupled_harmonic_oscillators:
   category: Oscillators
   name: Coupled Harmonic Oscillators
   formula: f[0,2] = -ω²f[0,0] + k(f[1,0]-f[0,0]), f[1,2] = -ω²f[1,0] + k(f[0,0]-f[1,0])
-  description: 'Two masses connected by springs. f[0,0], f[1,0] are positions.
+  description: "Two masses connected by springs. f[0,0], f[1,0] are positions.
 
-    f[i,k] = component i, derivative order k.
-
-    '
+    f[i,k] = component i, derivative order k."
   order: 2
   vector_expressions:
   - -ω**2 * f[0,0] + k * (f[1,0] - f[0,0])
@@ -1214,11 +1174,9 @@ double_pendulum_linearized:
   category: Oscillators
   name: Double Pendulum (Linearized)
   formula: f[0,2] = -2ω²f[0,0] + ω²f[1,0], f[1,2] = 2ω²f[0,0] - 2ω²f[1,0]
-  description: 'Linearized double pendulum. f[0,0], f[1,0] are small angles.
+  description: "Linearized double pendulum. f[0,0], f[1,0] are small angles.
 
-    f[i,k] = component i, derivative order k.
-
-    '
+    f[i,k] = component i, derivative order k."
   order: 2
   vector_expressions:
   - -2*ω**2*f[0,0] + ω**2*f[1,0]
@@ -1240,13 +1198,11 @@ three_coupled_oscillators:
   category: Oscillators
   name: Three Coupled Oscillators
   formula: f[i,2] = -ω²f[i,0] + k(f[i+1,0] + f[i-1,0] - 2f[i,0])
-  description: 'Chain of three masses with nearest-neighbor coupling.
+  description: "Chain of three masses with nearest-neighbor coupling.
 
     f[i,k] = component i, derivative order k.
 
-    Boundary: f[-1]=f[3]=0.
-
-    '
+    Boundary: f[-1]=f[3]=0."
   order: 2
   vector_expressions:
   - -ω**2*f[0,0] + k*(f[1,0] - 2*f[0,0])
@@ -1274,11 +1230,9 @@ twenty_coupled_oscillators:
   category: Oscillators
   name: 20 Coupled Harmonic Oscillators
   formula: f[i,2] = -ω²f[i,0] + k(f[i+1,0] + f[i-1,0] - 2f[i,0])
-  description: 'Linear chain of 20 masses with nearest-neighbor coupling.
+  description: "Linear chain of 20 masses with nearest-neighbor coupling.
 
-    f[i,k] = component i, derivative order k. Boundary: f[-1]=f[20]=0.
-
-    '
+    f[i,k] = component i, derivative order k. Boundary: f[-1]=f[20]=0."
   order: 2
   vector_expressions:
   - -ω**2*f[0,0] + k*(f[1,0] - 2*f[0,0])
@@ -1358,11 +1312,9 @@ damped_coupled_system:
   name: Damped Coupled System
   formula: f[0,2] = -γf[0,1] - ω²f[0,0] + cf[1,0], f[1,2] = -γf[1,1] - ω²f[1,0] +
     cf[0,0]
-  description: 'Two damped oscillators with linear coupling.
+  description: "Two damped oscillators with linear coupling.
 
-    f[i,k] = component i, derivative order k.
-
-    '
+    f[i,k] = component i, derivative order k."
   order: 2
   vector_expressions:
   - -γ*f[0,1] - ω**2*f[0,0] + c*f[1,0]

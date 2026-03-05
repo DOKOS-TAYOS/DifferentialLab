@@ -2,11 +2,9 @@ geometric_growth_diff:
   category: Discrete Population
   name: Geometric Growth (Discrete)
   formula: fₙ₊₁ = r·fₙ
-  description: 'fₙ₊₁ = r·fₙ
+  description: "fₙ₊₁ = r·fₙ
 
-    Discrete exponential growth. Use n for index, f[0] for fₙ.
-
-    '
+    Discrete exponential growth. Use n for index, f[0] for fₙ."
   order: 1
   parameters:
     r:
@@ -22,11 +20,9 @@ logistic_map_diff:
   category: Discrete Population
   name: Logistic Map
   formula: fₙ₊₁ = r·fₙ·(1 - fₙ)
-  description: 'fₙ₊₁ = r·fₙ·(1 - fₙ)
+  description: "fₙ₊₁ = r·fₙ·(1 - fₙ)
 
-    Classic chaotic map. For r≈3.57 exhibits chaos.
-
-    '
+    Classic chaotic map. For r≈3.57 exhibits chaos."
   order: 1
   parameters:
     r:
@@ -42,11 +38,9 @@ fibonacci_diff:
   category: Linear Recurrence
   name: Fibonacci Recurrence
   formula: fₙ₊₂ = fₙ₊₁ + fₙ
-  description: 'fₙ₊₂ = fₙ₊₁ + fₙ
+  description: "fₙ₊₂ = fₙ₊₁ + fₙ
 
-    Classic Fibonacci sequence. f[0]=fₙ, f[1]=fₙ₊₁.
-
-    '
+    Classic Fibonacci sequence. f[0]=fₙ, f[1]=fₙ₊₁."
   order: 2
   parameters: {}
   expression: f[1] + f[0]
@@ -60,11 +54,9 @@ linear_recurrence_2_diff:
   category: Linear Recurrence
   name: Second-Order Linear Recurrence
   formula: fₙ₊₂ = a·fₙ₊₁ + b·fₙ
-  description: 'fₙ₊₂ = a·fₙ₊₁ + b·fₙ
+  description: "fₙ₊₂ = a·fₙ₊₁ + b·fₙ
 
-    General second-order linear recurrence.
-
-    '
+    General second-order linear recurrence."
   order: 2
   parameters:
     a:
@@ -84,11 +76,9 @@ cobweb_model_diff:
   category: Discrete Population
   name: Discrete Logistic (Cobweb)
   formula: fₙ₊₁ = r·fₙ·(1 - fₙ/K)
-  description: 'fₙ₊₁ = r·fₙ·(1 - fₙ/K)
+  description: "fₙ₊₁ = r·fₙ·(1 - fₙ/K)
 
-    Discrete population model with carrying capacity.
-
-    '
+    Discrete population model with carrying capacity."
   order: 1
   parameters:
     r:
@@ -107,11 +97,9 @@ ricker_model_diff:
   category: Discrete Population
   name: Ricker Model
   formula: fₙ₊₁ = r·fₙ·exp(-fₙ)
-  description: 'fₙ₊₁ = r·fₙ·exp(-fₙ)
+  description: "fₙ₊₁ = r·fₙ·exp(-fₙ)
 
-    Fish population dynamics, used in ecology.
-
-    '
+    Fish population dynamics, used in ecology."
   order: 1
   parameters:
     r:
@@ -127,11 +115,9 @@ beverton_holt_diff:
   category: Discrete Population
   name: Beverton-Holt
   formula: fₙ₊₁ = r·fₙ/(1 + (r-1)·fₙ/K)
-  description: 'Stock recruitment model in fisheries.
+  description: "Stock recruitment model in fisheries.
 
-    Saturating growth with carrying capacity.
-
-    '
+    Saturating growth with carrying capacity."
   order: 1
   parameters:
     r:
@@ -150,11 +136,9 @@ tent_map_diff:
   category: Chaos
   name: Tent Map
   formula: fₙ₊₁ = μ·min(fₙ, 1-fₙ)
-  description: 'Piecewise linear chaotic map.
+  description: "Piecewise linear chaotic map.
 
-    For μ=2 exhibits full chaos.
-
-    '
+    For μ=2 exhibits full chaos."
   order: 1
   parameters:
     mu:
@@ -171,11 +155,9 @@ third_order_recurrence_diff:
   category: Linear Recurrence
   name: Third-Order Linear Recurrence
   formula: fₙ₊₃ = a·fₙ₊₂ + b·fₙ₊₁ + c·fₙ
-  description: 'General third-order linear recurrence.
+  description: "General third-order linear recurrence.
 
-    f[0]=fₙ, f[1]=fₙ₊₁, f[2]=fₙ₊₂.
-
-    '
+    f[0]=fₙ, f[1]=fₙ₊₁, f[2]=fₙ₊₂."
   order: 3
   parameters:
     a:
@@ -199,11 +181,9 @@ gauss_map_diff:
   category: Chaos
   name: Gauss Map
   formula: fₙ₊₁ = exp(-β·fₙ²)
-  description: 'fₙ₊₁ = exp(-β·fₙ²)
+  description: "fₙ₊₁ = exp(-β·fₙ²)
 
-    Chaotic map with Gaussian nonlinearity.
-
-    '
+    Chaotic map with Gaussian nonlinearity."
   order: 1
   parameters:
     beta:

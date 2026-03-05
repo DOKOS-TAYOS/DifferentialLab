@@ -2,9 +2,9 @@ harmonic_oscillator:
   category: Oscillators
   name: Simple Harmonic Oscillator
   formula: f'' + ω²f = 0
-  description: 'f'''' + ω²f = 0
+  description: "f'' + ω²f = 0
 
-    Models a mass on a spring with no friction.'
+    Models a mass on a spring with no friction."
   order: 2
   parameters:
     ω:
@@ -21,9 +21,9 @@ damped_oscillator:
   category: Oscillators
   name: Damped Oscillator
   formula: f'' + 2γf' + ω²f = 0
-  description: 'f'''' + 2γf'' + ω²f = 0
+  description: "f'' + 2γf' + ω²f = 0
 
-    Mass-spring-damper system.'
+    Mass-spring-damper system."
   order: 2
   parameters:
     ω:
@@ -43,9 +43,9 @@ exponential_growth:
   category: Population
   name: Exponential Growth / Decay
   formula: f' = kf
-  description: 'f'' = kf
+  description: "f' = kf
 
-    Growth (k>0) or decay (k<0).'
+    Growth (k>0) or decay (k<0)."
   order: 1
   parameters:
     k:
@@ -61,9 +61,9 @@ logistic_equation:
   category: Population
   name: Logistic Equation
   formula: f' = rf(1 - f/K)
-  description: 'f'' = rf(1 - f/K)
+  description: "f' = rf(1 - f/K)
 
-    Population growth with carrying capacity.'
+    Population growth with carrying capacity."
   order: 1
   parameters:
     r:
@@ -82,9 +82,9 @@ van_der_pol:
   category: Oscillators
   name: Van der Pol Oscillator
   formula: f'' - μ(1 - f²)f' + f = 0
-  description: 'f'''' - μ(1 - f²)f'' + f = 0
+  description: "f'' - μ(1 - f²)f' + f = 0
 
-    Nonlinear oscillator with self-sustained oscillations.'
+    Nonlinear oscillator with self-sustained oscillations."
   order: 2
   parameters:
     μ:
@@ -101,9 +101,9 @@ simple_pendulum:
   category: Oscillators
   name: Simple Pendulum
   formula: f'' + (g/L)sin(f) = 0
-  description: 'f'''' + (g/L)sin(f) = 0
+  description: "f'' + (g/L)sin(f) = 0
 
-    Nonlinear pendulum with gravity.'
+    Nonlinear pendulum with gravity."
   order: 2
   parameters:
     g:
@@ -123,9 +123,9 @@ rc_circuit:
   category: Physics
   name: RC Circuit (Discharge)
   formula: f' = -f/(RC)
-  description: 'f'' = -f/(RC)
+  description: "f' = -f/(RC)
 
-    Capacitor voltage during discharge.'
+    Capacitor voltage during discharge."
   order: 1
   parameters:
     R:
@@ -144,9 +144,9 @@ free_fall_drag:
   category: Physics
   name: Free Fall with Drag
   formula: f'' = g - (b/m)f'
-  description: 'f'''' = g - (b/m)f''
+  description: "f'' = g - (b/m)f'
 
-    Falling object with linear air resistance.'
+    Falling object with linear air resistance."
   order: 2
   parameters:
     g:
@@ -169,9 +169,9 @@ rlc_circuit:
   category: Physics
   name: RLC Circuit (Series)
   formula: f'' + (R/L)f' + (1/LC)f = 0
-  description: 'f'''' + (R/L)f'' + (1/LC)f = 0
+  description: "f'' + (R/L)f' + (1/LC)f = 0
 
-    Series RLC circuit with zero forcing.'
+    Series RLC circuit with zero forcing."
   order: 2
   parameters:
     R:
@@ -194,9 +194,9 @@ gompertz_growth:
   category: Population
   name: Gompertz Growth
   formula: f' = rf·ln(K/f)
-  description: 'f'' = rf·ln(K/f)
+  description: "f' = rf·ln(K/f)
 
-    Tumor and cell population growth model.'
+    Tumor and cell population growth model."
   order: 1
   parameters:
     r:
@@ -215,9 +215,9 @@ newton_cooling:
   category: Physics
   name: Newton's Law of Cooling
   formula: f' = -k(f - T_env)
-  description: 'f'' = -k(f - T_env)
+  description: "f' = -k(f - T_env)
 
-    Temperature decay toward ambient.'
+    Temperature decay toward ambient."
   order: 1
   parameters:
     k:
@@ -236,9 +236,9 @@ linear_decay_source:
   category: Physics
   name: Linear Decay with Source
   formula: f' = a - bf
-  description: 'f'' = a - bf
+  description: "f' = a - bf
 
-    Constant inflow with linear decay (e.g. drug concentration).'
+    Constant inflow with linear decay (e.g. drug concentration)."
   order: 1
   parameters:
     a:
@@ -257,9 +257,9 @@ airy_equation:
   category: Quantum
   name: Airy Equation
   formula: f'' = x·f
-  description: 'f'''' = x·f
+  description: "f'' = x·f
 
-    Quantum mechanics, optics, and diffraction.'
+    Quantum mechanics, optics, and diffraction."
   order: 2
   parameters: {}
   function_name: airy_equation
@@ -273,9 +273,9 @@ hermite_ode:
   category: Quantum
   name: Hermite Equation
   formula: f'' - 2xf' + 2nf = 0
-  description: 'f'''' - 2xf'' + 2nf = 0
+  description: "f'' - 2xf' + 2nf = 0
 
-    Hermite polynomials; eigenfunctions of quantum harmonic oscillator.'
+    Hermite polynomials; eigenfunctions of quantum harmonic oscillator."
   order: 2
   parameters:
     n:
@@ -292,9 +292,9 @@ laguerre_ode:
   category: Quantum
   name: Laguerre Equation
   formula: xf'' + (1-x)f' + nf = 0
-  description: 'xf'''' + (1-x)f'' + nf = 0
+  description: "xf'' + (1-x)f' + nf = 0
 
-    Laguerre polynomials; hydrogen atom radial wave functions.'
+    Laguerre polynomials; hydrogen atom radial wave functions."
   order: 2
   parameters:
     n:
@@ -311,9 +311,9 @@ bessel_ode:
   category: Quantum
   name: Bessel Equation
   formula: f'' + f'/x + (1 - n²/x²)f = 0
-  description: 'f'''' + f''/x + (1 - n²/x²)f = 0
+  description: "f'' + f'/x + (1 - n²/x²)f = 0
 
-    Radial equation in QM; spherical Bessel, hydrogen.'
+    Radial equation in QM; spherical Bessel, hydrogen."
   order: 2
   parameters:
     n:
@@ -330,9 +330,9 @@ stationary_schrodinger_ho:
   category: Quantum
   name: Stationary Schrödinger (Harmonic Well)
   formula: f'' + (E - x²)f = 0
-  description: 'f'''' + (E - x²)f = 0
+  description: "f'' + (E - x²)f = 0
 
-    1D Schrödinger in V(x)=x²/2; ℏ=m=ω=1. f = ψ(x).'
+    1D Schrödinger in V(x)=x²/2; ℏ=m=ω=1. f = ψ(x)."
   order: 2
   parameters:
     E:
@@ -349,9 +349,9 @@ stationary_schrodinger_well:
   category: Quantum
   name: Stationary Schrödinger (Square Well)
   formula: f'' + (E - V(x))f = 0
-  description: 'f'''' + (E - V(x))f = 0
+  description: "f'' + (E - V(x))f = 0
 
-    Finite square well: V=V₀ for |x|>a, 0 inside.'
+    Finite square well: V=V₀ for |x|>a, 0 inside."
   order: 2
   parameters:
     E:
@@ -374,9 +374,9 @@ kummer_ode:
   category: Quantum
   name: Kummer Equation
   formula: xf'' + (b-x)f' - af = 0
-  description: 'xf'''' + (b-x)f'' - af = 0
+  description: "xf'' + (b-x)f' - af = 0
 
-    Confluent hypergeometric; hydrogen atom radial.'
+    Confluent hypergeometric; hydrogen atom radial."
   order: 2
   parameters:
     a:
@@ -396,9 +396,9 @@ michaelis_menten:
   category: Physics
   name: Michaelis-Menten Kinetics
   formula: f' = -V_max·f/(K_m + f)
-  description: 'f'' = -V_max·f/(K_m + f)
+  description: "f' = -V_max·f/(K_m + f)
 
-    Enzyme-catalyzed reaction kinetics.'
+    Enzyme-catalyzed reaction kinetics."
   order: 1
   parameters:
     V_max:
@@ -417,9 +417,9 @@ riccati_ode:
   category: Mathematics
   name: Riccati Equation
   formula: f' = a + bf + cf²
-  description: 'f'' = a + bf + cf²
+  description: "f' = a + bf + cf²
 
-    General Riccati form.'
+    General Riccati form."
   order: 1
   parameters:
     a:
@@ -441,9 +441,9 @@ rayleigh_oscillator:
   category: Oscillators
   name: Rayleigh Oscillator
   formula: f'' - μ(1 - f'²)f' + f = 0
-  description: 'f'''' - μ(1 - f''²)f'' + f = 0
+  description: "f'' - μ(1 - f'²)f' + f = 0
 
-    Self-excited nonlinear oscillator.'
+    Self-excited nonlinear oscillator."
   order: 2
   parameters:
     mu:
@@ -461,9 +461,9 @@ forced_harmonic_oscillator:
   category: Oscillators
   name: Forced Harmonic Oscillator
   formula: f'' + ω²f = F·cos(Ωt)
-  description: 'f'''' + ω²f = F·cos(Ωt)
+  description: "f'' + ω²f = F·cos(Ωt)
 
-    Harmonic oscillator with external forcing.'
+    Harmonic oscillator with external forcing."
   order: 2
   parameters:
     omega:
@@ -488,9 +488,9 @@ allee_effect:
   category: Population
   name: Allee Effect
   formula: f' = rf(1 - f/K)(f/K - m)
-  description: 'f'' = rf(1 - f/K)(f/K - m)
+  description: "f' = rf(1 - f/K)(f/K - m)
 
-    Population with critical threshold.'
+    Population with critical threshold."
   order: 1
   parameters:
     r:
@@ -512,9 +512,9 @@ langmuir_adsorption:
   category: Physics
   name: Langmuir Adsorption
   formula: f' = k_a(1 - f) - k_d·f
-  description: 'f'' = k_a(1 - f) - k_d·f
+  description: "f' = k_a(1 - f) - k_d·f
 
-    Surface adsorption/desorption kinetics.'
+    Surface adsorption/desorption kinetics."
   order: 1
   parameters:
     k_a:
@@ -533,9 +533,9 @@ cubic_decay:
   category: Physics
   name: Cubic Decay
   formula: f' = -k·f³
-  description: 'f'' = -k·f³
+  description: "f' = -k·f³
 
-    Nonlinear decay proportional to the cube of the variable.'
+    Nonlinear decay proportional to the cube of the variable."
   order: 1
   parameters:
     k:
@@ -551,9 +551,9 @@ sqrt_growth:
   category: Population
   name: Square-Root Growth
   formula: f' = k·√f
-  description: 'f'' = k·√f
+  description: "f' = k·√f
 
-    Growth rate proportional to square root (e.g. droplet evaporation).'
+    Growth rate proportional to square root (e.g. droplet evaporation)."
   order: 1
   parameters:
     k:
@@ -569,9 +569,9 @@ bistable:
   category: Mathematics
   name: Bistable (Cubic)
   formula: f' = f(1-f)(f-a)
-  description: 'f'' = f(1-f)(f-a)
+  description: "f' = f(1-f)(f-a)
 
-    Cubic with three equilibria; bistable dynamics for 0<a<1.'
+    Cubic with three equilibria; bistable dynamics for 0<a<1."
   order: 1
   parameters:
     a:
@@ -587,9 +587,9 @@ landau:
   category: Physics
   name: Landau (Pitchfork)
   formula: f' = f - f³
-  description: 'f'' = f - f³
+  description: "f' = f - f³
 
-    Normal form of pitchfork bifurcation; phase transitions.'
+    Normal form of pitchfork bifurcation; phase transitions."
   order: 1
   parameters: {}
   function_name: landau
@@ -602,9 +602,9 @@ cubic_oscillator:
   category: Oscillators
   name: Cubic Oscillator
   formula: f'' = -f³
-  description: 'f'''' = -f³
+  description: "f'' = -f³
 
-    Pure cubic restoring force; nonlinear oscillations.'
+    Pure cubic restoring force; nonlinear oscillations."
   order: 2
   parameters: {}
   function_name: cubic_oscillator
@@ -618,9 +618,9 @@ bernoulli_decay:
   category: Physics
   name: Bernoulli Decay
   formula: f' = -k·f^n
-  description: 'f'' = -k·f^n
+  description: "f' = -k·f^n
 
-    Power-law decay; n=2 gives quadratic, n=1 gives exponential.'
+    Power-law decay; n=2 gives quadratic, n=1 gives exponential."
   order: 1
   parameters:
     k:
@@ -639,9 +639,9 @@ holling_type2:
   category: Population
   name: Holling Type II
   formula: f' = r·f·(K-f)/(K+c·f)
-  description: 'f'' = r·f·(K-f)/(K+c·f)
+  description: "f' = r·f·(K-f)/(K+c·f)
 
-    Population growth with Holling type II functional response.'
+    Population growth with Holling type II functional response."
   order: 1
   parameters:
     r:
@@ -660,9 +660,9 @@ soft_spring:
   category: Oscillators
   name: Soft Spring (Duffing)
   formula: f'' = -ω²f - εf³
-  description: 'f'''' = -ω²f - εf³
+  description: "f'' = -ω²f - εf³
 
-    Duffing oscillator without forcing; soft nonlinear spring.'
+    Duffing oscillator without forcing; soft nonlinear spring."
   order: 2
   parameters:
     omega:
@@ -680,9 +680,9 @@ quadratic_decay:
   category: Physics
   name: Quadratic Decay
   formula: f' = a - b·f²
-  description: 'f'' = a - b·f²
+  description: "f' = a - b·f²
 
-    Constant source with quadratic loss; reaches equilibrium √(a/b).'
+    Constant source with quadratic loss; reaches equilibrium √(a/b)."
   order: 1
   parameters:
     a:
@@ -699,9 +699,9 @@ cubic_landau:
   category: Physics
   name: Cubic Landau
   formula: f' = f(1-f²)
-  description: 'f'' = f(1-f²)
+  description: "f' = f(1-f²)
 
-    Symmetric cubic; equilibria at -1, 0, 1.'
+    Symmetric cubic; equilibria at -1, 0, 1."
   order: 1
   parameters: {}
   function_name: cubic_landau
@@ -714,9 +714,9 @@ smooth_decay:
   category: Mathematics
   name: Smooth Decay
   formula: f' = -f/(1+f²)
-  description: 'f'' = -f/(1+f²)
+  description: "f' = -f/(1+f²)
 
-    Smooth bounded decay; derivative vanishes at large |f|.'
+    Smooth bounded decay; derivative vanishes at large |f|."
   order: 1
   parameters: {}
   function_name: smooth_decay
@@ -729,9 +729,9 @@ gompertz_harvesting:
   category: Population
   name: Gompertz with Harvesting
   formula: f' = rf·ln(K/f) - d·f
-  description: 'f'' = rf·ln(K/f) - d·f
+  description: "f' = rf·ln(K/f) - d·f
 
-    Gompertz growth with constant harvesting rate.'
+    Gompertz growth with constant harvesting rate."
   order: 1
   parameters:
     r:
@@ -750,9 +750,9 @@ damped_pendulum:
   category: Oscillators
   name: Damped Pendulum
   formula: f'' + (g/L)sin(f) + γf' = 0
-  description: 'f'''' + (g/L)sin(f) + γf'' = 0
+  description: "f'' + (g/L)sin(f) + γf' = 0
 
-    Pendulum with viscous damping; energy dissipation.'
+    Pendulum with viscous damping; energy dissipation."
   order: 2
   parameters:
     g:
@@ -772,9 +772,9 @@ lienard:
   category: Oscillators
   name: Liénard
   formula: f'' + μ(f²-1)f' + f = 0
-  description: 'f'''' + μ(f²-1)f'' + f = 0
+  description: "f'' + μ(f²-1)f' + f = 0
 
-    Liénard oscillator; related to Van der Pol, self-excited.'
+    Liénard oscillator; related to Van der Pol, self-excited."
   order: 2
   parameters:
     mu:
@@ -790,9 +790,9 @@ matthew_equation:
   category: Quantum
   name: Mathieu Equation
   formula: f'' + (a - 2q·cos(2x))f = 0
-  description: 'f'''' + (a - 2q·cos(2x))f = 0
+  description: "f'' + (a - 2q·cos(2x))f = 0
 
-    Parametric oscillator; stability regions (Mathieu functions).'
+    Parametric oscillator; stability regions (Mathieu functions)."
   order: 2
   parameters:
     a:
@@ -810,9 +810,9 @@ legendre_ode:
   category: Mathematics
   name: Legendre Equation
   formula: (1-x²)f'' - 2xf' + n(n+1)f = 0
-  description: '(1-x²)f'''' - 2xf'' + n(n+1)f = 0
+  description: "(1-x²)f'' - 2xf' + n(n+1)f = 0
 
-    Legendre ODE; solutions are Legendre polynomials for integer n.'
+    Legendre ODE; solutions are Legendre polynomials for integer n."
   order: 2
   parameters:
     n:
@@ -828,9 +828,9 @@ blasius_type:
   category: Physics
   name: Blasius (Simplified)
   formula: f''' = -f·f''/2
-  description: 'f'''''' = -f·f''''/2
+  description: "f''' = -f·f''/2
 
-    Simplified Blasius equation; boundary layer flow.'
+    Simplified Blasius equation; boundary layer flow."
   order: 3
   parameters: {}
   function_name: blasius_type
@@ -845,9 +845,9 @@ emden_fowler:
   category: Physics
   name: Emden-Fowler
   formula: f'' + (2/x)f' + f^n = 0
-  description: 'f'''' + (2/x)f'' + f^n = 0
+  description: "f'' + (2/x)f' + f^n = 0
 
-    Polytropic stellar structure; Lane-Emden equation.'
+    Polytropic stellar structure; Lane-Emden equation."
   order: 2
   parameters:
     n:
@@ -863,9 +863,9 @@ fisher_kpp:
   category: Population
   name: Fisher-KPP
   formula: f' = r·f(1-f)
-  description: 'f'' = r·f(1-f)
+  description: "f' = r·f(1-f)
 
-    Fisher-KPP (temporal part); reaction-diffusion, genetics.'
+    Fisher-KPP (temporal part); reaction-diffusion, genetics."
   order: 1
   parameters:
     r:
@@ -880,9 +880,9 @@ malthus_harvesting:
   category: Population
   name: Malthus with Harvesting
   formula: f' = r·f - h
-  description: 'f'' = r·f - h
+  description: "f' = r·f - h
 
-    Exponential growth with constant harvesting; critical h = r·f.'
+    Exponential growth with constant harvesting; critical h = r·f."
   order: 1
   parameters:
     r:
@@ -899,9 +899,9 @@ relu_activation:
   category: Mathematics
   name: ReLU Activation
   formula: f' = k·max(0,f)
-  description: 'f'' = k·max(0,f)
+  description: "f' = k·max(0,f)
 
-    ReLU-like activation; linear growth for f>0, flat for f<0.'
+    ReLU-like activation; linear growth for f>0, flat for f<0."
   order: 1
   parameters:
     k:
@@ -916,9 +916,9 @@ tanh_decay:
   category: Mathematics
   name: Tanh Decay
   formula: f' = -k·tanh(f)
-  description: 'f'' = -k·tanh(f)
+  description: "f' = -k·tanh(f)
 
-    Smooth bounded decay; saturates for large |f|.'
+    Smooth bounded decay; saturates for large |f|."
   order: 1
   parameters:
     k:
@@ -933,11 +933,9 @@ duffing_oscillator:
   category: Oscillators
   name: Duffing Oscillator
   formula: f'' + δf' + αf + βf³ = γcos(ωt)
-  description: 'f'''' + δf'' + αf + βf³ = γcos(ωt)
+  description: "f'' + δf' + αf + βf³ = γcos(ωt)
 
-    Nonlinear oscillator with cubic stiffness and forcing.
-
-    '
+    Nonlinear oscillator with cubic stiffness and forcing."
   order: 2
   parameters:
     delta:
