@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from solver.notation import FNotation, rewrite_f_expression
+from solver.notation import FNotation, _rewrite_f_expression
 from utils import (
     EquationParseError,
     build_eval_namespace,
@@ -38,7 +38,7 @@ def _maybe_rewrite(expression: str, notation: FNotation | None) -> str:
         Expression with f rewritten to y if notation given, else unchanged.
     """
     if notation is not None:
-        return rewrite_f_expression(expression, notation)
+        return _rewrite_f_expression(expression, notation)
     return expression
 
 
@@ -553,7 +553,7 @@ def get_vector_ode_function(
     return ode_func
 
 
-def validate_expression(expression: str) -> list[str]:
+def _validate_expression(expression: str) -> list[str]:
     """Check an expression for obvious errors without evaluating.
 
     Args:
@@ -562,7 +562,7 @@ def validate_expression(expression: str) -> list[str]:
     Returns:
         List of error messages (empty if valid).
     """
-    from solver.notation import preprocess_prime_notation
+    from solver.notation import _preprocess_prime_notation
 
     errors: list[str] = []
     if not expression or not expression.strip():
@@ -571,7 +571,7 @@ def validate_expression(expression: str) -> list[str]:
     try:
         # Preprocess f'/f'' notation before AST validation so that
         # Python's parser doesn't confuse f' with an f-string literal.
-        expr = preprocess_prime_notation(normalize_unicode_escapes(expression.strip()))
+        expr = _preprocess_prime_notation(normalize_unicode_escapes(expression.strip()))
         validate_expression_ast(expr, "expression")
     except EquationParseError as exc:
         errors.append(str(exc))

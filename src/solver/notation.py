@@ -57,7 +57,7 @@ _F_PRIME_TOKEN = re.compile(
 )
 
 
-def preprocess_prime_notation(expression: str) -> str:
+def _preprocess_prime_notation(expression: str) -> str:
     """Convert ``f'`` notation to ``f[k]`` notation before main rewriting.
 
     Scalar ODE:  ``f'`` → ``f[1]``,  ``f''`` → ``f[2]``,  ``f'''`` → ``f[3]``
@@ -170,7 +170,7 @@ def _rewrite_match_vector_ode(m: re.Match, notation: FNotation) -> str:
     return m.group(0)  # leave unchanged
 
 
-def rewrite_f_expression(expression: str, notation: FNotation) -> str:
+def _rewrite_f_expression(expression: str, notation: FNotation) -> str:
     """Rewrite user-facing ``f[...]`` tokens to internal ``y[...]`` form.
 
     Supports both bracket notation (``f[k]``, ``f[i,k]``) and prime notation
@@ -185,7 +185,7 @@ def rewrite_f_expression(expression: str, notation: FNotation) -> str:
         Equivalent expression with ``y[...]`` indexing suitable for the solver.
     """
     # Preprocess prime notation (f', f'', f'[i], ...) into bracket form first
-    expression = preprocess_prime_notation(expression)
+    expression = _preprocess_prime_notation(expression)
 
     if notation.kind in ("ode", "difference"):
         return _F_TOKEN.sub(lambda m: _rewrite_match_ode_scalar(m, notation.order), expression)
@@ -231,7 +231,7 @@ def _subscript(n: int) -> str:
     return "".join(_SUBSCRIPT_DIGITS[int(d)] if d.isdigit() else d for d in str(n))
 
 
-def flat_index_to_label(j: int, notation: FNotation) -> str:
+def _flat_index_to_label(j: int, notation: FNotation) -> str:
     """Convert flat state-vector index *j* to a human-readable label.
 
     Args:
@@ -277,7 +277,7 @@ def generate_derivative_labels(notation: FNotation) -> list[str]:
     Returns:
         List of human-readable labels, length == ``notation.state_size()``.
     """
-    return [flat_index_to_label(j, notation) for j in range(notation.state_size())]
+    return [_flat_index_to_label(j, notation) for j in range(notation.state_size())]
 
 
 def generate_phase_space_options(notation: FNotation) -> list[tuple[str, int | None]]:
@@ -295,5 +295,5 @@ def generate_phase_space_options(notation: FNotation) -> list[tuple[str, int | N
     x_label = "n" if notation.kind == "difference" else "x"
     options: list[tuple[str, int | None]] = [(x_label, None)]
     for j in range(notation.state_size()):
-        options.append((flat_index_to_label(j, notation), j))
+        options.append((_flat_index_to_label(j, notation), j))
     return options

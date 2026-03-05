@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 from config import SOLVER_METHODS
-from solver.equation_parser import validate_expression
+from solver.equation_parser import _validate_expression
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -218,7 +218,7 @@ def validate_all_inputs(
             errors.append("Vector ODE requires vector_expressions or function_name")
         elif vector_expressions:
             for i, expr in enumerate(vector_expressions):
-                errors.extend(f"Vector expression {i}: {e}" for e in validate_expression(expr))
+                errors.extend(f"Vector expression {i}: {e}" for e in _validate_expression(expr))
         # else: function_name only — no expression validation needed
     else:
         if expression is not None and function_name is not None:
@@ -226,7 +226,7 @@ def validate_all_inputs(
         elif expression is None and function_name is None:
             errors.append("Provide either expression or function_name")
         elif expression is not None:
-            errors.extend(validate_expression(expression))
+            errors.extend(_validate_expression(expression))
     errors.extend(_validate_domain(x_min, x_max))
     errors.extend(_validate_initial_conditions(y0, expected_order))
 

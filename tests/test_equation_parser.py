@@ -7,8 +7,8 @@ import pytest
 
 from solver.equation_parser import (
     _parse_expression,
+    _validate_expression,
     normalize_unicode_escapes,
-    validate_expression,
 )
 from utils import EquationParseError
 
@@ -35,32 +35,32 @@ class TestNormalizeUnicodeEscapes:
 
 class TestValidateExpression:
     def test_empty_returns_error(self) -> None:
-        errors = validate_expression("")
+        errors = _validate_expression("")
         assert len(errors) == 1
         assert "empty" in errors[0].lower()
 
     def test_whitespace_only_returns_error(self) -> None:
-        errors = validate_expression("   \n\t  ")
+        errors = _validate_expression("   \n\t  ")
         assert len(errors) == 1
         assert "empty" in errors[0].lower()
 
     def test_valid_expression_returns_no_errors(self) -> None:
-        errors = validate_expression("y[0] * 2 + x")
+        errors = _validate_expression("y[0] * 2 + x")
         assert errors == []
 
     def test_syntax_error_reported(self) -> None:
-        errors = validate_expression("y[0] + (")
+        errors = _validate_expression("y[0] + (")
         assert len(errors) == 1
         assert "syntax" in errors[0].lower() or "error" in errors[0].lower()
 
     def test_disallowed_construct_reported(self) -> None:
         # Lambda is not in allowed AST nodes
-        errors = validate_expression("(lambda x: x)(1)")
+        errors = _validate_expression("(lambda x: x)(1)")
         assert len(errors) == 1
         assert "disallowed" in errors[0].lower() or "construct" in errors[0].lower()
 
     def test_strips_whitespace(self) -> None:
-        errors = validate_expression("  y[0] + 1  ")
+        errors = _validate_expression("  y[0] + 1  ")
         assert errors == []
 
 
