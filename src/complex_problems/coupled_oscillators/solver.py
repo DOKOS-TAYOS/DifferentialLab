@@ -9,6 +9,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from complex_problems.coupled_oscillators.model import (
+    _resolve_k,
+    _resolve_mass,
     build_ode_function,
     compute_normal_modes,
 )
@@ -20,19 +22,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class CoupledOscillatorsResult:
-    """Result from solving coupled oscillators.
-
-    Attributes:
-        x: Time values (1D).
-        y: State array shape (2*N, n_points): [x_0..x_{N-1}, v_0..v_{N-1}].
-        n_oscillators: Number of oscillators.
-        masses: Mass array (n_oscillators,).
-        k_coupling: Coupling array (n_oscillators-1 or n_oscillators for periodic).
-        M_modes: Mode matrix (n, n), columns are eigenvectors.
-        omega_modes: Angular frequencies of modes (1D).
-        has_modes: True if normal modes were computed (linear only).
-        metadata: Additional solver metadata.
-    """
+    """Result from solving coupled oscillators."""
 
     x: np.ndarray
     y: np.ndarray
@@ -43,6 +33,23 @@ class CoupledOscillatorsResult:
     omega_modes: np.ndarray
     has_modes: bool
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def _resolve_state_arrays(
+    n: int,
+    boundary: str,
+    masses: float | list[float] | Callable[[int], float],
+    k_coupling: float | list[float] | Callable[[int], float],
+) -> tuple[np.ndarray, np.ndarray]:
+    masses_arr = np.array([_resolve_mass(masses, i, n) for i in range(n)], dtype=float)
+    if np.any(masses_arr <= 0):
+        raise ValueError("All masses must be positive.")
+
+    n_springs = n if boundary == "periodic" else n - 1
+    k_arr = np.array([_resolve_k(k_coupling, i, n) for i in range(n_springs)], dtype=float)
+    if np.any(k_arr < 0):
+        raise ValueError("All coupling constants must be non-negative.")
+    return masses_arr, k_arr
 
 
 def solve_coupled_oscillators(
@@ -66,46 +73,34 @@ def solve_coupled_oscillators(
     y0: list[float] | None = None,
     method: str | None = None,
 ) -> CoupledOscillatorsResult:
-    """Solve the coupled oscillators system.
+    """Solve the coupled oscillators system."""
+    if boundary not in {"fixed", "periodic"}:
+        raise ValueError("Boundary must be 'fixed' or 'periodic'.")
 
-    Args:
-        n_oscillators: Number of oscillators.
-        masses: Mass specification.
-        k_coupling: Coupling specification.
-        boundary: "fixed" or "periodic".
-        coupling_types: List of coupling types.
-        nonlinear_coeff: Cubic nonlinear coupling coefficient (FPUT-β).
-        nonlinear_fput_alpha: FPUT-α quadratic nonlinear coefficient.
-        nonlinear_quartic: Quartic nonlinear coefficient.
-        nonlinear_quintic: Quintic nonlinear coefficient.
-        k_2nn: 2nd-neighbor linear coupling (0 = disabled).
-        k_3nn: 3rd-neighbor linear coupling (0 = disabled).
-        k_4nn: 4th-neighbor linear coupling (0 = disabled).
-        external_amplitude: External force amplitude.
-        external_frequency: External force frequency.
-        t_min: Start time.
-        t_max: End time.
-        n_points: Number of output points (default from env).
-        y0: Initial conditions [x_0, ..., x_{N-1}, v_0, ..., v_{N-1}].
-        method: Solver method.
+    n = int(n_oscillators)
+    if n < 2:
+        raise ValueError("Number of oscillators must be at least 2.")
+    if t_max <= t_min:
+        raise ValueError("t_max must be greater than t_min.")
 
-    Returns:
-        CoupledOscillatorsResult with solution and metadata.
-
-    Raises:
-        SolverFailedError: If integration fails.
-    """
     coupling_types = coupling_types or ["linear"]
-    n = n_oscillators
+    method = method or DEFAULT_SOLVER_METHOD
 
     if n_points is None:
         n_points = int(get_env_from_schema("SOLVER_NUM_POINTS"))
-    t_eval = np.linspace(t_min, t_max, n_points)
+    if n_points < 2:
+        raise ValueError("Resolution points must be at least 2.")
 
     if y0 is None:
         y0 = [0.0] * (2 * n)
-        y0[0] = 1.0  # Excite first oscillator
-    y0_arr = np.array(y0, dtype=float)
+        y0[0] = 1.0
+    y0_arr = np.asarray(y0, dtype=float)
+    if y0_arr.shape != (2 * n,):
+        raise ValueError(
+            f"Initial state must have exactly {2 * n} values, got {y0_arr.size}."
+        )
+
+    masses_arr, k_arr = _resolve_state_arrays(n, boundary, masses, k_coupling)
 
     ode_func = build_ode_function(
         n_oscillators=n,
@@ -124,10 +119,10 @@ def solve_coupled_oscillators(
         external_frequency=external_frequency,
     )
 
-    method = method or DEFAULT_SOLVER_METHOD
-    rtol = get_env_from_schema("SOLVER_RTOL")
-    atol = get_env_from_schema("SOLVER_ATOL")
-    max_step = get_env_from_schema("SOLVER_MAX_STEP")
+    t_eval = np.linspace(t_min, t_max, n_points)
+    rtol = float(get_env_from_schema("SOLVER_RTOL"))
+    atol = float(get_env_from_schema("SOLVER_ATOL"))
+    max_step = float(get_env_from_schema("SOLVER_MAX_STEP"))
     effective_max_step = np.inf if max_step <= 0 else max_step
 
     logger.info(
@@ -147,43 +142,45 @@ def solve_coupled_oscillators(
         max_step=effective_max_step,
         rtol=rtol,
         atol=atol,
-        dense_output=True,
+        dense_output=False,
     )
 
     if not sol.success:
         logger.error("Solver failed: %s", sol.message)
         raise SolverFailedError(f"Solver failed ({method}): {sol.message}")
 
-    # Resolve masses and k to arrays for result
-    from complex_problems.coupled_oscillators.model import _resolve_k, _resolve_mass
-
-    masses_arr = np.array([_resolve_mass(masses, i, n) for i in range(n)])
-    n_springs = n if boundary == "periodic" else n - 1
-    k_arr = np.array([_resolve_k(k_coupling, i, n) for i in range(n_springs)])
-
-    # Compute linear modes whenever linear coupling is present; use as projection basis
-    # even for nonlinear/external systems (energy per mode not conserved in that case)
+    # Keep modal analysis in the linear basis by design, even for nonlinear runs.
     has_modes = "linear" in coupling_types
     M_modes = np.eye(n)
     omega_modes = np.ones(n)
     if has_modes:
         M_modes, omega_modes = compute_normal_modes(
-            n, masses, k_coupling, boundary,
-            k_2nn=k_2nn, k_3nn=k_3nn, k_4nn=k_4nn,
+            n,
+            masses,
+            k_coupling,
+            boundary,
+            k_2nn=k_2nn,
+            k_3nn=k_3nn,
+            k_4nn=k_4nn,
         )
 
     metadata = {
         "method": method,
-        "n_eval": getattr(sol, "nfev", 0),
+        "n_eval": int(getattr(sol, "nfev", 0)),
         "boundary": boundary,
         "coupling_types": coupling_types,
-        "nonlinear_coeff": nonlinear_coeff,
-        "nonlinear_fput_alpha": nonlinear_fput_alpha,
-        "nonlinear_quartic": nonlinear_quartic,
-        "nonlinear_quintic": nonlinear_quintic,
-        "k_2nn": k_2nn,
-        "k_3nn": k_3nn,
-        "k_4nn": k_4nn,
+        "nonlinear_coeff": float(nonlinear_coeff),
+        "nonlinear_fput_alpha": float(nonlinear_fput_alpha),
+        "nonlinear_quartic": float(nonlinear_quartic),
+        "nonlinear_quintic": float(nonlinear_quintic),
+        "k_2nn": float(k_2nn),
+        "k_3nn": float(k_3nn),
+        "k_4nn": float(k_4nn),
+        "external_amplitude": float(external_amplitude),
+        "external_frequency": float(external_frequency),
+        "rtol": rtol,
+        "atol": atol,
+        "max_step": max_step,
     }
 
     return CoupledOscillatorsResult(
@@ -197,3 +194,4 @@ def solve_coupled_oscillators(
         has_modes=has_modes,
         metadata=metadata,
     )
+

@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from complex_problems.problem_registry import PROBLEM_REGISTRY
+from complex_problems.problem_registry import PROBLEM_REGISTRY, open_problem_dialog
 from config import get_env_from_schema
 from frontend.ui_dialogs import ToolTip, setup_arrow_enter_navigation
 from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
@@ -68,7 +68,7 @@ class ComplexProblemsDialog:
             btn = ttk.Button(
                 btn_frame,
                 text=descriptor.name,
-                command=self._make_open_callback(descriptor),
+                command=self._make_open_callback(prob_id),
             )
             btn.pack(fill=tk.X, padx=pad, pady=pad // 2)
             ToolTip(btn, descriptor.description)
@@ -84,11 +84,11 @@ class ComplexProblemsDialog:
         setup_arrow_enter_navigation([[btn_close]])
         btn_close.focus_set()
 
-    def _make_open_callback(self, descriptor):
+    def _make_open_callback(self, problem_id: str):
         """Create a callback that opens the problem dialog and closes this one."""
 
         def _on_click() -> None:
             self.win.destroy()
-            descriptor.open_dialog(self.parent)
+            open_problem_dialog(problem_id, self.parent)
 
         return _on_click
