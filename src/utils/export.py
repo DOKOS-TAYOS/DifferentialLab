@@ -177,32 +177,3 @@ def export_json_to_path(
         The path that was written.
     """
     return _export_json(statistics, metadata, filepath)
-
-
-def export_all_results(
-    x: np.ndarray,
-    y: np.ndarray,
-    statistics: dict[str, Any],
-    metadata: dict[str, Any],
-    csv_path: Path,
-    json_path: Path,
-    *,
-    y_grid: np.ndarray | None = None,
-) -> tuple[Path, Path]:
-    """Export both CSV data and JSON statistics.
-
-    Args:
-        x: Independent variable values (1D) or x grid for 2D.
-        y: Solution values. For 2D PDE: shape (ny, nx).
-        statistics: Computed statistics dict.
-        metadata: Equation/solver metadata dict.
-        csv_path: CSV destination.
-        json_path: JSON destination.
-        y_grid: For 2D PDE, the y grid. If provided with 2D y, uses 2D CSV.
-
-    Returns:
-        Tuple of ``(csv_path, json_path)`` that were written.
-    """
-    export_csv_to_path(x, y, csv_path, y_grid=y_grid)
-    export_json_to_path(statistics, metadata, json_path)
-    return csv_path, json_path

@@ -8,7 +8,7 @@ from solver.equation_parser import (
     parse_pde_rhs_expression,
 )
 from solver.error_metrics import compute_ode_residual_error
-from solver.notation import FNotation, generate_derivative_labels, rewrite_f_expression
+from solver.notation import FNotation, generate_derivative_labels
 from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
 from solver.pde_solver import solve_pde_2d
 from solver.predefined import is_multivariate, load_predefined_equations
@@ -24,7 +24,6 @@ __all__ = [
     "compute_ode_residual_error",
     "FNotation",
     "generate_derivative_labels",
-    "rewrite_f_expression",
     "ODESolution",
     "solve_multipoint",
     "solve_ode",

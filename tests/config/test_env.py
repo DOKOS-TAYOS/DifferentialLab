@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from config.env import (
-    _ENV_SCHEMA_BY_KEY,
     ENV_SCHEMA,
+    SCHEMA_BY_KEY,
     _validate_env_value,
     get_current_env_values,
     get_env,
@@ -45,13 +45,13 @@ class TestValidateEnvValue:
         assert value == 100
 
     def test_log_level_invalid_option(self) -> None:
-        schema = _ENV_SCHEMA_BY_KEY["LOG_LEVEL"]
+        schema = SCHEMA_BY_KEY["LOG_LEVEL"]
         valid, value = _validate_env_value("LOG_LEVEL", "INVALID", schema)
         assert valid is False
         assert value == schema["default"]
 
     def test_log_level_valid_uppercase(self) -> None:
-        schema = _ENV_SCHEMA_BY_KEY["LOG_LEVEL"]
+        schema = SCHEMA_BY_KEY["LOG_LEVEL"]
         valid, value = _validate_env_value("LOG_LEVEL", "info", schema)
         assert valid is True
         assert value == "INFO"

@@ -11,7 +11,6 @@ from utils.export import (
     _export_csv,
     _export_json,
     _make_serializable,
-    export_all_results,
 )
 
 
@@ -73,23 +72,3 @@ class TestExportJson:
         assert "metadata" in data and "statistics" in data
         assert data["metadata"]["equation_name"] == "Test"
         assert data["statistics"]["mean"] == 1.0
-
-
-class TestExportAllResults:
-    def test_returns_both_paths(self, tmp_path: Path) -> None:
-        csv_path = tmp_path / "sol.csv"
-        json_path = tmp_path / "sol.json"
-        x = np.linspace(0, 1, 10)
-        y = np.sin(x).reshape(1, -1)
-        csv_out, json_out = export_all_results(
-            x,
-            y,
-            statistics={"mean": 0.0},
-            metadata={"name": "Test"},
-            csv_path=csv_path,
-            json_path=json_path,
-        )
-        assert csv_out == csv_path
-        assert json_out == json_path
-        assert csv_path.exists()
-        assert json_path.exists()

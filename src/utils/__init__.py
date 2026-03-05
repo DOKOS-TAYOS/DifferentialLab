@@ -11,7 +11,6 @@ from utils.export import (
     export_json_to_path,
 )
 from utils.expression_parser_shared import (
-    SAFE_MATH,
     build_eval_namespace,
     normalize_params,
     normalize_unicode_escapes,
@@ -39,7 +38,6 @@ __all__ = [
     "normalize_params",
     "normalize_unicode_escapes",
     "safe_eval",
-    "SAFE_MATH",
     "validate_exclusive_args",
     "validate_expression_ast",
     "is_update_available",
