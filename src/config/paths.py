@@ -53,18 +53,6 @@ def get_csv_path(basename: str) -> Path:
     return get_output_dir() / f"{basename}.csv"
 
 
-def get_json_path(basename: str) -> Path:
-    """Return the full path for a JSON file.
-
-    Args:
-        basename: Base filename (without extension).
-
-    Returns:
-        Full path with ``.json`` extension.
-    """
-    return get_output_dir() / f"{basename}.json"
-
-
 def get_env_path() -> Path:
     """Return the path to the ``.env`` file.
 

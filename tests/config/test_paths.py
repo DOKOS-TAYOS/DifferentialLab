@@ -9,7 +9,6 @@ from config.paths import (
     generate_output_basename,
     get_csv_path,
     get_env_path,
-    get_json_path,
     get_output_dir,
 )
 
@@ -28,13 +27,6 @@ def test_get_csv_path(mock_output_dir: object, tmp_path: Path) -> None:
     mock_output_dir.return_value = tmp_path
     path = get_csv_path("solution_20260220_120000")
     assert path == tmp_path / "solution_20260220_120000.csv"
-
-
-@patch("config.paths.get_output_dir")
-def test_get_json_path(mock_output_dir: object, tmp_path: Path) -> None:
-    mock_output_dir.return_value = tmp_path
-    path = get_json_path("solution_20260220_120000")
-    assert path == tmp_path / "solution_20260220_120000.json"
 
 
 def test_get_output_dir_creates_dir(tmp_path: Path) -> None:
