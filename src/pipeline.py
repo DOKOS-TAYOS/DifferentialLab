@@ -34,7 +34,19 @@ logger = get_logger(__name__)
 
 @dataclass
 class _DispatchResult:
-    """Intermediate result from a solver dispatch function."""
+    """Intermediate result from a solver dispatch function.
+
+    Attributes:
+        x: Independent variable or grid values.
+        y: Solution array.
+        success: Whether the solver converged.
+        message: Solver status message.
+        n_eval: Number of function evaluations.
+        error_metrics: Residual error metrics (ODE only).
+        solver_quality: Solver parameters and metadata.
+        y_grid: For 2D PDE, the y-axis grid. None otherwise.
+        ode_func: ODE function used (for residual computation). None for PDE/difference.
+    """
 
     x: np.ndarray
     y: np.ndarray
@@ -48,7 +60,14 @@ class _DispatchResult:
 
 
 def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
-    """Build solver quality metadata from an ODE solution."""
+    """Build solver quality metadata from an ODE solution.
+
+    Args:
+        solution: ODE solution from :func:`solve_ode` or :func:`solve_multipoint`.
+
+    Returns:
+        Dict with rtol, atol, and optionally n_jacobian_evals.
+    """
     quality: dict[str, Any] = {
         "rtol": get_env_from_schema("SOLVER_RTOL"),
         "atol": get_env_from_schema("SOLVER_ATOL"),
@@ -71,11 +90,22 @@ def _build_bc_array(
 ) -> np.ndarray:
     """Build a (ny, nx) boundary values array from function expressions.
 
-    ``bc_expressions`` order: [bottom(y=y_min), top(y=y_max),
-    left(x=x_min), right(x=x_max)].
+    Order of ``bc_expressions``: [bottom(y=y_min), top(y=y_max),
+    left(x=x_min), right(x=x_max)]. Horizontal boundaries (bottom/top)
+    are written first. Vertical boundaries (left/right) overwrite corner
+    values where they overlap.
 
-    Horizontal boundaries (bottom/top) are written first. Vertical
-    boundaries (left/right) overwrite corner values where they overlap.
+    Args:
+        bc_expressions: List of 4 expressions for boundary values.
+        variables: Independent variable names (e.g. ``["x", "y"]``).
+        parameters: Named parameter values for expression evaluation.
+        x_grid: 1D array of x values.
+        y_grid: 1D array of y values.
+        nx: Number of x grid points.
+        ny: Number of y grid points.
+
+    Returns:
+        Boundary values array of shape (ny, nx).
     """
     bc = np.zeros((ny, nx))
 
@@ -112,7 +142,18 @@ def _build_mask(
     y_grid: np.ndarray,
     parameters: dict[str, float],
 ) -> np.ndarray | None:
-    """Evaluate a mask expression on the grid, or return None for rectangular."""
+    """Evaluate a mask expression on the grid, or return None for rectangular.
+
+    Args:
+        mask_expression: Python expression using x, y (or X, Y for meshgrid).
+        x_grid: 1D array of x values.
+        y_grid: 1D array of y values.
+        parameters: Named parameters for expression evaluation.
+
+    Returns:
+        Boolean array (ny, nx) where True = inside domain, or None if
+        no mask (rectangular domain).
+    """
     if not mask_expression or not mask_expression.strip():
         return None
     X, Y = np.meshgrid(x_grid, y_grid)
@@ -132,8 +173,19 @@ def _build_bc_type_array(
 ) -> np.ndarray | None:
     """Build a (ny, nx) BC type array from per-edge types or contour type.
 
-    bc_types order: [bottom, top, left, right] — each "dirichlet" or "neumann".
-    For custom contour domains, contour_bc_type is used for all boundary points.
+    Order of bc_types: [bottom, top, left, right] — each "dirichlet" or
+    "neumann". For custom contour domains, contour_bc_type is used for
+    all boundary points.
+
+    Args:
+        bc_types: Per-edge BC types [bottom, top, left, right].
+        nx: Number of x grid points.
+        ny: Number of y grid points.
+        mask: Boolean mask (ny, nx). None for rectangular.
+        contour_bc_type: BC type for custom contour (all boundary).
+
+    Returns:
+        String array (ny, nx) with "dirichlet" or "neumann", or None.
     """
     if bc_types is None and contour_bc_type is None:
         return None
@@ -170,6 +222,22 @@ def _build_neumann_array(
     """Build a (ny, nx) Neumann derivative values array.
 
     Only fills values where bc_type is "neumann". Returns None if no Neumann.
+
+    Args:
+        bc_types: Per-edge BC types.
+        bc_expressions: Boundary value expressions.
+        variables: Independent variable names.
+        parameters: Parameter dict for expression evaluation.
+        x_grid: 1D x grid.
+        y_grid: 1D y grid.
+        nx: Number of x points.
+        ny: Number of y points.
+        mask: Domain mask (ny, nx) or None.
+        contour_bc_type: BC type for custom contour.
+        contour_bc_expression: Expression for contour Neumann values.
+
+    Returns:
+        Neumann values array (ny, nx) or None if no Neumann BCs.
     """
     has_neumann = False
     if bc_types and any(t == BC_NEUMANN for t in bc_types):
@@ -231,7 +299,11 @@ def _dispatch_2d_pde(
     contour_bc_expression: str | None = None,
     contour_bc_type: str | None = None,
 ) -> _DispatchResult:
-    """Dispatch a 2D PDE solve."""
+    """Dispatch a 2D PDE solve.
+
+    Returns:
+        :class:`_DispatchResult` with grid, solution, and metadata.
+    """
     ny = n_points_y if n_points_y is not None else n_points
     rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
 
@@ -349,7 +421,11 @@ def _dispatch_difference(
     x_max: float,
     y0: list[float],
 ) -> _DispatchResult:
-    """Dispatch a difference equation solve."""
+    """Dispatch a difference equation solve.
+
+    Returns:
+        :class:`_DispatchResult` with n, y, and metadata.
+    """
     recur_func = get_difference_function(
         expression=expression,
         function_name=function_name,
@@ -384,7 +460,11 @@ def _dispatch_vector_ode(
     n_points: int,
     method: str,
 ) -> _DispatchResult:
-    """Dispatch a vector ODE solve."""
+    """Dispatch a vector ODE solve.
+
+    Returns:
+        :class:`_DispatchResult` with solution and error metrics.
+    """
     vec_exprs = vector_expressions if vector_expressions else None
     ode_func = get_vector_ode_function(
         vector_expressions=vec_exprs,
@@ -420,7 +500,11 @@ def _dispatch_scalar_ode(
     method: str,
     x0_list: list[float] | None,
 ) -> _DispatchResult:
-    """Dispatch a scalar ODE solve (IVP or multipoint BVP)."""
+    """Dispatch a scalar ODE solve (IVP or multipoint BVP).
+
+    Returns:
+        :class:`_DispatchResult` with solution and error metrics.
+    """
     ode_func = get_ode_function(
         expression=expression,
         function_name=function_name,

@@ -95,7 +95,15 @@ def compute_statistics(
 
 
 def _compute_mean(x: np.ndarray, y: np.ndarray) -> float:
-    """Weighted mean over the domain using trapezoidal integration."""
+    """Weighted mean over the domain using trapezoidal integration.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Weighted mean value.
+    """
     span = x[-1] - x[0]
     if span == 0:
         return float(np.mean(y))
@@ -103,7 +111,15 @@ def _compute_mean(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _compute_rms(x: np.ndarray, y: np.ndarray) -> float:
-    """Root mean square over the domain."""
+    """Root mean square over the domain.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        RMS value.
+    """
     span = x[-1] - x[0]
     if span == 0:
         return float(np.sqrt(np.mean(y**2)))
@@ -111,7 +127,14 @@ def _compute_rms(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _count_zero_crossings(y: np.ndarray) -> int:
-    """Count the number of sign changes in *y*."""
+    """Count the number of sign changes in *y*.
+
+    Args:
+        y: 1D array of values.
+
+    Returns:
+        Number of zero crossings.
+    """
     signs = np.sign(y)
     crossings = np.where(np.diff(signs) != 0)[0]
     return len(crossings)
@@ -119,6 +142,10 @@ def _count_zero_crossings(y: np.ndarray) -> int:
 
 def _estimate_period(x: np.ndarray, y: np.ndarray) -> float | None:
     """Estimate the period of an oscillatory signal via peak detection.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
 
     Returns:
         Estimated period, or ``None`` if fewer than 2 peaks found.
@@ -134,12 +161,27 @@ def _estimate_period(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _estimate_amplitude(y: np.ndarray) -> float:
-    """Estimate amplitude as half the peak-to-peak range."""
+    """Estimate amplitude as half the peak-to-peak range.
+
+    Args:
+        y: 1D array of values.
+
+    Returns:
+        Estimated amplitude.
+    """
     return float((np.max(y) - np.min(y)) / 2.0)
 
 
 def _compute_l2_norm(x: np.ndarray, y: np.ndarray) -> float:
-    """L2 norm over the domain: sqrt(∫f² dx). Common in functional analysis."""
+    """L2 norm over the domain: sqrt(∫f² dx). Common in functional analysis.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        L2 norm value.
+    """
     span = x[-1] - x[0]
     if span == 0:
         return float(np.sqrt(np.mean(y**2)) * len(y))
@@ -147,7 +189,15 @@ def _compute_l2_norm(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _estimate_dominant_frequency(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Dominant frequency via FFT (cycles per unit of x). Returns None if invalid."""
+    """Dominant frequency via FFT (cycles per unit of x).
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Dominant frequency in cycles per unit, or None if invalid.
+    """
     n = len(y)
     if n < 4:
         return None
@@ -165,7 +215,15 @@ def _estimate_dominant_frequency(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _estimate_exponential_rate(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Fit y = A*exp(λ*x). Returns λ when fit is good (monotonic, all same sign)."""
+    """Fit y = A*exp(λ*x). Returns λ when fit is good (monotonic, all same sign).
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Exponential rate λ, or None if fit fails.
+    """
     if len(y) < 3 or len(x) < 3:
         return None
     if np.any(y <= 0):
@@ -185,7 +243,15 @@ def _estimate_exponential_rate(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _compute_half_life(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Half-life for exponential decay: t_1/2 = ln(2)/|λ|. Returns None if not decay."""
+    """Half-life for exponential decay: t_1/2 = ln(2)/|λ|.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Half-life, or None if not exponential decay.
+    """
     lam = _estimate_exponential_rate(x, y)
     if lam is None or lam >= 0:
         return None
@@ -193,7 +259,15 @@ def _compute_half_life(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _compute_time_constant(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Time constant τ = 1/|λ| for exponential decay (e.g. RC circuit)."""
+    """Time constant τ = 1/|λ| for exponential decay (e.g. RC circuit).
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Time constant, or None if not exponential decay.
+    """
     lam = _estimate_exponential_rate(x, y)
     if lam is None or lam >= 0:
         return None
@@ -201,7 +275,15 @@ def _compute_time_constant(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _compute_doubling_time(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Doubling time t_2 = ln(2)/λ for exponential growth."""
+    """Doubling time t_2 = ln(2)/λ for exponential growth.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Doubling time, or None if not exponential growth.
+    """
     lam = _estimate_exponential_rate(x, y)
     if lam is None or lam <= 0:
         return None
@@ -209,7 +291,15 @@ def _compute_doubling_time(x: np.ndarray, y: np.ndarray) -> float | None:
 
 
 def _compute_angular_frequency(x: np.ndarray, y: np.ndarray) -> float | None:
-    """Angular frequency ω = 2πf (rad per unit of x) from dominant frequency."""
+    """Angular frequency ω = 2πf (rad per unit of x) from dominant frequency.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        Angular frequency in rad per unit, or None.
+    """
     freq = _estimate_dominant_frequency(x, y)
     if freq is None:
         return None
@@ -303,7 +393,16 @@ def _compute_gradient_norm_2d(
     y_grid: np.ndarray,
     u: np.ndarray,
 ) -> float:
-    """Mean magnitude of gradient |∇u| over the 2D domain."""
+    """Mean magnitude of gradient |∇u| over the 2D domain.
+
+    Args:
+        x_grid: 1D array of x values.
+        y_grid: 1D array of y values.
+        u: 2D solution array (ny, nx).
+
+    Returns:
+        Mean gradient magnitude.
+    """
     uy, ux = np.gradient(u, y_grid, x_grid)
     grad_mag = np.sqrt(ux**2 + uy**2)
     return float(np.mean(grad_mag))

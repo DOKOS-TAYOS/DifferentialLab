@@ -26,7 +26,11 @@ _PYPROJECT_VERSION_RE = re.compile(r'version\s*=\s*["\']([^"\']+)["\']')
 
 
 def _get_last_check_path() -> Path:
-    """Return path to the file storing last update check timestamp."""
+    """Return path to the file storing last update check timestamp.
+
+    Returns:
+        Path to ``.last_update_check`` in project root.
+    """
     root = get_project_root()
     return root / _LAST_CHECK_FILE
 
@@ -58,7 +62,11 @@ def should_run_check() -> bool:
 
 
 def record_check_done() -> None:
-    """Record that an update check was performed (touch the file)."""
+    """Record that an update check was performed (touch the file).
+
+    Updates the modification time of ``.last_update_check`` so the next
+    check is deferred by UPDATE_CHECK_INTERVAL_DAYS.
+    """
     path = _get_last_check_path()
     try:
         path.touch()

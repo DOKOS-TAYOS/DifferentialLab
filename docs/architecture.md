@@ -32,6 +32,14 @@ src/
 ├── transforms/              # Function transforms
 │   ├── function_parser.py   # Safe parsing of scalar f(x) expressions
 │   └── transform_engine.py  # Fourier, Laplace, Taylor, Hilbert, Z-transform
+├── complex_problems/        # Special problems with custom UIs (experimental, in development)
+│   ├── complex_problems_dialog.py  # Problem selection dialog
+│   ├── problem_registry.py  # Registry of available problems
+│   └── coupled_oscillators/ # Coupled harmonic oscillators
+│       ├── model.py         # Physical model
+│       ├── solver.py        # Numerical solver
+│       ├── ui.py            # Problem-specific dialog
+│       └── result_dialog.py # Result visualization
 ├── frontend/                # Tkinter/ttk GUI
 │   ├── theme.py             # Dark theme, colour helpers
 │   ├── window_utils.py      # Window centering, modal helpers
@@ -44,6 +52,7 @@ src/
 │       ├── config_dialog.py
 │       ├── help_dialog.py
 │       ├── transform_dialog.py
+│       ├── loading_dialog.py
 │       ├── collapsible_section.py
 │       ├── scrollable_frame.py
 │       ├── keyboard_nav.py
@@ -113,6 +122,18 @@ and coefficients view (a_i vs i). Laplace transform bounds (`laplace_s_min`,
 `laplace_s_max`) are passed as function parameters to `apply_transform` and
 `get_transform_coefficients` (defaults 0.1 and 10.0).
 
+### `complex_problems` *(experimental)*
+
+Special problems with custom UIs, parameters, and visualizations. **Still in
+development**; may contain bugs.  The
+`problem_registry` holds `ProblemDescriptor` entries; each problem provides
+an `open_dialog(parent)` callable.  `complex_problems_dialog` lists available
+problems and launches the selected one.  The `coupled_oscillators` submodule
+implements a one-dimensional chain of N harmonic oscillators: `model.py`
+defines the physics, `solver.py` computes the solution, `ui.py` provides the
+parameter dialog, and `result_dialog.py` shows mode shapes and time evolution.
+`loading_dialog` in `frontend.ui_dialogs` displays progress during long solves.
+
 ### `frontend`
 
 The Tkinter/ttk user interface.  `theme.py` builds a dark theme from env
@@ -121,13 +142,13 @@ colours.  `window_utils.py` provides window sizing and centering (`center_window
 `bind_wraplength()` helper for dynamic text wrapping across dialogs.
 `plot_embed.py` embeds matplotlib figures in Tkinter with a refactored
 `_bind_resize_handler()` for consistent canvas resize handling.
-`ui_main_menu.py` is the main window with Solve, Configuration,
-Information, Transforms, and Quit.  Each dialog in `ui_dialogs/` handles
-one step of the workflow (equation selection, parameter input, result
-display, configuration, help, transforms).  Shared widgets
-(`ScrollableFrame`, `CollapsibleSection`, `ToolTip`, `keyboard_nav`) live
-alongside the dialogs. The `result_dialog.py` uses a shared `_save_export_file()`
-handler for CSV and JSON export buttons.
+`ui_main_menu.py` is the main window with six buttons: Solve, Function
+Transform, Complex Problems, Information, Configuration, and Quit.  Each
+dialog in `ui_dialogs/` handles one step of the workflow (equation selection,
+parameter input, result display, configuration, help, transforms, loading).
+Shared widgets (`ScrollableFrame`, `CollapsibleSection`, `ToolTip`,
+`keyboard_nav`) live alongside the dialogs. The `result_dialog.py` uses a
+shared `_save_export_file()` handler for CSV and JSON export buttons.
 
 ### `utils`
 
@@ -153,6 +174,8 @@ from `variables` and routes to ODE or PDE solver accordingly.
 
 ## Data Flow
 
+**Solve workflow (ODEs, difference equations, PDEs):**
+
 ```
 User input (GUI)
        │
@@ -176,6 +199,21 @@ User input (GUI)
                                       ▼
                               ResultDialog (GUI)
                               creates plots interactively
+```
+
+**Complex Problems workflow:**
+
+```
+User input (GUI)
+       │
+       ▼
+  ComplexProblemsDialog ──► Problem-specific UI (e.g. CoupledOscillatorsDialog)
+                                      │
+                                      ▼
+                              Problem-specific solver
+                                      │
+                                      ▼
+                              Problem-specific result dialog
 ```
 
 ## Import Strategy

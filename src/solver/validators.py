@@ -18,6 +18,12 @@ _SUBSCRIPTS = "₀₁₂₃₄₅₆₇₈₉"
 def _ordinal(n: int) -> str:
     """Convert an integer to its ordinal string representation.
 
+    Args:
+        n: Integer to convert.
+
+    Returns:
+        Ordinal string (e.g. "1st", "2nd", "3rd", "4th").
+
     Examples:
         1 -> "1st", 2 -> "2nd", 3 -> "3rd", 4 -> "4th", etc.
     """
@@ -30,7 +36,14 @@ def _ordinal(n: int) -> str:
 
 
 def _is_finite(value: float) -> bool:
-    """Return ``True`` if *value* is a finite number (not NaN, not ±inf)."""
+    """Return ``True`` if *value* is a finite number (not NaN, not ±inf).
+
+    Args:
+        value: Value to check.
+
+    Returns:
+        True if finite, False otherwise.
+    """
     try:
         return math.isfinite(float(value))
     except (TypeError, ValueError):

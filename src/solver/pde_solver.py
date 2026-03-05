@@ -114,8 +114,14 @@ def _probe_coefficients(
         R = a*fxx + b*fxy + c*fyy + d*fx + e*fy + g*f + rhs_const
     We extract a,b,c,d,e,g by probing with unit perturbations.
 
+    Args:
+        residual_func: Callable returning residual at (x,y) with derivatives.
+        xi: x-coordinate of the grid point.
+        yj: y-coordinate of the grid point.
+        params: Parameter dict passed to residual_func.
+
     Returns:
-        (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, rhs_const)
+        Tuple of (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, rhs_const).
     """
     # R(all zeros) gives the constant part (negated RHS)
     r0 = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params)
@@ -132,7 +138,15 @@ def _probe_coefficients(
 
 
 def _default_rectangular_mask(nx: int, ny: int) -> np.ndarray:
-    """Create a mask where every point is inside the domain."""
+    """Create a mask where every point is inside the domain.
+
+    Args:
+        nx: Number of x grid points.
+        ny: Number of y grid points.
+
+    Returns:
+        Boolean array (ny, nx) with all True.
+    """
     return np.ones((ny, nx), dtype=bool)
 
 
@@ -364,6 +378,19 @@ def _estimate_neumann_boundary_value(
 
     Uses the nearest interior neighbor's value plus h * g_N where g_N is the
     prescribed normal derivative.
+
+    Args:
+        bi: x-index of the boundary point.
+        bj: y-index of the boundary point.
+        u: Solution array (ny, nx).
+        index_map: Mapping from (i,j) to flat index for interior points.
+        interior_mask: Boolean array marking interior points.
+        hx: Grid spacing in x direction.
+        hy: Grid spacing in y direction.
+        neumann_val: Prescribed normal derivative value.
+
+    Returns:
+        Estimated solution value at the Neumann boundary point.
     """
     ny, nx = u.shape
     for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):

@@ -172,12 +172,28 @@ def free_fall_drag(
 
 
 def _default_hamiltonian(x: float, a: float) -> float:
-    """Default time-dependent Hamiltonian: H(x) = a * (1 + 0.1*sin(x))."""
+    """Default time-dependent Hamiltonian: H(x) = a * (1 + 0.1*sin(x)).
+
+    Args:
+        x: Time variable.
+        a: Hamiltonian scale parameter.
+
+    Returns:
+        Hamiltonian value at time x.
+    """
     return a * (1.0 + 0.1 * np.sin(x))
 
 
 def _default_potential(x: float, b: float) -> float:
-    """Default time-dependent potential: V(x) = b * x² * exp(-0.1*x²)."""
+    """Default time-dependent potential: V(x) = b * x² * exp(-0.1*x²).
+
+    Args:
+        x: Position variable.
+        b: Potential scale parameter.
+
+    Returns:
+        Potential value at position x.
+    """
     return b * x**2 * np.exp(-0.1 * x**2)
 
 
@@ -524,7 +540,18 @@ def stationary_schrodinger_well(
 ) -> np.ndarray:
     """y'' + (E - V(x))y = 0 — 1D Schrödinger, finite square well.
 
-    V(x) = V0 for |x| > a, 0 otherwise. Units ℏ²/(2m)=1.
+    V(x) = V0 for ``|x| > a``, 0 otherwise. Units ℏ²/(2m)=1.
+
+    Args:
+        x: Position.
+        y: State vector ``[ψ, ψ']`` (wave function).
+        E: Energy eigenvalue.
+        V0: Well depth.
+        a: Half-width of the well.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
     """
     v_x = V0 if abs(x) > a else 0.0
     dydt = np.empty(2)
@@ -541,7 +568,8 @@ def kummer_ode(
     Args:
         x: Independent variable.
         y: State vector ``[y, y']``.
-        a, b: Kummer parameters.
+        a: Kummer parameter a.
+        b: Kummer parameter b.
         **kwargs: Ignored.
 
     Returns:
@@ -565,6 +593,17 @@ def rabi_oscillations(
     """Rabi oscillations: two-level system. y = [Re(c_g), Im(c_g), Re(c_e), Im(c_e)].
 
     dc_g/dt = -i(Ω/2)cos(ωt)c_e, dc_e/dt = -i(Ω/2)cos(ωt)c_g - iΔ·c_e.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[Re(c_g), Im(c_g), Re(c_e), Im(c_e)]``.
+        Omega: Rabi frequency.
+        delta: Detuning.
+        omega_drive: Drive frequency.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
     """
     drive = (Omega / 2) * np.cos(omega_drive * x)
     dydt = np.empty(4)
@@ -944,7 +983,13 @@ def hindmarsh_rose(
     Args:
         x: Independent variable (time).
         y: State vector ``[x, y, z]`` (membrane, recovery, slow).
-        a, b, c, d, r, s, x1: Model parameters.
+        a: Model parameter.
+        b: Model parameter.
+        c: Model parameter.
+        d: Model parameter.
+        r: Model parameter.
+        s: Model parameter.
+        x1: Model parameter.
         I_ext: External current.
         **kwargs: Ignored.
 
@@ -1060,6 +1105,23 @@ def competitive_lotka_volterra_3(
     """Competitive Lotka-Volterra: 3 species competition.
 
     dN_i/dt = r_i·N_i·(1 - N_i - Σ a_ij·N_j). f₀=N₁, f₁=N₂, f₂=N₃.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[N₁, N₂, N₃]`` (species populations).
+        r1: Growth rate of species 1.
+        r2: Growth rate of species 2.
+        r3: Growth rate of species 3.
+        a12: Competition coefficient of 2 on 1.
+        a13: Competition coefficient of 3 on 1.
+        a21: Competition coefficient of 1 on 2.
+        a23: Competition coefficient of 3 on 2.
+        a31: Competition coefficient of 1 on 3.
+        a32: Competition coefficient of 2 on 3.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
     """
     n1, n2, n3 = y[0], y[1], y[2]
     dydt = np.empty(3)
@@ -1082,7 +1144,9 @@ def lu_chen(
     Args:
         x: Independent variable.
         y: State vector ``[x, y, z]``.
-        a, b, c: Parameters.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
         **kwargs: Ignored.
 
     Returns:
@@ -1111,7 +1175,12 @@ def aizawa_attractor(
     Args:
         x: Independent variable.
         y: State vector ``[x, y, z]``.
-        a, b, c, d, e, f_param: Parameters.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        d: Parameter d.
+        e: Parameter e.
+        f_param: Parameter f.
         **kwargs: Ignored.
 
     Returns:
@@ -1129,35 +1198,83 @@ def aizawa_attractor(
 
 
 def cubic_decay(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y' = -k·y³ — Cubic decay (nonlinear)."""
+    """y' = -k·y³ — Cubic decay (nonlinear).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Decay rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = -k * y[0] ** 3
     return dydt
 
 
 def sqrt_growth(x: float, y: np.ndarray, k: float = 0.5, **kwargs: Any) -> np.ndarray:
-    """y' = k·√y — Square-root growth (e.g. droplet)."""
+    """y' = k·√y — Square-root growth (e.g. droplet).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Growth rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = k * np.sqrt(np.maximum(y[0], 0))
     return dydt
 
 
 def bistable(x: float, y: np.ndarray, a: float = 0.5, **kwargs: Any) -> np.ndarray:
-    """y' = y(1-y)(y-a) — Bistable (cubic with 3 equilibria)."""
+    """y' = y(1-y)(y-a) — Bistable (cubic with 3 equilibria).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        a: Bistability parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = y[0] * (1 - y[0]) * (y[0] - a)
     return dydt
 
 
 def landau(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """y' = y - y³ — Landau potential (pitchfork)."""
+    """y' = y - y³ — Landau potential (pitchfork).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = y[0] - y[0] ** 3
     return dydt
 
 
 def cubic_oscillator(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """y'' = -y³ — Pure cubic oscillator."""
+    """y'' = -y³ — Pure cubic oscillator.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(y[0] ** 3)
@@ -1167,7 +1284,18 @@ def cubic_oscillator(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
 def bernoulli_decay(
     x: float, y: np.ndarray, k: float = 1.0, n: float = 2.0, **kwargs: Any
 ) -> np.ndarray:
-    """y' = -k·y^n — Bernoulli-type decay."""
+    """y' = -k·y^n — Bernoulli-type decay.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Decay rate.
+        n: Exponent.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = -k * (y[0] ** n)
     return dydt
@@ -1181,7 +1309,19 @@ def holling_type2(
     c: float = 1.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """y' = r·y·(K-y)/(K+c·y) — Holling type II growth."""
+    """y' = r·y·(K-y)/(K+c·y) — Holling type II growth.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        r: Growth rate.
+        K: Carrying capacity.
+        c: Holling parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = r * y[0] * (K - y[0]) / (K + c * y[0])
     return dydt
@@ -1190,7 +1330,18 @@ def holling_type2(
 def soft_spring(
     x: float, y: np.ndarray, omega: float = 1.0, eps: float = 0.1, **kwargs: Any
 ) -> np.ndarray:
-    """y'' = -ω²y - εy³ — Soft spring (Duffing)."""
+    """y'' = -ω²y - εy³ — Soft spring (Duffing).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        omega: Natural frequency.
+        eps: Nonlinearity parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(omega**2) * y[0] - eps * y[0] ** 3
@@ -1200,21 +1351,50 @@ def soft_spring(
 def quadratic_decay(
     x: float, y: np.ndarray, a: float = 1.0, b: float = 0.5, **kwargs: Any
 ) -> np.ndarray:
-    """y' = a - b·y² — Quadratic decay with source."""
+    """y' = a - b·y² — Quadratic decay with source.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        a: Source rate.
+        b: Decay coefficient.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = a - b * y[0] ** 2
     return dydt
 
 
 def cubic_landau(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """y' = y(1-y²) — Cubic (symmetric bistable)."""
+    """y' = y(1-y²) — Cubic (symmetric bistable).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = y[0] * (1 - y[0] ** 2)
     return dydt
 
 
 def smooth_decay(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """y' = -y/(1+y²) — Smooth decay."""
+    """y' = -y/(1+y²) — Smooth decay.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = -y[0] / (1 + y[0] ** 2)
     return dydt
@@ -1228,7 +1408,19 @@ def gompertz_harvesting(
     d: float = 0.1,
     **kwargs: Any,
 ) -> np.ndarray:
-    """y' = r·y·ln(K/y) - d·y — Gompertz with harvesting."""
+    """y' = r·y·ln(K/y) - d·y — Gompertz with harvesting.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        r: Growth rate.
+        K: Carrying capacity.
+        d: Harvesting rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = r * y[0] * np.log(K / np.maximum(y[0], 1e-10)) - d * y[0]
     return dydt
@@ -1237,7 +1429,19 @@ def gompertz_harvesting(
 def damped_pendulum(
     x: float, y: np.ndarray, g: float = 9.81, L: float = 1.0, gamma: float = 0.5, **kwargs: Any
 ) -> np.ndarray:
-    """y'' + (g/L)sin(y) + γ·y' = 0 — Damped pendulum."""
+    """y'' + (g/L)sin(y) + γ·y' = 0 — Damped pendulum.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[θ, θ']``.
+        g: Gravitational acceleration.
+        L: Pendulum length.
+        gamma: Damping coefficient.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(g / L) * np.sin(y[0]) - gamma * y[1]
@@ -1245,7 +1449,17 @@ def damped_pendulum(
 
 
 def lienard(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y'' + μ(y²-1)y' + y = 0 — Liénard (Van der Pol-like)."""
+    """y'' + μ(y²-1)y' + y = 0 — Liénard (Van der Pol-like).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        mu: Nonlinearity parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -mu * (y[0] ** 2 - 1) * y[1] - y[0]
@@ -1255,7 +1469,18 @@ def lienard(x: float, y: np.ndarray, mu: float = 1.0, **kwargs: Any) -> np.ndarr
 def matthew_equation(
     x: float, y: np.ndarray, a: float = 1.0, q: float = 0.5, **kwargs: Any
 ) -> np.ndarray:
-    """y'' + (a - 2q·cos(2x))y = 0 — Mathieu equation."""
+    """y'' + (a - 2q·cos(2x))y = 0 — Mathieu equation.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y, y']``.
+        a: Mathieu parameter.
+        q: Mathieu parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = y[1]
     dydt[1] = -(a - 2 * q * np.cos(2 * x)) * y[0]
@@ -1271,7 +1496,16 @@ def legendre_ode(x: float, y: np.ndarray, n: float = 2.0, **kwargs: Any) -> np.n
 
 
 def blasius_type(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """y''' = -y·y''/2 — Blasius (simplified). y=[f,f',f'']."""
+    """y''' = -y·y''/2 — Blasius (simplified). y=[f,f',f''].
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[f, f', f'']``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1]
     dydt[1] = y[2]
@@ -1280,7 +1514,17 @@ def blasius_type(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
 
 
 def emden_fowler(x: float, y: np.ndarray, n: float = 5.0, **kwargs: Any) -> np.ndarray:
-    """y'' + (2/x)y' + y^n = 0 — Emden-Fowler (polytropic)."""
+    """y'' + (2/x)y' + y^n = 0 — Emden-Fowler (polytropic).
+
+    Args:
+        x: Independent variable (x > 0).
+        y: State vector ``[y, y']``.
+        n: Polytropic index.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     xx = max(x, 1e-8)
     dydt = np.empty(2)
     dydt[0] = y[1]
@@ -1289,7 +1533,17 @@ def emden_fowler(x: float, y: np.ndarray, n: float = 5.0, **kwargs: Any) -> np.n
 
 
 def fisher_kpp(x: float, y: np.ndarray, r: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y' = r·y(1-y) — Fisher-KPP (spatial would need diffusion)."""
+    """y' = r·y(1-y) — Fisher-KPP (spatial would need diffusion).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        r: Growth rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = r * y[0] * (1 - y[0])
     return dydt
@@ -1298,21 +1552,52 @@ def fisher_kpp(x: float, y: np.ndarray, r: float = 1.0, **kwargs: Any) -> np.nda
 def malthus_harvesting(
     x: float, y: np.ndarray, r: float = 0.5, h: float = 0.1, **kwargs: Any
 ) -> np.ndarray:
-    """y' = r·y - h — Malthus with constant harvesting."""
+    """y' = r·y - h — Malthus with constant harvesting.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        r: Growth rate.
+        h: Harvesting rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = r * y[0] - h
     return dydt
 
 
 def relu_activation(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y' = k·max(0, y) — ReLU-like activation (linear for y>0)."""
+    """y' = k·max(0, y) — ReLU-like activation (linear for y>0).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Slope for y > 0.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = k * np.maximum(0, y[0])
     return dydt
 
 
 def tanh_decay(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.ndarray:
-    """y' = -k·tanh(y) — Tanh decay (smooth)."""
+    """y' = -k·tanh(y) — Tanh decay (smooth).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[y]``.
+        k: Decay rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(1)
     dydt[0] = -k * np.tanh(y[0])
     return dydt
@@ -1322,7 +1607,17 @@ def tanh_decay(x: float, y: np.ndarray, k: float = 1.0, **kwargs: Any) -> np.nda
 
 
 def halvorsen_attractor(x: float, y: np.ndarray, a: float = 1.89, **kwargs: Any) -> np.ndarray:
-    """Halvorsen attractor: chaotic 3D."""
+    """Halvorsen attractor: chaotic 3D.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = -a * y[0] - 4 * y[1] - 4 * y[2] - y[1] ** 2
     dydt[1] = -a * y[1] - 4 * y[2] - 4 * y[0] - y[2] ** 2
@@ -1340,7 +1635,21 @@ def dadras_attractor(
     e: float = 9.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Dadras attractor: chaotic 3D."""
+    """Dadras attractor: chaotic 3D.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        d: Parameter d.
+        e: Parameter e.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1] - a * y[0] + b * y[1] * y[2]
     dydt[1] = c * y[1] - y[0] * y[2] + y[2]
@@ -1358,7 +1667,16 @@ def sprott_s(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
 
 
 def sprott_a(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """Sprott A system: chaotic 3D."""
+    """Sprott A system: chaotic 3D.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1]
     dydt[1] = -y[0] + y[1] * y[2]
@@ -1394,7 +1712,19 @@ def sirs_epidemic(
     xi: float = 0.1,
     **kwargs: Any,
 ) -> np.ndarray:
-    """SIRS: dS/dt=-βSI+ξR, dI/dt=βSI-γI, dR/dt=γI-ξR."""
+    """SIRS: dS/dt=-βSI+ξR, dI/dt=βSI-γI, dR/dt=γI-ξR.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[S, I, R]`` (susceptible, infected, recovered).
+        beta: Transmission rate.
+        gamma: Recovery rate.
+        xi: Waning immunity rate.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     s, i, r = y[0], y[1], y[2]
     dydt = np.empty(3)
     dydt[0] = -beta * s * i + xi * r
@@ -1429,7 +1759,19 @@ def oregonator(
     eps: float = 0.01,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Oregonator: Belousov-Zhabotinsky reaction."""
+    """Oregonator: Belousov-Zhabotinsky reaction.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[u, v, w]`` (concentrations).
+        q: Parameter q.
+        f: Parameter f.
+        eps: Parameter eps.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     u, v, w = y[0], y[1], y[2]
     dydt = np.empty(3)
     dydt[0] = (u - u * u - f * v * (u - q) / (u + q)) / eps
@@ -1479,7 +1821,20 @@ def wilson_cowan(
     I_i: float = 0.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Wilson-Cowan: excitatory-inhibitory neural populations."""
+    """Wilson-Cowan: excitatory-inhibitory neural populations.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[e, i]`` (excitatory, inhibitory).
+        tau_e: Excitatory time constant.
+        tau_i: Inhibitory time constant.
+        w_ee, w_ei, w_ie, w_ii: Connection weights.
+        I_e, I_i: External inputs.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     e, i = y[0], y[1]
     s_e = 1 / (1 + np.exp(-e))
     s_i = 1 / (1 + np.exp(-i))
@@ -1513,7 +1868,19 @@ def t_system(
     c: float = 1.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """T system: chaotic 3D."""
+    """T system: chaotic 3D.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = a * (y[1] - y[0])
     dydt[1] = (c - a) * y[0] - a * y[0] * y[2]
@@ -1545,7 +1912,19 @@ def arneodo(
     c: float = -1.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Arneodo system: chaotic."""
+    """Arneodo system: chaotic.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1]
     dydt[1] = y[2]
@@ -1560,7 +1939,18 @@ def bouali_attractor(
     s: float = 1.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Bouali attractor: chaotic."""
+    """Bouali attractor: chaotic.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        s: Parameter s.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[0] * (1 - y[1] ** 2) - a * y[2]
     dydt[1] = s * y[2]
@@ -1569,7 +1959,16 @@ def bouali_attractor(
 
 
 def nose_hoover(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
-    """Nose-Hoover: thermostat (Hamiltonian-like)."""
+    """Nose-Hoover: thermostat (Hamiltonian-like).
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[q, p, ζ]``.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1]
     dydt[1] = y[2] * y[0] - y[1]
@@ -1580,7 +1979,18 @@ def nose_hoover(x: float, y: np.ndarray, **kwargs: Any) -> np.ndarray:
 def dee_attractor(
     x: float, y: np.ndarray, a: float = 1.0, b: float = 0.1, **kwargs: Any
 ) -> np.ndarray:
-    """Dee attractor: chaotic."""
+    """Dee attractor: chaotic.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = y[1]
     dydt[1] = -y[0] - a * y[2]
@@ -1596,7 +2006,19 @@ def four_wing(
     c: float = 10.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Four-wing attractor."""
+    """Four-wing attractor.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = a * y[0] - y[1] * y[2]
     dydt[1] = -b * y[1] + y[0] * y[2]
@@ -1612,7 +2034,19 @@ def genesi_attractor(
     c: float = 1.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Genesiş attractor: chaotic."""
+    """Genesiş attractor: chaotic.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = -y[1]
     dydt[1] = y[0] + a * y[2]
@@ -1645,7 +2079,20 @@ def wang_sun_chaos(
     d: float = 5.0,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Wang-Sun chaotic system."""
+    """Wang-Sun chaotic system.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        d: Parameter d.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(3)
     dydt[0] = a * (y[1] - y[0])
     dydt[1] = y[0] * y[2] - y[1]
@@ -1663,7 +2110,21 @@ def predator_prey_ratio(
     m: float = 0.2,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Ratio-dependent predator-prey: f₀=prey, f₁=predator."""
+    """Ratio-dependent predator-prey: f₀=prey, f₁=predator.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[prey, predator]``.
+        r: Prey growth rate.
+        a: Predation rate.
+        b: Ratio parameter.
+        e: Conversion efficiency.
+        m: Predator mortality.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = r * y[0] * (1 - y[0]) - a * y[0] * y[1] / (y[0] + b * y[1])
     dydt[1] = e * a * y[0] * y[1] / (y[0] + b * y[1]) - m * y[1]
@@ -1697,7 +2158,21 @@ def holling_tanner(
     m: float = 0.2,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Holling-Tanner: predator-prey with prey-dependent growth."""
+    """Holling-Tanner: predator-prey with prey-dependent growth.
+
+    Args:
+        x: Independent variable (time).
+        y: State vector ``[prey, predator]``.
+        r: Prey growth rate.
+        a: Predation rate.
+        b: Half-saturation.
+        e: Conversion efficiency.
+        m: Predator mortality.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(2)
     dydt[0] = r * y[0] * (1 - y[0]) - a * y[0] * y[1] / (y[0] + b)
     dydt[1] = y[1] * (e * a * y[0] / (y[0] + b) - m)
@@ -1713,7 +2188,20 @@ def rossler_hyperchaos(
     d: float = 0.05,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Rössler hyperchaos: 4D."""
+    """Rössler hyperchaos: 4D.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z, w]``.
+        a: Parameter a.
+        b: Parameter b.
+        c: Parameter c.
+        d: Parameter d.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(4)
     dydt[0] = -y[1] - y[2]
     dydt[1] = y[0] + a * y[1] + y[3]
@@ -1731,7 +2219,20 @@ def hyperchaos_lorenz(
     r: float = 0.5,
     **kwargs: Any,
 ) -> np.ndarray:
-    """Lorenz 4D hyperchaos."""
+    """Lorenz 4D hyperchaos.
+
+    Args:
+        x: Independent variable.
+        y: State vector ``[x, y, z, w]``.
+        a: Parameter a (Prandtl-like).
+        b: Parameter b (Rayleigh-like).
+        c: Parameter c.
+        r: Fourth dimension coupling.
+        **kwargs: Ignored.
+
+    Returns:
+        dy/dx as 1-D numpy array.
+    """
     dydt = np.empty(4)
     dydt[0] = a * (y[1] - y[0]) + y[3]
     dydt[1] = y[0] * (b - y[2]) - y[1]

@@ -16,6 +16,7 @@ def _setup_root_logger() -> None:
     """Configure the root ``differential_lab`` logger once from env settings.
 
     Idempotent: subsequent calls have no effect after the first configuration.
+    Uses LOG_LEVEL, LOG_FILE, and LOG_CONSOLE from environment.
     """
     global _CONFIGURED
     if _CONFIGURED:

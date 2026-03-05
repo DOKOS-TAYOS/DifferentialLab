@@ -14,9 +14,11 @@ if str(_src_dir) not in sys.path:
 
 
 def _check_for_updates() -> None:
-    """Check for updates once a week. If a newer version is available and
-    CHECK_UPDATES is enabled, show a dialog asking if the user wants to update.
-    If yes, perform git pull (preserves input/, output/, .env).
+    """Check for updates once a week.
+
+    If a newer version is available and CHECK_UPDATES is enabled, show a
+    dialog asking if the user wants to update. If yes, perform git pull
+    (preserves input/, output/, .env).
     """
     from config import APP_VERSION
     from utils import (
@@ -63,7 +65,11 @@ def _check_for_updates() -> None:
 
 
 def main() -> None:
-    """Initialize configuration, logging, and launch the main menu."""
+    """Initialize configuration, logging, and launch the main menu.
+
+    Sets up the application environment, checks for updates, and starts
+    the Tkinter main loop with the main menu window.
+    """
     from config import APP_VERSION, get_output_dir, initialize_and_validate_config
     from utils import get_logger
 

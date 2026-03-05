@@ -27,6 +27,7 @@ Taylor, Hilbert, Z-transform).
 - **Difference equations**: Recurrence relations (geometric growth, logistic map, Fibonacci, etc.)
 - **PDEs**: 2D elliptic solver (Poisson, Laplace) plus general operator-based PDEs
 - **Vector ODEs**: Coupled systems with animation, 3D phase-space trajectories, and surface visualization
+- **Complex Problems** *(experimental)*: Special cases with custom UIs (e.g. coupled harmonic oscillators). Still in development; may contain bugs.
 - **Unified f-notation**: Write equations using `f[0]`, `f[1]`, `f[i,k]` (function, derivatives, vector components)
 - **Interactive result tabs**: Select derivatives to plot, choose phase-space axes, switch visualization modes without re-solving
 - **Predefined equations**: Harmonic oscillator, pendulum, Van der Pol, Lorenz, Lotka-Volterra, and more

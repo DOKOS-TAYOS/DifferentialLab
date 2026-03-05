@@ -24,6 +24,15 @@ After saving through the dialog the application restarts automatically.
 Colours accept any Tk colour name (e.g. `lime green`, `crimson`) or a hex
 code (`#RRGGBB`).
 
+## UI Tooltips
+
+| Variable              | Type | Default | Description                                    |
+|-----------------------|------|---------|------------------------------------------------|
+| `UI_TOOLTIP_DELAY_MS` | int  | `500`   | Delay in milliseconds before showing a tooltip. |
+| `UI_TOOLTIP_WRAPLENGTH` | int | `350`   | Maximum width in pixels before tooltip text wraps. |
+| `UI_TOOLTIP_PADX`    | int  | `8`     | Horizontal padding inside tooltip.             |
+| `UI_TOOLTIP_PADY`    | int  | `4`     | Vertical padding inside tooltip.               |
+
 ## Plot Style
 
 | Variable              | Type  | Default      | Description                                   |
@@ -47,6 +56,14 @@ code (`#RRGGBB`).
 | `PLOT_MARKER_FACE_COLOR`| str  | `crimson` | Marker fill colour.              |
 | `PLOT_MARKER_EDGE_COLOR`| str  | `crimson` | Marker edge colour.              |
 
+## Plot Phase-Space
+
+| Variable                 | Type | Default | Description                              |
+|---------------------------|------|---------|------------------------------------------|
+| `PLOT_PHASE_START_COLOR`  | str  | `green` | Colour of the start marker in phase-space plots. |
+| `PLOT_PHASE_END_COLOR`    | str  | `red`   | Colour of the end marker in phase-space plots.   |
+| `PLOT_PHASE_MARKER_SIZE`  | int  | `8`     | Size of start/end markers in phase-space plots.  |
+
 ## Plot Fonts
 
 Configured directly under Plot Style in the Configuration dialog.
@@ -59,6 +76,16 @@ Configured directly under Plot Style in the Configuration dialog.
 | `FONT_AXIS_SIZE`    | int  | `16`        | Axis label font size in points.              |
 | `FONT_AXIS_STYLE`   | str  | `italic`    | Axis label font style.  Options: `normal`, `italic`, `oblique`. |
 | `FONT_TICK_SIZE`    | int  | `12`        | Tick label font size in points.              |
+
+## Plot 3D / Contour
+
+| Variable               | Type  | Default  | Description                              |
+|------------------------|-------|----------|------------------------------------------|
+| `PLOT_SURFACE_CMAP`    | str   | `viridis`| Matplotlib colormap for 3D surface and contour plots. |
+| `PLOT_CONTOUR_LEVELS`  | int   | `20`     | Number of contour levels in 2D contour plots. |
+| `PLOT_GRID_ALPHA`      | float | `0.3`    | Transparency of the grid lines (0–1).    |
+| `PLOT_SURFACE_ALPHA`   | float | `0.9`    | Transparency of 3D surfaces (0–1).      |
+| `PLOT_COLORBAR_SHRINK` | float | `0.6`    | Shrink factor for the colorbar (0–1).    |
 
 ## Plot Animation
 

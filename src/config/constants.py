@@ -16,7 +16,11 @@ SOLVER_METHODS: Final[tuple[str, ...]] = (
 
 
 def get_default_solver_method() -> str:
-    """Return the default ODE integration method (first in available list)."""
+    """Return the default ODE integration method (first in available list).
+
+    Returns:
+        The default solver method name (e.g. ``"RK45"``).
+    """
     return SOLVER_METHODS[0]
 
 

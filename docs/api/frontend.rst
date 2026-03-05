@@ -56,6 +56,12 @@ frontend.ui_dialogs.config_dialog
 .. automodule:: frontend.ui_dialogs.config_dialog
    :members:
 
+frontend.ui_dialogs.loading_dialog
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: frontend.ui_dialogs.loading_dialog
+   :members:
+
 frontend.ui_dialogs.help_dialog
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

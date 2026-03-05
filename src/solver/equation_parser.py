@@ -28,7 +28,15 @@ logger = get_logger(__name__)
 
 
 def _maybe_rewrite(expression: str, notation: FNotation | None) -> str:
-    """Rewrite f-notation to y-notation if a notation context is provided."""
+    """Rewrite f-notation to y-notation if a notation context is provided.
+
+    Args:
+        expression: Expression string with f-notation.
+        notation: Notation context, or None to skip rewriting.
+
+    Returns:
+        Expression with f rewritten to y if notation given, else unchanged.
+    """
     if notation is not None:
         return rewrite_f_expression(expression, notation)
     return expression
@@ -329,6 +337,12 @@ def _rewrite_pde_f_notation(expression: str) -> str:
 
     Notation: f[k] = f_{x[k]}, f[i,j] = f_{x[i],x[j]}.
     Bare f (no brackets) = solution value.
+
+    Args:
+        expression: PDE RHS expression string.
+
+    Returns:
+        Expression with f-notation rewritten to derivative names.
     """
 
     # Replace f[i,j] first (longer pattern)
@@ -350,6 +364,12 @@ def _rewrite_indexed_vars(expression: str) -> str:
     Maps ``x[0]`` -> ``x``, ``x[1]`` -> ``y``, ``x[2]`` -> ``z``, ``x[3]`` -> ``w``.
     This allows users to write PDE expressions using indexed notation while
     the internal solver still uses named variables.
+
+    Args:
+        expression: Expression string with indexed variables.
+
+    Returns:
+        Expression with indexed vars replaced by names.
     """
     return _INDEXED_VAR_RE.sub(
         lambda m: _INDEXED_VAR_NAMES[int(m.group(1))],

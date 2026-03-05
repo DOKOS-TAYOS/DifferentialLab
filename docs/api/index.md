@@ -8,6 +8,7 @@ Auto-generated documentation from the source code docstrings (Google-style docst
 - [plotting](plotting.rst) -- Solution plots, phase portraits, surface and contour plots
 - [pipeline](pipeline.rst) -- Solver pipeline orchestration
 - [transforms](transforms.rst) -- Function transforms (Fourier, Laplace, Taylor, Hilbert, Z-transform)
+- [complex_problems](complex_problems.rst) -- Special problems with custom UIs (experimental, in development)
 - [frontend](frontend.rst) -- GUI: theme, windows, dialogs, widgets
 - [utils](utils.rst) -- Exceptions, expression parser shared utilities, export, logging, update checker
 
@@ -22,6 +23,7 @@ solver
 plotting
 pipeline
 transforms
+complex_problems
 frontend
 utils
 ```

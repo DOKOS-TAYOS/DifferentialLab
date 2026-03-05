@@ -64,6 +64,12 @@ def preprocess_prime_notation(expression: str) -> str:
     Vector ODE:  ``f'[i]`` → ``f[i,1]``,  ``f''[i]`` → ``f[i,2]``
 
     Bare ``f`` (no primes, no brackets) is left unchanged.
+
+    Args:
+        expression: Python expression string with prime notation.
+
+    Returns:
+        Expression with primes rewritten to bracket notation.
     """
 
     def _replace(m: re.Match) -> str:
@@ -96,7 +102,15 @@ _F_TOKEN = re.compile(
 
 
 def _rewrite_match_ode_scalar(m: re.Match, order: int) -> str:
-    """Rewrite a single f-token for scalar ODE / difference."""
+    """Rewrite a single f-token for scalar ODE / difference.
+
+    Args:
+        m: Regex match for f-token.
+        order: ODE order.
+
+    Returns:
+        Equivalent y-index expression.
+    """
     bracket = m.group(1)
     if bracket is None:
         # bare 'f' -> y[0]
@@ -109,7 +123,15 @@ def _rewrite_match_ode_scalar(m: re.Match, order: int) -> str:
 
 
 def _rewrite_match_vector_ode(m: re.Match, notation: FNotation) -> str:
-    """Rewrite a single f-token for vector ODE."""
+    """Rewrite a single f-token for vector ODE.
+
+    Args:
+        m: Regex match for f-token.
+        notation: Vector ODE notation context.
+
+    Returns:
+        Equivalent y-index expression.
+    """
     bracket = m.group(1)
     if bracket is None:
         return "y[0]"
@@ -196,7 +218,14 @@ def _prime_str(k: int) -> str:
 
 
 def _subscript(n: int) -> str:
-    """Return subscript digits for integer n (e.g. 12 → '₁₂')."""
+    """Return subscript digits for integer n (e.g. 12 → '₁₂').
+
+    Args:
+        n: Non-negative integer.
+
+    Returns:
+        Unicode subscript string.
+    """
     if 0 <= n < len(_SUBSCRIPT_DIGITS):
         return _SUBSCRIPT_DIGITS[n]
     return "".join(_SUBSCRIPT_DIGITS[int(d)] if d.isdigit() else d for d in str(n))

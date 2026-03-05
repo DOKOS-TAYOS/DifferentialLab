@@ -28,6 +28,7 @@
 - **Vector ODEs**: Coupled systems with animation, 3D phase-space trajectories, and surface visualization
 - **Unified f-notation**: Write equations using `f[0]` (function), `f[1]` (first derivative), `f[i,k]` (component i, derivative k for vector ODEs)
 - **Predefined equations**: Harmonic oscillator, pendulum, Van der Pol, Lorenz, Lotka-Volterra, Duffing, Schrödinger, and more
+- **Complex Problems** *(experimental)*: Special cases with custom UIs (e.g. coupled harmonic oscillators). Still in development; may contain bugs.
 - **Function transforms**: Fourier (FFT), Laplace, Taylor series, Hilbert, Z-transform
 - **Custom equations**: Write any ODE, difference equation, or PDE in Python syntax
 - **Interactive result tabs**: Select derivatives to plot, choose phase-space axes, switch visualization modes without re-solving
@@ -91,11 +92,10 @@ python src/main_program.py
 Copy `.env.example` to `.env` and customize, or use the in-app **Configuration** dialog.
 
 Available settings:
-- UI theme (colors, fonts, padding)
-- Plot style (line, markers, fonts, grid)
+- UI theme (colors, fonts, padding, tooltips)
+- Plot style (line, markers, fonts, phase-space, 3D/contour, animation)
 - Solver defaults (method, tolerances)
-- File paths and output format
-- Logging
+- Logging and update check
 
 ## Documentation
 

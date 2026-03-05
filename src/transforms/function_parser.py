@@ -54,7 +54,14 @@ def parse_scalar_function(
         raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     def scalar_func(x: np.ndarray) -> np.ndarray:
-        """Evaluate the compiled expression over a vectorized array."""
+        """Evaluate the compiled expression over a vectorized array.
+
+        Args:
+            x: Input array of values.
+
+        Returns:
+            Evaluated values as numpy array.
+        """
         x_arr = np.asarray(x, dtype=float)
         ns = {**namespace, "x": x_arr}
         result = safe_eval(compiled, ns)

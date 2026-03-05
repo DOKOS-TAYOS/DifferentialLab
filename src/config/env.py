@@ -592,6 +592,9 @@ def get_current_env_values() -> dict[str, str]:
     """Collect current environment values as strings for all schema keys.
 
     Uses validated cache when populated for performance.
+
+    Returns:
+        Dictionary mapping each schema key to its string value.
     """
     result: dict[str, str] = {}
     for item in ENV_SCHEMA:

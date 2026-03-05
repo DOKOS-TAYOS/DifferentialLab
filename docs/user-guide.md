@@ -7,15 +7,17 @@ function transforms feature.
 
 ## Launching the Application
 
-When DifferentialLab starts you see the **main menu** with five buttons:
+When DifferentialLab starts you see the **main menu** with six buttons:
 
 - **Solve** -- open the equation selector and solve an ODE, difference
   equation, PDE, or vector ODE.
-- **Transforms** -- apply mathematical transforms (Fourier, Laplace, Taylor,
-  Hilbert, Z-transform) to scalar functions.
+- **Function Transform** -- apply mathematical transforms (Fourier, Laplace,
+  Taylor, Hilbert, Z-transform) to scalar functions.
+- **Complex Problems** *(experimental)* -- solve special cases with custom UIs
+  (e.g. coupled harmonic oscillators). Still in development; may contain bugs.
+- **Information** -- view help, usage instructions, and reference material.
 - **Configuration** -- edit all application settings (theme, plot style,
   solver defaults, logging).
-- **Information** -- view help, usage instructions, and reference material.
 - **Quit** -- close the application.
 
 Navigate between buttons with the arrow keys and press Enter to activate.
@@ -112,9 +114,24 @@ After clicking **Solve**, the results window shows:
 The plot is interactive (zoom, pan) via the matplotlib toolbar at the bottom.
 Vector animations can be exported to MP4.
 
+## Complex Problems *(experimental)*
+
+**Note:** Complex Problems is still in development and may contain bugs. Use with caution.
+
+Click **Complex Problems** from the main menu to open the selection dialog.
+Each problem has custom parameters, statistics, and visualizations.
+
+### Coupled Harmonic Oscillators
+
+A one-dimensional chain of N oscillators with configurable masses, coupling
+constants, and coupling types. Select it from the list, configure the number
+of oscillators and physical parameters, then solve. The result dialog shows
+mode shapes, time evolution, and phase-space views specific to the coupled
+system.
+
 ## Function Transforms
 
-Click **Transforms** from the main menu to open the transform dialog.  Enter a
+Click **Function Transform** from the main menu to open the transform dialog.  Enter a
 scalar function `f(x)` (e.g. `sin(x)`, `exp(-x**2)`), optionally with
 parameters (`a=1.0, b=2`), and choose a transform:
 
@@ -147,13 +164,15 @@ Open **Configuration** from the main menu.  Settings are grouped into
 collapsible sections:
 
 - UI Theme
+- UI Tooltips
 - Plot Style
-- Plot Markers
 - Plot Fonts
+- Plot Markers
+- Plot Phase-Space
+- Plot 3D / Contour
+- Plot Animation
 - Solver Defaults
-- File Paths
-- Logging
-- Update Check
+- Logging & Update
 
 After saving, the application restarts automatically so that changes take
 effect.  You can also edit the `.env` file directly with any text editor.
