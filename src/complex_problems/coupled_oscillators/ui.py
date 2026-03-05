@@ -11,7 +11,7 @@ from tkinter import messagebox, ttk
 import numpy as np
 
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
-from config import get_default_solver_method, get_env_from_schema
+from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from config.constants import SOLVER_METHODS
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.loading_dialog import LoadingDialog
@@ -360,7 +360,7 @@ class CoupledOscillatorsDialog:
             row_res, textvariable=self._n_points_var, width=10, font=get_font()
         ).pack(side=tk.LEFT, padx=(0, pad * 2))
         ttk.Label(row_res, text="Solver:").pack(side=tk.LEFT, padx=(pad * 2, pad))
-        self._method_var = tk.StringVar(value=get_default_solver_method())
+        self._method_var = tk.StringVar(value=DEFAULT_SOLVER_METHOD)
         method_combo = ttk.Combobox(
             row_res,
             textvariable=self._method_var,
@@ -664,7 +664,7 @@ class CoupledOscillatorsDialog:
 
         method = self._method_var.get()
         if method not in SOLVER_METHODS:
-            method = get_default_solver_method()
+            method = DEFAULT_SOLVER_METHOD
 
         # Parse initial conditions
         try:

@@ -412,7 +412,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
     },
 ]
 
-_ENV_SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
+SCHEMA_BY_KEY: dict[str, dict[str, Any]] = {item["key"]: item for item in ENV_SCHEMA}
 
 # Cache of validated values, populated at startup. Avoids repeated os.getenv + validation.
 _VALIDATED_CACHE: dict[str, Any] = {}
@@ -514,7 +514,7 @@ def get_env(
     if value is None:
         return default
 
-    schema_item = _ENV_SCHEMA_BY_KEY.get(key)
+    schema_item = SCHEMA_BY_KEY.get(key)
     if schema_item is None:
         try:
             if cast_type is bool:
@@ -551,7 +551,7 @@ def get_env_from_schema(key: str) -> Any:
     """
     if key in _VALIDATED_CACHE:
         return _VALIDATED_CACHE[key]
-    item = _ENV_SCHEMA_BY_KEY.get(key)
+    item = SCHEMA_BY_KEY.get(key)
     if item is None:
         raise KeyError(f"Unknown env key: {key}")
     value = get_env(key, item["default"], item["cast_type"])

@@ -4,15 +4,15 @@ from config.constants import (
     APP_NAME,
     APP_VERSION,
     AVAILABLE_STATISTICS,
+    DEFAULT_SOLVER_METHOD,
     SOLVER_METHOD_DESCRIPTIONS,
     SOLVER_METHODS,
-    get_default_solver_method,
 )
-from config.env import _ENV_SCHEMA_BY_KEY as SCHEMA_BY_KEY
 from config.env import (
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
     ENV_SCHEMA,
+    SCHEMA_BY_KEY,
     get_current_env_values,
     get_env,
     get_env_from_schema,
@@ -34,7 +34,7 @@ __all__ = [
     "AVAILABLE_STATISTICS",
     "SOLVER_METHODS",
     "SOLVER_METHOD_DESCRIPTIONS",
-    "get_default_solver_method",
+    "DEFAULT_SOLVER_METHOD",
     # env
     "DEFAULT_LOG_FILE",
     "DEFAULT_LOG_LEVEL",

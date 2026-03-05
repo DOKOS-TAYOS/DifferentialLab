@@ -11,9 +11,9 @@ from typing import Any
 
 from config import (
     AVAILABLE_STATISTICS,
+    DEFAULT_SOLVER_METHOD,
     SOLVER_METHOD_DESCRIPTIONS,
     SOLVER_METHODS,
-    get_default_solver_method,
     get_env_from_schema,
 )
 from frontend.theme import get_contrast_foreground, get_font
@@ -485,7 +485,7 @@ class ParametersDialog:
         self.method_frame = ttk.LabelFrame(right_col, text="Solver Method", padding=pad)
         self.method_frame.pack(fill=tk.X, pady=(0, pad))
 
-        self.method_var = tk.StringVar(value=get_default_solver_method())
+        self.method_var = tk.StringVar(value=DEFAULT_SOLVER_METHOD)
         combo = ttk.Combobox(
             self.method_frame,
             textvariable=self.method_var,

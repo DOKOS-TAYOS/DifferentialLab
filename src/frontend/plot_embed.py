@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, Callable
 
 from config import get_env_from_schema
 from frontend.theme import get_font
+from utils import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -37,8 +40,8 @@ def _bind_resize_handler(
                 warnings.simplefilter("ignore", UserWarning)
                 _fig.tight_layout()  # type: ignore[union-attr]
             _canvas.draw_idle()  # type: ignore[union-attr]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Plot resize handler failed: %s", exc)
 
     canvas.mpl_connect("resize_event", _on_resize)
 

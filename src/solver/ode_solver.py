@@ -9,7 +9,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.optimize import fsolve
 
-from config import get_default_solver_method, get_env_from_schema
+from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from utils import SolverFailedError, get_logger
 
 logger = get_logger(__name__)
@@ -58,7 +58,7 @@ def _resolve_solver_params(
         Tuple of (method, effective_max_step, rtol, atol, t_eval).
     """
     if method is None:
-        method = get_default_solver_method()
+        method = DEFAULT_SOLVER_METHOD
     if max_step is None:
         max_step = get_env_from_schema("SOLVER_MAX_STEP")
     if rtol is None:
@@ -109,7 +109,7 @@ def solve_ode(
         )
     else:
         # If t_eval is provided, still resolve other params
-        method = method or get_default_solver_method()
+        method = method or DEFAULT_SOLVER_METHOD
         max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
         rtol = rtol or get_env_from_schema("SOLVER_RTOL")
         atol = atol or get_env_from_schema("SOLVER_ATOL")
@@ -197,7 +197,7 @@ def solve_multipoint(
         )
     else:
         # If t_eval is provided, still resolve other params
-        method = method or get_default_solver_method()
+        method = method or DEFAULT_SOLVER_METHOD
         max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
         rtol = rtol or get_env_from_schema("SOLVER_RTOL")
         atol = atol or get_env_from_schema("SOLVER_ATOL")

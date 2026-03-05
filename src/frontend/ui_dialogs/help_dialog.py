@@ -18,11 +18,8 @@ from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
-from utils import get_logger
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
-
-logger = get_logger(__name__)
 
 # ── Section content (human-readable) ─────────────────────────────────
 

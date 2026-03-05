@@ -5,25 +5,6 @@ from typing import Final
 APP_NAME: Final[str] = "DifferentialLab"
 APP_VERSION: Final[str] = "0.4.1"
 
-SOLVER_METHODS: Final[tuple[str, ...]] = (
-    "RK45",
-    "RK23",
-    "DOP853",
-    "Radau",
-    "BDF",
-    "LSODA",
-)
-
-
-def get_default_solver_method() -> str:
-    """Return the default ODE integration method (first in available list).
-
-    Returns:
-        The default solver method name (e.g. ``"RK45"``).
-    """
-    return SOLVER_METHODS[0]
-
-
 SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "RK45": "Runge-Kutta 4(5) — general-purpose explicit method",
     "RK23": "Runge-Kutta 2(3) — low-order, faster per step",
@@ -32,6 +13,9 @@ SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "BDF": "Backward Differentiation Formula — stiff problems",
     "LSODA": "Adams/BDF auto-switching — stiff/non-stiff detection",
 }
+
+SOLVER_METHODS: Final[tuple[str, ...]] = tuple(SOLVER_METHOD_DESCRIPTIONS.keys())
+DEFAULT_SOLVER_METHOD: Final[str] = SOLVER_METHODS[0]
 
 LINE_STYLES: Final[tuple[str, ...]] = ("-", "--", "-.", ":")
 MARKER_FORMATS: Final[tuple[str, ...]] = ("o", "s", "^", "d", "*")

@@ -6,10 +6,6 @@ from typing import Callable
 
 import numpy as np
 
-from utils import get_logger
-
-logger = get_logger(__name__)
-
 
 def compute_ode_residual_error(
     ode_func: Callable[[float, np.ndarray], np.ndarray],

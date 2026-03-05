@@ -12,7 +12,7 @@ from complex_problems.coupled_oscillators.model import (
     build_ode_function,
     compute_normal_modes,
 )
-from config import get_default_solver_method, get_env_from_schema
+from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from utils import SolverFailedError, get_logger
 
 logger = get_logger(__name__)
@@ -124,7 +124,7 @@ def solve_coupled_oscillators(
         external_frequency=external_frequency,
     )
 
-    method = method or get_default_solver_method()
+    method = method or DEFAULT_SOLVER_METHOD
     rtol = get_env_from_schema("SOLVER_RTOL")
     atol = get_env_from_schema("SOLVER_ATOL")
     max_step = get_env_from_schema("SOLVER_MAX_STEP")
