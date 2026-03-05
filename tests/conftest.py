@@ -51,6 +51,6 @@ def sample_t_eval(sample_domain: tuple[float, float]) -> np.ndarray:
 
 
 @pytest.fixture
-def equations_yaml_path() -> Path:
-    """Path to the predefined equations YAML (in src/config)."""
-    return Path(__file__).resolve().parent.parent / "src" / "config" / "equations.yaml"
+def equations_dir() -> Path:
+    """Path to the predefined equations directory (src/config/equations)."""
+    return Path(__file__).resolve().parent.parent / "src" / "config" / "equations"

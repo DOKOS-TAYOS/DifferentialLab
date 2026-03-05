@@ -1,0 +1,969 @@
+harmonic_oscillator:
+  category: Oscillators
+  name: Simple Harmonic Oscillator
+  formula: f'' + ω²f = 0
+  description: 'f'''' + ω²f = 0
+
+    Models a mass on a spring with no friction.'
+  order: 2
+  parameters:
+    ω:
+      default: 1.0
+      description: Angular frequency (rad/s)
+  expression: -ω**2 * f[0]
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 20.0
+damped_oscillator:
+  category: Oscillators
+  name: Damped Oscillator
+  formula: f'' + 2γf' + ω²f = 0
+  description: 'f'''' + 2γf'' + ω²f = 0
+
+    Mass-spring-damper system.'
+  order: 2
+  parameters:
+    ω:
+      default: 1.0
+      description: Natural angular frequency (rad/s)
+    γ:
+      default: 0.1
+      description: Damping coefficient
+  expression: -2*γ*f[1] - ω**2*f[0]
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 40.0
+exponential_growth:
+  category: Population
+  name: Exponential Growth / Decay
+  formula: f' = kf
+  description: 'f'' = kf
+
+    Growth (k>0) or decay (k<0).'
+  order: 1
+  parameters:
+    k:
+      default: 0.5
+      description: Growth rate constant
+  expression: k * f[0]
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 10.0
+logistic_equation:
+  category: Population
+  name: Logistic Equation
+  formula: f' = rf(1 - f/K)
+  description: 'f'' = rf(1 - f/K)
+
+    Population growth with carrying capacity.'
+  order: 1
+  parameters:
+    r:
+      default: 1.0
+      description: Growth rate
+    K:
+      default: 10.0
+      description: Carrying capacity
+  expression: r * f[0] * (1 - f[0] / K)
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0.0
+  - 15.0
+van_der_pol:
+  category: Oscillators
+  name: Van der Pol Oscillator
+  formula: f'' - μ(1 - f²)f' + f = 0
+  description: 'f'''' - μ(1 - f²)f'' + f = 0
+
+    Nonlinear oscillator with self-sustained oscillations.'
+  order: 2
+  parameters:
+    μ:
+      default: 1.0
+      description: Nonlinearity parameter
+  expression: μ * (1 - f[0]**2) * f[1] - f[0]
+  default_initial_conditions:
+  - 2.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 30.0
+simple_pendulum:
+  category: Oscillators
+  name: Simple Pendulum
+  formula: f'' + (g/L)sin(f) = 0
+  description: 'f'''' + (g/L)sin(f) = 0
+
+    Nonlinear pendulum with gravity.'
+  order: 2
+  parameters:
+    g:
+      default: -9.81
+      description: Gravitational acceleration (m/s²)
+    L:
+      default: 1.0
+      description: Pendulum length (m)
+  expression: -(g / L) * sin(f[0])
+  default_initial_conditions:
+  - 0.5
+  - 0.0
+  default_domain:
+  - 0.0
+  - 15.0
+rc_circuit:
+  category: Physics
+  name: RC Circuit (Discharge)
+  formula: f' = -f/(RC)
+  description: 'f'' = -f/(RC)
+
+    Capacitor voltage during discharge.'
+  order: 1
+  parameters:
+    R:
+      default: 1000.0
+      description: Resistance (Ω)
+    C:
+      default: 0.001
+      description: Capacitance (F)
+  expression: -f[0] / (R * C)
+  default_initial_conditions:
+  - 5.0
+  default_domain:
+  - 0.0
+  - 5.0
+free_fall_drag:
+  category: Physics
+  name: Free Fall with Drag
+  formula: f'' = g - (b/m)f'
+  description: 'f'''' = g - (b/m)f''
+
+    Falling object with linear air resistance.'
+  order: 2
+  parameters:
+    g:
+      default: -9.81
+      description: Gravitational acceleration (m/s²)
+    b:
+      default: 0.5
+      description: Drag coefficient (kg/s)
+    m:
+      default: 1.0
+      description: Mass (kg)
+  expression: g - (b / m) * f[1]
+  default_initial_conditions:
+  - 0.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 10.0
+rlc_circuit:
+  category: Physics
+  name: RLC Circuit (Series)
+  formula: f'' + (R/L)f' + (1/LC)f = 0
+  description: 'f'''' + (R/L)f'' + (1/LC)f = 0
+
+    Series RLC circuit with zero forcing.'
+  order: 2
+  parameters:
+    R:
+      default: 1.0
+      description: Resistance (Ω)
+    L:
+      default: 1.0
+      description: Inductance (H)
+    C:
+      default: 1.0
+      description: Capacitance (F)
+  function_name: rlc_circuit
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 20.0
+gompertz_growth:
+  category: Population
+  name: Gompertz Growth
+  formula: f' = rf·ln(K/f)
+  description: 'f'' = rf·ln(K/f)
+
+    Tumor and cell population growth model.'
+  order: 1
+  parameters:
+    r:
+      default: 0.5
+      description: Growth rate
+    K:
+      default: 10.0
+      description: Carrying capacity
+  function_name: gompertz_growth
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 15.0
+newton_cooling:
+  category: Physics
+  name: Newton's Law of Cooling
+  formula: f' = -k(f - T_env)
+  description: 'f'' = -k(f - T_env)
+
+    Temperature decay toward ambient.'
+  order: 1
+  parameters:
+    k:
+      default: 0.1
+      description: Cooling coefficient
+    T_env:
+      default: 20.0
+      description: Ambient temperature
+  function_name: newton_cooling
+  default_initial_conditions:
+  - 100.0
+  default_domain:
+  - 0.0
+  - 50.0
+linear_decay_source:
+  category: Physics
+  name: Linear Decay with Source
+  formula: f' = a - bf
+  description: 'f'' = a - bf
+
+    Constant inflow with linear decay (e.g. drug concentration).'
+  order: 1
+  parameters:
+    a:
+      default: 1.0
+      description: Source rate
+    b:
+      default: 0.5
+      description: Decay rate
+  function_name: linear_decay_source
+  default_initial_conditions:
+  - 0.0
+  default_domain:
+  - 0.0
+  - 10.0
+airy_equation:
+  category: Quantum
+  name: Airy Equation
+  formula: f'' = x·f
+  description: 'f'''' = x·f
+
+    Quantum mechanics, optics, and diffraction.'
+  order: 2
+  parameters: {}
+  function_name: airy_equation
+  default_initial_conditions:
+  - 0.355028
+  - -0.258819
+  default_domain:
+  - 0.0
+  - 5.0
+hermite_ode:
+  category: Quantum
+  name: Hermite Equation
+  formula: f'' - 2xf' + 2nf = 0
+  description: 'f'''' - 2xf'' + 2nf = 0
+
+    Hermite polynomials; eigenfunctions of quantum harmonic oscillator.'
+  order: 2
+  parameters:
+    n:
+      default: 2.0
+      description: Quantum number / eigenvalue
+  function_name: hermite_ode
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - -2.0
+  - 2.0
+laguerre_ode:
+  category: Quantum
+  name: Laguerre Equation
+  formula: xf'' + (1-x)f' + nf = 0
+  description: 'xf'''' + (1-x)f'' + nf = 0
+
+    Laguerre polynomials; hydrogen atom radial wave functions.'
+  order: 2
+  parameters:
+    n:
+      default: 1.0
+      description: Parameter (integer for Laguerre polynomials)
+  function_name: laguerre_ode
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.01
+  - 10.0
+bessel_ode:
+  category: Quantum
+  name: Bessel Equation
+  formula: f'' + f'/x + (1 - n²/x²)f = 0
+  description: 'f'''' + f''/x + (1 - n²/x²)f = 0
+
+    Radial equation in QM; spherical Bessel, hydrogen.'
+  order: 2
+  parameters:
+    n:
+      default: 0.0
+      description: Order (integer for Bessel J_n)
+  function_name: bessel_ode
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.1
+  - 10.0
+stationary_schrodinger_ho:
+  category: Quantum
+  name: Stationary Schrödinger (Harmonic Well)
+  formula: f'' + (E - x²)f = 0
+  description: 'f'''' + (E - x²)f = 0
+
+    1D Schrödinger in V(x)=x²/2; ℏ=m=ω=1. f = ψ(x).'
+  order: 2
+  parameters:
+    E:
+      default: 1.5
+      description: Energy eigenvalue
+  function_name: stationary_schrodinger_ho
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - -3.0
+  - 3.0
+stationary_schrodinger_well:
+  category: Quantum
+  name: Stationary Schrödinger (Square Well)
+  formula: f'' + (E - V(x))f = 0
+  description: 'f'''' + (E - V(x))f = 0
+
+    Finite square well: V=V₀ for |x|>a, 0 inside.'
+  order: 2
+  parameters:
+    E:
+      default: 2.0
+      description: Energy
+    V0:
+      default: 10.0
+      description: Well depth
+    a:
+      default: 1.0
+      description: Half-width
+  function_name: stationary_schrodinger_well
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - -2.0
+  - 2.0
+kummer_ode:
+  category: Quantum
+  name: Kummer Equation
+  formula: xf'' + (b-x)f' - af = 0
+  description: 'xf'''' + (b-x)f'' - af = 0
+
+    Confluent hypergeometric; hydrogen atom radial.'
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+      description: Parameter a
+    b:
+      default: 1.0
+      description: Parameter b
+  function_name: kummer_ode
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.01
+  - 5.0
+michaelis_menten:
+  category: Physics
+  name: Michaelis-Menten Kinetics
+  formula: f' = -V_max·f/(K_m + f)
+  description: 'f'' = -V_max·f/(K_m + f)
+
+    Enzyme-catalyzed reaction kinetics.'
+  order: 1
+  parameters:
+    V_max:
+      default: 1.0
+      description: Maximum reaction rate
+    K_m:
+      default: 0.5
+      description: Michaelis constant
+  function_name: michaelis_menten
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 10.0
+riccati_ode:
+  category: Mathematics
+  name: Riccati Equation
+  formula: f' = a + bf + cf²
+  description: 'f'' = a + bf + cf²
+
+    General Riccati form.'
+  order: 1
+  parameters:
+    a:
+      default: 1.0
+      description: Constant term
+    b:
+      default: 0.5
+      description: Linear coefficient
+    c:
+      default: -0.1
+      description: Quadratic coefficient
+  function_name: riccati_ode
+  default_initial_conditions:
+  - 0.0
+  default_domain:
+  - 0.0
+  - 5.0
+rayleigh_oscillator:
+  category: Oscillators
+  name: Rayleigh Oscillator
+  formula: f'' - μ(1 - f'²)f' + f = 0
+  description: 'f'''' - μ(1 - f''²)f'' + f = 0
+
+    Self-excited nonlinear oscillator.'
+  order: 2
+  parameters:
+    mu:
+      default: 1.0
+      description: Nonlinearity parameter
+      display: μ
+  function_name: rayleigh_oscillator
+  default_initial_conditions:
+  - 0.1
+  - 0.0
+  default_domain:
+  - 0.0
+  - 30.0
+forced_harmonic_oscillator:
+  category: Oscillators
+  name: Forced Harmonic Oscillator
+  formula: f'' + ω²f = F·cos(Ωt)
+  description: 'f'''' + ω²f = F·cos(Ωt)
+
+    Harmonic oscillator with external forcing.'
+  order: 2
+  parameters:
+    omega:
+      default: 1.0
+      description: Natural frequency
+      display: ω
+    F:
+      default: 0.5
+      description: Forcing amplitude
+    Omega:
+      default: 1.2
+      description: Forcing frequency
+      display: Ω
+  function_name: forced_harmonic_oscillator
+  default_initial_conditions:
+  - 0.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 30.0
+allee_effect:
+  category: Population
+  name: Allee Effect
+  formula: f' = rf(1 - f/K)(f/K - m)
+  description: 'f'' = rf(1 - f/K)(f/K - m)
+
+    Population with critical threshold.'
+  order: 1
+  parameters:
+    r:
+      default: 1.0
+      description: Growth rate
+    K:
+      default: 10.0
+      description: Carrying capacity
+    m:
+      default: 0.2
+      description: Allee threshold (0 < m < 1)
+  function_name: allee_effect
+  default_initial_conditions:
+  - 2.0
+  default_domain:
+  - 0.0
+  - 20.0
+langmuir_adsorption:
+  category: Physics
+  name: Langmuir Adsorption
+  formula: f' = k_a(1 - f) - k_d·f
+  description: 'f'' = k_a(1 - f) - k_d·f
+
+    Surface adsorption/desorption kinetics.'
+  order: 1
+  parameters:
+    k_a:
+      default: 1.0
+      description: Adsorption rate
+    k_d:
+      default: 0.2
+      description: Desorption rate
+  function_name: langmuir_adsorption
+  default_initial_conditions:
+  - 0.0
+  default_domain:
+  - 0.0
+  - 10.0
+cubic_decay:
+  category: Physics
+  name: Cubic Decay
+  formula: f' = -k·f³
+  description: 'f'' = -k·f³
+
+    Nonlinear decay proportional to the cube of the variable.'
+  order: 1
+  parameters:
+    k:
+      default: 1.0
+      description: Decay rate
+  function_name: cubic_decay
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 5.0
+sqrt_growth:
+  category: Population
+  name: Square-Root Growth
+  formula: f' = k·√f
+  description: 'f'' = k·√f
+
+    Growth rate proportional to square root (e.g. droplet evaporation).'
+  order: 1
+  parameters:
+    k:
+      default: 0.5
+      description: Growth rate
+  function_name: sqrt_growth
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 10.0
+bistable:
+  category: Mathematics
+  name: Bistable (Cubic)
+  formula: f' = f(1-f)(f-a)
+  description: 'f'' = f(1-f)(f-a)
+
+    Cubic with three equilibria; bistable dynamics for 0<a<1.'
+  order: 1
+  parameters:
+    a:
+      default: 0.5
+      description: Threshold
+  function_name: bistable
+  default_initial_conditions:
+  - 0.3
+  default_domain:
+  - 0.0
+  - 10.0
+landau:
+  category: Physics
+  name: Landau (Pitchfork)
+  formula: f' = f - f³
+  description: 'f'' = f - f³
+
+    Normal form of pitchfork bifurcation; phase transitions.'
+  order: 1
+  parameters: {}
+  function_name: landau
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0.0
+  - 5.0
+cubic_oscillator:
+  category: Oscillators
+  name: Cubic Oscillator
+  formula: f'' = -f³
+  description: 'f'''' = -f³
+
+    Pure cubic restoring force; nonlinear oscillations.'
+  order: 2
+  parameters: {}
+  function_name: cubic_oscillator
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 20.0
+bernoulli_decay:
+  category: Physics
+  name: Bernoulli Decay
+  formula: f' = -k·f^n
+  description: 'f'' = -k·f^n
+
+    Power-law decay; n=2 gives quadratic, n=1 gives exponential.'
+  order: 1
+  parameters:
+    k:
+      default: 1.0
+      description: Rate
+    n:
+      default: 2.0
+      description: Exponent
+  function_name: bernoulli_decay
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 5.0
+holling_type2:
+  category: Population
+  name: Holling Type II
+  formula: f' = r·f·(K-f)/(K+c·f)
+  description: 'f'' = r·f·(K-f)/(K+c·f)
+
+    Population growth with Holling type II functional response.'
+  order: 1
+  parameters:
+    r:
+      default: 1.0
+    K:
+      default: 10.0
+    c:
+      default: 1.0
+  function_name: holling_type2
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 15.0
+soft_spring:
+  category: Oscillators
+  name: Soft Spring (Duffing)
+  formula: f'' = -ω²f - εf³
+  description: 'f'''' = -ω²f - εf³
+
+    Duffing oscillator without forcing; soft nonlinear spring.'
+  order: 2
+  parameters:
+    omega:
+      default: 1.0
+    eps:
+      default: 0.1
+  function_name: soft_spring
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 20.0
+quadratic_decay:
+  category: Physics
+  name: Quadratic Decay
+  formula: f' = a - b·f²
+  description: 'f'' = a - b·f²
+
+    Constant source with quadratic loss; reaches equilibrium √(a/b).'
+  order: 1
+  parameters:
+    a:
+      default: 1.0
+    b:
+      default: 0.5
+  function_name: quadratic_decay
+  default_initial_conditions:
+  - 0.0
+  default_domain:
+  - 0.0
+  - 5.0
+cubic_landau:
+  category: Physics
+  name: Cubic Landau
+  formula: f' = f(1-f²)
+  description: 'f'' = f(1-f²)
+
+    Symmetric cubic; equilibria at -1, 0, 1.'
+  order: 1
+  parameters: {}
+  function_name: cubic_landau
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0.0
+  - 10.0
+smooth_decay:
+  category: Mathematics
+  name: Smooth Decay
+  formula: f' = -f/(1+f²)
+  description: 'f'' = -f/(1+f²)
+
+    Smooth bounded decay; derivative vanishes at large |f|.'
+  order: 1
+  parameters: {}
+  function_name: smooth_decay
+  default_initial_conditions:
+  - 2.0
+  default_domain:
+  - 0.0
+  - 10.0
+gompertz_harvesting:
+  category: Population
+  name: Gompertz with Harvesting
+  formula: f' = rf·ln(K/f) - d·f
+  description: 'f'' = rf·ln(K/f) - d·f
+
+    Gompertz growth with constant harvesting rate.'
+  order: 1
+  parameters:
+    r:
+      default: 0.5
+    K:
+      default: 10.0
+    d:
+      default: 0.1
+  function_name: gompertz_harvesting
+  default_initial_conditions:
+  - 5.0
+  default_domain:
+  - 0.0
+  - 20.0
+damped_pendulum:
+  category: Oscillators
+  name: Damped Pendulum
+  formula: f'' + (g/L)sin(f) + γf' = 0
+  description: 'f'''' + (g/L)sin(f) + γf'' = 0
+
+    Pendulum with viscous damping; energy dissipation.'
+  order: 2
+  parameters:
+    g:
+      default: 9.81
+    L:
+      default: 1.0
+    gamma:
+      default: 0.5
+  function_name: damped_pendulum
+  default_initial_conditions:
+  - 1.5
+  - 0.0
+  default_domain:
+  - 0.0
+  - 20.0
+lienard:
+  category: Oscillators
+  name: Liénard
+  formula: f'' + μ(f²-1)f' + f = 0
+  description: 'f'''' + μ(f²-1)f'' + f = 0
+
+    Liénard oscillator; related to Van der Pol, self-excited.'
+  order: 2
+  parameters:
+    mu:
+      default: 1.0
+  function_name: lienard
+  default_initial_conditions:
+  - 0.1
+  - 0.0
+  default_domain:
+  - 0.0
+  - 30.0
+matthew_equation:
+  category: Quantum
+  name: Mathieu Equation
+  formula: f'' + (a - 2q·cos(2x))f = 0
+  description: 'f'''' + (a - 2q·cos(2x))f = 0
+
+    Parametric oscillator; stability regions (Mathieu functions).'
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+    q:
+      default: 0.5
+  function_name: matthew_equation
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 10.0
+legendre_ode:
+  category: Mathematics
+  name: Legendre Equation
+  formula: (1-x²)f'' - 2xf' + n(n+1)f = 0
+  description: '(1-x²)f'''' - 2xf'' + n(n+1)f = 0
+
+    Legendre ODE; solutions are Legendre polynomials for integer n.'
+  order: 2
+  parameters:
+    n:
+      default: 2.0
+  function_name: legendre_ode
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - -0.5
+  - 0.5
+blasius_type:
+  category: Physics
+  name: Blasius (Simplified)
+  formula: f''' = -f·f''/2
+  description: 'f'''''' = -f·f''''/2
+
+    Simplified Blasius equation; boundary layer flow.'
+  order: 3
+  parameters: {}
+  function_name: blasius_type
+  default_initial_conditions:
+  - 0.0
+  - 0.0
+  - 0.332
+  default_domain:
+  - 0.0
+  - 5.0
+emden_fowler:
+  category: Physics
+  name: Emden-Fowler
+  formula: f'' + (2/x)f' + f^n = 0
+  description: 'f'''' + (2/x)f'' + f^n = 0
+
+    Polytropic stellar structure; Lane-Emden equation.'
+  order: 2
+  parameters:
+    n:
+      default: 5.0
+  function_name: emden_fowler
+  default_initial_conditions:
+  - 1.0
+  - 0.0
+  default_domain:
+  - 0.01
+  - 5.0
+fisher_kpp:
+  category: Population
+  name: Fisher-KPP
+  formula: f' = r·f(1-f)
+  description: 'f'' = r·f(1-f)
+
+    Fisher-KPP (temporal part); reaction-diffusion, genetics.'
+  order: 1
+  parameters:
+    r:
+      default: 1.0
+  function_name: fisher_kpp
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0.0
+  - 10.0
+malthus_harvesting:
+  category: Population
+  name: Malthus with Harvesting
+  formula: f' = r·f - h
+  description: 'f'' = r·f - h
+
+    Exponential growth with constant harvesting; critical h = r·f.'
+  order: 1
+  parameters:
+    r:
+      default: 0.5
+    h:
+      default: 0.1
+  function_name: malthus_harvesting
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0.0
+  - 10.0
+relu_activation:
+  category: Mathematics
+  name: ReLU Activation
+  formula: f' = k·max(0,f)
+  description: 'f'' = k·max(0,f)
+
+    ReLU-like activation; linear growth for f>0, flat for f<0.'
+  order: 1
+  parameters:
+    k:
+      default: 1.0
+  function_name: relu_activation
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0.0
+  - 5.0
+tanh_decay:
+  category: Mathematics
+  name: Tanh Decay
+  formula: f' = -k·tanh(f)
+  description: 'f'' = -k·tanh(f)
+
+    Smooth bounded decay; saturates for large |f|.'
+  order: 1
+  parameters:
+    k:
+      default: 1.0
+  function_name: tanh_decay
+  default_initial_conditions:
+  - 2.0
+  default_domain:
+  - 0.0
+  - 10.0
+duffing_oscillator:
+  category: Oscillators
+  name: Duffing Oscillator
+  formula: f'' + δf' + αf + βf³ = γcos(ωt)
+  description: 'f'''' + δf'' + αf + βf³ = γcos(ωt)
+
+    Nonlinear oscillator with cubic stiffness and forcing.
+
+    '
+  order: 2
+  parameters:
+    delta:
+      default: 0.5
+      description: Damping
+      display: δ
+    alpha:
+      default: -1.0
+      description: Linear stiffness
+      display: α
+    beta:
+      default: 1.0
+      description: Cubic stiffness
+      display: β
+    gamma:
+      default: 0.3
+      description: Forcing amplitude
+      display: γ
+    omega:
+      default: 1.2
+      description: Forcing frequency
+      display: ω
+  function_name: duffing_oscillator
+  default_initial_conditions:
+  - 0.0
+  - 0.0
+  default_domain:
+  - 0.0
+  - 50.0

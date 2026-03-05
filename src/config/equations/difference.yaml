@@ -1,0 +1,218 @@
+geometric_growth_diff:
+  category: Discrete Population
+  name: Geometric Growth (Discrete)
+  formula: fₙ₊₁ = r·fₙ
+  description: 'fₙ₊₁ = r·fₙ
+
+    Discrete exponential growth. Use n for index, f[0] for fₙ.
+
+    '
+  order: 1
+  parameters:
+    r:
+      default: 1.5
+      description: Growth factor
+  expression: r * f[0]
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0
+  - 50
+logistic_map_diff:
+  category: Discrete Population
+  name: Logistic Map
+  formula: fₙ₊₁ = r·fₙ·(1 - fₙ)
+  description: 'fₙ₊₁ = r·fₙ·(1 - fₙ)
+
+    Classic chaotic map. For r≈3.57 exhibits chaos.
+
+    '
+  order: 1
+  parameters:
+    r:
+      default: 3.5
+      description: Growth parameter
+  expression: r * f[0] * (1 - f[0])
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0
+  - 100
+fibonacci_diff:
+  category: Linear Recurrence
+  name: Fibonacci Recurrence
+  formula: fₙ₊₂ = fₙ₊₁ + fₙ
+  description: 'fₙ₊₂ = fₙ₊₁ + fₙ
+
+    Classic Fibonacci sequence. f[0]=fₙ, f[1]=fₙ₊₁.
+
+    '
+  order: 2
+  parameters: {}
+  expression: f[1] + f[0]
+  default_initial_conditions:
+  - 0.0
+  - 1.0
+  default_domain:
+  - 0
+  - 30
+linear_recurrence_2_diff:
+  category: Linear Recurrence
+  name: Second-Order Linear Recurrence
+  formula: fₙ₊₂ = a·fₙ₊₁ + b·fₙ
+  description: 'fₙ₊₂ = a·fₙ₊₁ + b·fₙ
+
+    General second-order linear recurrence.
+
+    '
+  order: 2
+  parameters:
+    a:
+      default: 1.0
+      description: Coefficient of fₙ₊₁
+    b:
+      default: 1.0
+      description: Coefficient of fₙ
+  expression: a * f[1] + b * f[0]
+  default_initial_conditions:
+  - 0.0
+  - 1.0
+  default_domain:
+  - 0
+  - 30
+cobweb_model_diff:
+  category: Discrete Population
+  name: Discrete Logistic (Cobweb)
+  formula: fₙ₊₁ = r·fₙ·(1 - fₙ/K)
+  description: 'fₙ₊₁ = r·fₙ·(1 - fₙ/K)
+
+    Discrete population model with carrying capacity.
+
+    '
+  order: 1
+  parameters:
+    r:
+      default: 2.5
+      description: Growth rate
+    K:
+      default: 1.0
+      description: Carrying capacity
+  function_name: cobweb_model
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0
+  - 50
+ricker_model_diff:
+  category: Discrete Population
+  name: Ricker Model
+  formula: fₙ₊₁ = r·fₙ·exp(-fₙ)
+  description: 'fₙ₊₁ = r·fₙ·exp(-fₙ)
+
+    Fish population dynamics, used in ecology.
+
+    '
+  order: 1
+  parameters:
+    r:
+      default: 2.5
+      description: Growth parameter
+  function_name: ricker_model
+  default_initial_conditions:
+  - 1.0
+  default_domain:
+  - 0
+  - 50
+beverton_holt_diff:
+  category: Discrete Population
+  name: Beverton-Holt
+  formula: fₙ₊₁ = r·fₙ/(1 + (r-1)·fₙ/K)
+  description: 'Stock recruitment model in fisheries.
+
+    Saturating growth with carrying capacity.
+
+    '
+  order: 1
+  parameters:
+    r:
+      default: 2.0
+      description: Growth rate
+    K:
+      default: 100.0
+      description: Carrying capacity
+  function_name: beverton_holt
+  default_initial_conditions:
+  - 10.0
+  default_domain:
+  - 0
+  - 50
+tent_map_diff:
+  category: Chaos
+  name: Tent Map
+  formula: fₙ₊₁ = μ·min(fₙ, 1-fₙ)
+  description: 'Piecewise linear chaotic map.
+
+    For μ=2 exhibits full chaos.
+
+    '
+  order: 1
+  parameters:
+    mu:
+      default: 2.0
+      description: Parameter (typically 2)
+      display: μ
+  function_name: tent_map
+  default_initial_conditions:
+  - 0.3
+  default_domain:
+  - 0
+  - 100
+third_order_recurrence_diff:
+  category: Linear Recurrence
+  name: Third-Order Linear Recurrence
+  formula: fₙ₊₃ = a·fₙ₊₂ + b·fₙ₊₁ + c·fₙ
+  description: 'General third-order linear recurrence.
+
+    f[0]=fₙ, f[1]=fₙ₊₁, f[2]=fₙ₊₂.
+
+    '
+  order: 3
+  parameters:
+    a:
+      default: 1.0
+      description: Coefficient of fₙ₊₂
+    b:
+      default: 0.5
+      description: Coefficient of fₙ₊₁
+    c:
+      default: 0.25
+      description: Coefficient of fₙ
+  function_name: third_order_recurrence
+  default_initial_conditions:
+  - 0.0
+  - 1.0
+  - 1.0
+  default_domain:
+  - 0
+  - 30
+gauss_map_diff:
+  category: Chaos
+  name: Gauss Map
+  formula: fₙ₊₁ = exp(-β·fₙ²)
+  description: 'fₙ₊₁ = exp(-β·fₙ²)
+
+    Chaotic map with Gaussian nonlinearity.
+
+    '
+  order: 1
+  parameters:
+    beta:
+      default: 6.0
+      description: Parameter
+      display: β
+  function_name: gauss_map
+  default_initial_conditions:
+  - 0.5
+  default_domain:
+  - 0
+  - 100

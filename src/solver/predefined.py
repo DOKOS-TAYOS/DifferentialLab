@@ -12,7 +12,8 @@ from utils import get_logger
 
 logger = get_logger(__name__)
 
-_EQUATIONS_PATH = Path(__file__).resolve().parent.parent / "config" / "equations.yaml"
+_EQUATIONS_DIR = Path(__file__).resolve().parent.parent / "config" / "equations"
+_EQUATION_FILES = ["ode.yaml", "vector_ode.yaml", "difference.yaml", "pde.yaml"]
 _cache: dict[str, PredefinedEquation] | None = None
 
 
@@ -84,12 +85,24 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
     if _cache is not None:
         return _cache
 
-    if not _EQUATIONS_PATH.exists():
-        logger.error("Equations YAML not found: %s", _EQUATIONS_PATH)
-        raise FileNotFoundError(f"Equations file not found: {_EQUATIONS_PATH}")
+    if not _EQUATIONS_DIR.exists():
+        logger.error("Equations directory not found: %s", _EQUATIONS_DIR)
+        raise FileNotFoundError(f"Equations directory not found: {_EQUATIONS_DIR}")
 
-    with open(_EQUATIONS_PATH, "r", encoding="utf-8") as f:
-        raw: dict[str, Any] = yaml.safe_load(f)
+    raw: dict[str, Any] = {}
+    for filename in _EQUATION_FILES:
+        filepath = _EQUATIONS_DIR / filename
+        if not filepath.exists():
+            logger.error("Equations file not found: %s", filepath)
+            raise FileNotFoundError(f"Equations file not found: {filepath}")
+        inferred_type = filename.replace(".yaml", "")
+        with open(filepath, "r", encoding="utf-8") as f:
+            chunk: dict[str, Any] = yaml.safe_load(f) or {}
+        for key, eq_data in chunk.items():
+            eq_data = dict(eq_data)
+            if "equation_type" not in eq_data:
+                eq_data["equation_type"] = inferred_type
+            raw[key] = eq_data
 
     equations: dict[str, PredefinedEquation] = {}
     for key, data in raw.items():

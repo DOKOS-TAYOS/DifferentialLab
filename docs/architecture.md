@@ -16,7 +16,11 @@ src/
 │   ├── paths.py             # Output file path management
 │   ├── equations.py         # Python-callable ODE functions
 │   ├── difference_equations.py  # Python-callable difference equation functions
-│   └── equations.yaml       # Predefined ODE/difference/PDE definitions
+│   └── equations/           # Predefined ODE/difference/PDE definitions (by type)
+│       ├── ode.yaml
+│       ├── vector_ode.yaml
+│       ├── difference.yaml
+│       └── pde.yaml
 ├── solver/                  # Numerical solving engine
 │   ├── equation_parser.py   # Safe expression parsing (AST-validated)
 │   ├── ode_solver.py        # solve_ivp wrappers, shooting method

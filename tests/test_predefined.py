@@ -59,7 +59,7 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
 
 def test_load_predefined_equations_known_keys() -> None:
     equations = load_predefined_equations()
-    # From equations.yaml
+    # From config/equations/*.yaml
     assert "harmonic_oscillator" in equations
     assert "exponential_growth" in equations or "damped_oscillator" in equations
 
@@ -73,7 +73,7 @@ def test_load_predefined_equations_cached() -> None:
 def test_load_predefined_equations_missing_file_raises() -> None:
     import solver.predefined as mod
 
-    with patch("solver.predefined._EQUATIONS_PATH", Path("/nonexistent/equations.yaml")):
+    with patch("solver.predefined._EQUATIONS_DIR", Path("/nonexistent/equations")):
         mod._cache = None
         with pytest.raises(FileNotFoundError):
             load_predefined_equations()
