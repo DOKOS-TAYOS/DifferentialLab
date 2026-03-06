@@ -96,7 +96,6 @@ def main() -> None:
 
         _plt.close("all")
         logger.info("DifferentialLab shutting down")
-        sys.exit(0)
 
 
 if __name__ == "__main__":
