@@ -213,7 +213,9 @@ def solve_aerodynamics_2d(
             conv_u = u * ux + v * uy
             conv_v = u * vx + v * vy
 
-        mean_u = float(np.mean(u[fluid_mask])) if np.any(fluid_mask) else float(np.mean(u))
+        mean_u = (
+            float(np.mean(u[fluid_mask])) if np.any(fluid_mask) else float(np.mean(u))
+        )
         force_x = (u_inf - mean_u) / tau_drive
 
         pen_u = -(mask_f * u) / penalization

@@ -6,10 +6,35 @@ REM ============================================================================
 REM Change to project root directory (parent of bin)
 cd /d "%~dp0.."
 
+set "MODE=%~1"
+if "%MODE%"=="" set "MODE=--prod"
+
+set "INSTALL_TARGET=."
+set "INSTALL_MODE_LABEL=production"
+
+if /I "%MODE%"=="--dev" goto mode_dev
+if /I "%MODE%"=="-d" goto mode_dev
+if /I "%MODE%"=="--prod" goto mode_prod
+if /I "%MODE%"=="-p" goto mode_prod
+
+echo Usage: bin\setup.bat [--prod ^| -p ^| --dev ^| -d]
+exit /b 1
+
+:mode_dev
+set "INSTALL_TARGET=.[dev]"
+set "INSTALL_MODE_LABEL=development"
+goto mode_ok
+
+:mode_prod
+goto mode_ok
+
+:mode_ok
+
 echo.
 echo ====================================
 echo  DifferentialLab Setup (Windows)
 echo ====================================
+echo  Mode: %INSTALL_MODE_LABEL%
 echo.
 
 REM Check if Python is installed
@@ -52,7 +77,7 @@ python -m pip install --upgrade pip
 
 echo.
 echo [5/6] Installing dependencies...
-pip install -r requirements.txt
+python -m pip install -e "%INSTALL_TARGET%"
 
 echo.
 echo [6/6] Setting up environment file...

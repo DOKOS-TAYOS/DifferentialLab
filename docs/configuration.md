@@ -134,7 +134,9 @@ Supported methods in UI:
 ## Practical recommendations
 
 - Keep solver tolerances strict for stiff/nonlinear systems.
-- Lower `SOLVER_NUM_POINTS` for exploratory runs, increase for publication output.
+- `SOLVER_NUM_POINTS` profile:
+  - Quick/exploratory: `1000-5000`
+  - High-resolution/publication: `20000-100000`
 - Keep `ANIMATION_MAX_FPS` moderate (20-30) to avoid UI saturation.
 - Enable `LOG_CONSOLE=true` while debugging.
 

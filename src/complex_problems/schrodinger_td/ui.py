@@ -22,7 +22,15 @@ from frontend.window_utils import fit_and_center, make_modal
 
 _DIMENSIONS = ("1D", "2D")
 _BOUNDARIES = ("periodic", "absorbing")
-_POTENTIALS = ("free", "harmonic", "square_well", "barrier", "double_well", "lattice", "custom")
+_POTENTIALS = (
+    "free",
+    "harmonic",
+    "square_well",
+    "barrier",
+    "double_well",
+    "lattice",
+    "custom",
+)
 _PACKETS = ("gaussian", "superposition", "custom")
 
 
@@ -35,7 +43,9 @@ class SchrodingerTDDialog:
         self.win.title("Schrodinger TD (1D/2D)")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=1040, min_height=780, padding=32, resizable=True)
+        fit_and_center(
+            self.win, min_width=1040, min_height=780, padding=32, resizable=True
+        )
         self.win.minsize(960, 700)
         make_modal(self.win, parent)
 
@@ -49,7 +59,9 @@ class SchrodingerTDDialog:
         body = scroll.inner
         body.configure(padding=pad)
 
-        ttk.Label(body, text="Schrodinger Time Evolution", style="Title.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Schrodinger Time Evolution", style="Title.TLabel").pack(
+            anchor=tk.W
+        )
         ttk.Label(
             body,
             text=(
@@ -73,8 +85,12 @@ class SchrodingerTDDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._dimension_var = tk.StringVar(value="1D")
         self._boundary_var = tk.StringVar(value="periodic")
-        dim_combo = self._make_combo(row, "Dimension", self._dimension_var, _DIMENSIONS, width=8)
-        bnd_combo = self._make_combo(row, "Boundary", self._boundary_var, _BOUNDARIES, width=10)
+        dim_combo = self._make_combo(
+            row, "Dimension", self._dimension_var, _DIMENSIONS, width=8
+        )
+        bnd_combo = self._make_combo(
+            row, "Boundary", self._boundary_var, _BOUNDARIES, width=10
+        )
         dim_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
         bnd_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
@@ -94,7 +110,9 @@ class SchrodingerTDDialog:
         self._ny_var = tk.StringVar(value="128")
         self._make_entry(self._y_domain_row, "yₘᵢₙ", self._y_min_var, width=10)
         self._make_entry(self._y_domain_row, "yₘₐₓ", self._y_max_var, width=10)
-        self._make_spinbox(self._y_domain_row, "Nᵧ", self._ny_var, from_=32, to=16384, width=8)
+        self._make_spinbox(
+            self._y_domain_row, "Nᵧ", self._ny_var, from_=32, to=16384, width=8
+        )
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -116,8 +134,12 @@ class SchrodingerTDDialog:
         self._absorb_row.pack(fill=tk.X, pady=pad // 2)
         self._absorb_ratio_var = tk.StringVar(value="0.10")
         self._absorb_strength_var = tk.StringVar(value="1.0")
-        self._make_entry(self._absorb_row, "Absorb ratio", self._absorb_ratio_var, width=9)
-        self._make_entry(self._absorb_row, "Absorb strength", self._absorb_strength_var, width=11)
+        self._make_entry(
+            self._absorb_row, "Absorb ratio", self._absorb_ratio_var, width=9
+        )
+        self._make_entry(
+            self._absorb_row, "Absorb strength", self._absorb_strength_var, width=11
+        )
         ToolTip(
             self._absorb_row,
             "Only used for absorbing boundaries. Ratio should be between 0 and 0.49.",
@@ -129,11 +151,14 @@ class SchrodingerTDDialog:
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._potential_var = tk.StringVar(value="free")
-        pot_combo = self._make_combo(row, "Type", self._potential_var, _POTENTIALS, width=14)
+        pot_combo = self._make_combo(
+            row, "Type", self._potential_var, _POTENTIALS, width=14
+        )
         pot_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
         ToolTip(
             pot_combo,
-            "free, harmonic, square_well, barrier, double_well, lattice, or custom expression.",
+            "free, harmonic, square_well, barrier, double_well, lattice, "
+            "or custom expression.",
         )
 
         row = ttk.Frame(body)
@@ -158,7 +183,9 @@ class SchrodingerTDDialog:
 
         self._custom_potential_row = ttk.Frame(body)
         self._custom_potential_row.pack(fill=tk.X, pady=pad // 2)
-        ttk.Label(self._custom_potential_row, text="V_custom =").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(self._custom_potential_row, text="V_custom =").pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
         self._custom_potential_var = tk.StringVar(value="0.5*(x**2 + y**2)")
         self._custom_potential_entry = ttk.Entry(
             self._custom_potential_row,
@@ -174,7 +201,9 @@ class SchrodingerTDDialog:
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._packet_var = tk.StringVar(value="gaussian")
-        packet_combo = self._make_combo(row, "Type", self._packet_var, _PACKETS, width=14)
+        packet_combo = self._make_combo(
+            row, "Type", self._packet_var, _PACKETS, width=14
+        )
         packet_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
         row = ttk.Frame(body)
@@ -223,9 +252,7 @@ class SchrodingerTDDialog:
             text="Close",
             style="Cancel.TButton",
             command=self.win.destroy,
-        ).pack(
-            side=tk.LEFT
-        )
+        ).pack(side=tk.LEFT)
 
         self._update_visibility()
 
@@ -344,7 +371,9 @@ class SchrodingerTDDialog:
         omega = parse_positive_float(self._omega_var.get(), name="ω")
         v0 = parse_float(self._v0_var.get(), name="V₀")
         width = parse_positive_float(self._width_var.get(), name="Width")
-        barrier_sigma = parse_positive_float(self._barrier_sigma_var.get(), name="Barrier σ")
+        barrier_sigma = parse_positive_float(
+            self._barrier_sigma_var.get(), name="Barrier σ"
+        )
         lattice_k = parse_positive_float(self._lattice_k_var.get(), name="Lattice k")
         a_dw = parse_positive_float(self._a_dw_var.get(), name="a (double-well)")
         b_dw = parse_positive_float(self._b_dw_var.get(), name="b (double-well)")
@@ -462,7 +491,9 @@ class SchrodingerTDDialog:
             return solve_schrodinger_td(**params)
 
         def _on_success(result) -> None:
-            from complex_problems.schrodinger_td.result_dialog import SchrodingerTDResultDialog
+            from complex_problems.schrodinger_td.result_dialog import (
+                SchrodingerTDResultDialog,
+            )
 
             SchrodingerTDResultDialog(self.parent, result=result)
 
