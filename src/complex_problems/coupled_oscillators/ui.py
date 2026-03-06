@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 
 import numpy as np
 
+from complex_problems.common import add_how_to_config_section
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
 from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from config.constants import SOLVER_METHODS
@@ -17,23 +18,12 @@ from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.loading_dialog import LoadingDialog
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from utils import build_eval_namespace, get_logger, safe_eval, validate_expression_ast
 
 logger = get_logger(__name__)
 
 _BOUNDARY_OPTIONS = ("Fixed ends", "Periodic")
-
-_COUPLED_OSC_INFO = """
-Configure a 1D chain of N coupled harmonic oscillators.
-
-• Mass and k: Single number = constant. Comma-separated = list per oscillator/spring.
-  Expression with "i" (e.g. 1.0+0.1*i) or containing "[" = function of index.
-
-• Boundary: Fixed ends (x_{-1} = x_N = 0) or Periodic (ring).
-
-• Initial conditions: Oscillators (x_i,v_i) or Modes (q_i,dq_i). Comma-separated values.
-"""
 
 
 def _auto_parse_mass_or_k(
@@ -150,21 +140,13 @@ class CoupledOscillatorsDialog:
         n_spin.pack(side=tk.LEFT)
         ToolTip(n_spin, "Number of oscillators in the chain (2–100).")
 
-        # Info section
-        from frontend.ui_dialogs.collapsible_section import CollapsibleSection
-
-        info_section = CollapsibleSection(
-            inner, self._scroll, "How to configure", expanded=False, pad=pad
+        add_how_to_config_section(
+            inner,
+            self._scroll,
+            problem_id="coupled_oscillators",
+            pad=pad,
+            wraplength=840,
         )
-        info_lbl = ttk.Label(
-            info_section.content,
-            text=_COUPLED_OSC_INFO.strip(),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-            wraplength=520,
-        )
-        info_lbl.pack(anchor=tk.W)
-        self._scroll.bind_new_children()
 
         # Mass and k in same row (auto-detect: constant, list, or function)
         row = ttk.Frame(inner)
@@ -201,7 +183,7 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         )
         boundary_combo.pack(side=tk.LEFT)
-        ToolTip(boundary_combo, "Fixed ends: x_{-1}=x_N=0. Periodic: chain forms a ring.")
+        ToolTip(boundary_combo, "Fixed ends: x₋₁=xₙ=0. Periodic: chain forms a ring.")
 
         # Coupling types (multi-select Listbox + Equations button)
         row = ttk.Frame(inner)
@@ -348,7 +330,7 @@ class CoupledOscillatorsDialog:
         ttk.Entry(
             row, textvariable=self._t_max_var, width=8, font=get_font()
         ).pack(side=tk.LEFT)
-        ToolTip(row, "Integration time interval [t_min, t_max].")
+        ToolTip(row, "Integration time interval [tₘᵢₙ, tₘₐₓ].")
 
         # Resolution points and solver method
         row_res = ttk.Frame(inner)
@@ -519,19 +501,25 @@ class CoupledOscillatorsDialog:
         """Show equations for each coupling type in a formatted help window."""
         pad = int(get_env_from_schema("UI_PADDING"))
         bg = get_env_from_schema("UI_BACKGROUND")
-        txt_bg = get_env_from_schema("UI_BUTTON_BG")
-        txt_fg = get_env_from_schema("UI_FOREGROUND")
 
         sections: list[tuple[str, str]] = [
-            ("Linear (always active)", "k·(xᵢ₊₁+xᵢ₋₁-2xᵢ)"),
-            ("2nd neighbor", "k₂·(xᵢ₊₂+xᵢ₋₂-2xᵢ)"),
-            ("3rd neighbor", "k₃·(xᵢ₊₃+xᵢ₋₃-2xᵢ)"),
-            ("4th neighbor", "k₄·(xᵢ₊₄+xᵢ₋₄-2xᵢ)"),
-            ("FPUT-α", "α·[(xᵢ₊₁-xᵢ)²-(xᵢ-xᵢ₋₁)²]"),
-            ("Cubic", "ε₃·[(xᵢ₊₁-xᵢ)³-(xᵢ-xᵢ₋₁)³]"),
-            ("Quartic", "ε₄·sign(L)·|L|⁴  with  L = xᵢ₊₁+xᵢ₋₁-2xᵢ"),
-            ("Quintic", "ε₅·(xᵢ₊₁+xᵢ₋₁-2xᵢ)⁵"),
-            ("External force", "F·cos(Ωt)"),
+            (
+                "Full equation",
+                "mᵢẍᵢ = kᵢ⁺(xᵢ₊₁−xᵢ) − kᵢ⁻(xᵢ−xᵢ₋₁) + optional terms",
+            ),
+            (
+                "Boundary handling",
+                "Periodic: wrapped neighbors. Fixed: virtual walls x₋₁=xₙ=0 "
+                "(wall springs only linear).",
+            ),
+            ("2nd neighbor", "k₂·(xᵢ₊₂ + xᵢ₋₂ − 2xᵢ)"),
+            ("3rd neighbor", "k₃·(xᵢ₊₃ + xᵢ₋₃ − 2xᵢ)"),
+            ("4th neighbor", "k₄·(xᵢ₊₄ + xᵢ₋₄ − 2xᵢ)"),
+            ("FPUT-α", "α·[(xᵢ₊₁−xᵢ)² − (xᵢ−xᵢ₋₁)²]"),
+            ("Cubic nonlinear", "ε₃·[(xᵢ₊₁−xᵢ)³ − (xᵢ−xᵢ₋₁)³]"),
+            ("Quartic nonlinear", "ε₄·sign(Lᵢ)·|Lᵢ|⁴, with Lᵢ = xᵢ₊₁ + xᵢ₋₁ − 2xᵢ"),
+            ("Quintic nonlinear", "ε₅·Lᵢ⁵, with Lᵢ = xᵢ₊₁ + xᵢ₋₁ − 2xᵢ"),
+            ("External forcing", "F·cos(Ωt)"),
         ]
 
         dlg = tk.Toplevel(self.win)
@@ -557,29 +545,26 @@ class CoupledOscillatorsDialog:
             style="Title.TLabel",
         ).pack(anchor=tk.W, pady=(0, pad))
 
-        txt = tk.Text(
-            main,
-            wrap=tk.WORD,
-            width=48,
-            height=14,
-            font=get_font(),
-            bg=txt_bg,
-            fg=txt_fg,
-            relief=tk.FLAT,
-        )
-        scroll = ttk.Scrollbar(main, orient=tk.VERTICAL, command=txt.yview)
-        txt.configure(yscrollcommand=scroll.set)
-        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=(0, pad))
-        scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=(0, pad))
+        content = ScrollableFrame(main)
+        content.apply_bg(get_env_from_schema("UI_BUTTON_BG"))
+        content.pack(fill=tk.BOTH, expand=True, pady=(0, pad))
 
-        for i, (title, body) in enumerate(sections):
-            if i > 0:
-                txt.insert(tk.END, "\n\n")
-            txt.insert(tk.END, f"▸ {title}\n", "heading")
-            txt.insert(tk.END, f"{body}\n", "body")
-        txt.tag_configure("heading", font=(get_font()[0], get_font()[1], "bold"))
-        txt.tag_configure("body", font=get_font())
-        txt.config(state=tk.DISABLED)
+        for idx, (title, body) in enumerate(sections):
+            if idx > 0:
+                ttk.Separator(content.inner).pack(fill=tk.X, pady=(0, pad // 2))
+            heading = ttk.Label(content.inner, text=f"{title}", style="Subtitle.TLabel")
+            heading.pack(anchor=tk.W, pady=(0, 2))
+            body_label = ttk.Label(
+                content.inner,
+                text=body,
+                style="Small.TLabel",
+                justify=tk.LEFT,
+            )
+            body_label.pack(anchor=tk.W, fill=tk.X, pady=(0, pad // 2))
+            bind_wraplength(content.inner, body_label, pad=2 * pad, min_wrap=220)
+
+        content.bind_new_children()
+        content.refresh_scroll_region()
 
         fit_and_center(dlg, min_width=380, min_height=340, padding=32)
         make_modal(dlg, self.win)
@@ -645,7 +630,7 @@ class CoupledOscillatorsDialog:
             t_min = float(self._t_min_var.get())
             t_max = float(self._t_max_var.get())
             if t_min >= t_max:
-                raise ValueError("t_max must be greater than t_min")
+                raise ValueError("tₘₐₓ must be greater than tₘᵢₙ")
         except ValueError as e:
             messagebox.showerror("Invalid input", str(e), parent=self.win)
             return

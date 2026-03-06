@@ -4,137 +4,143 @@
 
 # DifferentialLab
 
-**Numerical ODE, difference equation, and PDE solver with a graphical interface for scientists, engineers, and students.**
+Numerical ODE, difference-equation, and PDE solver with a desktop GUI for science and engineering workflows.
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
 [![Version](https://img.shields.io/badge/version-0.4.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
-[![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org/)
-[![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
-[![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=matplotlib&logoColor=white)](https://matplotlib.org/)
 
-[📖 **Documentation**](docs/index.md) • [🐛 **Report Bug**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) • [💡 **Request Feature**](https://github.com/DOKOS-TAYOS/DifferentialLab/issues)
+[Documentation](docs/index.md) |
+[Report Bug](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) |
+[Request Feature](https://github.com/DOKOS-TAYOS/DifferentialLab/issues)
 
 </div>
 
----
+## What It Solves
 
-## Features
+- ODEs with SciPy integrators (`RK45`, `RK23`, `DOP853`, `Radau`, `BDF`, `LSODA`)
+- Difference equations (recurrence systems)
+- PDEs (elliptic 2D solver and operator-based PDE workflows)
+- Vector ODE systems with dedicated visualization modes
+- Function transforms (Fourier, Laplace, Taylor, Hilbert, Z-transform)
 
-- **ODEs**: Six methods (RK45, RK23, DOP853, Radau, BDF, LSODA) via SciPy
-- **Difference equations**: Recurrence relations (geometric growth, logistic map, Fibonacci, etc.)
-- **PDEs**: 2D elliptic solver (Poisson, Laplace) plus general operator-based PDEs with configurable derivative terms
-- **Vector ODEs**: Coupled systems with animation, 3D phase-space trajectories, and surface visualization
-- **Unified f-notation**: Write equations using `f[0]` (function), `f[1]` (first derivative), `f[i,k]` (component i, derivative k for vector ODEs)
-- **Predefined equations**: Harmonic oscillator, pendulum, Van der Pol, Lorenz, Lotka-Volterra, Duffing, Schrödinger, and more
-- **Complex Problems** *(experimental)*: Special cases with custom UIs (e.g. coupled harmonic oscillators). Still in development; may contain bugs.
-- **Function transforms**: Fourier (FFT), Laplace, Taylor series, Hilbert, Z-transform
-- **Custom equations**: Write any ODE, difference equation, or PDE in Python syntax
-- **Interactive result tabs**: Select derivatives to plot, choose phase-space axes, switch visualization modes without re-solving
-- **Professional plots**: Solution curves, phase portraits (2D/3D), surface/contour, vector animation
-- **Statistics**: Mean, max/min, period, energy, RMS, residual error metrics
-- **Export**: CSV, JSON, PNG/JPG/PDF, MP4 animation
-- **Configurable** via `.env` file or in-app Configuration dialog
-- **Desktop GUI** built with Tkinter/ttk
+## Core Features
+
+- Predefined equation catalog loaded from YAML (`config/equations/*.yaml`)
+- Custom equation parsing with safe AST validation
+- Unified `f[...]` notation (`f[0]`, `f[1]`, `f[i,k]`)
+- Interactive result dialogs (derivative selection, phase-space selection, dynamic redraw)
+- Export to CSV, JSON, static figures, and MP4 animations
+- Configurable UI/plot/solver behavior via `.env` or in-app configuration dialog
+
+## Complex Problems (Plugin Mode)
+
+`Complex Problems` is a plugin-style subsystem for specialized models with custom UI, solver, and result dialogs.
+
+Current modules:
+
+- `coupled_oscillators` (1D coupled oscillators and FPUT variants)
+- `membrane_2d` (2D coupled nonlinear membrane)
+- `nonlinear_waves` (NLSE and KdV)
+- `schrodinger_td` (time-dependent Schrodinger in 1D/2D)
+- `antenna_radiation` (far-field patterns and antenna metrics)
+- `aerodynamics_2d` (2D incompressible obstacle flow approximations)
+- `pipe_flow` (steady and transient 1D pipe-flow models)
 
 ## Requirements
 
-- Python 3.12 or higher
-- Windows 10/11, macOS 10.14+, or Linux
-- 4 GB RAM minimum
+- Python `>=3.12`
+- Windows 10/11, macOS, or Linux
+- Tkinter available in the Python runtime (GUI requirement)
 
 ## Quick Start
 
-### Installation (first-time setup)
+### First-time setup
 
-**Windows:**
-```
+Windows:
+
+```bat
 install.bat
 ```
 
-**Linux/macOS:**
+Linux/macOS:
+
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-This clones the repository (if needed) and runs setup.
+### Existing clone
 
-### Manual setup (existing clone)
+Windows:
 
-1. Create virtual environment and install dependencies:
-```bash
-# Windows
+```bat
 bin\setup.bat
-
-# Linux/macOS
-chmod +x bin/setup.sh
-./bin/setup.sh
+bin\run.bat
 ```
 
-2. Run the application:
-```bash
-# Windows
-bin\run.bat
+Linux/macOS:
 
-# Linux/macOS
+```bash
+chmod +x bin/setup.sh bin/run.sh
+./bin/setup.sh
 ./bin/run.sh
 ```
 
-Or run directly:
+Direct run:
+
 ```bash
 python src/main_program.py
 ```
 
-## Configuration
+Installed console entry point:
 
-Copy `.env.example` to `.env` and customize, or use the in-app **Configuration** dialog.
-
-Available settings:
-- UI theme (colors, fonts, padding, tooltips)
-- Plot style (line, markers, fonts, phase-space, 3D/contour, animation)
-- Solver defaults (method, tolerances)
-- Logging and update check
+```bash
+differential-lab
+```
 
 ## Documentation
 
-Full documentation is built with [Sphinx](https://www.sphinx-doc.org/) and hosted on Read the Docs.
+- [Documentation Home](docs/index.md)
+- [Getting Started](docs/getting-started.md)
+- [User Guide](docs/user-guide.md)
+- [Complex Problems Guide](docs/complex-problems.md)
+- [Configuration Reference](docs/configuration.md)
+- [Architecture](docs/architecture.md)
+- [Developer Guide](docs/developer-guide.md)
+- [Testing](docs/testing.md)
+- [API Reference](docs/api/index.md)
 
-To build the docs locally:
+To build docs locally:
 
 ```bash
 pip install -e ".[docs]"
 cd docs
-make html          # Linux/macOS
-make.bat html      # Windows
+make html      # Linux/macOS
+make.bat html  # Windows
 ```
 
-The output will be in `docs/_build/html/`.
+Output directory: `docs/_build/html/`.
 
-Documentation contents:
-- **Getting Started** — installation, setup, first run
-- **User Guide** — walk-through of the complete workflow
-- **Configuration Reference** — every `.env` setting explained
-- **Architecture** — module structure and design decisions
-- **API Reference** — auto-generated from source docstrings
+## Development
 
-## Dependencies
+Install development dependencies:
 
-| Package        | Version     | Purpose                     |
-|----------------|-------------|-----------------------------|
-| NumPy          | >= 2.0      | Numerical computations      |
-| Matplotlib     | >= 3.10     | Plotting and visualization  |
-| SciPy          | >= 1.15     | ODE solving engine          |
-| python-dotenv  | >= 1.0      | Environment configuration   |
-| PyYAML         | >= 6.0      | Equation definitions        |
+```bash
+pip install -e ".[dev]"
+```
+
+Run tests:
+
+```bash
+pytest
+```
+
+Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
 MIT License. See [license.md](license.md).
 
-Third-party licenses: see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-
-## Author
-
-**Alejandro Mata Ali**
+Third-party licenses: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

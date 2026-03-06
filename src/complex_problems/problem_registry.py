@@ -91,6 +91,12 @@ class _LazyDescriptorMapping(Mapping[str, ProblemDescriptor]):
 
 _REGISTRATIONS: tuple[ProblemRegistration, ...] = (
     ProblemRegistration(module_path="complex_problems.coupled_oscillators.problem"),
+    ProblemRegistration(module_path="complex_problems.membrane_2d.problem"),
+    ProblemRegistration(module_path="complex_problems.nonlinear_waves.problem"),
+    ProblemRegistration(module_path="complex_problems.schrodinger_td.problem"),
+    ProblemRegistration(module_path="complex_problems.antenna_radiation.problem"),
+    ProblemRegistration(module_path="complex_problems.aerodynamics_2d.problem"),
+    ProblemRegistration(module_path="complex_problems.pipe_flow.problem"),
 )
 
 _REGISTRY = ProblemRegistry(_REGISTRATIONS)

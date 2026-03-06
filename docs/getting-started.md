@@ -2,165 +2,116 @@
 
 ## Requirements
 
-- **Python 3.12** or higher
-- Windows 10/11, macOS 10.14+, or Linux
-- 4 GB RAM minimum
+- Python 3.12 or newer
+- Windows, macOS, or Linux
+- Tkinter available in your Python runtime
 
 ## Installation
 
-### Quick Install (Recommended)
+### Recommended bootstrap scripts
 
-**Windows:**
+Windows:
 
-```
+```bat
 install.bat
 ```
 
-**Linux / macOS:**
+Linux/macOS:
 
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-These scripts clone the repository (if needed) and run setup, which creates a
-virtual environment, installs all dependencies, and generates a default `.env`
-file.
+These scripts set up the repository and execute environment setup.
 
-### Manual Setup (existing clone)
+### Manual setup (already cloned repository)
 
-If you need to clone the repository first:
+Windows:
 
-```bash
-git clone https://github.com/DOKOS-TAYOS/DifferentialLab.git
-cd DifferentialLab
-```
-
-If you already have the repository cloned:
-
-**Windows:**
-
-```
+```bat
 bin\setup.bat
 ```
 
-**Linux / macOS:**
+Linux/macOS:
 
 ```bash
 chmod +x bin/setup.sh
 ./bin/setup.sh
 ```
 
-Alternatively, set up manually:
-
-1. Create and activate a virtual environment:
-
-   ```bash
-   python -m venv .venv
-
-   # Windows
-   .venv\Scripts\activate
-
-   # Linux / macOS
-   source .venv/bin/activate
-   ```
-
-2. Install the package in editable mode:
-
-   ```bash
-   pip install -e .
-   ```
-
-   For development (tests, linting, type-checking):
-
-   ```bash
-   pip install -e ".[dev]"
-   ```
-
-   For building documentation:
-
-   ```bash
-   pip install -e ".[docs]"
-   ```
-
-3. Copy the example configuration:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-## Running the Application
-
-**With the helper scripts:**
+Or manually:
 
 ```bash
-# Windows
-bin\run.bat
+python -m venv .venv
 
-# Linux / macOS
+# Windows
+.venv\Scripts\activate
+
+# Linux/macOS
+source .venv/bin/activate
+
+pip install -e .
+```
+
+Optional extras:
+
+```bash
+pip install -e ".[dev]"   # tests + linting + typing
+pip install -e ".[docs]"  # documentation build dependencies
+```
+
+## Run the application
+
+Windows:
+
+```bat
+bin\run.bat
+```
+
+Linux/macOS:
+
+```bash
 ./bin/run.sh
 ```
 
-**Directly via Python** (from project root):
+Direct run:
 
 ```bash
 python src/main_program.py
 ```
 
-**Via the installed entry point:**
+Installed entry point:
 
 ```bash
 differential-lab
 ```
 
-## Dependencies
+## First run checklist
 
-| Package       | Version     | Purpose                    |
-|---------------|-------------|----------------------------|
-| NumPy         | >= 2.0, < 3.0 | Numerical computations   |
-| Matplotlib    | >= 3.10, < 4.0 | Plotting and visualization |
-| SciPy         | >= 1.15, < 2.0 | ODE solving engine       |
-| python-dotenv | >= 1.0, < 2.0 | Environment configuration |
-| PyYAML        | >= 6.0, < 7.0 | Equation definitions      |
+1. Open `Solve` and run a predefined equation to validate solver output.
+2. Open `Configuration` and save your preferred UI/plot defaults.
+3. Confirm `output/` receives CSV/JSON/plot exports.
+4. Optionally open `Complex Problems` and run one plugin with default parameters.
 
-## Building the Documentation
+## Build docs locally
 
 ```bash
 pip install -e ".[docs]"
 cd docs
+make html      # Linux/macOS
+make.bat html  # Windows
 ```
 
-**Linux / macOS:**
-
-```bash
-make html
-```
-
-**Windows:**
-
-```
-make.bat html
-```
-
-The built HTML will be in `docs/_build/html/`. Open `index.html` in a browser
-to view it locally.
+Open `docs/_build/html/index.html`.
 
 ## Troubleshooting
 
-**Virtual environment not found**
-
-If `bin\run.bat` or `./bin/run.sh` reports that the virtual environment is
-missing, run `bin\setup.bat` (Windows) or `./bin/setup.sh` (Linux/macOS) first
-to create it and install dependencies.
-
-**ModuleNotFoundError when running directly**
-
-If you get `ModuleNotFoundError` when running `python src/main_program.py`,
-ensure you are in the project root directory (the folder containing `src/`).
-Alternatively, use the installed entry point: `differential-lab` (after
-`pip install -e .`).
-
-**Git not found (install scripts)**
-
-The `install.bat` and `install.sh` scripts require Git. Install it from
-<https://git-scm.com/downloads> before running them.
+- Virtual environment missing:
+  - Run `bin/setup.bat` or `./bin/setup.sh`.
+- `ModuleNotFoundError` on direct run:
+  - Run from project root, or use `differential-lab` after `pip install -e .`.
+- Tkinter unavailable:
+  - Install Tk for your OS/Python distribution.
+- `pythonw` not found on Linux/macOS in helper script:
+  - Run `python src/main_program.py` directly.

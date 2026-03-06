@@ -1,133 +1,144 @@
 # Configuration Reference
 
-DifferentialLab is configured via a `.env` file in the project root.  Copy
-`.env.example` to `.env` to get started, or use the in-app **Configuration**
-dialog (Main Menu > Configuration) which writes the file for you.
+DifferentialLab reads configuration from `.env` in the project root.
 
-After saving through the dialog the application restarts automatically.
+- Use `.env.example` as template.
+- Or use the in-app `Configuration` dialog (recommended).
+- On startup, values are validated against `ENV_SCHEMA` (`src/config/env.py`).
+- Invalid values are automatically replaced with defaults and logged.
 
-## UI Theme
+## How values are interpreted
 
-| Variable              | Type | Default      | Description                                    |
-|-----------------------|------|--------------|------------------------------------------------|
-| `UI_BACKGROUND`       | str  | `#181818`    | Main background colour (hex).                  |
-| `UI_FOREGROUND`       | str  | `#CCCCCC`    | Default text colour (hex).                     |
-| `UI_BUTTON_BG`        | str  | `#1F1F1F`    | Button / input background colour (hex).        |
-| `UI_BUTTON_WIDTH`     | int  | `14`         | Width of main-menu buttons in characters.      |
-| `UI_BUTTON_FG`        | str  | `lime green` | Primary button text colour.                    |
-| `UI_BUTTON_FG_CANCEL` | str  | `red2`       | Cancel / destructive button text colour.       |
-| `UI_BUTTON_FG_ACCENT2`| str  | `yellow`     | Secondary accent button text colour.           |
-| `UI_FONT_SIZE`        | int  | `16`         | Base font size in points.                      |
-| `UI_FONT_FAMILY`      | str  | `Bahnschrift`| Font family for the interface.                 |
-| `UI_PADDING`          | int  | `8`          | Padding in pixels between UI elements.         |
+- `bool`: accepts `true/false`, `1/0`, `yes/no`
+- `int` and `float`: parsed numerically with range checks where defined
+- `str`: non-empty; some keys enforce enumerated options
 
-Colours accept any Tk colour name (e.g. `lime green`, `crimson`) or a hex
-code (`#RRGGBB`).
+## UI settings
 
-## UI Tooltips
+| Key | Default |
+|---|---|
+| `UI_BACKGROUND` | `#181818` |
+| `UI_FOREGROUND` | `#CCCCCC` |
+| `UI_BUTTON_BG` | `#1F1F1F` |
+| `UI_BUTTON_WIDTH` | `14` |
+| `UI_BUTTON_FG` | `lime green` |
+| `UI_BUTTON_FG_CANCEL` | `red2` |
+| `UI_BUTTON_FG_ACCENT2` | `yellow` |
+| `UI_FONT_SIZE` | `16` |
+| `UI_FONT_FAMILY` | `Bahnschrift` |
+| `UI_PADDING` | `8` |
 
-| Variable              | Type | Default | Description                                    |
-|-----------------------|------|---------|------------------------------------------------|
-| `UI_TOOLTIP_DELAY_MS` | int  | `500`   | Delay in milliseconds before showing a tooltip. |
-| `UI_TOOLTIP_WRAPLENGTH` | int | `350`   | Maximum width in pixels before tooltip text wraps. |
-| `UI_TOOLTIP_PADX`    | int  | `8`     | Horizontal padding inside tooltip.             |
-| `UI_TOOLTIP_PADY`    | int  | `4`     | Vertical padding inside tooltip.               |
+## Tooltip settings
 
-## Plot Style
+| Key | Default |
+|---|---|
+| `UI_TOOLTIP_DELAY_MS` | `500` |
+| `UI_TOOLTIP_WRAPLENGTH` | `350` |
+| `UI_TOOLTIP_PADX` | `8` |
+| `UI_TOOLTIP_PADY` | `4` |
 
-| Variable              | Type  | Default      | Description                                   |
-|-----------------------|-------|--------------|-----------------------------------------------|
-| `PLOT_FIGSIZE_WIDTH`  | int   | `12`         | Plot width in inches.                         |
-| `PLOT_FIGSIZE_HEIGHT` | int   | `6`          | Plot height in inches.                        |
-| `DPI`                 | int   | `100`        | Dots per inch (50--1000).                     |
-| `PLOT_SHOW_TITLE`     | bool  | `true`       | Show a title above the plot.                  |
-| `PLOT_SHOW_GRID`      | bool  | `true`       | Draw a background grid.                       |
-| `PLOT_LINE_COLOR`     | str   | `royalblue`  | Colour of the main solution curve.            |
-| `PLOT_LINE_WIDTH`     | float | `1.5`        | Line thickness in points.                     |
-| `PLOT_LINE_STYLE`     | str   | `-`          | `-` solid, `--` dashed, `-.` dash-dot, `:` dotted. |
-| `PLOT_COLOR_SCHEME`   | str   | `Set1`       | Matplotlib colormap for extra derivatives.    |
+Tooltip font size is derived automatically from `UI_FONT_SIZE`:
 
-## Plot Markers
+- `tooltip_size = max(6, round(UI_FONT_SIZE * 0.5))`
+- There is no separate `.env` key for tooltip font size.
 
-| Variable                | Type | Default   | Description                      |
-|-------------------------|------|-----------|----------------------------------|
-| `PLOT_MARKER_FORMAT`    | str  | `o`       | `o` circle, `s` square, `^` triangle, `d` diamond, `*` star. |
-| `PLOT_MARKER_SIZE`      | int  | `3`       | Marker size in points.           |
-| `PLOT_MARKER_FACE_COLOR`| str  | `crimson` | Marker fill colour.              |
-| `PLOT_MARKER_EDGE_COLOR`| str  | `crimson` | Marker edge colour.              |
+## Plot settings
 
-## Plot Phase-Space
+### Layout and style
 
-| Variable                 | Type | Default | Description                              |
-|---------------------------|------|---------|------------------------------------------|
-| `PLOT_PHASE_START_COLOR`  | str  | `green` | Colour of the start marker in phase-space plots. |
-| `PLOT_PHASE_END_COLOR`    | str  | `red`   | Colour of the end marker in phase-space plots.   |
-| `PLOT_PHASE_MARKER_SIZE`  | int  | `8`     | Size of start/end markers in phase-space plots.  |
+| Key | Default |
+|---|---|
+| `PLOT_FIGSIZE_WIDTH` | `12` |
+| `PLOT_FIGSIZE_HEIGHT` | `6` |
+| `DPI` | `100` |
+| `PLOT_SHOW_TITLE` | `true` |
+| `PLOT_SHOW_GRID` | `true` |
+| `PLOT_LINE_COLOR` | `royalblue` |
+| `PLOT_LINE_WIDTH` | `1.5` |
+| `PLOT_LINE_STYLE` | `-` |
+| `PLOT_COLOR_SCHEME` | `Set1` |
 
-## Plot Fonts
+### Markers
 
-Configured directly under Plot Style in the Configuration dialog.
+| Key | Default |
+|---|---|
+| `PLOT_MARKER_FORMAT` | `o` |
+| `PLOT_MARKER_SIZE` | `3` |
+| `PLOT_MARKER_FACE_COLOR` | `crimson` |
+| `PLOT_MARKER_EDGE_COLOR` | `crimson` |
 
-| Variable            | Type | Default     | Description                                  |
-|---------------------|------|-------------|----------------------------------------------|
-| `FONT_FAMILY`       | str  | `serif`     | Font family for matplotlib plots.  Options: `serif`, `sans-serif`, `monospace`, `cursive`, `fantasy`. |
-| `FONT_TITLE_SIZE`   | str  | `xx-large`  | Title font size (matplotlib size string).    |
-| `FONT_TITLE_WEIGHT` | str  | `semibold`  | Title font weight.  Options: `normal`, `bold`, `light`, `semibold`, `heavy`. |
-| `FONT_AXIS_SIZE`    | int  | `16`        | Axis label font size in points.              |
-| `FONT_AXIS_STYLE`   | str  | `italic`    | Axis label font style.  Options: `normal`, `italic`, `oblique`. |
-| `FONT_TICK_SIZE`    | int  | `12`        | Tick label font size in points.              |
+### Phase-space and 3D/contour
 
-## Plot 3D / Contour
+| Key | Default |
+|---|---|
+| `PLOT_PHASE_START_COLOR` | `green` |
+| `PLOT_PHASE_END_COLOR` | `red` |
+| `PLOT_PHASE_MARKER_SIZE` | `8` |
+| `PLOT_SURFACE_CMAP` | `viridis` |
+| `PLOT_CONTOUR_LEVELS` | `20` |
+| `PLOT_GRID_ALPHA` | `0.3` |
+| `PLOT_SURFACE_ALPHA` | `0.9` |
+| `PLOT_COLORBAR_SHRINK` | `0.6` |
 
-| Variable               | Type  | Default  | Description                              |
-|------------------------|-------|----------|------------------------------------------|
-| `PLOT_SURFACE_CMAP`    | str   | `viridis`| Matplotlib colormap for 3D surface and contour plots. |
-| `PLOT_CONTOUR_LEVELS`  | int   | `20`     | Number of contour levels in 2D contour plots. |
-| `PLOT_GRID_ALPHA`      | float | `0.3`    | Transparency of the grid lines (0–1).    |
-| `PLOT_SURFACE_ALPHA`   | float | `0.9`    | Transparency of 3D surfaces (0–1).      |
-| `PLOT_COLORBAR_SHRINK` | float | `0.6`    | Shrink factor for the colorbar (0–1).    |
+### Animation
 
-## Plot Animation
+| Key | Default |
+|---|---|
+| `PLOT_ANIMATION_LINE_WIDTH` | `2.0` |
+| `PLOT_VLINES_LINE_WIDTH` | `1.5` |
+| `PLOT_VLINES_ALPHA` | `0.6` |
+| `PLOT_ANIMATION_Y_MARGIN` | `0.1` |
+| `ANIMATION_MAX_FPS` | `30` |
 
-| Variable                  | Type  | Default | Description                                    |
-|---------------------------|-------|---------|------------------------------------------------|
-| `PLOT_ANIMATION_LINE_WIDTH` | float | `2.0`  | Line width for vector animation plot.         |
-| `PLOT_VLINES_LINE_WIDTH`  | float | `1.5`   | Line width for vertical lines in animation.   |
-| `PLOT_VLINES_ALPHA`       | float | `0.6`   | Transparency of vertical lines (0–1).         |
-| `PLOT_ANIMATION_Y_MARGIN` | float | `0.1`   | Margin added to y-axis limits in animation.  |
-| `ANIMATION_MAX_FPS`       | int   | `30`    | Maximum frames per second for animation playback. |
+## Matplotlib font settings
 
-## Solver Defaults
+| Key | Default |
+|---|---|
+| `FONT_FAMILY` | `serif` |
+| `FONT_TITLE_SIZE` | `xx-large` |
+| `FONT_TITLE_WEIGHT` | `semibold` |
+| `FONT_AXIS_SIZE` | `16` |
+| `FONT_AXIS_STYLE` | `italic` |
+| `FONT_TICK_SIZE` | `12` |
 
-The default integration method is the first in the available list (`RK45`). Use the
-Parameters dialog to select a different method per run.
+## Solver defaults
 
-| Variable            | Type  | Default  | Description                     |
-|---------------------|-------|----------|---------------------------------|
-| `SOLVER_MAX_STEP`   | float | `0.0`    | Maximum step size (0 = automatic). |
-| `SOLVER_RTOL`           | float | `1e-8`   | Relative tolerance.                          |
-| `SOLVER_ATOL`           | float | `1e-10`  | Absolute tolerance.                          |
-| `SOLVER_NUM_POINTS`     | int   | `1000`   | Number of evaluation points in the grid.     |
+| Key | Default |
+|---|---|
+| `SOLVER_MAX_STEP` | `0.0` |
+| `SOLVER_RTOL` | `1e-8` |
+| `SOLVER_ATOL` | `1e-10` |
+| `SOLVER_NUM_POINTS` | `1000` |
 
-### Solver Methods
+Supported methods in UI:
 
-| Method   | Description                                              |
-|----------|----------------------------------------------------------|
-| `RK45`   | Runge-Kutta 4(5) -- general-purpose explicit method.     |
-| `RK23`   | Runge-Kutta 2(3) -- low-order, faster per step.          |
-| `DOP853` | Runge-Kutta 8(5,3) -- high-order explicit method.        |
-| `Radau`  | Implicit Runge-Kutta (Radau IIA) -- stiff problems.      |
-| `BDF`    | Backward Differentiation Formula -- stiff problems.      |
-| `LSODA`  | Adams/BDF auto-switching -- stiff/non-stiff detection.   |
+- `RK45`
+- `RK23`
+- `DOP853`
+- `Radau`
+- `BDF`
+- `LSODA`
 
-## Logging & Update
+## Logging and update checks
 
-| Variable                   | Type | Default                  | Description                          |
-|----------------------------|------|--------------------------|--------------------------------------|
-| `LOG_LEVEL`                | str  | `INFO`                   | Verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
-| `LOG_FILE`                 | str  | `differential_lab.log`   | Log file name (project root).        |
-| `LOG_CONSOLE`              | bool | `false`                  | Also print logs to the terminal.     |
-| `CHECK_UPDATES`            | bool | `true`                   | Check for updates on startup (once per week). |
-| `UPDATE_CHECK_INTERVAL_DAYS` | int  | `7`                    | Days between automatic update checks. |
-| `CHECK_UPDATES_FORCE`      | bool | `false`                  | Force update check on every startup. |
-| `UPDATE_CHECK_URL`         | str  | *(main branch)*          | URL to pyproject.toml for version check. |
+| Key | Default |
+|---|---|
+| `LOG_LEVEL` | `INFO` |
+| `LOG_FILE` | `differential_lab.log` |
+| `LOG_CONSOLE` | `false` |
+| `CHECK_UPDATES` | `true` |
+| `UPDATE_CHECK_INTERVAL_DAYS` | `7` |
+| `CHECK_UPDATES_FORCE` | `false` |
+| `UPDATE_CHECK_URL` | `https://raw.githubusercontent.com/DOKOS-TAYOS/DifferentialLab/main/pyproject.toml` |
+
+## Practical recommendations
+
+- Keep solver tolerances strict for stiff/nonlinear systems.
+- Lower `SOLVER_NUM_POINTS` for exploratory runs, increase for publication output.
+- Keep `ANIMATION_MAX_FPS` moderate (20-30) to avoid UI saturation.
+- Enable `LOG_CONSOLE=true` while debugging.
+
+## Source of truth
+
+If this page and runtime behavior differ, runtime behavior is authoritative.
+The canonical schema lives in `src/config/env.py` (`ENV_SCHEMA`).
