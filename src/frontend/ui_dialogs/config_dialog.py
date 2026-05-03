@@ -1,4 +1,4 @@
-"""Configuration dialog — edit .env variables with collapsible sections."""
+"""Settings dialog - edit .env variables with collapsible sections."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     (
         "ui_theme",
-        "UI Theme",
+        "Interface Theme",
         [
             "UI_BACKGROUND",
             "UI_FOREGROUND",
@@ -42,7 +42,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
     (
         "ui_tooltips",
-        "UI Tooltips",
+        "Tooltips",
         [
             "UI_TOOLTIP_DELAY_MS",
             "UI_TOOLTIP_WRAPLENGTH",
@@ -89,7 +89,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
     (
         "plot_phase",
-        "Plot Phase-Space",
+        "Phase-Space Plots",
         [
             "PLOT_PHASE_START_COLOR",
             "PLOT_PHASE_END_COLOR",
@@ -98,7 +98,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
     (
         "plot_surface",
-        "Plot 3D / Contour",
+        "3D and Contour Plots",
         [
             "PLOT_SURFACE_CMAP",
             "PLOT_CONTOUR_LEVELS",
@@ -109,7 +109,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
     (
         "plot_animation",
-        "Plot Animation",
+        "Animations",
         [
             "PLOT_ANIMATION_LINE_WIDTH",
             "PLOT_VLINES_LINE_WIDTH",
@@ -130,7 +130,7 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     ),
     (
         "logging",
-        "Logging & Update",
+        "Logging and Updates",
         [
             "LOG_LEVEL",
             "LOG_FILE",
@@ -159,7 +159,7 @@ class ConfigDialog:
         self.parent = parent
         self.accepted = False
         self.win = tk.Toplevel(parent)
-        self.win.title("Configuration")
+        self.win.title("Settings")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -182,7 +182,7 @@ class ConfigDialog:
 
         hint = ttk.Label(
             btn_frame,
-            text="The application will restart after saving.",
+            text="Saving writes these values to .env and restarts the app.",
             style="Small.TLabel",
             anchor=tk.CENTER,
         )
@@ -191,7 +191,7 @@ class ConfigDialog:
         btn_inner = ttk.Frame(btn_frame)
         btn_inner.pack()
 
-        btn_save = ttk.Button(btn_inner, text="Save", command=self._on_save)
+        btn_save = ttk.Button(btn_inner, text="Save & Restart", command=self._on_save)
         btn_save.pack(side=tk.LEFT, padx=pad)
 
         btn_cancel = ttk.Button(
@@ -212,7 +212,7 @@ class ConfigDialog:
         form = self._scroll.inner
         form.configure(padding=pad)
 
-        ttk.Label(form, text="Configuration", style="Title.TLabel").pack(
+        ttk.Label(form, text="Settings", style="Title.TLabel").pack(
             anchor=tk.W,
             pady=(0, pad),
         )
@@ -309,9 +309,13 @@ class ConfigDialog:
 
         try:
             write_env_file(get_env_path(), values)
-            logger.info("Configuration saved to .env")
+            logger.info("Settings saved to .env")
             self.accepted = True
             self.win.destroy()
         except Exception as exc:
             logger.error("Failed to save .env: %s", exc, exc_info=True)
-            messagebox.showerror("Error", f"Could not save: {exc}", parent=self.win)
+            messagebox.showerror(
+                "Settings were not saved",
+                f"DifferentialLab could not save the settings:\n{exc}",
+                parent=self.win,
+            )

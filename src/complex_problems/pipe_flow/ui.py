@@ -60,8 +60,8 @@ class PipeFlowDialog:
         ttk.Label(
             body,
             text=(
-                "Steady Darcy-Weisbach model and transient pressure-wave model.\n"
-                "Define geometry profile, friction correlation, and pressure conditions."
+                "Use steady Darcy-Weisbach flow or a transient pressure-wave model.\n"
+                "Define pipe geometry, friction correlation, fluid properties, and pressure inputs."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -147,7 +147,7 @@ class PipeFlowDialog:
         self._steady_frame.pack(fill=tk.X, pady=pad)
         ttk.Label(
             self._steady_frame,
-            text="Steady pressure BC",
+            text="Steady pressure boundary",
             style="Small.TLabel",
         ).pack(anchor=tk.W)
         row = ttk.Frame(self._steady_frame)
@@ -159,7 +159,7 @@ class PipeFlowDialog:
 
         self._transient_frame = ttk.Frame(body)
         self._transient_frame.pack(fill=tk.X, pady=pad)
-        ttk.Label(self._transient_frame, text="Transient settings", style="Small.TLabel").pack(
+        ttk.Label(self._transient_frame, text="Transient forcing", style="Small.TLabel").pack(
             anchor=tk.W
         )
 
@@ -183,7 +183,7 @@ class PipeFlowDialog:
         make_labeled_entry(row, "Damping", self._damping_var, width=8)
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
         make_labeled_entry(row, "Δt", self._dt_var, width=8)
-        make_labeled_entry(row, "sample_every", self._sample_every_var, width=10)
+        make_labeled_entry(row, "Sample every", self._sample_every_var, width=10)
 
         self._btn_row = ttk.Frame(body)
         self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
@@ -275,7 +275,7 @@ class PipeFlowDialog:
             params["dt"] = parse_positive_float(self._dt_var.get(), name="Δt")
             params["sample_every"] = parse_positive_int(
                 self._sample_every_var.get(),
-                name="sample_every",
+                name="Sample every",
                 min_value=1,
             )
         return params

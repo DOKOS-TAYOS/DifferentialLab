@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refreshed repository documentation to match the current 0.4.1 codebase, including
+  setup/run modes, solver coverage, complex-problem plugins, configuration defaults,
+  logging behavior, API docs, and the pytest/ruff/pyright workflow.
+- Aligned `.env.example` with the current `ENV_SCHEMA` defaults, including log
+  rotation settings.
+- Ignored the local `.tmp/` scratch directory used by sandboxed test runs.
 - Improved the logging setup with rotating log files, safer handler reconfiguration, nested log-path support, and graceful console fallback when file logging cannot start.
 - Removed the unused internal `_is_uniform` helper from the coupled oscillators model.
 - Extracted shared internal complex-problem dialog helpers to reduce UI duplication across simpler solver dialogs.
@@ -20,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deferred large Schrödinger and nonlinear-wave `magnitude`/`phase` arrays until first access, and added pre-run performance advisories for expensive solver configurations.
 - Reused result-plot canvases on view changes, debounced resize redraws, and collapsed membrane history summaries into a single energy/extrema pass.
 - Added a repo-local `pyright` configuration, tightened Tk/matplotlib typing in shared UI helpers, and cleaned transform/solver typing hotspots until `pyright` reports zero errors.
+- Refreshed user-facing dialog copy across the main UI, equation setup, transforms, results, settings, performance warnings, and advanced-problem workflows.
 
 ## [0.3.2] - 2026-03-05
 

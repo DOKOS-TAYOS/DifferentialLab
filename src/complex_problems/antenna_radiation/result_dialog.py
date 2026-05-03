@@ -72,7 +72,7 @@ class AntennaRadiationResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Antenna Radiation")
+        self.win.title("Antenna Radiation Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._map_canvas = None
@@ -124,7 +124,7 @@ class AntennaRadiationResultDialog:
         nb.pack(fill=tk.BOTH, expand=True)
 
         tab_map = ttk.Frame(nb)
-        nb.add(tab_map, text="  Angular Map  ")
+        nb.add(tab_map, text="  Angular Gain Map  ")
         self._build_map_tab(tab_map)
 
         tab_cut = ttk.Frame(nb)
@@ -140,7 +140,7 @@ class AntennaRadiationResultDialog:
         self._build_3d_tab(tab_3d)
 
         tab_field = ttk.Frame(nb)
-        nb.add(tab_field, text="  Field Map  ")
+        nb.add(tab_field, text="  Field Strength  ")
         self._build_field_tab(tab_field)
 
         btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))

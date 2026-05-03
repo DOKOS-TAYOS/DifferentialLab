@@ -183,7 +183,7 @@ def test_run_solver_dialog_shows_invalid_input_error() -> None:
             result_dialog_factory=result_dialog_factory,
         )
 
-    showerror.assert_called_once_with("Invalid input", "bad input", parent=window)
+    showerror.assert_called_once_with("Check the input values", "bad input", parent=window)
     run_loading.assert_not_called()
     solver.assert_not_called()
     result_dialog_factory.assert_not_called()

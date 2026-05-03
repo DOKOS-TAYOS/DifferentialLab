@@ -79,11 +79,11 @@ def assess_parameters_dialog_request(
             return None
         return PerformanceAdvisory(
             severity=severity,
-            title="Large PDE grid",
+            title="Large PDE grid request",
             message=(
                 f"This PDE run will assemble a {n_points:,} x {ny:,} grid "
                 f"({grid_points:,} points). High-resolution PDE grids can take noticeably longer "
-                "to assemble and solve."
+                "to assemble, solve, plot, and export."
             ),
         )
 
@@ -98,7 +98,7 @@ def assess_parameters_dialog_request(
 
     return PerformanceAdvisory(
         severity=severity,
-        title="Dense output grid",
+        title="Dense output request",
         message=(
             f"This run will generate {n_points:,} sampled points"
             + (
@@ -106,7 +106,7 @@ def assess_parameters_dialog_request(
                 if state_size > 1
                 else "."
             )
-            + " Dense output can slow solving, plotting, and exporting."
+            + " Dense output can make solving, plotting and exporting noticeably slower."
         ),
     )
 
@@ -134,11 +134,12 @@ def assess_time_history_request(
 
     return PerformanceAdvisory(
         severity=severity,
-        title=f"Large {label} run",
+        title=f"Large {label} history",
         message=(
             f"This setup is expected to store about {frames:,} frame(s) with "
             f"{points_per_frame:,} point(s) per frame across {array_count} array(s), "
-            f"roughly {_format_bytes(total_bytes)} of raw history data."
+            f"roughly {_format_bytes(total_bytes)} of raw history data. "
+            "Continue only if this is intentional."
         ),
     )
 

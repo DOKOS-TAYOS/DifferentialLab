@@ -57,8 +57,8 @@ class Aerodynamics2DDialog:
         ttk.Label(
             body,
             text=(
-                "Incompressible flow around immersed bodies with FFT projection.\n"
-                "Choose full nonlinear Navier-Stokes or Stokes approximation."
+                "Simulate incompressible flow around immersed bodies with FFT projection.\n"
+                "Choose the full nonlinear Navier-Stokes model or a Stokes approximation."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -97,8 +97,8 @@ class Aerodynamics2DDialog:
         self._sample_every_var = tk.StringVar(value="10")
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
         make_labeled_entry(row, "Δt", self._dt_var, width=8)
-        make_labeled_entry(row, "sample_every", self._sample_every_var, width=10)
-        ToolTip(row, "Lower Δt and/or lower sample_every increase temporal resolution.")
+        make_labeled_entry(row, "Sample every", self._sample_every_var, width=10)
+        ToolTip(row, "Lower Δt and/or Sample every values store more animation frames.")
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -148,7 +148,7 @@ class Aerodynamics2DDialog:
 
         t_max = parse_positive_float(self._t_max_var.get(), name="tₘₐₓ")
         dt = parse_positive_float(self._dt_var.get(), name="Δt")
-        sample_every = parse_positive_int(self._sample_every_var.get(), name="sample_every")
+        sample_every = parse_positive_int(self._sample_every_var.get(), name="Sample every")
 
         rho = parse_positive_float(self._rho_var.get(), name="ρ")
         nu = parse_positive_float(self._nu_var.get(), name="ν")
@@ -206,7 +206,7 @@ class Aerodynamics2DDialog:
             window=self.win,
             collect_inputs=self._collect_inputs,
             solver=solve_aerodynamics_2d,
-            message="Solving aerodynamics 2D...",
+            message="Solving 2D aerodynamics...",
             result_parent=self.parent,
             result_dialog_factory=Aerodynamics2DResultDialog,
             confirm_run=self._confirm_heavy_request,

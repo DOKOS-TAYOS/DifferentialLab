@@ -131,6 +131,22 @@ class CoupledOscillatorsDialog:
         inner = self._scroll.inner
         inner.configure(padding=pad)
 
+        ttk.Label(inner, text="Coupled Harmonic Oscillators", style="Title.TLabel").pack(
+            anchor=tk.W,
+            pady=(0, pad),
+        )
+        intro = ttk.Label(
+            inner,
+            text=(
+                "Configure a chain of masses and springs, optional nonlinear terms, "
+                "and initial energy in oscillator or mode coordinates."
+            ),
+            style="Small.TLabel",
+            justify=tk.LEFT,
+        )
+        intro.pack(anchor=tk.W, pady=(0, pad))
+        bind_wraplength(inner, intro, pad=2 * pad, min_wrap=240)
+
         row = ttk.Frame(inner)
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Number of oscillators:").pack(side=tk.LEFT, padx=(0, pad))
@@ -167,8 +183,7 @@ class CoupledOscillatorsDialog:
         k_entry.pack(side=tk.LEFT)
         ToolTip(
             row,
-            "Auto-detect: single number=constant, comma-separated=list, "
-            "contains [ or expression with i=function of index.",
+            "Use a single number, a comma-separated list, or an expression in i.",
         )
 
         # Boundary
@@ -221,7 +236,7 @@ class CoupledOscillatorsDialog:
         self._coupling_listbox.pack(side=tk.LEFT, padx=(0, pad))
         ttk.Button(
             row,
-            text="Equations",
+            text="Equation Help",
             command=self._show_coupling_equations,
         ).pack(side=tk.LEFT)
         self._coupling_listbox.bind("<<ListboxSelect>>", self._on_coupling_selection_change)
@@ -323,7 +338,7 @@ class CoupledOscillatorsDialog:
         # Resolution points and solver method
         row_res = ttk.Frame(inner)
         row_res.pack(fill=tk.X, pady=pad)
-        ttk.Label(row_res, text="Resolution points:").pack(side=tk.LEFT, padx=(0, pad))
+        ttk.Label(row_res, text="Sample points:").pack(side=tk.LEFT, padx=(0, pad))
         default_n_points = max(2000, int(get_env_from_schema("SOLVER_NUM_POINTS")))
         self._n_points_var = tk.StringVar(value=str(default_n_points))
         ttk.Entry(row_res, textvariable=self._n_points_var, width=10, font=get_font()).pack(
@@ -340,7 +355,7 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         )
         method_combo.pack(side=tk.LEFT)
-        ToolTip(row_res, "Number of output points and ODE solver method.")
+        ToolTip(row_res, "Number of saved output samples and ODE solver method.")
 
         self._update_extra_params_visibility()
 
@@ -349,7 +364,7 @@ class CoupledOscillatorsDialog:
         ic_frame.pack(fill=tk.X, pady=pad)
         ic_row1 = ttk.Frame(ic_frame)
         ic_row1.pack(fill=tk.X)
-        ttk.Label(ic_row1, text="Initial conditions in:").pack(side=tk.LEFT, padx=(0, pad))
+        ttk.Label(ic_row1, text="Initial state in:").pack(side=tk.LEFT, padx=(0, pad))
         self._ic_space_var = tk.StringVar(value="Modes")
         ic_space_combo = ttk.Combobox(
             ic_row1,
@@ -378,7 +393,7 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         )
         self._ic_pos_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, pad))
-        ToolTip(self._ic_pos_entry, "Comma-separated values. Default: 1 for first, 0 for rest.")
+        ToolTip(self._ic_pos_entry, "Comma-separated values. Missing values are not inferred.")
 
         ic_row3 = ttk.Frame(ic_frame)
         ic_row3.pack(fill=tk.X, pady=(pad // 2, 0))
@@ -506,7 +521,7 @@ class CoupledOscillatorsDialog:
         ]
 
         dlg = tk.Toplevel(self.win)
-        dlg.title("Equations — Coupled Oscillators")
+        dlg.title("Coupled Oscillator Equations")
         dlg.transient(self.win)
         dlg.configure(bg=bg)
 
@@ -524,7 +539,7 @@ class CoupledOscillatorsDialog:
 
         ttk.Label(
             main,
-            text="Equations of motion",
+            text="Equation reference",
             style="Title.TLabel",
         ).pack(anchor=tk.W, pady=(0, pad))
 

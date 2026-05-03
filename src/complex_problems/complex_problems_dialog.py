@@ -1,4 +1,4 @@
-"""Dialog for selecting which complex problem to solve."""
+"""Dialog for selecting which advanced problem to solve."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ class ComplexProblemsDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.parent = parent
         self.win = tk.Toplevel(parent)
-        self.win.title("Complex Problems")
+        self.win.title("Advanced Problems")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -50,15 +50,15 @@ class ComplexProblemsDialog:
 
         ttk.Label(
             main_frame,
-            text="Complex Problems",
+            text="Advanced Problems",
             style="Title.TLabel",
         ).pack(pady=(0, pad))
 
         intro = ttk.Label(
             main_frame,
             text=(
-                "Choose one problem on the left. The right panel summarizes"
-                " physical context, configurable options, and outputs."
+                "Choose a specialized model on the left. The details panel explains "
+                "the physical context, key settings, and available outputs."
             ),
             style="Small.TLabel",
             justify=tk.CENTER,
@@ -74,7 +74,10 @@ class ComplexProblemsDialog:
 
         left = ttk.Frame(content)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, pad))
-        ttk.Label(left, text="Problems", style="Subtitle.TLabel").pack(anchor=tk.W, pady=(0, 4))
+        ttk.Label(left, text="Available models", style="Subtitle.TLabel").pack(
+            anchor=tk.W,
+            pady=(0, 4),
+        )
 
         left_list_frame = ttk.Frame(left)
         left_list_frame.pack(fill=tk.BOTH, expand=True)
@@ -98,12 +101,12 @@ class ComplexProblemsDialog:
         self._problem_listbox.bind("<Double-Button-1>", self._on_open)
         self._problem_listbox.bind("<Return>", self._on_open)
 
-        right = ttk.LabelFrame(content, text="Problem details", padding=pad)
+        right = ttk.LabelFrame(content, text="Model details", padding=pad)
         right.grid(row=0, column=1, sticky="nsew")
         right.columnconfigure(1, weight=1)
         right.rowconfigure(2, weight=1)
 
-        ttk.Label(right, text="Problem:", style="Subtitle.TLabel").grid(
+        ttk.Label(right, text="Model:", style="Subtitle.TLabel").grid(
             row=0,
             column=0,
             sticky="nw",
@@ -150,7 +153,7 @@ class ComplexProblemsDialog:
         for problem_id, descriptor in PROBLEM_REGISTRY.items():
             self._problem_ids.append(problem_id)
             self._problem_listbox.insert(tk.END, descriptor.name)
-        ToolTip(self._problem_listbox, "Double-click a problem to open it.")
+        ToolTip(self._problem_listbox, "Double-click a model to open its setup dialog.")
 
         if self._problem_ids:
             self._problem_listbox.selection_set(0)
@@ -160,7 +163,7 @@ class ComplexProblemsDialog:
         btn_frame.pack(pady=(pad * 2, 0))
         self._open_btn = ttk.Button(
             btn_frame,
-            text="Open",
+            text="Open Selected",
             command=self._on_open,
         )
         self._open_btn.pack(side=tk.LEFT, padx=(0, pad))
@@ -198,9 +201,9 @@ class ComplexProblemsDialog:
         self._type_label.config(text=doc.problem_type)
         details = (
             f"Description:\n{doc.extended_description}\n\n"
-            "Configurable options:\n"
+            "Key settings:\n"
             + "\n".join(f"• {line}" for line in doc.config_options_summary)
-            + "\n\nOutputs / visualizations:\n"
+            + "\n\nOutputs and visualizations:\n"
             + "\n".join(f"• {line}" for line in doc.visualizations_summary)
         )
         self._set_details_text(details)

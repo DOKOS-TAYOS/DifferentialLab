@@ -92,8 +92,8 @@ def run_solver_dialog(
     message: str,
     result_parent: tk.Tk | tk.Toplevel,
     result_dialog_factory: ResultDialogFactory[_TResult_contra],
-    invalid_input_title: str = "Invalid input",
-    error_title: str = "Solver Error",
+    invalid_input_title: str = "Check the input values",
+    error_title: str = "Solver error",
     poll_ms: int = 100,
     confirm_run: Callable[[dict[str, object], tk.Toplevel], bool] | None = None,
 ) -> None:

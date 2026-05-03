@@ -130,15 +130,15 @@ class TransformDialog:
             command=self._on_help,
         )
         btn_help.pack(side=tk.LEFT, padx=pad)
-        ToolTip(btn_help, "Show help about the Transforms section.")
+        ToolTip(btn_help, "Open transform syntax, options, and export notes.")
 
         btn_export = ttk.Button(
             btn_inner,
-            text="Export CSV",
+            text="Export CSV...",
             command=self._on_export,
         )
         btn_export.pack(side=tk.LEFT, padx=pad)
-        ToolTip(btn_export, "Export the transformed data points to a CSV file.")
+        ToolTip(btn_export, "Save the displayed curve or coefficients to a CSV file.")
 
         btn_close = ttk.Button(
             btn_inner,
@@ -159,12 +159,12 @@ class TransformDialog:
         left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, pad))
 
         # Function
-        func_lf = ttk.LabelFrame(left, text="Function f(x)", padding=pad)
+        func_lf = ttk.LabelFrame(left, text="Function", padding=pad)
         func_lf.pack(fill=tk.X, pady=(0, pad))
 
         func_hint_lbl = ttk.Label(
             func_lf,
-            text="Use x as variable. Example: sin(x), exp(-a*x)",
+            text="Use x as the independent variable, for example sin(x) or exp(-a*x).",
             style="Small.TLabel",
         )
         func_hint_lbl.pack(anchor=tk.W)
@@ -226,11 +226,11 @@ class TransformDialog:
         # Apply button (below function/range)
         self._btn_apply = ttk.Button(
             left,
-            text="Apply / Update plot",
+            text="Apply transform",
             command=self._on_apply,
         )
         self._btn_apply.pack(fill=tk.X, pady=(0, pad))
-        ToolTip(self._btn_apply, "Parse function and apply selected transformation.")
+        ToolTip(self._btn_apply, "Parse the function and refresh the plot.")
 
         # Transform
         trans_lf = ttk.LabelFrame(left, text="Transformation", padding=pad)
@@ -349,10 +349,10 @@ class TransformDialog:
         try:
             func, x_min, x_max, _params = self._parse_inputs()
         except ValueError as exc:
-            messagebox.showerror("Invalid Input", str(exc), parent=self.win)
+            messagebox.showerror("Check the function input", str(exc), parent=self.win)
             return
         except EquationParseError as exc:
-            messagebox.showerror("Parse Error", str(exc), parent=self.win)
+            messagebox.showerror("Function could not be parsed", str(exc), parent=self.win)
             return
 
         scalar_func = cast(Callable[[np.ndarray], np.ndarray], func)
@@ -412,8 +412,8 @@ class TransformDialog:
         except Exception as exc:
             logger.exception("Transform failed")
             messagebox.showerror(
-                "Transform Error",
-                f"Could not compute transform: {exc}",
+                "Transform could not be computed",
+                f"DifferentialLab could not compute this transform:\n{exc}",
                 parent=self.win,
             )
             return
@@ -507,7 +507,7 @@ class TransformDialog:
         """Export the transformed data to CSV."""
         if self._current_x is None or self._current_y is None:
             messagebox.showwarning(
-                "No Data",
+                "No data to export",
                 "Apply a transformation first to generate data.",
                 parent=self.win,
             )
@@ -540,17 +540,16 @@ class TransformDialog:
 
         logger.info("Transform data exported: %s", path)
         messagebox.showinfo(
-            "Export Complete",
-            f"Data exported to:\n{path}",
+            "CSV export saved",
+            f"Data was saved to:\n{path}",
             parent=self.win,
         )
 
 
 _TRANSFORM_HELP_ABOUT = (
-    "This dialog lets you apply classical mathematical transforms to any scalar "
-    "function f(x). Enter an expression, pick a transform, and instantly "
-    "visualise the result. You can switch between a curve view and a "
-    "coefficients view, and export the data to CSV or save the plot as an image."
+    "This dialog applies classical mathematical transforms to a scalar function f(x). "
+    "Enter an expression, choose a transform, inspect the curve or coefficients, "
+    "and export the current data to CSV."
 )
 
 _TRANSFORM_HELP_HOW_TO_USE = (
@@ -561,7 +560,7 @@ _TRANSFORM_HELP_HOW_TO_USE = (
     "5.  For Taylor: adjust  Order  (1\u201315) and  Centre  as needed.\n"
     "6.  Pick  Display  mode:  Curve  (function vs domain) or  "
     "Coefficients  (a\u1d62 vs index).\n"
-    "7.  The plot updates automatically when you change any setting.\n"
+    "7.  Click  Apply transform  after editing the function or range.\n"
     "8.  Use  Export CSV  or the Matplotlib toolbar (floppy-disk icon) to save."
 )
 
@@ -597,10 +596,9 @@ _TRANSFORM_HELP_DISPLAY = (
 )
 
 _TRANSFORM_HELP_EXPORT = (
-    "Export CSV — Saves the currently displayed data (curve or coefficients) to a "
-    "CSV file. A file dialog is displayed to select the save location.\n\n"
-    "Matplotlib toolbar — A toolbar is displayed below the plot. Use the save "
-    "button to export the plot as PNG, JPG, or PDF."
+    "Export CSV saves the currently displayed data (curve or coefficients) to a "
+    "CSV file. A file dialog lets you choose the save location.\n\n"
+    "Matplotlib toolbar: use the save button below the plot to export PNG, JPG, or PDF."
 )
 
 _TRANSFORM_HELP_SECTIONS: list[tuple[str, str]] = [

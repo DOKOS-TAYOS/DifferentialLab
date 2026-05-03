@@ -15,10 +15,10 @@ class SchrodingerTDProblem:
 
     descriptor = ProblemDescriptor(
         id="schrodinger_td",
-        name="Schrodinger TD (1D/2D)",
+        name="Schrodinger Time Evolution (1D/2D)",
         description=(
-            "Time-dependent Schrodinger equation with split-operator spectral "
-            "solver, configurable potentials, and packet initial states."
+            "Split-operator TDSE solver with configurable potentials, wave packets, "
+            "and 1D or 2D domains."
         ),
     )
 

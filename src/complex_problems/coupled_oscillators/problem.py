@@ -17,8 +17,8 @@ class CoupledOscillatorsProblem:
         id="coupled_oscillators",
         name="Coupled Harmonic Oscillators",
         description=(
-            "One-dimensional chain of N oscillators with configurable "
-            "masses, coupling constants, and coupling types."
+            "Mass-spring chain with configurable masses, boundary conditions, "
+            "long-range coupling, nonlinear terms, and forcing."
         ),
     )
 

@@ -164,7 +164,7 @@ class ResultDialog:
                 self._render_stat_entry(stat_section.content, key, val, pad)
 
         # Solver info
-        info_section = CollapsibleSection(inner, scroll, "Solver Info", expanded=True, pad=pad)
+        info_section = CollapsibleSection(inner, scroll, "Solver Summary", expanded=True, pad=pad)
         info_items: list[tuple[str, Any]] = [
             ("Method", metadata.get("method", "?")),
             ("Success", "Yes" if metadata.get("solver_success") else "No"),
@@ -190,13 +190,13 @@ class ResultDialog:
             ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
 
         # Export
-        export_section = CollapsibleSection(inner, scroll, "Export Data", expanded=True, pad=pad)
+        export_section = CollapsibleSection(inner, scroll, "Export Results", expanded=True, pad=pad)
         btn_row = ttk.Frame(export_section.content)
         btn_row.pack(fill=tk.X, pady=2)
-        ttk.Button(btn_row, text="Save CSV...", command=self._on_save_csv).pack(
+        ttk.Button(btn_row, text="Export CSV...", command=self._on_save_csv).pack(
             side=tk.LEFT, padx=(0, pad)
         )
-        ttk.Button(btn_row, text="Save JSON...", command=self._on_save_json).pack(side=tk.LEFT)
+        ttk.Button(btn_row, text="Export JSON...", command=self._on_save_json).pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Transform controls helper
@@ -1535,13 +1535,13 @@ class ResultDialog:
         try:
             export_fn(path)
             messagebox.showinfo(
-                "Export Complete",
-                f"{prefix_log} saved to:\n{path}",
+                "Export saved",
+                f"{prefix_log} was saved to:\n{path}",
                 parent=self.win,
             )
         except Exception as exc:
             logger.error(f"{prefix_log} export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+            messagebox.showerror("Export was not saved", str(exc), parent=self.win)
 
     def _on_save_csv(self) -> None:
         r = self._result
@@ -1595,20 +1595,20 @@ class ResultDialog:
                 duration_seconds=duration_seconds,
             )
             messagebox.showinfo(
-                "Export Complete",
-                f"Animation saved to:\n{filepath}",
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
                 parent=self.win,
             )
         except RuntimeError as exc:
             logger.warning("MP4 export failed (ffmpeg): %s", exc)
             messagebox.showerror(
-                "Export Failed",
+                "Animation export was not saved",
                 str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
                 parent=self.win,
             )
         except Exception as exc:
             logger.error("MP4 export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     @staticmethod
     def _format_stat(value: Any) -> str:

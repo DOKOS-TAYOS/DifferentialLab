@@ -18,7 +18,7 @@ def run_solver_with_loading(
     message: str,
     task: Callable[[], Any],
     on_success: Callable[[Any], None],
-    error_title: str = "Solver Error",
+    error_title: str = "Solver error",
     poll_ms: int = 100,
 ) -> None:
     """Run a blocking solver task on a daemon thread with a loading dialog."""

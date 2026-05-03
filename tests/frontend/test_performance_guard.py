@@ -21,7 +21,9 @@ def test_assess_parameters_dialog_request_warns_for_dense_output_grid() -> None:
 
     assert advisory is not None
     assert advisory.severity == "warn"
+    assert advisory.title == "Dense output request"
     assert "100,000" in advisory.message
+    assert "plotting and exporting" in advisory.message
 
 
 def test_assess_time_history_request_requires_confirmation_for_large_history() -> None:
@@ -35,7 +37,8 @@ def test_assess_time_history_request_requires_confirmation_for_large_history() -
 
     assert advisory is not None
     assert advisory.severity == "confirm"
-    assert "2D membrane" in advisory.title
+    assert advisory.title == "Large 2D membrane history"
+    assert "Continue only if this is intentional." in advisory.message
 
 
 def test_confirm_performance_advisory_uses_warning_and_confirmation_dialogs() -> None:

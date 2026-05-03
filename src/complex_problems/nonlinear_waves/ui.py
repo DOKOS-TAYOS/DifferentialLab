@@ -58,8 +58,8 @@ class NonlinearWavesDialog:
         ttk.Label(
             body,
             text=(
-                "Choose NLSE (complex envelope) or KdV (real nonlinear dispersive wave).\n"
-                "Both use periodic pseudo-spectral solvers."
+                "Choose NLSE for complex envelopes or KdV for real dispersive waves.\n"
+                "Both solvers use periodic pseudo-spectral methods."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -129,10 +129,10 @@ class NonlinearWavesDialog:
             font=get_font(),
         )
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ToolTip(self._custom_entry, "Custom expression in x.")
+        ToolTip(self._custom_entry, "Custom initial profile as an expression in x.")
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Model parameters", style="Small.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Equation parameters", style="Small.TLabel").pack(anchor=tk.W)
 
         self._nlse_row = ttk.Frame(body)
         self._nlse_row.pack(fill=tk.X, pady=pad // 2)

@@ -52,8 +52,8 @@ class AntennaRadiationDialog:
         ttk.Label(
             body,
             text=(
-                "Far-field radiation maps, gain/directivity, and field magnitudes.\n"
-                "Choose the antenna family and set its geometric parameters."
+                "Compute far-field radiation maps, gain/directivity, and RMS field estimates.\n"
+                "Choose an antenna family, then set geometry and sampling resolution."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -99,7 +99,9 @@ class AntennaRadiationDialog:
         make_labeled_entry(row, "N_φ", self._n_phi_var, width=8)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Antenna parameters", style="Small.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Geometry and array parameters", style="Small.TLabel").pack(
+            anchor=tk.W
+        )
 
         self._dipole_row = ttk.Frame(body)
         self._dipole_row.pack(fill=tk.X, pady=pad // 2)

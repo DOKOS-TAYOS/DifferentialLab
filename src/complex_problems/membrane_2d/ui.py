@@ -91,8 +91,8 @@ class Membrane2DDialog:
         ttk.Label(
             body,
             text=(
-                "Discrete membrane lattice with fixed or periodic boundaries.\n"
-                "The linear Laplacian term is always active; optional nonlinear terms can be added."
+                "Simulate a rectangular membrane lattice with fixed or periodic boundaries.\n"
+                "Start from the linear Laplacian model, then add nonlinear terms as needed."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -190,7 +190,7 @@ class Membrane2DDialog:
         make_labeled_entry(row, "Δt", self._dt_var, width=8)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial condition", style="Small.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Initial state", style="Small.TLabel").pack(anchor=tk.W)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -220,7 +220,7 @@ class Membrane2DDialog:
             font=get_font(),
         )
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ToolTip(self._custom_entry, "Custom expression using x and y in [0,1].")
+        ToolTip(self._custom_entry, "Custom displacement expression using x and y in [0,1].")
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)

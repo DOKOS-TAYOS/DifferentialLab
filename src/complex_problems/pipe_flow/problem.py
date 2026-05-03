@@ -17,8 +17,8 @@ class PipeFlowProblem:
         id="pipe_flow",
         name="Pipe Flow",
         description=(
-            "Steady and transient 1D pipe-flow models with configurable geometry, "
-            "fluid properties, friction correlations, and pressure boundary conditions."
+            "Steady and transient 1D pipe-flow models with configurable diameter, "
+            "fluid properties, friction, and pressure boundary conditions."
         ),
     )
 

@@ -2,13 +2,25 @@
 
 # DifferentialLab Documentation
 
-DifferentialLab is a desktop application for numerical differential-equation workflows:
+DifferentialLab is a desktop application for numerical equation and simulation
+workflows. The current repository includes:
 
-- ordinary differential equations (ODE)
-- recurrence/difference equations
-- PDE workflows
-- transforms and custom analysis
-- specialized plugin-based `complex_problems`
+- scalar ODE solving
+- vector ODE systems
+- difference and recurrence equations
+- 2D PDE workflows
+- function transforms
+- specialized `complex_problems` plugins
+- Sphinx-generated API documentation
+
+## Repository Snapshot
+
+- Version: `0.4.1`
+- Python: `>=3.12`
+- Predefined equation catalog: 120 entries
+- Complex problem plugins: 7 registered modules
+- Configuration source of truth: `src/config/env.py`
+- Main entry point: `src/main_program.py`
 
 ## Documentation Map
 
@@ -26,6 +38,7 @@ DifferentialLab is a desktop application for numerical differential-equation wor
 - [Developer Guide](developer-guide.md)
 - [Testing Guide](testing.md)
 - [Changelog](changelog.md)
+- [Logging Design Note](superpowers/specs/2026-05-03-logging-design.md)
 
 ### API docs
 
@@ -52,6 +65,7 @@ architecture
 developer-guide
 testing
 changelog
+superpowers/specs/2026-05-03-logging-design
 ```
 
 ```{toctree}

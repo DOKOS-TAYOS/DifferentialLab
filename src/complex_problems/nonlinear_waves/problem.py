@@ -17,8 +17,8 @@ class NonlinearWavesProblem:
         id="nonlinear_waves",
         name="Nonlinear Waves (NLSE + KdV)",
         description=(
-            "Propagation in nonlinear media with pseudo-spectral solvers for "
-            "NLSE (complex envelope) and KdV (real nonlinear dispersive waves)."
+            "Periodic pseudo-spectral propagation for NLSE complex envelopes "
+            "and KdV real dispersive waves."
         ),
     )
 

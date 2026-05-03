@@ -93,7 +93,7 @@ class Aerodynamics2DResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Aerodynamics 2D")
+        self.win.title("2D Aerodynamics Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
@@ -143,11 +143,11 @@ class Aerodynamics2DResultDialog:
         self._build_anim_tab(tab_anim)
 
         tab_map = ttk.Frame(nb)
-        nb.add(tab_map, text="  Final Map  ")
+        nb.add(tab_map, text="  Final Fields  ")
         self._build_map_tab(tab_map)
 
         tab_coef = ttk.Frame(nb)
-        nb.add(tab_coef, text="  Coefficients  ")
+        nb.add(tab_coef, text="  Drag / Lift  ")
         self._build_coeff_tab(tab_coef)
 
         tab_stream = ttk.Frame(nb)
@@ -155,7 +155,7 @@ class Aerodynamics2DResultDialog:
         self._build_stream_tab(tab_stream)
 
         tab_profile = ttk.Frame(nb)
-        nb.add(tab_profile, text="  Centerline  ")
+        nb.add(tab_profile, text="  Centerline Profiles  ")
         self._build_profile_tab(tab_profile)
 
         btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
@@ -168,7 +168,7 @@ class Aerodynamics2DResultDialog:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
         self._view_var = tk.StringVar(value="speed")
-        ttk.Label(ctrl, text="Field:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             ctrl,
             textvariable=self._view_var,

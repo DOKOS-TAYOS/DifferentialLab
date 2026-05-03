@@ -255,7 +255,7 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         foreground=[("active", btn_fg), ("focus", btn_fg)],
     )
 
-    # Small menu buttons (Configuration, Quit) - smaller font and padding
+    # Small menu buttons (Settings, Exit) - smaller font and padding
     style.configure(
         "SmallMenu.TButton",
         background=btn_bg,

@@ -1,4 +1,4 @@
-"""Help / Information dialog with collapsible sections."""
+"""Help and about dialog with collapsible sections."""
 
 from __future__ import annotations
 
@@ -24,9 +24,8 @@ YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 # ── Section content (human-readable) ─────────────────────────────────
 
 _ABOUT = (
-    f"Welcome to {APP_NAME} v{APP_VERSION}!\n\n"
-    f"{APP_NAME} is a graphical tool for solving and visualising differential "
-    "equations, recurrence relations, and mathematical transforms. "
+    f"{APP_NAME} v{APP_VERSION} is a graphical workspace for solving and visualizing "
+    "differential equations, recurrence relations, and mathematical transforms. "
     "It supports:\n\n"
     "\u2022 Scalar ODEs — ordinary differential equations of any order\n"
     "\u2022 Vector ODEs — coupled systems (Lorenz attractor, Lotka-Volterra, "
@@ -42,10 +41,10 @@ _ABOUT = (
 )
 
 _HOW_TO_USE = (
-    "The main menu has five buttons: Solve Differential Equation, "
-    "Function Transform, Information, Configuration, and Quit.\n\n"
+    "The main menu gives direct access to equation solving, function transforms, "
+    "advanced problems, help, settings, and exit.\n\n"
     "Solving an equation step by step:\n"
-    "1.  Click  Solve Differential Equation.\n"
+    "1.  Click  Solve Equation.\n"
     "2.  Pick a predefined equation from the list, or switch to the  Custom  "
     "tab and write your own expression.\n"
     "3.  Choose the equation type: ODE, Vector ODE, Difference, or PDE.\n"
@@ -120,9 +119,9 @@ _PREDEFINED_EQUATIONS = (
 
 _OUTPUT_FILES = (
     "All files are saved on demand from the Results or Transform dialog.\n\n"
-    "\u2022 Save CSV  \u2014  tabular data (x, f, f\u2032, f\u2080, f\u2032\u2080, \u2026) "
+    "\u2022 Export CSV  \u2014  tabular data (x, f, f\u2032, f\u2080, f\u2032\u2080, \u2026) "
     "ready for spreadsheets or further analysis.\n"
-    "\u2022 Save JSON  \u2014  full metadata, equation definition, and all computed "
+    "\u2022 Export JSON  \u2014  full metadata, equation definition, and all computed "
     "statistics in a structured format.\n"
     "\u2022 Matplotlib toolbar  \u2014  use the floppy-disk icon below any plot to "
     "save it.\n"
@@ -148,11 +147,11 @@ _FUNCTION_TRANSFORMS = (
 )
 
 _CONFIGURATION = (
-    f"Almost every visual and numerical aspect of {APP_NAME} can be customised: "
+    f"Almost every visual and numerical aspect of {APP_NAME} can be customized: "
     "UI colours and fonts, plot styling (colours, line width, markers, DPI), "
     "solver defaults (method, tolerances, step size), output paths, and "
     "logging verbosity.\n\n"
-    "Open  Configuration  from the main menu to edit settings in a graphical "
+    "Open  Settings  from the main menu to edit values in a graphical "
     "form, or edit the  .env  file directly with any text editor.\n\n"
     "After saving, the application restarts automatically so changes take "
     "effect immediately."
@@ -182,20 +181,20 @@ _KEYBOARD_SHORTCUTS = (
 
 _SECTIONS: list[tuple[str, str]] = [
     ("About", _ABOUT),
-    ("How to Use", _HOW_TO_USE),
+    ("Quick Start", _HOW_TO_USE),
     ("Writing Custom Expressions", _CUSTOM_EXPRESSIONS),
     ("Predefined Equations", _PREDEFINED_EQUATIONS),
     ("Function Transforms", _FUNCTION_TRANSFORMS),
     ("Solver Methods", _solver_methods_text()),
     ("Available Statistics", _statistics_text()),
-    ("Output Files", _OUTPUT_FILES),
-    ("Configuration", _CONFIGURATION),
+    ("Exports and Files", _OUTPUT_FILES),
+    ("Settings", _CONFIGURATION),
     ("Keyboard Shortcuts", _KEYBOARD_SHORTCUTS),
 ]
 
 
 class HelpDialog:
-    """Information window with collapsible sections.
+    """Help window with collapsible sections.
 
     Args:
         parent: Parent window.
@@ -203,7 +202,7 @@ class HelpDialog:
 
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.win = tk.Toplevel(parent)
-        self.win.title(f"{APP_NAME} — Information")
+        self.win.title(f"{APP_NAME} - Help & About")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -224,7 +223,7 @@ class HelpDialog:
 
         btn_youtube = ttk.Button(
             btn_frame,
-            text="Support us on YouTube",
+            text="Open YouTube Channel",
             command=lambda: webbrowser.open(YOUTUBE_CHANNEL_URL),
             padding=(14, 8),
         )
@@ -251,7 +250,7 @@ class HelpDialog:
 
         ttk.Label(
             inner,
-            text=f"{APP_NAME} — Information",
+            text=f"{APP_NAME} - Help & About",
             style="Title.TLabel",
         ).pack(anchor=tk.W, pady=(0, pad))
 

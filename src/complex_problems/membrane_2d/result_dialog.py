@@ -71,7 +71,7 @@ class Membrane2DResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - 2D Nonlinear Membrane")
+        self.win.title("2D Nonlinear Membrane Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
@@ -122,7 +122,7 @@ class Membrane2DResultDialog:
         self._build_animation_tab(tab_anim)
 
         tab_st = ttk.Frame(notebook)
-        notebook.add(tab_st, text="  Space-Time  ")
+        notebook.add(tab_st, text="  Centerline Map  ")
         self._build_space_time_tab(tab_st)
 
         tab_surface = ttk.Frame(notebook)
@@ -146,7 +146,7 @@ class Membrane2DResultDialog:
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(ctrl, text="Field:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_field_var = tk.StringVar(value="Displacement")
         combo = ttk.Combobox(
             ctrl,

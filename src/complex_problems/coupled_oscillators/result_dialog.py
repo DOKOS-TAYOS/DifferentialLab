@@ -129,7 +129,7 @@ class CoupledOscillatorsResultDialog:
         self._result = result
 
         self.win = tk.Toplevel(parent)
-        self.win.title("Results — Coupled Harmonic Oscillators")
+        self.win.title("Coupled Harmonic Oscillator Results")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -191,10 +191,10 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 2: Energy per mode
         energy_mode_tab = ttk.Frame(nb)
-        nb.add(energy_mode_tab, text="  Energy per mode  ")
+        nb.add(energy_mode_tab, text="  Energy by Mode/Oscillator  ")
         em_ctrl = ttk.Frame(energy_mode_tab)
         em_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(em_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(em_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._em_view_var = tk.StringVar(value="Modes" if self._result.has_modes else "Oscillators")
         em_values = ["Modes", "Oscillators"] if self._result.has_modes else ["Oscillators"]
         em_view_combo = ttk.Combobox(
@@ -242,7 +242,7 @@ class CoupledOscillatorsResultDialog:
         nb.add(anim_tab, text="  Animation  ")
         anim_ctrl = ttk.Frame(anim_tab)
         anim_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(anim_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(anim_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_view_var = tk.StringVar(value="Oscillators")
         anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         view_combo = ttk.Combobox(
@@ -261,10 +261,10 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 4: Heatmap 2D
         heatmap_tab = ttk.Frame(nb)
-        nb.add(heatmap_tab, text="  Heatmap 2D  ")
+        nb.add(heatmap_tab, text="  Space-Time Heatmap  ")
         hm_ctrl = ttk.Frame(heatmap_tab)
         hm_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(hm_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(hm_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._hm_view_var = tk.StringVar(value="Oscillators")
         hm_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         hm_view_combo = ttk.Combobox(
@@ -286,7 +286,7 @@ class CoupledOscillatorsResultDialog:
         nb.add(surf_tab, text="  Surface 3D  ")
         surf_ctrl = ttk.Frame(surf_tab)
         surf_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(surf_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(surf_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._surf_view_var = tk.StringVar(value="Oscillators")
         surf_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         surf_view_combo = ttk.Combobox(

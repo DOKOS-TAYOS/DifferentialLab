@@ -48,7 +48,7 @@ class SchrodingerTDDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.parent = parent
         self.win = tk.Toplevel(parent)
-        self.win.title("Schrodinger TD (1D/2D)")
+        self.win.title("Schrodinger Time Evolution (1D/2D)")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
         fit_and_center(self.win, min_width=1040, min_height=780, padding=32, resizable=True)
@@ -69,9 +69,9 @@ class SchrodingerTDDialog:
         ttk.Label(
             body,
             text=(
-                "Split-operator spectral solver for TDSE in 1D or 2D.\n"
-                "Use periodic boundaries for conservation checks or "
-                "absorbing edges for open-domain behavior."
+                "Use a split-operator spectral solver for TDSE in 1D or 2D.\n"
+                "Periodic boundaries are useful for conservation checks; absorbing edges "
+                "model open-domain behavior."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -185,7 +185,7 @@ class SchrodingerTDDialog:
         self._custom_potential_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial packet", style="Small.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Initial wave packet", style="Small.TLabel").pack(anchor=tk.W)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -226,7 +226,7 @@ class SchrodingerTDDialog:
         self._custom_packet_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ToolTip(
             self._custom_packet_entry,
-            "Custom real amplitude profile. The phase comes from k0x/k0y.",
+            "Custom real amplitude profile. Momentum comes from k0x and k0y.",
         )
 
         self._btn_row = ttk.Frame(body)
@@ -448,7 +448,7 @@ class SchrodingerTDDialog:
             window=self.win,
             collect_inputs=self._collect_inputs,
             solver=solve_schrodinger_td,
-            message="Solving Schrodinger TD...",
+            message="Solving Schrodinger time evolution...",
             result_parent=self.parent,
             result_dialog_factory=SchrodingerTDResultDialog,
             confirm_run=self._confirm_heavy_request,

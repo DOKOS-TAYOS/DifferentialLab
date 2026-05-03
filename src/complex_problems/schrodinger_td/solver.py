@@ -42,7 +42,7 @@ class SchrodingerTDResult:
 
     @property
     def magnitude(self) -> np.ndarray:
-        """Return |psi|^2, materializing it only when needed."""
+        """Return squared wavefunction magnitude, materializing it only when needed."""
         if self._magnitude_cache is None:
             self._magnitude_cache = np.abs(self.psi) ** 2
         return self._magnitude_cache

@@ -17,8 +17,8 @@ class Membrane2DProblem:
         id="membrane_2d",
         name="2D Nonlinear Membrane",
         description=(
-            "Discrete 2D membrane (grid of coupled oscillators) with optional "
-            "nonlinear terms, spectral diagnostics, and spatiotemporal views."
+            "Rectangular membrane lattice with optional nonlinear corrections, "
+            "energy diagnostics, spectral views, and animations."
         ),
     )
 

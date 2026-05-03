@@ -46,6 +46,7 @@ output/*.mp4
 docs/_build/
 
 # Testing
+.tmp/
 .pytest_cache/
 .pytest_tmp*/
 pytest-cache-files-*/

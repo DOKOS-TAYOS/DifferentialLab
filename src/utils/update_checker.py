@@ -223,6 +223,7 @@ def perform_git_pull() -> tuple[bool, str]:
     """Perform git pull in the project root.
 
     Strategy:
+
     1. Preflight check the working tree. If files outside input/output are dirty,
        abort and ask the user to commit/stash first.
     2. Stash local input/output changes.

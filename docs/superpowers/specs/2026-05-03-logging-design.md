@@ -2,136 +2,93 @@
 
 **Date:** 2026-05-03
 
-**Goal:** Improve the current logging system so it is more robust in normal use and more helpful during debugging, while preserving the existing `get_logger(name: str) -> logging.Logger` API used across the project.
+**Status:** Implemented in the current unreleased code.
 
-## Current State
+**Goal:** Improve the logging system so it is robust in normal use and helpful
+during debugging, while preserving the existing
+`get_logger(name: str) -> logging.Logger` API used across the project.
 
-The project already centralizes logging in `src/utils/logger.py`. It reads `LOG_LEVEL`, `LOG_FILE`, and `LOG_CONSOLE` from the environment and configures a namespaced logger under `differential_lab`.
+## Implemented State
 
-This is a good base, but it still has a few practical limitations:
+The project centralizes logging in `src/utils/logger.py`. It reads `LOG_LEVEL`,
+`LOG_FILE`, `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`, and `LOG_CONSOLE` from the
+environment and configures a namespaced logger under `differential_lab`.
 
-- The log file grows without rotation.
-- The log path is treated as a simple file name and does not create missing parent directories.
-- File-handler setup can fail hard if the path is invalid or unavailable.
-- There is no supported way to reset logging state in tests.
-- There are no dedicated tests for logger configuration behavior.
+Current behavior:
+
+- Log files use `RotatingFileHandler`.
+- Relative log paths are resolved from the project root.
+- Missing parent directories are created automatically.
+- File-handler setup failures fall back to console logging.
+- Reconfiguration support exists for tests through `_reset_logging_state()`.
+- Logger propagation is disabled to avoid duplicate output.
+- Log records include timestamp, level, thread name, logger name, and message.
 
 ## Scope
 
-This change should improve logging internals and configuration only. It should not require broad edits to solver, frontend, plotting, or complex-problem modules that already call `get_logger(__name__)`.
+This change improved logging internals and configuration only. It did not
+require broad edits to solver, frontend, plotting, or complex-problem modules
+that already call `get_logger(__name__)`.
 
 Out of scope:
 
-- structured JSON logging,
-- external logging libraries,
-- per-module custom log levels,
-- a UI log viewer.
+- structured JSON logging
+- external logging libraries
+- per-module custom log levels
+- a UI log viewer
 
-## Recommended Approach
+## Configuration
 
-Keep Python's built-in `logging` module and the current namespaced API, but strengthen the implementation with safer configuration and bounded log-file growth.
+Logging is controlled by these `.env` keys:
 
-### 1. Safer logger configuration
+- `LOG_LEVEL`: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`
+- `LOG_FILE`: filename, relative path, or absolute path for the active log
+- `LOG_MAX_BYTES`: maximum active log size before rotation
+- `LOG_BACKUP_COUNT`: number of rotated files to keep
+- `LOG_CONSOLE`: whether to also print logs to the terminal
 
-`src/utils/logger.py` should:
+The canonical schema lives in `src/config/env.py`.
 
-- keep `get_logger(name: str) -> logging.Logger` unchanged,
-- configure the `differential_lab` root logger only once during normal runtime,
-- avoid duplicate handlers if configuration is triggered again,
-- expose a small internal reset/reconfigure hook for tests,
-- disable propagation to unrelated ancestor loggers to avoid duplicate output.
+## Testing Coverage
 
-### 2. Rotating file logs
+Focused tests live under `tests/utils/test_logger.py`.
 
-Replace the current plain `FileHandler` with a rotating file handler.
+The suite covers:
 
-New environment settings:
-
-- `LOG_MAX_BYTES`: maximum size of the active log file before rotation,
-- `LOG_BACKUP_COUNT`: number of rotated log files to keep.
-
-Default behavior should remain friendly for desktop usage: one active log plus a small number of backups, enough for debugging recent sessions without growing forever.
-
-### 3. Better failure handling
-
-If file logging cannot be initialized:
-
-- the application should not crash during logger setup,
-- the failure should fall back to console logging when possible,
-- if console logging is already enabled, the setup error should still be visible there.
-
-This is especially useful on systems with permission issues, invalid paths, or read-only locations.
-
-### 4. More useful log format
-
-Keep the format readable for humans, but include a bit more execution context.
-
-The format should include:
-
-- timestamp,
-- level,
-- logger name,
-- thread name,
-- message.
-
-This adds value for background tasks and UI-triggered operations without making logs hard to scan.
-
-### 5. Configuration and UI exposure
-
-Update the configuration schema and configuration dialog so users can edit the new rotation settings through the same mechanism as the current logging settings.
-
-Files affected:
-
-- `src/config/env.py`
-- `src/config/__init__.py`
-- `src/frontend/ui_dialogs/config_dialog.py`
-- `docs/configuration.md`
-
-## Testing Strategy
-
-Add focused tests for logger setup behavior instead of relying only on indirect coverage.
-
-Recommended test coverage:
-
-- logger creation returns namespaced logger objects,
-- repeated setup does not duplicate handlers,
-- rotating file handler is configured with the expected limits,
-- missing parent directories are created for nested log paths,
-- configuration can fall back safely when file handler creation fails,
-- reset/reconfigure support works for isolated tests.
-
-These tests should live in a dedicated logger test module under `tests/utils/`.
+- logger creation under the `differential_lab` namespace
+- repeated configuration without duplicate handlers
+- rotating file handler limits
+- nested log-path directory creation
+- safe fallback when file logging cannot initialize
+- reset/reconfigure behavior for isolated tests
 
 ## Risks and Controls
 
-### Risk: duplicate logs
-
-If propagation or handler reuse is wrong, messages may appear more than once.
+### Duplicate logs
 
 Control:
 
-- explicitly manage handler replacement,
-- test repeated configuration paths.
+- root logger handlers are explicitly managed
+- propagation is disabled
+- repeated setup is tested
 
-### Risk: test fragility
-
-Global logging state is process-wide, so tests can interfere with each other.
-
-Control:
-
-- provide a small internal reset utility,
-- keep tests isolated with `monkeypatch` and temporary paths.
-
-### Risk: breaking user expectations
-
-Users may already rely on the current default log filename and readable text format.
+### Test fragility
 
 Control:
 
-- keep `LOG_FILE` and `LOG_LEVEL` semantics unchanged,
-- keep plain text output,
-- only extend configuration with rotation settings.
+- `_reset_logging_state()` clears global logging state for tests
+- tests use temporary paths and monkeypatched environment values
 
-## Expected Outcome
+### User expectations
 
-After this change, DifferentialLab should keep a bounded set of readable log files, behave better when log-file setup fails, and provide more useful execution context during debugging, all without changing how the rest of the codebase requests loggers.
+Control:
+
+- `LOG_FILE` and `LOG_LEVEL` semantics remain unchanged
+- plain text output remains readable
+- rotation settings extend configuration without changing how modules request loggers
+
+## Outcome
+
+DifferentialLab now keeps a bounded set of readable log files, behaves better
+when log-file setup fails, and provides more useful execution context during
+debugging without changing the public logger API.

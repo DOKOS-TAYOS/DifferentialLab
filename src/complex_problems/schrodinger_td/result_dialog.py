@@ -99,7 +99,7 @@ class SchrodingerTDResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Schrodinger TD")
+        self.win.title("Schrodinger Time Evolution Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
@@ -137,7 +137,7 @@ class SchrodingerTDResultDialog:
         self._build_animation_tab(tab_anim)
 
         tab_st = ttk.Frame(nb)
-        nb.add(tab_st, text="  Space-Time / Density  ")
+        nb.add(tab_st, text="  Density Maps  ")
         self._build_space_tab(tab_st)
 
         tab_spec = ttk.Frame(nb)
@@ -166,7 +166,7 @@ class SchrodingerTDResultDialog:
         else:
             options = ("Density", "Phase")
         self._anim_view_var = tk.StringVar(value=options[0])
-        ttk.Label(ctrl, text="View:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             ctrl,
             textvariable=self._anim_view_var,

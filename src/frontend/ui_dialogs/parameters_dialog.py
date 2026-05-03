@@ -38,17 +38,17 @@ def _format_solver_exception(exc: BaseException) -> BackgroundTaskFailure:
     """Map solver exceptions to user-facing dialog failures."""
     if isinstance(exc, DifferentialLabError):
         logger.warning("Solver pipeline failed (user-facing): %s", exc)
-        return BackgroundTaskFailure("DifferentialLabError", str(exc))
+        return BackgroundTaskFailure("Solver input issue", str(exc))
 
     if isinstance(exc, (MemoryError, OSError)):
         logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
         return BackgroundTaskFailure(
-            "Memory Error",
-            f"Not enough memory to solve: {exc}\n\nTry reducing the grid size (points per axis).",
+            "Not enough memory",
+            f"The solver ran out of memory: {exc}\n\nTry reducing the grid size (points per axis).",
         )
 
     logger.exception("Solver pipeline: unexpected error")
-    return BackgroundTaskFailure("Error", str(exc))
+    return BackgroundTaskFailure("Solver error", str(exc))
 
 
 class _InputValidationError(ValueError):
@@ -140,7 +140,7 @@ class ParametersDialog:
         self.component_orders = component_orders
 
         self.win = tk.Toplevel(parent)
-        self.win.title(f"Parameters — {equation_name}")
+        self.win.title(f"Solve - {equation_name}")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -381,7 +381,7 @@ class ParametersDialog:
         if self.equation_type != "difference" and not self.is_pde:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_n, text="Evaluation points:").pack(side=tk.LEFT)
+            ttk.Label(row_n, text="Sample points:").pack(side=tk.LEFT)
             self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
             npoints_entry = ttk.Entry(
                 row_n, textvariable=self.npoints_var, width=10, font=get_font()
@@ -453,7 +453,7 @@ class ParametersDialog:
 
             # Mask expression entry (hidden by default)
             self._mask_row = ttk.Frame(shape_frame)
-            ttk.Label(self._mask_row, text="Mask expr:").pack(side=tk.LEFT)
+            ttk.Label(self._mask_row, text="Mask expression:").pack(side=tk.LEFT)
             self._mask_expr_var = tk.StringVar(value="x**2 + y**2 <= 1")
             mask_entry = ttk.Entry(
                 self._mask_row,
@@ -625,7 +625,7 @@ class ParametersDialog:
 
     def _build_statistics_section(self, parent: ttk.Frame, pad: int) -> ttk.LabelFrame:
         """Build statistics selection controls."""
-        stats_frame = ttk.LabelFrame(parent, text="Statistics & Magnitudes", padding=pad)
+        stats_frame = ttk.LabelFrame(parent, text="Statistics and Magnitudes", padding=pad)
         stats_frame.pack(fill=tk.X, pady=(0, pad))
 
         self._stat_keys = list(AVAILABLE_STATISTICS.keys())
@@ -770,7 +770,7 @@ class ParametersDialog:
                     values = [float(v.strip()) for v in raw.split(",")]
                 except ValueError:
                     raise _InputValidationError(
-                        "Invalid Parameter",
+                        "Check the parameter value",
                         f"Parameter '{pname}' must be comma-separated numbers.",
                     ) from None
                 params[base_name] = _np.array(values)
@@ -780,7 +780,7 @@ class ParametersDialog:
                 params[pname] = float(raw)
             except ValueError:
                 raise _InputValidationError(
-                    "Invalid Parameter",
+                    "Check the parameter value",
                     f"Parameter '{pname}' must be a number.",
                 ) from None
 
@@ -798,7 +798,7 @@ class ParametersDialog:
                 else "x\u2098\u1d62\u2099 and x\u2098\u2090\u2093"
             )
             raise _InputValidationError(
-                "Invalid Domain",
+                "Check the domain",
                 f"{domain_name} must be numbers.",
             ) from None
 
@@ -806,7 +806,7 @@ class ParametersDialog:
         """Parse 2D PDE y-domain and grid sizes."""
         if self.ymin_var is None or self.ymax_var is None:
             raise _InputValidationError(
-                "Invalid PDE",
+                "Check the PDE domain",
                 "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.",
             )
         try:
@@ -814,7 +814,7 @@ class ParametersDialog:
             y_max = float(self.ymax_var.get())
         except ValueError:
             raise _InputValidationError(
-                "Invalid Domain",
+                "Check the domain",
                 "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 must be numbers.",
             ) from None
         try:
@@ -822,12 +822,12 @@ class ParametersDialog:
             n_points_y = int(self.npoints_y_var.get()) if self.npoints_y_var else n_points
         except (ValueError, AttributeError):
             raise _InputValidationError(
-                "Invalid Grid",
+                "Check the grid size",
                 "Grid points must be integers.",
             ) from None
         if n_points > _MAX_PDE_GRID or n_points_y > _MAX_PDE_GRID:
             raise _InputValidationError(
-                "Grid too large",
+                "Grid size is too large",
                 f"PDE grid is limited to {_MAX_PDE_GRID} points per axis to avoid "
                 f"excessive memory use. You entered {n_points}\u00d7{n_points_y}.",
             )
@@ -843,7 +843,7 @@ class ParametersDialog:
                 x0_list.append(float(x_var.get()))
             except ValueError:
                 raise _InputValidationError(
-                    "Invalid IC Point",
+                    "Check the initial-condition point",
                     f"x{sub} must be a number.",
                 ) from None
         return x0_list
@@ -856,7 +856,7 @@ class ParametersDialog:
                 y0_list.append(float(var.get()))
             except ValueError:
                 raise _InputValidationError(
-                    "Invalid IC",
+                    "Check the initial conditions",
                     f"Initial condition {i} must be a number.",
                 ) from None
         return y0_list
@@ -887,7 +887,7 @@ class ParametersDialog:
             mask_expression = self._mask_expr_var.get().strip() if self._mask_expr_var else None
             if not mask_expression:
                 raise _InputValidationError(
-                    "Missing Mask",
+                    "Add a mask expression",
                     "Custom contour requires a mask expression.",
                 )
             contour_bc_type = (
@@ -935,7 +935,7 @@ class ParametersDialog:
                 n_points = int(self.npoints_var.get())
             except ValueError:
                 raise _InputValidationError(
-                    "Invalid Grid",
+                    "Check the grid size",
                     "Number of points must be an integer.",
                 ) from None
             y_min = None
@@ -1101,7 +1101,7 @@ class ParametersDialog:
 
         run_task_with_loading(
             parent=self.parent,
-            message="Solving...",
+            message="Solving equation...",
             task=_run_solver_pipeline,
             on_success=_on_success,
             format_error=_format_solver_exception,

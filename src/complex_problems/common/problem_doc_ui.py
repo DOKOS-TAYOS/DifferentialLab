@@ -17,15 +17,15 @@ def _build_doc_text(problem_id: str) -> str:
         lines.append(f"Equation: {doc.equation_summary}")
         lines.append("")
 
-    lines.append("Physical description:")
+    lines.append("Physical context:")
     lines.extend(f"• {line}" for line in _split_sentences(doc.extended_description))
     lines.append("")
 
-    lines.append("What each option controls:")
+    lines.append("Key settings:")
     lines.extend(f"• {line}" for line in doc.config_options_summary)
     lines.append("")
 
-    lines.append("Main visualizations:")
+    lines.append("Outputs and visualizations:")
     lines.extend(f"• {line}" for line in doc.visualizations_summary)
     return "\n".join(lines)
 
@@ -43,8 +43,8 @@ def add_how_to_config_section(
     pad: int,
     wraplength: int = 760,
 ) -> None:
-    """Add a standard collapsed 'How to configure' block for a problem dialog."""
-    section = CollapsibleSection(parent, scroll, "How to configure", expanded=False, pad=pad)
+    """Add a standard collapsed setup guide block for a problem dialog."""
+    section = CollapsibleSection(parent, scroll, "Setup guide", expanded=False, pad=pad)
     lbl = ttk.Label(
         section.content,
         text=_build_doc_text(problem_id),

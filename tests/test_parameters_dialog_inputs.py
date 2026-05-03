@@ -113,21 +113,21 @@ def test_collect_solver_inputs_reports_invalid_parameter_with_title() -> None:
     with pytest.raises(parameters_ui._InputValidationError) as exc_info:
         dialog._collect_solver_inputs()
 
-    assert exc_info.value.title == "Invalid Parameter"
+    assert exc_info.value.title == "Check the parameter value"
     assert exc_info.value.message == "Parameter 'a' must be a number."
 
 
 def test_parameters_dialog_formats_solver_errors() -> None:
     user_error = parameters_ui._format_solver_exception(DifferentialLabError("bad input"))
-    assert user_error.title == "DifferentialLabError"
+    assert user_error.title == "Solver input issue"
     assert user_error.message == "bad input"
 
     memory_error = parameters_ui._format_solver_exception(MemoryError("too many points"))
-    assert memory_error.title == "Memory Error"
+    assert memory_error.title == "Not enough memory"
     assert "Try reducing the grid size" in memory_error.message
 
     generic_error = parameters_ui._format_solver_exception(RuntimeError("boom"))
-    assert generic_error.title == "Error"
+    assert generic_error.title == "Solver error"
     assert generic_error.message == "boom"
 
 
@@ -146,7 +146,7 @@ def test_on_solve_delegates_to_shared_background_runner() -> None:
     run_task.assert_called_once()
     kwargs = run_task.call_args.kwargs
     assert kwargs["parent"] is dialog.parent
-    assert kwargs["message"] == "Solving..."
+    assert kwargs["message"] == "Solving equation..."
     assert kwargs["format_error"] is parameters_ui._format_solver_exception
     assert kwargs["on_complete"] is not None
     assert callable(kwargs["task"])

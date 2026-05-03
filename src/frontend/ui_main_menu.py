@@ -19,8 +19,8 @@ logger = get_logger(__name__)
 class MainMenu:
     """Application main menu window.
 
-    Presents five actions: Solve, Function Transform, Information,
-    Configuration, Quit.
+    Presents actions for solving equations, transforms, advanced problems,
+    help, settings, and exit.
 
     Args:
         root: The root Tk window.
@@ -77,8 +77,8 @@ class MainMenu:
         desc_lbl = ttk.Label(
             main_frame,
             text=(
-                "Solve ODEs, vector ODEs, difference equations, and PDEs.\n"
-                "Apply Fourier, Laplace, Taylor, and other transforms."
+                "Solve ODEs, vector systems, recurrences, and PDEs.\n"
+                "Explore transforms, advanced models, plots, and exports."
             ),
             style="Small.TLabel",
             justify=tk.CENTER,
@@ -102,15 +102,18 @@ class MainMenu:
 
         btn_width: int = get_env_from_schema("UI_BUTTON_WIDTH")
 
-        # Row 1: Solve Differential Equation | Function Transform
+        # Row 1: Solve Equation | Function Transform
         self.btn_solve = ttk.Button(
             btn_frame,
-            text="Solve Differential\nEquation",
+            text="Solve\nEquation",
             width=btn_width,
             command=self._on_solve,
         )
         self.btn_solve.grid(row=1, column=0, padx=padding, pady=padding)
-        ToolTip(self.btn_solve, "Select or write an ODE and solve it numerically.")
+        ToolTip(
+            self.btn_solve,
+            "Choose a built-in or custom equation, then configure and solve it.",
+        )
 
         self.btn_transforms = ttk.Button(
             btn_frame,
@@ -122,13 +125,13 @@ class MainMenu:
         self.btn_transforms.grid(row=1, column=1, padx=padding, pady=padding)
         ToolTip(
             self.btn_transforms,
-            "Enter a function, apply Fourier/Laplace/Taylor transforms, and export data.",
+            "Enter f(x), apply a transform, inspect the plot, and export the data.",
         )
 
-        # Row 2: Complex Problems | Information
+        # Row 2: Advanced Problems | Help & About
         self.btn_complex = ttk.Button(
             btn_frame,
-            text="Complex\nProblems",
+            text="Advanced\nProblems",
             width=btn_width,
             style="Accent2.TButton",
             command=self._on_complex_problems,
@@ -136,39 +139,39 @@ class MainMenu:
         self.btn_complex.grid(row=2, column=0, padx=padding, pady=padding)
         ToolTip(
             self.btn_complex,
-            "Solve special cases: coupled oscillators, etc.",
+            "Open specialized physics and engineering solvers with guided settings.",
         )
 
         self.btn_info = ttk.Button(
             btn_frame,
-            text="Information",
+            text="Help & About",
             width=btn_width,
             style="Accent2.TButton",
             command=self._on_info,
         )
         self.btn_info.grid(row=2, column=1, padx=padding, pady=padding)
-        ToolTip(self.btn_info, "View help, usage instructions, and app information.")
+        ToolTip(self.btn_info, "Read usage notes, expression syntax, shortcuts, and app details.")
 
-        # Row 3: Configuration | Quit (sized to text)
+        # Row 3: Settings | Exit (sized to text)
         self.btn_config = ttk.Button(
             btn_frame,
-            text="Configuration",
-            width=len("Configuration"),
+            text="Settings",
+            width=len("Settings"),
             style="SmallMenu.Accent2.TButton",
             command=self._on_config,
         )
         self.btn_config.grid(row=3, column=0, padx=padding, pady=padding)
-        ToolTip(self.btn_config, "Adjust solver settings, theme, and other preferences.")
+        ToolTip(self.btn_config, "Adjust appearance, solver defaults, logging, and output paths.")
 
         self.btn_quit = ttk.Button(
             btn_frame,
-            text="Quit",
-            width=len("Quit"),
+            text="Exit",
+            width=len("Exit"),
             style="SmallMenu.Cancel.TButton",
             command=self._on_close,
         )
         self.btn_quit.grid(row=3, column=1, padx=padding, pady=padding)
-        ToolTip(self.btn_quit, "Close the application.")
+        ToolTip(self.btn_quit, "Close DifferentialLab.")
 
         setup_arrow_enter_navigation(
             [
@@ -205,14 +208,14 @@ class MainMenu:
 
     def _on_complex_problems(self) -> None:
         """Open the complex problems selection dialog."""
-        logger.info("User clicked Complex Problems")
+        logger.info("User clicked Advanced Problems")
         from complex_problems import ComplexProblemsDialog
 
         ComplexProblemsDialog(self.root)
 
     def _on_config(self) -> None:
         """Open the configuration dialog; restart the app if saved."""
-        logger.info("User clicked Configuration")
+        logger.info("User clicked Settings")
         from frontend.ui_dialogs import ConfigDialog
 
         dlg = ConfigDialog(self.root)
@@ -222,13 +225,13 @@ class MainMenu:
             import os
             import sys
 
-            logger.info("Configuration saved — restarting application")
+            logger.info("Settings saved - restarting application")
             self.root.destroy()
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _on_info(self) -> None:
         """Open the information / help dialog."""
-        logger.info("User clicked Information")
+        logger.info("User clicked Help & About")
         from frontend.ui_dialogs import HelpDialog
 
         HelpDialog(self.root)

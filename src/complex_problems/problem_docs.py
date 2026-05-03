@@ -20,9 +20,9 @@ _DOCS: dict[str, ProblemDoc] = {
     "coupled_oscillators": ProblemDoc(
         problem_type="Lattice dynamics (coupled ODE system)",
         extended_description=(
-            "One-dimensional chain of coupled oscillators with optional long-range, "
-            "nonlinear, and driven interactions. Useful for normal modes, energy transfer, "
-            "and FPUT-like dynamics."
+            "One-dimensional mass-spring chain with optional long-range, nonlinear, "
+            "and driven interactions. Use it to inspect normal modes, energy transfer, "
+            "and FPUT-like behavior."
         ),
         equation_summary=(
             "mᵢẍᵢ = kᵢ⁺(xᵢ₊₁−xᵢ) − kᵢ⁻(xᵢ−xᵢ₋₁) + Σ₍d₌₂..₄₎ k_d(xᵢ₊d+xᵢ₋d−2xᵢ) + "
@@ -30,8 +30,8 @@ _DOCS: dict[str, ProblemDoc] = {
             "ε₄ sign(Lᵢ)|Lᵢ|⁴ + ε₅Lᵢ⁵ + Fcos(Ωt)"
         ),
         config_options_summary=(
-            "Set N oscillators, mass and nearest-neighbor coupling as "
-            "constant/list/function of index.",
+            "Set the number of oscillators, masses, and nearest-neighbor coupling as "
+            "a constant, list, or expression of index.",
             "Choose boundary condition: fixed ends or periodic ring.",
             "Select optional terms: 2nd/3rd/4th neighbors, FPUT-α, "
             "cubic/quartic/quintic, external forcing.",
@@ -48,8 +48,8 @@ _DOCS: dict[str, ProblemDoc] = {
     "membrane_2d": ProblemDoc(
         problem_type="Discrete 2D lattice membrane",
         extended_description=(
-            "Two-dimensional membrane modeled as a grid of coupled oscillators with optional "
-            "nonlinear corrections on the discrete Laplacian."
+            "Two-dimensional membrane modeled as a grid of coupled oscillators. "
+            "Start with the linear Laplacian model, then add optional nonlinear corrections."
         ),
         equation_summary="m ü = kΔu + α(Δu)² + β(Δu)³ + cₚ sign(Δu)|Δu|ᵖ",
         config_options_summary=(
@@ -69,8 +69,8 @@ _DOCS: dict[str, ProblemDoc] = {
     "nonlinear_waves": ProblemDoc(
         problem_type="Periodic pseudo-spectral PDE propagation",
         extended_description=(
-            "Simulation of nonlinear wave propagation with periodic boundary conditions for "
-            "NLSE (complex envelope) and KdV (real nonlinear dispersive waves)."
+            "Periodic nonlinear wave propagation for NLSE complex envelopes and KdV "
+            "real dispersive waves."
         ),
         equation_summary=(
             "NLSE: i∂ψ/∂t = −(β₂/2)∂²ψ/∂x² + γ|ψ|²ψ    |    "
@@ -91,8 +91,8 @@ _DOCS: dict[str, ProblemDoc] = {
     "schrodinger_td": ProblemDoc(
         problem_type="Time-dependent quantum wave dynamics",
         extended_description=(
-            "Split-operator spectral integration of the time-dependent Schrödinger equation "
-            "in 1D or 2D with configurable potentials and wave-packet initial conditions."
+            "Split-operator spectral integration of the time-dependent Schrodinger equation "
+            "in 1D or 2D with configurable potentials and wave-packet initial states."
         ),
         equation_summary="iħ∂ψ/∂t = −(ħ²/2m)∇²ψ + Vψ",
         config_options_summary=(
@@ -112,11 +112,11 @@ _DOCS: dict[str, ProblemDoc] = {
         problem_type="Electromagnetic far-field pattern analysis",
         extended_description=(
             "Compute angular radiation patterns, directivity/gain metrics, and RMS electric "
-            "field magnitudes for dipole, loop, patch, and linear-array configurations."
+            "field estimates for dipole, loop, patch, and linear-array configurations."
         ),
         equation_summary="G(θ,φ) = η·D(θ,φ),   Eᵣₘₛ ∝ √(S·η₀)",
         config_options_summary=(
-            "Choose antenna family and geometry parameters.",
+            "Choose antenna family and geometry or array parameters.",
             "Set frequency, transmit power, efficiency, and observation distance.",
             "Configure angular sampling (N_θ, N_φ) and array steering/phase when applicable.",
         ),
@@ -130,7 +130,7 @@ _DOCS: dict[str, ProblemDoc] = {
     "aerodynamics_2d": ProblemDoc(
         problem_type="Incompressible 2D flow around obstacles",
         extended_description=(
-            "Pseudo-spectral/projection simulation of incompressible flow around immersed "
+            "Pseudo-spectral projection simulation of incompressible flow around immersed "
             "bodies with nonlinear Navier-Stokes or Stokes-limit approximation."
         ),
         equation_summary="∂u/∂t + (u·∇)u = −(1/ρ)∇p + ν∇²u + fₚₑₙ,   ∇·u = 0",
@@ -150,7 +150,7 @@ _DOCS: dict[str, ProblemDoc] = {
         problem_type="1D steady/transient hydraulic modeling",
         extended_description=(
             "Steady Darcy-Weisbach and transient pressure-wave pipe-flow models with "
-            "configurable geometry profile, friction correlation, and forcing conditions."
+            "configurable diameter profile, friction correlation, and forcing conditions."
         ),
         equation_summary=(
             "Steady: dp/dx = −f(ρu²)/(2D)    |    Transient: hyperbolic pressure-velocity system"

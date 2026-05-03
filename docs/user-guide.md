@@ -1,109 +1,149 @@
 # User Guide
 
-This guide covers the normal workflow: define problem, configure parameters, solve, inspect and export results.
+This guide covers the normal workflow: choose or define a problem, configure
+parameters, solve, inspect results, and export outputs.
 
-## Main menu
+## Main Menu
 
 Buttons:
 
-- `Solve`: general equation workflows (ODE, difference equations, PDE, vector ODE)
-- `Function Transform`: transform scalar functions
-- `Complex Problems`: plugin workflows with dedicated UI and visualizations
-- `Information`: in-app help panel
-- `Configuration`: edit `.env` values through UI
-- `Quit`: close application
+- `Solve Equation`: general equation workflows
+- `Function Transform`: scalar function transform workflows
+- `Advanced Problems`: specialized complex-problem models with dedicated UI and visualizations
+- `Help & About`: in-app help panel
+- `Settings`: edit `.env` values through the GUI
+- `Exit`: close the application
 
-## Solve workflow
+## Solve Workflow
 
-### 1. Choose equation type
+### 1. Choose an equation type
 
-In `Solve`, choose one of:
+The standard solver path currently supports:
 
 - ODE
 - Difference equation
 - PDE
 - Vector ODE
 
-You can use predefined equations (YAML catalog) or custom expressions.
+You can use the predefined YAML catalog or write custom expressions.
+The current catalog has 120 entries:
 
-### 2. Define equation
+| Type | Entries |
+|---|---:|
+| ODE | 48 |
+| Vector ODE | 50 |
+| Difference equation | 10 |
+| PDE | 12 |
+
+The catalog files live in `src/config/equations/`.
+
+### 2. Define the equation
 
 For custom expressions:
 
 - ODE notation: `f[0]`, `f[1]`, `f[2]`, ...
-- Vector notation: `f[i,k]` (component `i`, derivative order `k`)
-- Difference notation: `f[0]` for current term, `n` as index
+- Vector notation: `f[i,k]`, where `i` is the component and `k` is the derivative order
+- Difference notation: `f[0]` for the current term and `n` for the index
+- PDE expressions may use variables such as `x`, `y`, `f`, `fx`, `fy`, `fxx`, `fxy`, and `fyy`
 
 Typical safe math functions are available (`sin`, `cos`, `exp`, `log`, `sqrt`, etc.).
 
 ### 3. Configure numeric parameters
 
-- Domain bounds and sample points
-- Initial/boundary values
-- Solver method (ODE)
-- Statistics to compute
-- PDE visualization mode
+Common settings include:
+
+- domain bounds and output sample points
+- initial values or boundary values
+- ODE solver method
+- statistics to compute
+- PDE operator and visualization mode
+
+For 2D PDEs, the current UI supports rectangular domains and optional custom
+mask expressions. Boundary conditions can be Dirichlet or Neumann on rectangular
+edges, or on the contour of a masked domain.
 
 ### 4. Solve and inspect
 
-Result dialog includes:
+Result dialogs include:
 
-- statistics and metadata
+- metadata and solver quality information
+- selected statistics
 - interactive plots/tabs
-- derivative/axis selection without re-solving
-- export options (CSV/JSON/figures and MP4 when applicable)
+- derivative, component, or axis selection without re-solving
+- export options for data and figures
 
-## Function Transform workflow
+## Function Transform Workflow
 
 In `Function Transform`:
 
-1. Provide `f(x)` expression and optional parameters.
-2. Select transform (`Fourier`, `Laplace`, `Taylor`, `Hilbert`, `Z-transform`).
-3. Switch between curve view and coefficient view.
-4. Export transformed data and plots.
+1. Provide an `f(x)` expression and domain.
+2. Select transform type.
+3. Tune transform-specific parameters when shown.
+4. Switch between curve view and coefficient view.
+5. Export transformed data and plots.
 
-## Complex Problems workflow
+Available transform types:
 
-`Complex Problems` opens a selector dialog with a left module list and a right details panel.
+- Original function sampling
+- Fourier (FFT)
+- Laplace on the real axis
+- Taylor series
+- Hilbert (discrete)
+- Z-transform (discrete)
+
+## Complex Problems Workflow
+
+`Advanced Problems` opens the complex-problem selector dialog with a left module
+list and a right details panel.
 
 Each plugin has its own:
 
 - configuration UI
 - specialized solver
+- background execution/loading behavior where useful
 - dedicated result dialog and diagnostics
+
+Current modules are:
+
+- `coupled_oscillators`
+- `membrane_2d`
+- `nonlinear_waves`
+- `schrodinger_td`
+- `antenna_radiation`
+- `aerodynamics_2d`
+- `pipe_flow`
 
 Most plugin dialogs include a collapsed `How to configure` section with:
 
-- short equation summary
+- equation summary
 - physical interpretation
 - parameter meaning
 - expected visualizations
 
-UI notation uses Unicode math formatting where possible. When a Unicode subscript does not exist (for example theta/phi), the UI uses `base_subscript` style such as `N_θ`, `N_φ`.
-
-For current modules and details, see [Complex Problems Guide](complex-problems.md).
+For module details, see [Complex Problems Guide](complex-problems.md).
 
 ## Exports
 
-By default, solves generate output files under `output/`:
+By default, solves write generated files under `output/`.
+
+Common outputs:
 
 - `solution_*.csv`
 - `solution_*.json`
-- `solution_*.png` (or selected format)
+- `solution_*.png` or another selected static figure format
+- MP4 animations when the active result dialog supports animation
 
-Animation-capable dialogs can also export MP4.
+## Configuration Workflow
 
-## Configuration workflow
-
-Use `Configuration` in the main menu to edit environment-backed settings.
+Use `Settings` in the main menu to edit environment-backed settings.
 
 Categories include:
 
-- UI look and behavior
-- plot style/fonts/animation
+- UI colors, fonts, padding, and tooltips
+- plot style, fonts, phase-space markers, contour/surface style, and animation
 - solver defaults and tolerances
 - logging and update checks
 
 Saving from the dialog restarts the app so settings apply cleanly.
 
-See [Configuration Reference](configuration.md) for full key details.
+See [Configuration Reference](configuration.md) for the current key list.

@@ -4,6 +4,24 @@ Thanks for contributing to DifferentialLab.
 
 ## Setup
 
+Use a project-local `.venv`.
+
+Windows:
+
+```bat
+bin\setup.bat --dev
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+./bin/setup.sh --dev
+source .venv/bin/activate
+```
+
+Manual equivalent:
+
 ```bash
 pip install -e ".[dev]"
 ```
@@ -14,42 +32,49 @@ Optional documentation toolchain:
 pip install -e ".[docs]"
 ```
 
-## Before opening a PR
+## Before Opening a PR
 
-1. Run tests:
+1. Run formatting and lint fixes:
+
+```bash
+ruff check . --fix
+ruff format .
+```
+
+2. Run tests:
 
 ```bash
 pytest
 ```
 
-2. Run lint checks:
+3. Run type checks when `pyright` is available:
 
 ```bash
-ruff check src tests
+pyright
 ```
 
-3. If typing checks are used in your workflow:
+4. Update documentation for user-visible changes:
 
-```bash
-mypy src
-```
-
-4. Update docs for user-visible changes:
 - `README.md`
 - `docs/` pages
-- API refs if public interfaces changed
+- `docs/api/` pages if public modules changed
+- `CHANGELOG.md`
 
-## Plugin contributions (`complex_problems`)
+## Plugin Contributions (`complex_problems`)
 
 If you add a plugin:
 
 - implement package structure (`problem.py`, `ui.py`, `solver.py`, `result_dialog.py`)
+- add `model.py` when physical or numerical helper logic is non-trivial
 - register it in `src/complex_problems/problem_registry.py`
-- add solver + registry tests
+- add solver and registry tests
 - update `docs/complex-problems.md` and `docs/api/complex_problems.rst`
+- update `CHANGELOG.md`
 
 ## Style
 
+- Include typing in function definitions.
 - Keep numerical kernels separated from GUI code.
 - Validate UI inputs before solver execution.
-- Expose structured result dataclasses with explicit `metadata` and `magnitudes`.
+- Expose structured result dataclasses with explicit metadata.
+- Reuse shared helpers before adding new duplicated dialog logic.

@@ -15,7 +15,7 @@ from solver import load_predefined_equations
 
 
 class EquationDialog:
-    """Dialog for selecting or entering an ODE.
+    """Dialog for selecting or entering an equation.
 
     Args:
         parent: Parent window.
@@ -24,7 +24,7 @@ class EquationDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.parent = parent
         self.win = tk.Toplevel(parent)
-        self.win.title("Select Equation")
+        self.win.title("Choose an Equation")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -56,7 +56,7 @@ class EquationDialog:
 
         self._btn_next = ttk.Button(
             btn_inner,
-            text="Next \u2192",
+            text="Continue",
             command=self._on_next,
         )
         self._btn_next.pack(side=tk.LEFT, padx=pad)
@@ -74,26 +74,26 @@ class EquationDialog:
         # ── Equation type selector ──
         type_frame = ttk.Frame(self.win)
         type_frame.pack(fill=tk.X, padx=pad, pady=(pad, 0))
-        ttk.Label(type_frame, text="Equation type:", style="Subtitle.TLabel").pack(
+        ttk.Label(type_frame, text="Equation family:", style="Subtitle.TLabel").pack(
             side=tk.LEFT, padx=(0, pad)
         )
         ttk.Radiobutton(
             type_frame,
-            text="Differential (ODE)",
+            text="ODE",
             variable=self._equation_type_var,
             value="ode",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="Difference (recurrence)",
+            text="Recurrence",
             variable=self._equation_type_var,
             value="difference",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="Vector ODE",
+            text="Vector ODE system",
             variable=self._equation_type_var,
             value="vector_ode",
             command=self._on_type_change,
@@ -112,7 +112,7 @@ class EquationDialog:
 
         # --- Tab 1: Predefined ---
         predef_frame = ttk.Frame(self._notebook, padding=pad)
-        self._notebook.add(predef_frame, text="  Predefined  ")
+        self._notebook.add(predef_frame, text="  Built-in  ")
 
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
@@ -186,7 +186,7 @@ class EquationDialog:
 
         self.eq_listbox.bind("<<ListboxSelect>>", self._on_select_equation)
 
-        desc_frame = ttk.LabelFrame(right_container, text="Information", padding=pad)
+        desc_frame = ttk.LabelFrame(right_container, text="Details", padding=pad)
         desc_frame.grid(row=2, column=0, sticky="nsew", pady=(pad, 0))
         desc_frame.columnconfigure(0, weight=1)
         desc_frame.rowconfigure(0, weight=1)
@@ -295,7 +295,7 @@ class EquationDialog:
 
         # -- Hint --
         if eq_type == "difference":
-            hint_title = "Write f_{n+order} as a Python expression."
+            hint_title = "Write the next recurrence term as a Python expression."
             hint_detail = (
                 "Use n for the index, f[0] for f_n, f[1] for f_{n+1}, etc.\n"
                 "Example (geometric growth):  r * f[0]"
@@ -308,7 +308,7 @@ class EquationDialog:
                 "Example (coupled oscillators):  -\u03c9**2 * f[0,0] + k * (f[1,0] - f[0,0])"
             )
         elif eq_type == "pde":
-            hint_title = "Select the LHS operator and write the RHS expression."
+            hint_title = "Select the left-hand operator and write the right-hand expression."
             hint_detail = (
                 "Choose which derivative operator equals the expression.\n"
                 "Spatial: x, y (or x[0], x[1]). Solution: f. Derivatives: "
@@ -334,9 +334,7 @@ class EquationDialog:
         bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
 
         # -- Unicode reference --
-        unicode_frame = ttk.LabelFrame(
-            ci, text="Unicode symbols — copy and paste directly", padding=pad
-        )
+        unicode_frame = ttk.LabelFrame(ci, text="Symbols you can copy", padding=pad)
         unicode_frame.pack(fill=tk.X, pady=(0, pad))
         _unicode_hint = (
             "\u03b1 \u03b2 \u03b3 \u03b4 \u03b5 \u03b6 \u03b7"
@@ -428,7 +426,9 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, \u03b3")
@@ -483,7 +483,10 @@ class EquationDialog:
         # Per-component order spinbox variables
         self._vec_order_vars: list[tk.StringVar] = []
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W, pady=(pad, 0))
+        ttk.Label(
+            ci,
+            text="Parameter names to configure later (comma-separated):",
+        ).pack(anchor=tk.W, pady=(pad, 0))
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, k")
@@ -748,7 +751,7 @@ class EquationDialog:
 
         ttk.Label(
             ci,
-            text="Right-hand side expression (use x[0], x[1] or x, y for variables):",
+            text="Right-hand side expression (use x[0], x[1], or x, y for variables):",
         ).pack(anchor=tk.W)
         self.custom_expr = tk.Text(
             ci,
@@ -761,7 +764,9 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: k, \u03b1")
@@ -788,7 +793,11 @@ class EquationDialog:
 
     def _on_next_predefined(self) -> None:
         if self._selected_key is None:
-            messagebox.showwarning("No Selection", "Please select an equation.", parent=self.win)
+            messagebox.showwarning(
+                "Choose an equation",
+                "Select a built-in equation before continuing.",
+                parent=self.win,
+            )
             return
 
         eq = self.equations[self._selected_key]
@@ -862,7 +871,7 @@ class EquationDialog:
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
             messagebox.showwarning(
-                "Empty Expression", "Please enter an expression.", parent=self.win
+                "Add an expression", "Write the expression before continuing.", parent=self.win
             )
             return
 
@@ -870,7 +879,7 @@ class EquationDialog:
             order = int(self.custom_order_var.get())
         except ValueError:
             messagebox.showerror(
-                "Invalid Order", "Order must be a positive integer.", parent=self.win
+                "Check the order", "Order must be a positive integer.", parent=self.win
             )
             return
 
@@ -904,7 +913,9 @@ class EquationDialog:
             n_components = int(self._vec_n_var.get())
         except ValueError:
             messagebox.showerror(
-                "Invalid Input", "Number of components must be an integer.", parent=self.win
+                "Check the component count",
+                "Number of components must be an integer.",
+                parent=self.win,
             )
             return
 
@@ -917,7 +928,7 @@ class EquationDialog:
                 component_orders.append(int(ov.get()))
             except ValueError:
                 messagebox.showerror(
-                    "Invalid Order",
+                    "Check the order",
                     f"Order for component {idx} must be a positive integer.",
                     parent=self.win,
                 )
@@ -931,7 +942,9 @@ class EquationDialog:
             bulk_expr = normalize_unicode_escapes(self._vec_bulk_expr.get("1.0", tk.END).strip())
             if not bulk_expr:
                 messagebox.showwarning(
-                    "Empty Expression", "Please enter a bulk expression.", parent=self.win
+                    "Add an expression",
+                    "Write the bulk expression before continuing.",
+                    parent=self.win,
                 )
                 return
             # Expand bulk expression for each component index
@@ -942,9 +955,9 @@ class EquationDialog:
         else:
             if len(self._vec_expr_widgets) != n_components:
                 messagebox.showerror(
-                    "Mismatch",
-                    "Number of expression boxes doesn't match components. "
-                    "Click 'Refresh component boxes'.",
+                    "Component boxes are out of sync",
+                    "The number of expression boxes does not match the component count. "
+                    "Change the component count again to refresh the boxes.",
                     parent=self.win,
                 )
                 return
@@ -953,7 +966,7 @@ class EquationDialog:
                 expr = normalize_unicode_escapes(widget.get("1.0", tk.END).strip())
                 if not expr:
                     messagebox.showwarning(
-                        "Empty Expression",
+                        "Add an expression",
                         f"Expression for component {idx} is empty.",
                         parent=self.win,
                     )
@@ -994,7 +1007,7 @@ class EquationDialog:
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
             messagebox.showwarning(
-                "Empty Expression", "Please enter a PDE expression.", parent=self.win
+                "Add an expression", "Write the PDE expression before continuing.", parent=self.win
             )
             return
 
