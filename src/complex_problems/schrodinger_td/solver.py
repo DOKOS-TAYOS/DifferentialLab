@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -141,10 +142,10 @@ def solve_schrodinger_td(
     k0x: float = 0.0,
     k0y: float = 0.0,
     separation: float = 2.0,
-    custom_potential_fn_1d=None,
-    custom_potential_fn_2d=None,
-    custom_packet_fn_1d=None,
-    custom_packet_fn_2d=None,
+    custom_potential_fn_1d: Callable[[float], float] | None = None,
+    custom_potential_fn_2d: Callable[[float, float], float] | None = None,
+    custom_packet_fn_1d: Callable[[float], float] | None = None,
+    custom_packet_fn_2d: Callable[[float, float], float] | None = None,
 ) -> SchrodingerTDResult:
     """Solve TDSE in 1D or 2D with split-operator spectral method."""
     if dimension not in {1, 2}:
@@ -369,4 +370,3 @@ def solve_schrodinger_td(
         metadata=metadata2,
         magnitudes=magnitudes2,
     )
-

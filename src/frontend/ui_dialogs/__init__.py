@@ -1,5 +1,7 @@
 """UI dialog modules for DifferentialLab."""
 
+from typing import Any
+
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 
@@ -13,7 +15,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy-load heavy dialog modules on first access to speed up startup.
 
     Args:

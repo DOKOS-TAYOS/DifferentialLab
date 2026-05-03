@@ -22,13 +22,7 @@ def laplacian_2d(u: np.ndarray, *, boundary: str) -> np.ndarray:
 
     # Fixed boundary with u=0 outside domain.
     p = np.pad(u, pad_width=1, mode="constant", constant_values=0.0)
-    return (
-        p[2:, 1:-1]
-        + p[:-2, 1:-1]
-        + p[1:-1, 2:]
-        + p[1:-1, :-2]
-        - 4.0 * p[1:-1, 1:-1]
-    )
+    return p[2:, 1:-1] + p[:-2, 1:-1] + p[1:-1, 2:] + p[1:-1, :-2] - 4.0 * p[1:-1, 1:-1]
 
 
 def apply_fixed_boundary(u: np.ndarray, v: np.ndarray | None = None) -> None:
@@ -109,19 +103,17 @@ def build_initial_displacement(
     X, Y = _build_mesh(nx, ny)
 
     if shape == "gaussian":
-        u = amplitude * np.exp(
-            -(((X - center_x) ** 2 + (Y - center_y) ** 2) / (2.0 * sigma**2))
-        )
+        u = amplitude * np.exp(-(((X - center_x) ** 2 + (Y - center_y) ** 2) / (2.0 * sigma**2)))
     elif shape == "mode":
         if boundary == "periodic":
-            u = amplitude * np.cos(2.0 * np.pi * mode_x * X) * np.cos(
-                2.0 * np.pi * mode_y * Y
-            )
+            u = amplitude * np.cos(2.0 * np.pi * mode_x * X) * np.cos(2.0 * np.pi * mode_y * Y)
         else:
             j = np.arange(1, ny + 1)[:, np.newaxis]
             i = np.arange(1, nx + 1)[np.newaxis, :]
-            u = amplitude * np.sin(mode_x * np.pi * i / (nx + 1)) * np.sin(
-                mode_y * np.pi * j / (ny + 1)
+            u = (
+                amplitude
+                * np.sin(mode_x * np.pi * i / (nx + 1))
+                * np.sin(mode_y * np.pi * j / (ny + 1))
             )
     elif shape == "random":
         rng = np.random.default_rng(random_seed)
@@ -190,4 +182,3 @@ def compute_fft_power_2d(u: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndar
     kx = np.fft.fftshift(np.fft.fftfreq(nx))
     ky = np.fft.fftshift(np.fft.fftfreq(ny))
     return kx, ky, power
-

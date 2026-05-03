@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
 
 from complex_problems.common import (
@@ -316,8 +317,8 @@ class SchrodingerTDDialog:
         k0y = parse_float(self._k0y_var.get(), name="k₀y")
         separation = parse_positive_float(self._separation_var.get(), name="Separation")
 
-        custom_potential_fn_1d = None
-        custom_potential_fn_2d = None
+        custom_potential_fn_1d: Callable[[float], float] | None = None
+        custom_potential_fn_2d: Callable[[float, float], float] | None = None
         if potential_type == "custom":
             if dimension == 2:
                 compiled = compile_scalar_expression(
@@ -325,12 +326,14 @@ class SchrodingerTDDialog:
                     variables=("x", "y"),
                 )
 
-                def custom_potential_fn_2d(
+                def _custom_potential_fn_2d(
                     x: float,
                     y: float,
-                    _fn=compiled,
+                    _fn: Callable[..., float] = compiled,
                 ) -> float:
                     return _fn(x=float(x), y=float(y))
+
+                custom_potential_fn_2d = _custom_potential_fn_2d
 
             else:
                 compiled = compile_scalar_expression(
@@ -338,14 +341,16 @@ class SchrodingerTDDialog:
                     variables=("x",),
                 )
 
-                def custom_potential_fn_1d(
+                def _custom_potential_fn_1d(
                     x: float,
-                    _fn=compiled,
+                    _fn: Callable[..., float] = compiled,
                 ) -> float:
                     return _fn(x=float(x))
 
-        custom_packet_fn_1d = None
-        custom_packet_fn_2d = None
+                custom_potential_fn_1d = _custom_potential_fn_1d
+
+        custom_packet_fn_1d: Callable[[float], float] | None = None
+        custom_packet_fn_2d: Callable[[float, float], float] | None = None
         if packet_type == "custom":
             if dimension == 2:
                 compiled = compile_scalar_expression(
@@ -353,12 +358,14 @@ class SchrodingerTDDialog:
                     variables=("x", "y"),
                 )
 
-                def custom_packet_fn_2d(
+                def _custom_packet_fn_2d(
                     x: float,
                     y: float,
-                    _fn=compiled,
+                    _fn: Callable[..., float] = compiled,
                 ) -> float:
                     return _fn(x=float(x), y=float(y))
+
+                custom_packet_fn_2d = _custom_packet_fn_2d
 
             else:
                 compiled = compile_scalar_expression(
@@ -366,11 +373,13 @@ class SchrodingerTDDialog:
                     variables=("x",),
                 )
 
-                def custom_packet_fn_1d(
+                def _custom_packet_fn_1d(
                     x: float,
-                    _fn=compiled,
+                    _fn: Callable[..., float] = compiled,
                 ) -> float:
                     return _fn(x=float(x))
+
+                custom_packet_fn_1d = _custom_packet_fn_1d
 
         return {
             "dimension": dimension,

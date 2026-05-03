@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -183,7 +184,7 @@ def solve_nonlinear_waves(
     amplitude: float = 1.0,
     sigma: float = 0.3,
     center: float = 0.0,
-    custom_profile_fn=None,
+    custom_profile_fn: Callable[[float], float] | None = None,
     initial_phase_k: float = 0.0,
     # NLSE parameters
     beta2: float = 1.0,

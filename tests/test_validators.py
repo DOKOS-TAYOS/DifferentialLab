@@ -102,9 +102,9 @@ class TestValidateAllInputs:
             method="RK45",
         )
         assert len(errors) >= 1
-        assert any(
-            "10" in e and "points" in e.lower() for e in errors
-        ), "Expected 'at least 10' points error"
+        assert any("10" in e and "points" in e.lower() for e in errors), (
+            "Expected 'at least 10' points error"
+        )
 
     def test_num_points_too_large(self) -> None:
         errors = validators.validate_all_inputs(
@@ -117,9 +117,9 @@ class TestValidateAllInputs:
             method="RK45",
         )
         assert len(errors) >= 1
-        assert any(
-            "1,000,000" in e and "exceed" in e.lower() for e in errors
-        ), "Expected 'exceed 1,000,000' error"
+        assert any("1,000,000" in e and "exceed" in e.lower() for e in errors), (
+            "Expected 'exceed 1,000,000' error"
+        )
 
     def test_unknown_method(self) -> None:
         errors = validators.validate_all_inputs(
@@ -132,9 +132,9 @@ class TestValidateAllInputs:
             method="INVALID_METHOD",
         )
         assert len(errors) >= 1
-        assert any(
-            "unknown" in e.lower() and "method" in e.lower() for e in errors
-        ), "Expected 'unknown method' error"
+        assert any("unknown" in e.lower() and "method" in e.lower() for e in errors), (
+            "Expected 'unknown method' error"
+        )
 
     def test_valid_methods_accepted(self) -> None:
         for method in ("RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"):
@@ -161,9 +161,9 @@ class TestValidateAllInputs:
             params={"k": float("nan")},
         )
         assert len(errors) >= 1
-        assert any(
-            "parameter" in e.lower() or "finite" in e.lower() for e in errors
-        ), "Expected parameter/finite error for NaN"
+        assert any("parameter" in e.lower() or "finite" in e.lower() for e in errors), (
+            "Expected parameter/finite error for NaN"
+        )
 
     def test_x0_list_outside_domain_reported(self) -> None:
         errors = validators.validate_all_inputs(
@@ -176,9 +176,7 @@ class TestValidateAllInputs:
             method="RK45",
             x0_list=[15.0],  # outside [0, 10]
         )
-        assert any(
-            "domain" in e.lower() or "within" in e.lower() for e in errors
-        )
+        assert any("domain" in e.lower() or "within" in e.lower() for e in errors)
 
     def test_multiple_errors_accumulated(self) -> None:
         errors = validators.validate_all_inputs(

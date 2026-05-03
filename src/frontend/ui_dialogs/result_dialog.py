@@ -1514,7 +1514,7 @@ class ResultDialog:
 
     def _save_export_file(
         self,
-        export_fn,
+        export_fn: Callable[[Path], None],
         ext: str,
         filetypes: list[tuple[str, str]],
         prefix_log: str = "",
@@ -1544,7 +1544,7 @@ class ResultDialog:
     def _on_save_csv(self) -> None:
         r = self._result
 
-        def export_fn(path: str) -> None:
+        def export_fn(path: Path) -> None:
             export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid)
 
         self._save_export_file(
@@ -1557,7 +1557,7 @@ class ResultDialog:
     def _on_save_json(self) -> None:
         r = self._result
 
-        def export_fn(path: str) -> None:
+        def export_fn(path: Path) -> None:
             export_json_to_path(r.statistics, r.metadata, path)
 
         self._save_export_file(

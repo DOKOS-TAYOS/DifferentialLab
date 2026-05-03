@@ -30,4 +30,3 @@ class SchrodingerTDProblem:
 
 
 PROBLEM = SchrodingerTDProblem()
-

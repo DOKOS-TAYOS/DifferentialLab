@@ -30,4 +30,3 @@ class CoupledOscillatorsProblem:
 
 
 PROBLEM = CoupledOscillatorsProblem()
-

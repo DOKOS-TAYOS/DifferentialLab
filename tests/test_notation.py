@@ -1,6 +1,5 @@
 """Tests for the f-notation translation layer."""
 
-
 from solver.notation import (
     FNotation,
     _flat_index_to_label,
@@ -95,9 +94,7 @@ class TestRewriteVectorODE:
         assert _rewrite_f_expression("f", self.nota) == "y[0]"
 
     def test_expression(self):
-        result = _rewrite_f_expression(
-            "-omega**2 * f[0,0] + k * (f[1,0] - f[0,0])", self.nota
-        )
+        result = _rewrite_f_expression("-omega**2 * f[0,0] + k * (f[1,0] - f[0,0])", self.nota)
         assert result == "-omega**2 * y[0] + k * (y[2] - y[0])"
 
     def test_symbolic_indices(self):

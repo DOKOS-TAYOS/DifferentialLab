@@ -25,6 +25,7 @@ def test_geometric_growth() -> None:
 
 def test_fibonacci() -> None:
     """Fibonacci y_{n+2} = y_{n+1} + y_n with y_0=0, y_1=1."""
+
     def recur(n: int, y: np.ndarray) -> float:
         return y[0] + y[1]
 
@@ -39,6 +40,7 @@ def test_fibonacci() -> None:
 
 def test_n_min_ge_n_max_returns_failure() -> None:
     """n_min >= n_max should return success=False."""
+
     def recur(n: int, y: np.ndarray) -> float:
         return y[0]
 
@@ -54,6 +56,7 @@ def test_n_min_ge_n_max_returns_failure() -> None:
 
 def test_exception_in_recur_func_propagates() -> None:
     """Exception in recur_func should set success=False and propagate message."""
+
     def recur_failing(n: int, y: np.ndarray) -> float:
         raise ValueError("custom error")
 

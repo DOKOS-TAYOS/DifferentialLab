@@ -644,7 +644,12 @@ class EquationDialog:
 
                 # Bind order spinbox change to update label
                 def _on_order_change(
-                    _var: str, _idx: str, _mode: str, comp=i, ov=order_var, lb=lbl
+                    _var: str,
+                    _idx: str,
+                    _mode: str,
+                    comp: int = i,
+                    ov: tk.StringVar = order_var,
+                    lb: ttk.Label = lbl,
                 ) -> None:
                     try:
                         val = int(ov.get())

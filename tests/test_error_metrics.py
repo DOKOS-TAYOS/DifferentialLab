@@ -44,6 +44,7 @@ def test_exact_ode_low_residual(mock_get_env: object) -> None:
 
 def test_wrong_solution_high_residual() -> None:
     """Wrong solution y=1 (constant) for y'=y should yield large residual."""
+
     def ode_func(t: float, y: np.ndarray) -> np.ndarray:
         return np.array([y[0]])
 
@@ -57,6 +58,7 @@ def test_wrong_solution_high_residual() -> None:
 
 def test_residual_keys_and_shape() -> None:
     """Verify return dict structure and handling of 1D y with exact solution."""
+
     def ode_func(t: float, y: np.ndarray) -> np.ndarray:
         return np.array([-y[0]])
 
@@ -74,6 +76,7 @@ def test_residual_keys_and_shape() -> None:
 
 def test_few_points_returns_zeros() -> None:
     """n_points < 2 should return zero metrics (cannot compute derivative)."""
+
     def ode_func(t: float, y: np.ndarray) -> np.ndarray:
         return y
 

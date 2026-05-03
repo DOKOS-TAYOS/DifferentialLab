@@ -305,4 +305,3 @@ def solve_membrane_2d(
         metadata=metadata,
         magnitudes=magnitudes,
     )
-

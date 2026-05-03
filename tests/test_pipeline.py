@@ -14,7 +14,6 @@ from utils import ValidationError
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_success(
     mock_ode_env: object,
-    tmp_path: object,
     sample_expression_order1: str,
     sample_y0_order1: list[float],
     sample_domain: tuple[float, float],
@@ -52,9 +51,7 @@ def test_run_solver_pipeline_success(
     assert result.metadata["equation_name"] == "Exponential"
     # Verify numerical solution: y'=0.5*y, y(0)=1 => y(x)=exp(0.5*x)
     np.testing.assert_allclose(result.y[0, 0], 1.0)
-    np.testing.assert_allclose(
-        result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5
-    )
+    np.testing.assert_allclose(result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5)
 
 
 def test_run_solver_pipeline_validation_error() -> None:
@@ -80,7 +77,6 @@ def test_run_solver_pipeline_validation_error() -> None:
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_multipoint(
     mock_ode_env: object,
-    tmp_path: object,
 ) -> None:
     def env_side_effect(key: str) -> object:
         env = {
@@ -141,6 +137,7 @@ def test_run_solver_pipeline_difference_equation() -> None:
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_vector_ode(mock_ode_env: object) -> None:
     """Vector ODE: coupled system f0'=f1, f1'=-f0 (harmonic oscillator)."""
+
     def env_side_effect(key: str) -> object:
         env = {
             "SOLVER_MAX_STEP": 0.0,

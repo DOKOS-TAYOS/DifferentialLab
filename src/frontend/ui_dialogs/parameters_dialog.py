@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import queue
 import re
-import threading
 import tkinter as tk
+from collections.abc import Mapping
+from dataclasses import dataclass
 from tkinter import messagebox, ttk
 from typing import Any
 
@@ -17,6 +17,7 @@ from config import (
     get_env_from_schema,
 )
 from frontend.theme import get_contrast_foreground, get_font
+from frontend.ui_dialogs.background_task import BackgroundTaskFailure, run_task_with_loading
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -26,6 +27,54 @@ from utils import DifferentialLabError, get_logger
 logger = get_logger(__name__)
 
 _MAX_PDE_GRID = 1000
+
+
+def _format_solver_exception(exc: BaseException) -> BackgroundTaskFailure:
+    """Map solver exceptions to user-facing dialog failures."""
+    if isinstance(exc, DifferentialLabError):
+        logger.warning("Solver pipeline failed (user-facing): %s", exc)
+        return BackgroundTaskFailure("DifferentialLabError", str(exc))
+
+    if isinstance(exc, (MemoryError, OSError)):
+        logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
+        return BackgroundTaskFailure(
+            "Memory Error",
+            f"Not enough memory to solve: {exc}\n\nTry reducing the grid size (points per axis).",
+        )
+
+    logger.exception("Solver pipeline: unexpected error")
+    return BackgroundTaskFailure("Error", str(exc))
+
+
+class _InputValidationError(ValueError):
+    """User-facing input validation error with a dialog title."""
+
+    def __init__(self, title: str, message: str) -> None:
+        super().__init__(message)
+        self.title = title
+        self.message = message
+
+
+@dataclass(frozen=True, slots=True)
+class _SolverInputs:
+    """Validated inputs ready to pass to the solver pipeline."""
+
+    x_min: float
+    x_max: float
+    y0: list[float]
+    n_points: int
+    method: str
+    selected_stats: set[str]
+    parameters: dict[str, Any]
+    x0_list: list[float] | None
+    y_min: float | None
+    y_max: float | None
+    n_points_y: int | None
+    bc_expressions: list[str] | None
+    bc_types: list[str] | None
+    mask_expression: str | None
+    contour_bc_expression: str | None
+    contour_bc_type: str | None
 
 
 class ParametersDialog:
@@ -49,7 +98,7 @@ class ParametersDialog:
         expression: str | None = None,
         function_name: str | None = None,
         order: int,
-        parameters: dict[str, float],
+        parameters: Mapping[str, float | list[float]],
         equation_name: str,
         default_y0: list[float],
         default_domain: list[float],
@@ -66,7 +115,7 @@ class ParametersDialog:
         self.expression = expression
         self.function_name = function_name
         self.order = order
-        self.parameters = parameters
+        self.parameters: dict[str, float | list[float]] = dict(parameters)
         self.equation_name = equation_name
         self.display_formula = (
             display_formula
@@ -108,6 +157,53 @@ class ParametersDialog:
         pad: int = get_env_from_schema("UI_PADDING")
 
         # ── Fixed bottom button bar ──
+        btn_solve = self._build_action_buttons(pad)
+
+        # ── Scrollable content ──
+        scroll = ScrollableFrame(self.win)
+        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
+        scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        scroll_frame = scroll.inner
+        scroll_frame.configure(padding=pad)
+
+        # Equation summary
+        formula_lbl = self._build_equation_summary(scroll_frame, pad)
+
+        # Two-column layout: left = domain + ICs, right = solver + statistics
+        left_col, right_col = self._build_layout_columns(scroll_frame, pad)
+
+        is_diff = self._build_domain_and_parameter_sections(left_col, pad, default_domain)
+        self._build_initial_or_boundary_sections(
+            left_col,
+            pad,
+            default_y0,
+            default_domain,
+            is_diff,
+        )
+
+        # Solver method (ODE only) — right column
+        self._build_solver_method_section(right_col, pad)
+
+        # Statistics listbox (extended selection) — right column
+        stats_frame = self._build_statistics_section(right_col, pad)
+
+        bind_wraplength(scroll_frame, formula_lbl, pad=2 * pad, min_wrap=200)
+        bind_wraplength(
+            stats_frame,
+            [self.method_desc, self._stats_desc_label],
+            pad=2 * pad,
+            min_wrap=150,
+        )
+        scroll.bind_new_children()
+        btn_solve.focus_set()
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _build_action_buttons(self, pad: int) -> ttk.Button:
+        """Build the fixed bottom solve/cancel button row."""
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
@@ -126,36 +222,40 @@ class ParametersDialog:
         btn_cancel.pack(side=tk.LEFT, padx=pad)
 
         setup_arrow_enter_navigation([[btn_solve, btn_cancel]])
+        return btn_solve
 
-        # ── Scrollable content ──
-        scroll = ScrollableFrame(self.win)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        scroll_frame = scroll.inner
-        scroll_frame.configure(padding=pad)
-
-        # Equation summary
-        ttk.Label(
-            scroll_frame, text=f"Equation: {self.equation_name}", style="Subtitle.TLabel"
-        ).pack(anchor=tk.W, pady=(0, pad))
-        formula_lbl = ttk.Label(
-            scroll_frame,
+    def _build_equation_summary(self, parent: ttk.Frame, pad: int) -> ttk.Label:
+        """Build the equation title and formula summary."""
+        ttk.Label(parent, text=f"Equation: {self.equation_name}", style="Subtitle.TLabel").pack(
+            anchor=tk.W, pady=(0, pad)
+        )
+        formula_label = ttk.Label(
+            parent,
             text=self.display_formula,
             style="Small.TLabel",
             justify=tk.LEFT,
         )
-        formula_lbl.pack(anchor=tk.W, pady=(0, pad))
+        formula_label.pack(anchor=tk.W, pady=(0, pad))
+        return formula_label
 
-        # Two-column layout: left = domain + ICs, right = solver + statistics
-        columns_frame = ttk.Frame(scroll_frame)
+    def _build_layout_columns(self, parent: ttk.Frame, pad: int) -> tuple[ttk.Frame, ttk.Frame]:
+        """Build the two-column content layout."""
+        columns_frame = ttk.Frame(parent)
         columns_frame.pack(fill=tk.BOTH, expand=True, pady=(0, pad))
 
         left_col = ttk.Frame(columns_frame)
         left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, pad))
         right_col = ttk.Frame(columns_frame)
         right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        return left_col, right_col
 
+    def _build_domain_and_parameter_sections(
+        self,
+        left_col: ttk.Frame,
+        pad: int,
+        default_domain: list[float],
+    ) -> bool:
+        """Build domain, parameter, and grid-size controls."""
         # Domain (left column)
         domain_label = (
             "Domain (n\u2098\u1d62\u2099, n\u2098\u2090\u2093)"  # n_min, n_max
@@ -234,7 +334,8 @@ class ParametersDialog:
                 m = re.match(r"^(.+)\[(\d+)\]$", pname)
                 if m:
                     return f"{m.group(1)}{_subscript_n(int(m.group(2)))}"
-                return pinfo.get("display", pname)
+                display = pinfo.get("display")
+                return str(display) if display is not None else pname
 
             label_width = max(len(_display_name_for(p)) for p in self.parameters) + 1
 
@@ -246,8 +347,7 @@ class ParametersDialog:
                     display_name = _display_name_for(pname)
 
                     # Detect list parameter
-                    is_list_param = isinstance(val, list)
-                    if is_list_param:
+                    if isinstance(val, list):
                         ttk.Label(row, text=f"{display_name}:", width=label_width).pack(
                             side=tk.LEFT,
                         )
@@ -306,7 +406,17 @@ class ParametersDialog:
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
+        return is_diff
 
+    def _build_initial_or_boundary_sections(
+        self,
+        left_col: ttk.Frame,
+        pad: int,
+        default_y0: list[float],
+        default_domain: list[float],
+        is_diff: bool,
+    ) -> None:
+        """Build PDE boundary controls or non-PDE initial-condition controls."""
         # Initial conditions (skip for PDE) — left column
         self._bc_vars: list[tk.StringVar] = []
         self._bc_type_vars: list[tk.StringVar] = []
@@ -481,8 +591,9 @@ class ParametersDialog:
 
                 self._y0_vars.append(var)
 
-        # Solver method (ODE only) — right column
-        self.method_frame = ttk.LabelFrame(right_col, text="Solver Method", padding=pad)
+    def _build_solver_method_section(self, parent: ttk.Frame, pad: int) -> None:
+        """Build solver-method controls."""
+        self.method_frame = ttk.LabelFrame(parent, text="Solver Method", padding=pad)
         self.method_frame.pack(fill=tk.X, pady=(0, pad))
 
         self.method_var = tk.StringVar(value=DEFAULT_SOLVER_METHOD)
@@ -507,8 +618,9 @@ class ParametersDialog:
         if self.equation_type == "difference" or self.is_pde:
             self.method_frame.pack_forget()
 
-        # Statistics listbox (extended selection) — right column
-        stats_frame = ttk.LabelFrame(right_col, text="Statistics & Magnitudes", padding=pad)
+    def _build_statistics_section(self, parent: ttk.Frame, pad: int) -> ttk.LabelFrame:
+        """Build statistics selection controls."""
+        stats_frame = ttk.LabelFrame(parent, text="Statistics & Magnitudes", padding=pad)
         stats_frame.pack(fill=tk.X, pady=(0, pad))
 
         self._stat_keys = list(AVAILABLE_STATISTICS.keys())
@@ -549,20 +661,7 @@ class ParametersDialog:
         )
         self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
         self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
-
-        bind_wraplength(scroll_frame, formula_lbl, pad=2 * pad, min_wrap=200)
-        bind_wraplength(
-            stats_frame,
-            [self.method_desc, self._stats_desc_label],
-            pad=2 * pad,
-            min_wrap=150,
-        )
-        scroll.bind_new_children()
-        btn_solve.focus_set()
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+        return stats_frame
 
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
@@ -649,239 +748,235 @@ class ParametersDialog:
     # Solve
     # ------------------------------------------------------------------
 
-    def _on_solve(self) -> None:
-        """Parse inputs, run the solver pipeline, and open the result dialog."""
-        # Equation parameters
-        if self._eq_param_vars:
-            import numpy as _np
+    def _parse_equation_parameters(self) -> dict[str, Any]:
+        """Parse equation parameter widgets into numeric values."""
+        if not self._eq_param_vars:
+            return self.parameters
 
-            params: dict[str, Any] = {}
-            for pname, var in self._eq_param_vars.items():
-                raw = var.get().strip()
-                # Detect list parameter: name[n]
-                m = re.match(r"^(.+)\[(\d+)\]$", pname)
-                if m:
-                    base_name = m.group(1)
-                    try:
-                        values = [float(v.strip()) for v in raw.split(",")]
-                    except ValueError:
-                        messagebox.showerror(
-                            "Invalid Parameter",
-                            f"Parameter '{pname}' must be comma-separated numbers.",
-                            parent=self.win,
-                        )
-                        return
-                    # Store under base name so name[i] works in expressions
-                    params[base_name] = _np.array(values)
-                else:
-                    try:
-                        params[pname] = float(raw)
-                    except ValueError:
-                        messagebox.showerror(
-                            "Invalid Parameter",
-                            f"Parameter '{pname}' must be a number.",
-                            parent=self.win,
-                        )
-                        return
-            self.parameters = params
+        import numpy as _np
 
+        params: dict[str, Any] = {}
+        for pname, var in self._eq_param_vars.items():
+            raw = var.get().strip()
+            param_match = re.match(r"^(.+)\[(\d+)\]$", pname)
+            if param_match:
+                base_name = param_match.group(1)
+                try:
+                    values = [float(v.strip()) for v in raw.split(",")]
+                except ValueError:
+                    raise _InputValidationError(
+                        "Invalid Parameter",
+                        f"Parameter '{pname}' must be comma-separated numbers.",
+                    ) from None
+                params[base_name] = _np.array(values)
+                continue
+
+            try:
+                params[pname] = float(raw)
+            except ValueError:
+                raise _InputValidationError(
+                    "Invalid Parameter",
+                    f"Parameter '{pname}' must be a number.",
+                ) from None
+
+        self.parameters = params
+        return params
+
+    def _parse_domain(self) -> tuple[float, float]:
+        """Parse the primary x/n domain values."""
         try:
-            x_min = float(self.xmin_var.get())
-            x_max = float(self.xmax_var.get())
+            return float(self.xmin_var.get()), float(self.xmax_var.get())
         except ValueError:
             domain_name = (
                 "n\u2098\u1d62\u2099 and n\u2098\u2090\u2093"
                 if self.equation_type == "difference"
                 else "x\u2098\u1d62\u2099 and x\u2098\u2090\u2093"
             )
-            messagebox.showerror(
-                "Invalid Domain", f"{domain_name} must be numbers.", parent=self.win
+            raise _InputValidationError(
+                "Invalid Domain",
+                f"{domain_name} must be numbers.",
+            ) from None
+
+    def _parse_pde_domain_and_grid(self) -> tuple[float, float, int, int]:
+        """Parse 2D PDE y-domain and grid sizes."""
+        if self.ymin_var is None or self.ymax_var is None:
+            raise _InputValidationError(
+                "Invalid PDE",
+                "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.",
             )
-            return
+        try:
+            y_min = float(self.ymin_var.get())
+            y_max = float(self.ymax_var.get())
+        except ValueError:
+            raise _InputValidationError(
+                "Invalid Domain",
+                "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 must be numbers.",
+            ) from None
+        try:
+            n_points = int(self.npoints_var.get())
+            n_points_y = int(self.npoints_y_var.get()) if self.npoints_y_var else n_points
+        except (ValueError, AttributeError):
+            raise _InputValidationError(
+                "Invalid Grid",
+                "Grid points must be integers.",
+            ) from None
+        if n_points > _MAX_PDE_GRID or n_points_y > _MAX_PDE_GRID:
+            raise _InputValidationError(
+                "Grid too large",
+                f"PDE grid is limited to {_MAX_PDE_GRID} points per axis to avoid "
+                f"excessive memory use. You entered {n_points}\u00d7{n_points_y}.",
+            )
+        return y_min, y_max, n_points, n_points_y
 
-        if self.is_pde:
-            if self.ymin_var is None or self.ymax_var is None:
-                messagebox.showerror(
-                    "Invalid PDE",
-                    "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 required.",
-                    parent=self.win,
-                )
-                return
+    def _parse_ic_points(self) -> list[float]:
+        """Parse per-initial-condition x positions."""
+        subscripts = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
+        x0_list: list[float] = []
+        for i, x_var in enumerate(self._x0_vars):
+            sub = subscripts[i] if i < len(subscripts) else str(i)
             try:
-                y_min = float(self.ymin_var.get())
-                y_max = float(self.ymax_var.get())
+                x0_list.append(float(x_var.get()))
             except ValueError:
-                messagebox.showerror(
-                    "Invalid Domain",
-                    "y\u2098\u1d62\u2099 and y\u2098\u2090\u2093 must be numbers.",
-                    parent=self.win,
-                )
-                return
-            try:
-                n_points = int(self.npoints_var.get())
-                n_points_y = int(self.npoints_y_var.get()) if self.npoints_y_var else n_points
-            except (ValueError, AttributeError):
-                messagebox.showerror(
-                    "Invalid Grid", "Grid points must be integers.", parent=self.win
-                )
-                return
-            if n_points > _MAX_PDE_GRID or n_points_y > _MAX_PDE_GRID:
-                messagebox.showerror(
-                    "Grid too large",
-                    f"PDE grid is limited to {_MAX_PDE_GRID} points per axis to avoid "
-                    f"excessive memory use. You entered {n_points}×{n_points_y}.",
-                    parent=self.win,
-                )
-                return
-            y0 = []
-            x0_list = None
-            method = "fdm"
-        elif self.equation_type == "difference":
-            n_points = int(x_max) - int(x_min) + 1
-            x0_list = None
-            method = "iteration"
-            y_min = None
-            y_max = None
-            n_points_y = None
-        else:
-            try:
-                n_points = int(self.npoints_var.get())
-            except ValueError:
-                messagebox.showerror(
-                    "Invalid Grid", "Number of points must be an integer.", parent=self.win
-                )
-                return
-            subscripts = "₀₁₂₃₄₅₆₇₈₉"
-            x0_list = []
-            for i, x_var in enumerate(self._x0_vars):
-                sub = subscripts[i] if i < len(subscripts) else str(i)
-                try:
-                    x0_list.append(float(x_var.get()))
-                except ValueError:
-                    messagebox.showerror(
-                        "Invalid IC Point",
-                        f"x{sub} must be a number.",
-                        parent=self.win,
-                    )
-                    return
-            method = self.method_var.get()
-            y_min = None
-            y_max = None
-            n_points_y = None
+                raise _InputValidationError(
+                    "Invalid IC Point",
+                    f"x{sub} must be a number.",
+                ) from None
+        return x0_list
 
+    def _parse_initial_conditions(self) -> list[float]:
+        """Parse initial condition values for non-PDE solves."""
         y0_list: list[float] = []
-        if not self.is_pde:
-            for i, var in enumerate(self._y0_vars):
-                try:
-                    y0_list.append(float(var.get()))
-                except ValueError:
-                    messagebox.showerror(
-                        "Invalid IC",
-                        f"Initial condition {i} must be a number.",
-                        parent=self.win,
-                    )
-                    return
-        y0 = y0_list if not self.is_pde else []
+        for i, var in enumerate(self._y0_vars):
+            try:
+                y0_list.append(float(var.get()))
+            except ValueError:
+                raise _InputValidationError(
+                    "Invalid IC",
+                    f"Initial condition {i} must be a number.",
+                ) from None
+        return y0_list
 
-        selected_indices = self._stats_listbox.curselection()
-        selected_stats = {self._stat_keys[i] for i in selected_indices}
-
-        # Collect PDE boundary condition expressions and new parameters
+    def _collect_pde_options(
+        self,
+    ) -> tuple[list[str] | None, list[str] | None, str | None, str | None, str | None]:
+        """Collect PDE boundary, mask, and contour options."""
         bc_expressions: list[str] | None = None
         bc_types: list[str] | None = None
         mask_expression: str | None = None
         contour_bc_expression: str | None = None
         contour_bc_type: str | None = None
 
-        if self.is_pde:
-            is_custom_contour = (
-                self._domain_shape_var is not None
-                and self._domain_shape_var.get() == "Custom contour"
+        if not self.is_pde:
+            return (
+                bc_expressions,
+                bc_types,
+                mask_expression,
+                contour_bc_expression,
+                contour_bc_type,
             )
 
-            if is_custom_contour:
-                mask_expression = self._mask_expr_var.get().strip() if self._mask_expr_var else None
-                if not mask_expression:
-                    messagebox.showerror(
-                        "Missing Mask",
-                        "Custom contour requires a mask expression.",
-                        parent=self.win,
-                    )
-                    return
-                contour_bc_type = (
-                    self._contour_bc_type_var.get().strip().lower()
-                    if self._contour_bc_type_var
-                    else "dirichlet"
+        is_custom_contour = (
+            self._domain_shape_var is not None and self._domain_shape_var.get() == "Custom contour"
+        )
+        if is_custom_contour:
+            mask_expression = self._mask_expr_var.get().strip() if self._mask_expr_var else None
+            if not mask_expression:
+                raise _InputValidationError(
+                    "Missing Mask",
+                    "Custom contour requires a mask expression.",
                 )
-                contour_bc_expression = (
-                    self._contour_bc_expr_var.get().strip() or "0"
-                    if self._contour_bc_expr_var
-                    else "0"
-                )
-            else:
-                # Rectangular: collect per-edge expressions and types
-                if self._bc_vars:
-                    bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
-                if self._bc_type_vars:
-                    bc_types = [var.get().strip().lower() for var in self._bc_type_vars]
+            contour_bc_type = (
+                self._contour_bc_type_var.get().strip().lower()
+                if self._contour_bc_type_var
+                else "dirichlet"
+            )
+            contour_bc_expression = (
+                self._contour_bc_expr_var.get().strip() or "0" if self._contour_bc_expr_var else "0"
+            )
+        else:
+            if self._bc_vars:
+                bc_expressions = [var.get().strip() or "0" for var in self._bc_vars]
+            if self._bc_type_vars:
+                bc_types = [var.get().strip().lower() for var in self._bc_type_vars]
 
-        result_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
+        return (
+            bc_expressions,
+            bc_types,
+            mask_expression,
+            contour_bc_expression,
+            contour_bc_type,
+        )
 
-        def _run_solver() -> None:
+    def _collect_solver_inputs(self) -> _SolverInputs:
+        """Collect validated user inputs for ``run_solver_pipeline``."""
+        parameters = self._parse_equation_parameters()
+        x_min, x_max = self._parse_domain()
+
+        if self.is_pde:
+            y_min, y_max, n_points, n_points_y = self._parse_pde_domain_and_grid()
+            y0: list[float] = []
+            x0_list = None
+            method = "fdm"
+        elif self.equation_type == "difference":
+            n_points = int(x_max) - int(x_min) + 1
+            y_min = None
+            y_max = None
+            n_points_y = None
+            x0_list = None
+            method = "iteration"
+            y0 = self._parse_initial_conditions()
+        else:
             try:
-                from pipeline import run_solver_pipeline
+                n_points = int(self.npoints_var.get())
+            except ValueError:
+                raise _InputValidationError(
+                    "Invalid Grid",
+                    "Number of points must be an integer.",
+                ) from None
+            y_min = None
+            y_max = None
+            n_points_y = None
+            x0_list = self._parse_ic_points()
+            method = self.method_var.get()
+            y0 = self._parse_initial_conditions()
 
-                result = run_solver_pipeline(
-                    expression=self.expression,
-                    function_name=self.function_name,
-                    order=self.order,
-                    parameters=self.parameters,
-                    equation_name=self.equation_name,
-                    x_min=x_min,
-                    x_max=x_max,
-                    y0=y0,
-                    n_points=n_points,
-                    method=method,
-                    selected_stats=selected_stats,
-                    x0_list=x0_list,
-                    equation_type=self.equation_type,
-                    variables=self.variables,
-                    y_min=y_min,
-                    y_max=y_max,
-                    n_points_y=n_points_y,
-                    vector_expressions=self.vector_expressions,
-                    vector_components=self.vector_components,
-                    pde_operator=self.pde_operator,
-                    component_orders=self.component_orders,
-                    bc_expressions=bc_expressions,
-                    bc_types=bc_types,
-                    mask_expression=mask_expression,
-                    contour_bc_expression=contour_bc_expression,
-                    contour_bc_type=contour_bc_type,
-                )
-                result_queue.put(("success", result))
-            except DifferentialLabError as exc:
-                logger.warning("Solver pipeline failed (user-facing): %s", exc)
-                result_queue.put(("error", ("DifferentialLabError", str(exc))))
-            except (MemoryError, OSError) as exc:
-                logger.error("Solver pipeline: memory/system error: %s", exc, exc_info=True)
-                result_queue.put(
-                    (
-                        "error",
-                        (
-                            "Memory Error",
-                            f"Not enough memory to solve: {exc}\n\n"
-                            "Try reducing the grid size (points per axis).",
-                        ),
-                    )
-                )
-            except Exception as exc:
-                logger.exception("Solver pipeline: unexpected error")
-                result_queue.put(("error", ("Error", str(exc))))
+        selected_indices = self._stats_listbox.curselection()
+        selected_stats = {self._stat_keys[i] for i in selected_indices}
+        (
+            bc_expressions,
+            bc_types,
+            mask_expression,
+            contour_bc_expression,
+            contour_bc_type,
+        ) = self._collect_pde_options()
 
-        from frontend.ui_dialogs.loading_dialog import LoadingDialog
+        return _SolverInputs(
+            x_min=x_min,
+            x_max=x_max,
+            y0=y0,
+            n_points=n_points,
+            method=method,
+            selected_stats=selected_stats,
+            parameters=parameters,
+            x0_list=x0_list,
+            y_min=y_min,
+            y_max=y_max,
+            n_points_y=n_points_y,
+            bc_expressions=bc_expressions,
+            bc_types=bc_types,
+            mask_expression=mask_expression,
+            contour_bc_expression=contour_bc_expression,
+            contour_bc_type=contour_bc_type,
+        )
 
-        loading = LoadingDialog(self.parent, message="Solving...")
+    def _on_solve(self) -> None:
+        """Parse inputs, run the solver pipeline, and open the result dialog."""
+        try:
+            solver_inputs = self._collect_solver_inputs()
+        except _InputValidationError as exc:
+            messagebox.showerror(exc.title, exc.message, parent=self.win)
+            return
+
         self.win.destroy()
 
         # Keep ParametersDialog alive until _check_result runs on the main thread.
@@ -889,7 +984,45 @@ class ParametersDialog:
         # causing "RuntimeError: main thread is not in main loop" in Variable.__del__.
         dialog_ref = self
 
-        threading.Thread(target=_run_solver, daemon=True).start()
+        def _run_solver_pipeline() -> Any:
+            from pipeline import run_solver_pipeline
+
+            return run_solver_pipeline(
+                expression=dialog_ref.expression,
+                function_name=dialog_ref.function_name,
+                order=dialog_ref.order,
+                parameters=solver_inputs.parameters,
+                equation_name=dialog_ref.equation_name,
+                x_min=solver_inputs.x_min,
+                x_max=solver_inputs.x_max,
+                y0=solver_inputs.y0,
+                n_points=solver_inputs.n_points,
+                method=solver_inputs.method,
+                selected_stats=solver_inputs.selected_stats,
+                x0_list=solver_inputs.x0_list,
+                equation_type=dialog_ref.equation_type,
+                variables=dialog_ref.variables,
+                y_min=solver_inputs.y_min,
+                y_max=solver_inputs.y_max,
+                n_points_y=solver_inputs.n_points_y,
+                vector_expressions=dialog_ref.vector_expressions,
+                vector_components=dialog_ref.vector_components,
+                pde_operator=dialog_ref.pde_operator,
+                component_orders=dialog_ref.component_orders,
+                bc_expressions=solver_inputs.bc_expressions,
+                bc_types=solver_inputs.bc_types,
+                mask_expression=solver_inputs.mask_expression,
+                contour_bc_expression=solver_inputs.contour_bc_expression,
+                contour_bc_type=solver_inputs.contour_bc_type,
+            )
+
+        def _on_success(result: Any) -> None:
+            if not dialog_ref.parent.winfo_exists():
+                return
+
+            from frontend.ui_dialogs.result_dialog import ResultDialog
+
+            ResultDialog(dialog_ref.parent, result=result)
 
         def _release_tk_vars() -> None:
             """Clear all tk.StringVar references so GC doesn't call __del__ off-thread.
@@ -935,26 +1068,11 @@ class ParametersDialog:
 
             d.parent.after(0, _discard_on_main)
 
-        def _check_result() -> None:
-            _ = dialog_ref  # Closure keeps dialog_ref alive until this callback runs
-            try:
-                status, data = result_queue.get_nowait()
-                try:
-                    loading.destroy()
-                except tk.TclError:
-                    pass
-                _release_tk_vars()
-                if not self.parent.winfo_exists():
-                    return
-                if status == "success":
-                    from frontend.ui_dialogs.result_dialog import ResultDialog
-
-                    ResultDialog(self.parent, result=data)
-                else:
-                    title, msg = data
-                    messagebox.showerror(title, msg, parent=self.parent)
-            except queue.Empty:
-                if self.parent.winfo_exists():
-                    self.parent.after(100, _check_result)
-
-        self.parent.after(100, _check_result)
+        run_task_with_loading(
+            parent=self.parent,
+            message="Solving...",
+            task=_run_solver_pipeline,
+            on_success=_on_success,
+            format_error=_format_solver_exception,
+            on_complete=_release_tk_vars,
+        )

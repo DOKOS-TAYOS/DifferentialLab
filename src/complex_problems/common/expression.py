@@ -34,7 +34,7 @@ def compile_scalar_expression(
     except SyntaxError as exc:
         raise ValueError(f"Invalid expression syntax: {exc}") from exc
 
-    validate_expression_ast(tree)
+    validate_expression_ast(expr)
     code = compile(tree, "<expression>", "eval")
     ns = build_eval_namespace(parameters or {})
 
@@ -49,4 +49,3 @@ def compile_scalar_expression(
     test_args = {name: 0.0 for name in variables}
     _evaluate(**test_args)
     return _evaluate
-

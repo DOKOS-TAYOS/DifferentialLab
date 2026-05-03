@@ -47,6 +47,10 @@ docs/_build/
 
 # Testing
 .pytest_cache/
+.pytest_tmp*/
+pytest-cache-files-*/
+pytest_tmp*/
+tmp_pytest*/
 .coverage
 htmlcov/
 .mypy_cache/

@@ -9,4 +9,3 @@ __all__ = [
     "PROBLEM",
     "solve_nonlinear_waves",
 ]
-

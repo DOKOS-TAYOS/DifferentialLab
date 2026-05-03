@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
 
 from complex_problems.common import (
@@ -224,12 +225,14 @@ class PipeFlowDialog:
         profile_amplitude = parse_float(self._amp_var.get(), name="Sin amplitude")
         profile_waves = parse_positive_float(self._waves_var.get(), name="Sin waves")
 
-        custom_fn = None
+        custom_fn: Callable[[float], float] | None = None
         if profile == "custom":
             expr_fn = compile_scalar_expression(self._custom_expr_var.get(), variables=("x",))
 
-            def custom_fn(x: float, _fn=expr_fn) -> float:
+            def _custom_fn(x: float, _fn: Callable[..., float] = expr_fn) -> float:
                 return _fn(x=float(x))
+
+            custom_fn = _custom_fn
 
         rho = parse_positive_float(self._rho_var.get(), name="ρ")
         mu = parse_positive_float(self._mu_var.get(), name="μ")

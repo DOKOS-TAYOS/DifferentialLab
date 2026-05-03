@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import ast
-import queue
-import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from collections.abc import Callable
+from tkinter import ttk
+from typing import TypeAlias
 
 import numpy as np
 
 from complex_problems.common import add_how_to_config_section
+from complex_problems.common.dialog_ui import run_solver_dialog
+from complex_problems.coupled_oscillators.result_dialog import CoupledOscillatorsResultDialog
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
 from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from config.constants import SOLVER_METHODS
 from frontend.theme import get_contrast_foreground, get_font
-from frontend.ui_dialogs.loading_dialog import LoadingDialog
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
@@ -24,11 +25,12 @@ from utils import build_eval_namespace, get_logger, safe_eval, validate_expressi
 logger = get_logger(__name__)
 
 _BOUNDARY_OPTIONS = ("Fixed ends", "Periodic")
+_MassOrCouplingSpec: TypeAlias = float | list[float] | Callable[[int], float]
 
 
 def _auto_parse_mass_or_k(
     text: str, n: int, n_springs: int, name: str, default_const: float, is_mass: bool
-):
+) -> _MassOrCouplingSpec:
     """Auto-detect: single value=constant, comma-separated=list, '[' or expr=function.
 
     Returns float, list[float], or callable(i)->float.
@@ -65,7 +67,7 @@ def _auto_parse_mass_or_k(
     return vals[:n_vals]
 
 
-def _parse_function_of_index(expr: str, name: str):
+def _parse_function_of_index(expr: str, name: str) -> Callable[[int], float]:
     """Parse expression like '1.0 + 0.1*i' and return callable(i) -> float."""
     expr = expr.strip()
     if not expr:
@@ -74,7 +76,7 @@ def _parse_function_of_index(expr: str, name: str):
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
         raise ValueError(f"{name}: invalid expression: {e}")
-    validate_expression_ast(tree)
+    validate_expression_ast(expr)
     compiled = compile(tree, "<string>", "eval")
     ns = build_eval_namespace({})
 
@@ -153,15 +155,11 @@ class CoupledOscillatorsDialog:
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Mass:").pack(side=tk.LEFT, padx=(0, pad))
         self._mass_entry_var = tk.StringVar(value="1.0")
-        mass_entry = ttk.Entry(
-            row, textvariable=self._mass_entry_var, width=24, font=get_font()
-        )
+        mass_entry = ttk.Entry(row, textvariable=self._mass_entry_var, width=24, font=get_font())
         mass_entry.pack(side=tk.LEFT, padx=(0, pad * 2))
         ttk.Label(row, text="Coupling k:").pack(side=tk.LEFT, padx=(0, pad))
         self._k_entry_var = tk.StringVar(value="1.0")
-        k_entry = ttk.Entry(
-            row, textvariable=self._k_entry_var, width=24, font=get_font()
-        )
+        k_entry = ttk.Entry(row, textvariable=self._k_entry_var, width=24, font=get_font())
         k_entry.pack(side=tk.LEFT)
         ToolTip(
             row,
@@ -226,35 +224,27 @@ class CoupledOscillatorsDialog:
 
         # Long-range params: one row per selected neighbor (only its own k)
         self._k_2nn_frame = ttk.Frame(inner)
-        ttk.Label(self._k_2nn_frame, text="k₂ (2nd neighbor):").pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
+        ttk.Label(self._k_2nn_frame, text="k₂ (2nd neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_2nn_var = tk.StringVar(value="25")
-        ttk.Entry(
-            self._k_2nn_frame, textvariable=self._k_2nn_var, width=6, font=get_font()
-        ).pack(side=tk.LEFT)
+        ttk.Entry(self._k_2nn_frame, textvariable=self._k_2nn_var, width=6, font=get_font()).pack(
+            side=tk.LEFT
+        )
         self._k_3nn_frame = ttk.Frame(inner)
-        ttk.Label(self._k_3nn_frame, text="k₃ (3rd neighbor):").pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
+        ttk.Label(self._k_3nn_frame, text="k₃ (3rd neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_3nn_var = tk.StringVar(value="15")
-        ttk.Entry(
-            self._k_3nn_frame, textvariable=self._k_3nn_var, width=6, font=get_font()
-        ).pack(side=tk.LEFT)
-        self._k_4nn_frame = ttk.Frame(inner)
-        ttk.Label(self._k_4nn_frame, text="k₄ (4th neighbor):").pack(
-            side=tk.LEFT, padx=(0, pad)
+        ttk.Entry(self._k_3nn_frame, textvariable=self._k_3nn_var, width=6, font=get_font()).pack(
+            side=tk.LEFT
         )
+        self._k_4nn_frame = ttk.Frame(inner)
+        ttk.Label(self._k_4nn_frame, text="k₄ (4th neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_4nn_var = tk.StringVar(value="10")
-        ttk.Entry(
-            self._k_4nn_frame, textvariable=self._k_4nn_var, width=6, font=get_font()
-        ).pack(side=tk.LEFT)
+        ttk.Entry(self._k_4nn_frame, textvariable=self._k_4nn_var, width=6, font=get_font()).pack(
+            side=tk.LEFT
+        )
 
         # Nonlinear params: one row per selected (only its own ε)
         self._fput_alpha_frame = ttk.Frame(inner)
-        ttk.Label(self._fput_alpha_frame, text="α (FPUT-α):").pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
+        ttk.Label(self._fput_alpha_frame, text="α (FPUT-α):").pack(side=tk.LEFT, padx=(0, pad))
         self._fput_alpha_var = tk.StringVar(value="0.25")
         ttk.Entry(
             self._fput_alpha_frame,
@@ -272,9 +262,7 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         ).pack(side=tk.LEFT)
         self._quartic_frame = ttk.Frame(inner)
-        ttk.Label(self._quartic_frame, text="ε₄ (quartic):").pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
+        ttk.Label(self._quartic_frame, text="ε₄ (quartic):").pack(side=tk.LEFT, padx=(0, pad))
         self._nonlinear_quartic_var = tk.StringVar(value="150")
         ttk.Entry(
             self._quartic_frame,
@@ -283,9 +271,7 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         ).pack(side=tk.LEFT)
         self._quintic_frame = ttk.Frame(inner)
-        ttk.Label(self._quintic_frame, text="ε₅ (quintic):").pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
+        ttk.Label(self._quintic_frame, text="ε₅ (quintic):").pack(side=tk.LEFT, padx=(0, pad))
         self._nonlinear_quintic_var = tk.StringVar(value="5")
         ttk.Entry(
             self._quintic_frame,
@@ -323,13 +309,11 @@ class CoupledOscillatorsDialog:
         ttk.Label(row, text="Time domain:").pack(side=tk.LEFT, padx=(0, pad))
         self._t_min_var = tk.StringVar(value="0.0")
         self._t_max_var = tk.StringVar(value="200.0")
-        ttk.Entry(
-            row, textvariable=self._t_min_var, width=8, font=get_font()
-        ).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Entry(row, textvariable=self._t_min_var, width=8, font=get_font()).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
         ttk.Label(row, text="to").pack(side=tk.LEFT, padx=4)
-        ttk.Entry(
-            row, textvariable=self._t_max_var, width=8, font=get_font()
-        ).pack(side=tk.LEFT)
+        ttk.Entry(row, textvariable=self._t_max_var, width=8, font=get_font()).pack(side=tk.LEFT)
         ToolTip(row, "Integration time interval [tₘᵢₙ, tₘₐₓ].")
 
         # Resolution points and solver method
@@ -338,9 +322,9 @@ class CoupledOscillatorsDialog:
         ttk.Label(row_res, text="Resolution points:").pack(side=tk.LEFT, padx=(0, pad))
         default_n_points = max(2000, int(get_env_from_schema("SOLVER_NUM_POINTS")))
         self._n_points_var = tk.StringVar(value=str(default_n_points))
-        ttk.Entry(
-            row_res, textvariable=self._n_points_var, width=10, font=get_font()
-        ).pack(side=tk.LEFT, padx=(0, pad * 2))
+        ttk.Entry(row_res, textvariable=self._n_points_var, width=10, font=get_font()).pack(
+            side=tk.LEFT, padx=(0, pad * 2)
+        )
         ttk.Label(row_res, text="Solver:").pack(side=tk.LEFT, padx=(pad * 2, pad))
         self._method_var = tk.StringVar(value=DEFAULT_SOLVER_METHOD)
         method_combo = ttk.Combobox(
@@ -461,10 +445,7 @@ class CoupledOscillatorsDialog:
     def _update_extra_params_visibility(self) -> None:
         """Show/hide params based on listbox selection."""
         pad = int(get_env_from_schema("UI_PADDING"))
-        selected = {
-            self._coupling_listbox.get(i)
-            for i in self._coupling_listbox.curselection()
-        }
+        selected = {self._coupling_listbox.get(i) for i in self._coupling_listbox.curselection()}
         # Show only the k field for each selected neighbor (pack 4th first so 2nd ends on top)
         for label, frame in (
             ("4th neighbor", self._k_4nn_frame),
@@ -490,9 +471,7 @@ class CoupledOscillatorsDialog:
                 frame.pack_forget()
         if "External force" in selected:
             if not self._external_params_frame.winfo_manager():
-                self._external_params_frame.pack(
-                    fill=tk.X, pady=pad, before=self._domain_row
-                )
+                self._external_params_frame.pack(fill=tk.X, pady=pad, before=self._domain_row)
         else:
             self._external_params_frame.pack_forget()
         self._scroll.refresh_scroll_region()
@@ -569,146 +548,104 @@ class CoupledOscillatorsDialog:
         fit_and_center(dlg, min_width=380, min_height=340, padding=32)
         make_modal(dlg, self.win)
 
-    def _resolve_masses(self, n: int):
+    def _resolve_masses(self, n: int) -> _MassOrCouplingSpec:
         """Resolve mass spec from UI (auto-detect constant, list, or function)."""
         text = self._mass_entry_var.get().strip()
         n_springs = n - 1 if self._boundary_var.get() == "Fixed ends" else n
         return _auto_parse_mass_or_k(text, n, n_springs, "Mass", 1.0, is_mass=True)
 
-    def _resolve_k_coupling(self, n: int):
+    def _resolve_k_coupling(self, n: int) -> _MassOrCouplingSpec:
         """Resolve k spec from UI (auto-detect constant, list, or function)."""
         text = self._k_entry_var.get().strip()
         n_springs = n - 1 if self._boundary_var.get() == "Fixed ends" else n
-        return _auto_parse_mass_or_k(
-            text, n, n_springs, "Coupling k", 0.3, is_mass=False
-        )
+        return _auto_parse_mass_or_k(text, n, n_springs, "Coupling k", 0.3, is_mass=False)
 
-    def _on_solve(self) -> None:
-        """Start the solver in a background thread."""
+    def _collect_inputs(self) -> dict[str, object]:
+        """Collect and validate solver inputs from the dialog widgets."""
         try:
             n = int(self._n_var.get())
-            if n < 2 or n > 100:
-                messagebox.showerror(
-                    "Invalid input",
-                    "Number of oscillators must be between 2 and 100.",
-                    parent=self.win,
-                )
-                return
         except ValueError:
-            messagebox.showerror(
-                "Invalid input",
-                "Number of oscillators must be an integer.",
-                parent=self.win,
-            )
-            return
+            raise ValueError("Number of oscillators must be an integer.") from None
+        if n < 2 or n > 100:
+            raise ValueError("Number of oscillators must be between 2 and 100.")
 
-        try:
-            masses = self._resolve_masses(n)
-            if isinstance(masses, (list, tuple)):
-                if any(m <= 0 for m in masses):
-                    raise ValueError("All masses must be positive")
-            elif isinstance(masses, (int, float)):
-                if masses <= 0:
-                    raise ValueError("Mass must be positive")
-        except ValueError as e:
-            messagebox.showerror("Invalid input", str(e), parent=self.win)
-            return
+        masses = self._resolve_masses(n)
+        if isinstance(masses, list):
+            if any(m <= 0 for m in masses):
+                raise ValueError("All masses must be positive.")
+        elif isinstance(masses, (int, float)) and masses <= 0:
+            raise ValueError("Mass must be positive.")
 
-        try:
-            k_coupling = self._resolve_k_coupling(n)
-            if isinstance(k_coupling, (list, tuple)):
-                if any(k < 0 for k in k_coupling):
-                    raise ValueError("All coupling constants must be non-negative")
-            elif isinstance(k_coupling, (int, float)):
-                if k_coupling < 0:
-                    raise ValueError("Coupling k must be non-negative")
-        except ValueError as e:
-            messagebox.showerror("Invalid input", str(e), parent=self.win)
-            return
+        k_coupling = self._resolve_k_coupling(n)
+        if isinstance(k_coupling, list):
+            if any(k < 0 for k in k_coupling):
+                raise ValueError("All coupling constants must be non-negative.")
+        elif isinstance(k_coupling, (int, float)) and k_coupling < 0:
+            raise ValueError("Coupling k must be non-negative.")
 
         try:
             t_min = float(self._t_min_var.get())
             t_max = float(self._t_max_var.get())
-            if t_min >= t_max:
-                raise ValueError("tₘₐₓ must be greater than tₘᵢₙ")
-        except ValueError as e:
-            messagebox.showerror("Invalid input", str(e), parent=self.win)
-            return
+        except ValueError:
+            raise ValueError("Time domain values must be numeric.") from None
+        if t_min >= t_max:
+            raise ValueError("t_max must be greater than t_min.")
 
         try:
             n_points = int(self._n_points_var.get())
-            if n_points < 2:
-                raise ValueError("Resolution points must be at least 2")
-        except ValueError as e:
-            messagebox.showerror(
-                "Invalid input",
-                f"Resolution points: {e}" if str(e) else "Resolution points must be an integer.",
-                parent=self.win,
-            )
-            return
+        except ValueError:
+            raise ValueError("Resolution points must be an integer.") from None
+        if n_points < 2:
+            raise ValueError("Resolution points must be at least 2.")
 
         method = self._method_var.get()
         if method not in SOLVER_METHODS:
             method = DEFAULT_SOLVER_METHOD
 
-        # Parse initial conditions
         try:
             pos_str = self._ic_pos_var.get().strip()
             vel_str = self._ic_vel_var.get().strip()
             pos_vals = [float(p.strip()) for p in pos_str.split(",") if p.strip()]
             vel_vals = [float(v.strip()) for v in vel_str.split(",") if v.strip()]
-            if len(pos_vals) < n or len(vel_vals) < n:
-                raise ValueError(
-                    f"Initial conditions need at least {n} values each. "
-                    f"Got {len(pos_vals)} positions, {len(vel_vals)} velocities."
-                )
-            pos_vals = pos_vals[:n]
-            vel_vals = vel_vals[:n]
-        except ValueError as e:
-            messagebox.showerror("Invalid input", str(e), parent=self.win)
-            return
+        except ValueError as exc:
+            raise ValueError("Initial conditions must be comma-separated numbers.") from exc
+        if len(pos_vals) < n or len(vel_vals) < n:
+            raise ValueError(
+                f"Initial conditions need at least {n} values each. "
+                f"Got {len(pos_vals)} positions, {len(vel_vals)} velocities."
+            )
+        pos_vals = pos_vals[:n]
+        vel_vals = vel_vals[:n]
 
-        ic_space = self._ic_space_var.get()
-
-        # Linear coupling is always active; add nonlinear/external/long-range from listbox
         selected_labels = {
-            self._coupling_listbox.get(i)
-            for i in self._coupling_listbox.curselection()
-        }
-        _label_to_type = {
-            "FPUT-α": "nonlinear_fput_alpha",
-            "Nonlinear (cubic)": "nonlinear",
-            "Nonlinear (quartic)": "nonlinear_quartic",
-            "Nonlinear (quintic)": "nonlinear_quintic",
-            "External force": "external_force",
+            self._coupling_listbox.get(i) for i in self._coupling_listbox.curselection()
         }
         coupling_types: list[str] = ["linear"]
-        for label in selected_labels:
-            if label in _label_to_type:
-                coupling_types.append(_label_to_type[label])
+        for label, coupling_type in (
+            ("FPUT-\u03b1", "nonlinear_fput_alpha"),
+            ("Nonlinear (cubic)", "nonlinear"),
+            ("Nonlinear (quartic)", "nonlinear_quartic"),
+            ("Nonlinear (quintic)", "nonlinear_quintic"),
+            ("External force", "external_force"),
+        ):
+            if label in selected_labels:
+                coupling_types.append(coupling_type)
 
-        # Long-range: only use k values for selected neighbors
         try:
             k_2nn = (
-                max(0.0, float(self._k_2nn_var.get()))
-                if "2nd neighbor" in selected_labels
-                else 0.0
+                max(0.0, float(self._k_2nn_var.get())) if "2nd neighbor" in selected_labels else 0.0
             )
         except ValueError:
             k_2nn = 25.0 if "2nd neighbor" in selected_labels else 0.0
         try:
             k_3nn = (
-                max(0.0, float(self._k_3nn_var.get()))
-                if "3rd neighbor" in selected_labels
-                else 0.0
+                max(0.0, float(self._k_3nn_var.get())) if "3rd neighbor" in selected_labels else 0.0
             )
         except ValueError:
             k_3nn = 15.0 if "3rd neighbor" in selected_labels else 0.0
         try:
             k_4nn = (
-                max(0.0, float(self._k_4nn_var.get()))
-                if "4th neighbor" in selected_labels
-                else 0.0
+                max(0.0, float(self._k_4nn_var.get())) if "4th neighbor" in selected_labels else 0.0
             )
         except ValueError:
             k_4nn = 10.0 if "4th neighbor" in selected_labels else 0.0
@@ -723,9 +660,7 @@ class CoupledOscillatorsDialog:
             nonlinear_fput_alpha = 0.25
         try:
             nonlinear_coeff = (
-                float(self._nonlinear_coeff_var.get())
-                if "nonlinear" in coupling_types
-                else 0.0
+                float(self._nonlinear_coeff_var.get()) if "nonlinear" in coupling_types else 0.0
             )
         except ValueError:
             nonlinear_coeff = 80.0
@@ -747,33 +682,32 @@ class CoupledOscillatorsDialog:
             nonlinear_quintic = 5.0
         try:
             external_amp = (
-                float(self._external_amp_var.get())
-                if "external_force" in coupling_types
-                else 0.0
+                float(self._external_amp_var.get()) if "external_force" in coupling_types else 0.0
             )
         except ValueError:
             external_amp = 50.0
         try:
             external_freq = (
-                float(self._external_freq_var.get())
-                if "external_force" in coupling_types
-                else 1.0
+                float(self._external_freq_var.get()) if "external_force" in coupling_types else 1.0
             )
         except ValueError:
             external_freq = 1.0
 
         boundary = "periodic" if self._boundary_var.get() == "Periodic" else "fixed"
 
-        # Build initial conditions: [x_0, ..., x_{N-1}, v_0, ..., v_{N-1}]
-        if ic_space == "Oscillators":
+        if self._ic_space_var.get() == "Oscillators":
             y0 = list(pos_vals) + list(vel_vals)
         else:
-            # Modes: convert (q, dq) to (x, v) via x = M_modes @ q, v = M_modes @ dq
             from complex_problems.coupled_oscillators.model import compute_normal_modes
 
             M_modes, _ = compute_normal_modes(
-                n, masses, k_coupling, boundary,
-                k_2nn=k_2nn, k_3nn=k_3nn, k_4nn=k_4nn,
+                n,
+                masses,
+                k_coupling,
+                boundary,
+                k_2nn=k_2nn,
+                k_3nn=k_3nn,
+                k_4nn=k_4nn,
             )
             q = np.array(pos_vals, dtype=float)
             dq = np.array(vel_vals, dtype=float)
@@ -781,59 +715,36 @@ class CoupledOscillatorsDialog:
             v = M_modes @ dq
             y0 = list(x) + list(v)
 
-        result_queue: queue.Queue = queue.Queue()
+        return {
+            "n_oscillators": n,
+            "masses": masses,
+            "k_coupling": k_coupling,
+            "boundary": boundary,
+            "coupling_types": coupling_types,
+            "nonlinear_coeff": nonlinear_coeff,
+            "nonlinear_fput_alpha": nonlinear_fput_alpha,
+            "nonlinear_quartic": nonlinear_quartic,
+            "nonlinear_quintic": nonlinear_quintic,
+            "k_2nn": k_2nn,
+            "k_3nn": k_3nn,
+            "k_4nn": k_4nn,
+            "external_amplitude": external_amp,
+            "external_frequency": external_freq,
+            "t_min": t_min,
+            "t_max": t_max,
+            "n_points": n_points,
+            "y0": y0,
+            "method": method,
+        }
 
-        def _run_solver() -> None:
-            try:
-                result = solve_coupled_oscillators(
-                    n_oscillators=n,
-                    masses=masses,
-                    k_coupling=k_coupling,
-                    boundary=boundary,
-                    coupling_types=coupling_types,
-                    nonlinear_coeff=nonlinear_coeff,
-                    nonlinear_fput_alpha=nonlinear_fput_alpha,
-                    nonlinear_quartic=nonlinear_quartic,
-                    nonlinear_quintic=nonlinear_quintic,
-                    k_2nn=k_2nn,
-                    k_3nn=k_3nn,
-                    k_4nn=k_4nn,
-                    external_amplitude=external_amp,
-                    external_frequency=external_freq,
-                    t_min=t_min,
-                    t_max=t_max,
-                    n_points=n_points,
-                    y0=y0,
-                    method=method,
-                )
-                result_queue.put(("success", result))
-            except Exception as exc:
-                logger.exception("Coupled oscillators solver failed")
-                result_queue.put(("error", ("Solver Error", str(exc))))
-
-        thread = threading.Thread(target=_run_solver, daemon=True)
-        thread.start()
-
-        loading = LoadingDialog(self.parent, message="Solving coupled oscillators...")
-        self.win.destroy()
-
-        def _check_result() -> None:
-            try:
-                status, data = result_queue.get_nowait()
-            except queue.Empty:
-                self.parent.after(100, _check_result)
-                return
-
-            loading.destroy()
-
-            if status == "success":
-                from complex_problems.coupled_oscillators.result_dialog import (
-                    CoupledOscillatorsResultDialog,
-                )
-
-                CoupledOscillatorsResultDialog(self.parent, result=data)
-            else:
-                title, msg = data
-                messagebox.showerror(title, msg, parent=self.parent)
-
-        self.parent.after(100, _check_result)
+    def _on_solve(self) -> None:
+        """Validate inputs, run the solver, and open the result dialog."""
+        run_solver_dialog(
+            parent=self.parent,
+            window=self.win,
+            collect_inputs=self._collect_inputs,
+            solver=solve_coupled_oscillators,
+            message="Solving coupled oscillators...",
+            result_parent=self.parent,
+            result_dialog_factory=CoupledOscillatorsResultDialog,
+        )

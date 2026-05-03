@@ -96,9 +96,7 @@ def solve_coupled_oscillators(
         y0[0] = 1.0
     y0_arr = np.asarray(y0, dtype=float)
     if y0_arr.shape != (2 * n,):
-        raise ValueError(
-            f"Initial state must have exactly {2 * n} values, got {y0_arr.size}."
-        )
+        raise ValueError(f"Initial state must have exactly {2 * n} values, got {y0_arr.size}.")
 
     masses_arr, k_arr = _resolve_state_arrays(n, boundary, masses, k_coupling)
 
@@ -194,4 +192,3 @@ def solve_coupled_oscillators(
         has_modes=has_modes,
         metadata=metadata,
     )
-

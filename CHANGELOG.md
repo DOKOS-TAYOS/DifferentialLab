@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the unused internal `_is_uniform` helper from the coupled oscillators model.
 - Extracted shared internal complex-problem dialog helpers to reduce UI duplication across simpler solver dialogs.
 - Extracted shared internal result-dialog helpers to centralize embedded figure cleanup and animation reset logic.
+- Refactored coupled oscillators and standard parameter dialogs to use typed input-collection helpers before solver dispatch.
+- Added explicit function annotations across internal source modules.
+- Reused a shared background-task helper for solver dialogs and split the standard parameters dialog UI into focused private builders.
 
 ## [0.3.2] - 2026-03-05
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -227,7 +228,7 @@ def solve_pipe_flow(
     d0: float = 0.06,
     profile_amplitude: float = 0.20,
     profile_waves: float = 2.0,
-    custom_diameter_fn=None,
+    custom_diameter_fn: Callable[[float], float] | None = None,
     rho: float = 1000.0,
     mu: float = 1.0e-3,
     roughness: float = 1.0e-5,

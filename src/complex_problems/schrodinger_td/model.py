@@ -201,4 +201,3 @@ def initial_packet_2d(
     dx = float(X[0, 1] - X[0, 0]) if X.shape[1] > 1 else 1.0
     dy = float(Y[1, 0] - Y[0, 0]) if Y.shape[0] > 1 else 1.0
     return normalize_wavefunction_2d(psi, dx, dy)
-

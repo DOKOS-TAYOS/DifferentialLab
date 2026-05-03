@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import Any
 
 _REFRESH_DELAY_MS = 50
 
@@ -18,7 +19,7 @@ class ScrollableFrame(ttk.Frame):
         **kwargs: Extra keyword arguments forwarded to the outer ``ttk.Frame``.
     """
 
-    def __init__(self, parent: tk.Widget, **kwargs) -> None:  # type: ignore[type-arg]
+    def __init__(self, parent: tk.Widget, **kwargs: Any) -> None:  # type: ignore[type-arg]
         super().__init__(parent, **kwargs)
 
         self._canvas = tk.Canvas(self, highlightthickness=0)

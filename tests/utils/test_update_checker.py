@@ -44,6 +44,7 @@ class TestShouldRunCheck:
 
     def test_force_returns_true(self) -> None:
         with patch("utils.update_checker.get_env_from_schema") as mock:
+
             def env_effect(k: str) -> object:
                 if k == "CHECK_UPDATES":
                     return "true"
@@ -52,6 +53,7 @@ class TestShouldRunCheck:
                 if k == "UPDATE_CHECK_INTERVAL_DAYS":
                     return 7
                 return None
+
             mock.side_effect = env_effect
             assert should_run_check() is True
 
