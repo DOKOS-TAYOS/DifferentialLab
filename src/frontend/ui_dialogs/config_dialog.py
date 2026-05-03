@@ -134,6 +134,8 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         [
             "LOG_LEVEL",
             "LOG_FILE",
+            "LOG_MAX_BYTES",
+            "LOG_BACKUP_COUNT",
             "LOG_CONSOLE",
             "CHECK_UPDATES",
             "UPDATE_CHECK_INTERVAL_DAYS",

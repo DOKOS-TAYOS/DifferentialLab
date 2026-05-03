@@ -9,8 +9,10 @@ from config.constants import (
     SOLVER_METHODS,
 )
 from config.env import (
+    DEFAULT_LOG_BACKUP_COUNT,
     DEFAULT_LOG_FILE,
     DEFAULT_LOG_LEVEL,
+    DEFAULT_LOG_MAX_BYTES,
     ENV_SCHEMA,
     SCHEMA_BY_KEY,
     get_current_env_values,
@@ -38,6 +40,8 @@ __all__ = [
     # env
     "DEFAULT_LOG_FILE",
     "DEFAULT_LOG_LEVEL",
+    "DEFAULT_LOG_MAX_BYTES",
+    "DEFAULT_LOG_BACKUP_COUNT",
     "ENV_SCHEMA",
     "SCHEMA_BY_KEY",
     "get_current_env_values",

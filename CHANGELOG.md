@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved the logging setup with rotating log files, safer handler reconfiguration, nested log-path support, and graceful console fallback when file logging cannot start.
 - Removed the unused internal `_is_uniform` helper from the coupled oscillators model.
 - Extracted shared internal complex-problem dialog helpers to reduce UI duplication across simpler solver dialogs.
 - Extracted shared internal result-dialog helpers to centralize embedded figure cleanup and animation reset logic.

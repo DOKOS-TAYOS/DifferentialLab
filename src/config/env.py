@@ -27,6 +27,8 @@ except ImportError:
 
 DEFAULT_LOG_LEVEL: str = "INFO"
 DEFAULT_LOG_FILE: str = "differential_lab.log"
+DEFAULT_LOG_MAX_BYTES: int = 1_048_576
+DEFAULT_LOG_BACKUP_COUNT: int = 3
 
 ENV_SCHEMA: list[dict[str, Any]] = [
     # --- ui: general ---
@@ -377,6 +379,20 @@ ENV_SCHEMA: list[dict[str, Any]] = [
         "default": DEFAULT_LOG_FILE,
         "cast_type": str,
         "description": "Name of the log file written to the project root.",
+    },
+    {
+        "key": "LOG_MAX_BYTES",
+        "default": DEFAULT_LOG_MAX_BYTES,
+        "cast_type": int,
+        "min": 1,
+        "description": "Maximum size in bytes of the active log file before rotation.",
+    },
+    {
+        "key": "LOG_BACKUP_COUNT",
+        "default": DEFAULT_LOG_BACKUP_COUNT,
+        "cast_type": int,
+        "min": 0,
+        "description": "Number of rotated log-file backups to keep.",
     },
     {
         "key": "LOG_CONSOLE",

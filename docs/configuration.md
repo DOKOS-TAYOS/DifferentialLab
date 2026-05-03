@@ -125,11 +125,19 @@ Supported methods in UI:
 |---|---|
 | `LOG_LEVEL` | `INFO` |
 | `LOG_FILE` | `differential_lab.log` |
+| `LOG_MAX_BYTES` | `1048576` |
+| `LOG_BACKUP_COUNT` | `3` |
 | `LOG_CONSOLE` | `false` |
 | `CHECK_UPDATES` | `true` |
 | `UPDATE_CHECK_INTERVAL_DAYS` | `7` |
 | `CHECK_UPDATES_FORCE` | `false` |
 | `UPDATE_CHECK_URL` | `https://raw.githubusercontent.com/DOKOS-TAYOS/DifferentialLab/main/pyproject.toml` |
+
+Logging notes:
+
+- `LOG_FILE` accepts either a simple filename or a relative nested path such as `logs/app.log`.
+- When the file reaches `LOG_MAX_BYTES`, it rotates and keeps up to `LOG_BACKUP_COUNT` backup files.
+- If file logging cannot be initialized, DifferentialLab falls back to console logging so startup does not fail.
 
 ## Practical recommendations
 
@@ -139,6 +147,7 @@ Supported methods in UI:
   - High-resolution/publication: `20000-100000`
 - Keep `ANIMATION_MAX_FPS` moderate (20-30) to avoid UI saturation.
 - Enable `LOG_CONSOLE=true` while debugging.
+- Keep log rotation enabled unless you have a specific reason to preserve a single ever-growing log file.
 
 ## Source of truth
 
