@@ -1,9 +1,15 @@
 """UI dialog modules for DifferentialLab."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
+
+if TYPE_CHECKING:
+    from frontend.ui_dialogs.config_dialog import ConfigDialog
+    from frontend.ui_dialogs.equation_dialog import EquationDialog
+    from frontend.ui_dialogs.help_dialog import HelpDialog
+    from frontend.ui_dialogs.transform_dialog import TransformDialog
 
 __all__ = [
     "setup_arrow_enter_navigation",

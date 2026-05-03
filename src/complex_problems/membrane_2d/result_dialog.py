@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,7 +18,11 @@ from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
 from plotting import create_contour_plot, create_energy_evolution_plot, create_surface_plot
+from plotting.animation_metadata import attach_animation_metadata
 from utils import get_logger
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 logger = get_logger(__name__)
 
@@ -28,7 +33,7 @@ def _create_field_animation_figure(
     *,
     title: str,
     cmap: str = "viridis",
-) -> "object":
+) -> Figure:
     """Create an imshow figure compatible with embed_animation_plot_in_tk."""
     import matplotlib.pyplot as plt
 
@@ -56,10 +61,7 @@ def _create_field_animation_figure(
         ax.set_title(f"{title}  (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 class Membrane2DResultDialog:

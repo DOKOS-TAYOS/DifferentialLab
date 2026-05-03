@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 
@@ -164,6 +164,17 @@ def _build_mask(
     return np.asarray(result, dtype=bool)
 
 
+def _build_mask_boundary(mask: np.ndarray) -> np.ndarray:
+    """Return the boundary points of a boolean mask."""
+    padded = np.pad(mask, pad_width=1, mode="constant", constant_values=False)
+    north = padded[:-2, 1:-1]
+    south = padded[2:, 1:-1]
+    west = padded[1:-1, :-2]
+    east = padded[1:-1, 2:]
+    interior = mask & north & south & west & east
+    return mask & ~interior
+
+
 def _build_bc_type_array(
     bc_types: list[str] | None,
     nx: int,
@@ -216,6 +227,7 @@ def _build_neumann_array(
     nx: int,
     ny: int,
     mask: np.ndarray | None,
+    boundary_mask: np.ndarray | None,
     contour_bc_type: str | None,
     contour_bc_expression: str | None,
 ) -> np.ndarray | None:
@@ -250,11 +262,15 @@ def _build_neumann_array(
     arr = np.zeros((ny, nx))
 
     if mask is not None and contour_bc_type == BC_NEUMANN and contour_bc_expression:
-        # Custom contour: evaluate expression on full grid
+        # Custom contour: evaluate expression only on boundary points
         func = parse_pde_rhs_expression(contour_bc_expression, variables, parameters)
-        for j in range(ny):
-            for i in range(nx):
-                arr[j, i] = func(x_grid[i], y_grid[j])
+        boundary_points = (
+            np.argwhere(boundary_mask)
+            if boundary_mask is not None
+            else np.argwhere(np.ones((ny, nx), dtype=bool))
+        )
+        for j, i in boundary_points:
+            arr[j, i] = func(x_grid[i], y_grid[j])
     elif bc_types and bc_expressions:
         types = bc_types + [BC_DIRICHLET] * (4 - len(bc_types))
         # Bottom (row 0)
@@ -350,16 +366,17 @@ def _dispatch_2d_pde(
 
     # Build mask
     mask = _build_mask(mask_expression, x_grid, y_grid_bc, parameters)
+    boundary_mask = _build_mask_boundary(mask) if mask is not None else None
 
     # Build Dirichlet BC values
     bc_values: np.ndarray | None = None
     if mask is not None and contour_bc_type != BC_NEUMANN and contour_bc_expression:
-        # Custom contour with Dirichlet BC: evaluate expression on grid
+        # Custom contour with Dirichlet BC: evaluate expression only on the contour
         bc_values = np.zeros((ny, n_points))
         func = parse_pde_rhs_expression(contour_bc_expression, vars_list, parameters)
-        for j in range(ny):
-            for i in range(n_points):
-                bc_values[j, i] = func(x_grid[i], y_grid_bc[j])
+        assert boundary_mask is not None
+        for j, i in np.argwhere(boundary_mask):
+            bc_values[j, i] = func(x_grid[i], y_grid_bc[j])
     elif bc_expressions and any(e.strip() not in ("0", "") for e in bc_expressions):
         bc_values = _build_bc_array(
             bc_expressions,
@@ -383,6 +400,7 @@ def _dispatch_2d_pde(
         n_points,
         ny,
         mask,
+        boundary_mask,
         contour_bc_type,
         contour_bc_expression,
     )
@@ -465,7 +483,7 @@ def _dispatch_vector_ode(
     Returns:
         :class:`_DispatchResult` with solution and error metrics.
     """
-    vec_exprs = vector_expressions if vector_expressions else None
+    vec_exprs = vector_expressions if vector_expressions is not None else []
     ode_func = get_vector_ode_function(
         vector_expressions=vec_exprs,
         function_name=function_name if not vec_exprs else None,
@@ -752,7 +770,8 @@ def run_solver_pipeline(
 
     # ── Statistics ────────────────────────────────────────────────────
     if is_2d_pde:
-        stats = compute_statistics_2d(solution_x, dr.y_grid, solution_y, selected_stats)
+        y_grid = cast(np.ndarray, dr.y_grid)
+        stats = compute_statistics_2d(solution_x, y_grid, solution_y, selected_stats)
     else:
         stats = compute_statistics(solution_x, solution_y, selected_stats)
 

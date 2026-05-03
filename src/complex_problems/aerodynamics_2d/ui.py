@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import cast
 
 from complex_problems.aerodynamics_2d.solver import solve_aerodynamics_2d
 from complex_problems.common import (
@@ -19,6 +20,7 @@ from complex_problems.common.dialog_ui import (
     run_solver_dialog,
 )
 from config import get_env_from_schema
+from frontend.performance_guard import assess_aerodynamics_request, confirm_performance_advisory
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
@@ -180,6 +182,22 @@ class Aerodynamics2DDialog:
             "obstacle_attack_deg": attack_deg,
         }
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large aerodynamics histories."""
+        nx = cast(int, params["nx"])
+        ny = cast(int, params["ny"])
+        t_max = cast(float, params["t_max"])
+        dt = cast(float, params["dt"])
+        sample_every = cast(int, params["sample_every"])
+        advisory = assess_aerodynamics_request(
+            nx=nx,
+            ny=ny,
+            t_max=t_max,
+            dt=dt,
+            sample_every=sample_every,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         from complex_problems.aerodynamics_2d.result_dialog import Aerodynamics2DResultDialog
 
@@ -191,4 +209,5 @@ class Aerodynamics2DDialog:
             message="Solving aerodynamics 2D...",
             result_parent=self.parent,
             result_dialog_factory=Aerodynamics2DResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

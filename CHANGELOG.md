@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored coupled oscillators and standard parameter dialogs to use typed input-collection helpers before solver dispatch.
 - Added explicit function annotations across internal source modules.
 - Reused a shared background-task helper for solver dialogs and split the standard parameters dialog UI into focused private builders.
+- Reduced high-resolution PDE overhead by switching masked-domain classification and sparse assembly to compact integer grids with preallocated buffers.
+- Deferred large Schrödinger and nonlinear-wave `magnitude`/`phase` arrays until first access, and added pre-run performance advisories for expensive solver configurations.
+- Reused result-plot canvases on view changes, debounced resize redraws, and collapsed membrane history summaries into a single energy/extrema pass.
+- Added a repo-local `pyright` configuration, tightened Tk/matplotlib typing in shared UI helpers, and cleaned transform/solver typing hotspots until `pyright` reports zero errors.
 
 ## [0.3.2] - 2026-03-05
 

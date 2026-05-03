@@ -53,7 +53,7 @@ class PDESolution:
 
 def _classify_mask(
     mask: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, dict[tuple[int, int], int]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Classify grid points as interior, boundary, or exterior.
 
     A point (i, j) where mask[j, i] is True is *boundary* if any of its 4
@@ -64,41 +64,25 @@ def _classify_mask(
         mask: Boolean array of shape (ny, nx).
 
     Returns:
-        (interior_mask, boundary_mask, index_map)
+        (interior_mask, boundary_mask, index_grid)
         - interior_mask: bool (ny, nx)
         - boundary_mask: bool (ny, nx)
-        - index_map: {(i, j): flat_index} for interior points only
+        - index_grid: int (ny, nx), -1 outside the interior and a compact
+          row-major index on interior points
     """
-    ny, nx = mask.shape
-    interior = np.zeros_like(mask)
-    boundary = np.zeros_like(mask)
+    mask_bool = np.asarray(mask, dtype=bool)
+    padded = np.pad(mask_bool, pad_width=1, mode="constant", constant_values=False)
+    north = padded[:-2, 1:-1]
+    south = padded[2:, 1:-1]
+    west = padded[1:-1, :-2]
+    east = padded[1:-1, 2:]
 
-    for j in range(ny):
-        for i in range(nx):
-            if not mask[j, i]:
-                continue
-            # Check if all 4 neighbors are inside the mask
-            is_interior = True
-            for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                ni, nj = i + di, j + dj
-                if ni < 0 or ni >= nx or nj < 0 or nj >= ny or not mask[nj, ni]:
-                    is_interior = False
-                    break
-            if is_interior:
-                interior[j, i] = True
-            else:
-                boundary[j, i] = True
+    interior = mask_bool & north & south & west & east
+    boundary = mask_bool & ~interior
 
-    # Build index map for interior points (row-major order)
-    index_map: dict[tuple[int, int], int] = {}
-    idx = 0
-    for j in range(ny):
-        for i in range(nx):
-            if interior[j, i]:
-                index_map[(i, j)] = idx
-                idx += 1
-
-    return interior, boundary, index_map
+    index_grid = np.full(mask_bool.shape, -1, dtype=np.int64)
+    index_grid[interior] = np.arange(int(np.count_nonzero(interior)), dtype=np.int64)
+    return interior, boundary, index_grid
 
 
 def _probe_coefficients(
@@ -208,22 +192,27 @@ def solve_pde_2d(
     # Build mask
     if mask is None:
         mask = _default_rectangular_mask(nx, ny)
+    else:
+        mask = np.asarray(mask, dtype=bool)
 
     # Default BC arrays
     if bc_values is None:
         bc_values = np.zeros((ny, nx))
+    else:
+        bc_values = np.asarray(bc_values, dtype=float)
     if bc_neumann_value is None:
         bc_neumann_value = np.zeros((ny, nx))
+    else:
+        bc_neumann_value = np.asarray(bc_neumann_value, dtype=float)
 
     # Classify points
-    interior_mask, boundary_mask, index_map = _classify_mask(mask)
-    n_interior = len(index_map)
+    interior_mask, boundary_mask, index_grid = _classify_mask(mask)
+    n_interior = int(np.count_nonzero(interior_mask))
 
     if n_interior <= 0:
         u = np.full((ny, nx), np.nan)
         u[mask] = 0.0
-        if bc_values is not None:
-            u[boundary_mask] = bc_values[boundary_mask]
+        u[boundary_mask] = bc_values[boundary_mask]
         return PDESolution(
             grid=(x, y),
             u=u,
@@ -240,22 +229,31 @@ def solve_pde_2d(
     inv_2hy = 1.0 / (2.0 * hy)
     inv_4hxhy = 1.0 / (4.0 * hx * hy)
 
-    rows: list[int] = []
-    cols: list[int] = []
-    data: list[float] = []
+    max_entries = max(1, 9 * n_interior)
+    rows = np.empty(max_entries, dtype=np.int64)
+    cols = np.empty(max_entries, dtype=np.int64)
+    data = np.empty(max_entries, dtype=float)
     b_vec = np.zeros(n_interior)
+    entry_count = 0
+    neumann_mask = (
+        boundary_mask & (np.asarray(bc_type, dtype=object) == BC_NEUMANN)
+        if bc_type is not None
+        else np.zeros_like(boundary_mask)
+    )
 
-    def _is_neumann(ni: int, nj: int) -> bool:
-        if bc_type is None:
-            return False
-        return bc_type[nj, ni] == BC_NEUMANN
+    def _append_entry(row: int, col: int, value: float) -> None:
+        nonlocal entry_count
+        rows[entry_count] = row
+        cols[entry_count] = col
+        data[entry_count] = value
+        entry_count += 1
 
-    for (i, j), k in index_map.items():
+    for k, (j, i) in enumerate(np.argwhere(interior_mask)):
         try:
             a_c, bxy, c_c, d_c, e_c, g_c, r0 = _probe_coefficients(
                 residual_func,
-                x[i],
-                y[j],
+                float(x[i]),
+                float(y[j]),
                 params,
             )
         except Exception as exc:
@@ -267,41 +265,29 @@ def solve_pde_2d(
 
         # Central point coefficient
         center_coeff = -2.0 * a_c * inv_hx2 - 2.0 * c_c * inv_hy2 + g_c
-        rows.append(k)
-        cols.append(k)
-        data.append(center_coeff)
+        _append_entry(k, k, center_coeff)
 
         def _add_neighbor(ni: int, nj: int, coeff: float) -> None:
             """Add matrix entry for neighbor or move to RHS for boundary."""
-            if (ni, nj) in index_map:
-                # Interior neighbor → matrix entry
-                rows.append(k)
-                cols.append(index_map[(ni, nj)])
-                data.append(coeff)
-            elif 0 <= ni < nx and 0 <= nj < ny and boundary_mask[nj, ni]:
-                # Boundary neighbor
-                if _is_neumann(ni, nj):
-                    # Neumann BC: ghost-point substitution
-                    # The outward normal direction from interior (i,j) to boundary
-                    # (ni,nj). We use: u_boundary = u_interior + h * g_N
-                    # where h is the step size and g_N is the prescribed derivative.
-                    di, dj = ni - i, nj - j
-                    if di != 0:
-                        h_step = hx * di  # signed step
-                    else:
-                        h_step = hy * dj
-                    ghost_val = h_step * bc_neumann_value[nj, ni]
-                    # u[nj,ni] = u[j,i] + ghost_val
-                    # Substitute into stencil: coeff * u[nj,ni] = coeff * (u[j,i] + ghost_val)
-                    # Add coeff to center and move coeff*ghost_val to RHS
-                    rows.append(k)
-                    cols.append(k)
-                    data.append(coeff)  # adds to center coefficient
-                    b_vec[k] -= coeff * ghost_val
-                else:
-                    # Dirichlet BC: move known value to RHS
-                    b_vec[k] -= coeff * bc_values[nj, ni]
-            # else: exterior point — contributes nothing (zero flux assumption)
+            if not (0 <= ni < nx and 0 <= nj < ny):
+                return
+
+            neighbor_idx = int(index_grid[nj, ni])
+            if neighbor_idx >= 0:
+                _append_entry(k, neighbor_idx, coeff)
+                return
+
+            if not boundary_mask[nj, ni]:
+                return
+
+            if neumann_mask[nj, ni]:
+                di, dj = ni - i, nj - j
+                h_step = hx * di if di != 0 else hy * dj
+                _append_entry(k, k, coeff)
+                b_vec[k] -= coeff * h_step * bc_neumann_value[nj, ni]
+                return
+
+            b_vec[k] -= coeff * bc_values[nj, ni]
 
         # f_xx stencil + f_x contribution
         _add_neighbor(i - 1, j, a_c * inv_hx2 - d_c * inv_2hx)
@@ -319,7 +305,7 @@ def solve_pde_2d(
             _add_neighbor(i - 1, j - 1, bxy * inv_4hxhy)
 
     A = sparse.coo_matrix(
-        (data, (rows, cols)),
+        (data[:entry_count], (rows[:entry_count], cols[:entry_count])),
         shape=(n_interior, n_interior),
     ).tocsr()
 
@@ -331,27 +317,20 @@ def solve_pde_2d(
 
     # Build solution: NaN outside domain, BC on boundary, solved values inside
     u = np.full((ny, nx), np.nan)
-    for (i, j), k in index_map.items():
-        u[j, i] = u_flat[k]
-    # Set boundary values
-    for j in range(ny):
-        for i in range(nx):
-            if boundary_mask[j, i]:
-                if _is_neumann(i, j):
-                    # For Neumann boundary points, approximate value from
-                    # nearest interior neighbor + h * g_N
-                    u[j, i] = _estimate_neumann_boundary_value(
-                        i,
-                        j,
-                        u,
-                        index_map,
-                        interior_mask,
-                        hx,
-                        hy,
-                        bc_neumann_value[j, i],
-                    )
-                else:
-                    u[j, i] = bc_values[j, i]
+    u[interior_mask] = u_flat[index_grid[interior_mask]]
+    dirichlet_boundary = boundary_mask & ~neumann_mask
+    u[dirichlet_boundary] = bc_values[dirichlet_boundary]
+
+    for bj, bi in np.argwhere(neumann_mask):
+        u[bj, bi] = _estimate_neumann_boundary_value(
+            int(bi),
+            int(bj),
+            u,
+            interior_mask,
+            hx,
+            hy,
+            float(bc_neumann_value[bj, bi]),
+        )
 
     logger.info("PDE 2D solved: %dx%d grid, %d interior points", nx, ny, n_interior)
     return PDESolution(
@@ -368,7 +347,6 @@ def _estimate_neumann_boundary_value(
     bi: int,
     bj: int,
     u: np.ndarray,
-    index_map: dict[tuple[int, int], int],
     interior_mask: np.ndarray,
     hx: float,
     hy: float,
@@ -383,7 +361,6 @@ def _estimate_neumann_boundary_value(
         bi: x-index of the boundary point.
         bj: y-index of the boundary point.
         u: Solution array (ny, nx).
-        index_map: Mapping from (i,j) to flat index for interior points.
         interior_mask: Boolean array marking interior points.
         hx: Grid spacing in x direction.
         hy: Grid spacing in y direction.

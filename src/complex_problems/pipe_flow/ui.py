@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
+from typing import cast
 
 from complex_problems.common import (
     add_how_to_config_section,
@@ -21,6 +22,7 @@ from complex_problems.common.dialog_ui import (
 )
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 from config import get_env_from_schema
+from frontend.performance_guard import assess_pipe_flow_request, confirm_performance_advisory
 from frontend.theme import get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -278,6 +280,21 @@ class PipeFlowDialog:
             )
         return params
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large pipe-flow runs."""
+        nx = cast(int, params["nx"])
+        t_max = cast(float | None, params.get("t_max"))
+        dt = cast(float | None, params.get("dt"))
+        sample_every = cast(int | None, params.get("sample_every"))
+        advisory = assess_pipe_flow_request(
+            model_type=str(params["model_type"]),
+            nx=nx,
+            t_max=t_max,
+            dt=dt,
+            sample_every=sample_every,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         from complex_problems.pipe_flow.result_dialog import PipeFlowResultDialog
 
@@ -289,4 +306,5 @@ class PipeFlowDialog:
             message="Solving pipe flow...",
             result_parent=self.parent,
             result_dialog_factory=PipeFlowResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

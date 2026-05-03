@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDESolution, solve_pde_2d
+from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDESolution, _classify_mask, solve_pde_2d
 
 
 def _laplace_residual(
@@ -20,6 +20,25 @@ def _laplace_residual(
 ) -> float:
     """Residual for Laplace equation -f_xx - f_yy = 0."""
     return -fxx - fyy
+
+
+def test_classify_mask_returns_boundary_and_row_major_index_grid() -> None:
+    """Interior points should get a compact row-major index grid."""
+    mask = np.zeros((5, 6), dtype=bool)
+    mask[1:4, 1:5] = True
+
+    interior, boundary, index_grid = _classify_mask(mask)
+
+    expected_interior = np.zeros_like(mask)
+    expected_interior[2, 2] = True
+    expected_interior[2, 3] = True
+    expected_boundary = mask & ~expected_interior
+
+    np.testing.assert_array_equal(interior, expected_interior)
+    np.testing.assert_array_equal(boundary, expected_boundary)
+    np.testing.assert_array_equal(index_grid[~expected_interior], -1)
+    assert index_grid[2, 2] == 0
+    assert index_grid[2, 3] == 1
 
 
 def test_laplace_zero_bc() -> None:

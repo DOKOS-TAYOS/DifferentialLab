@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 from config import SOLVER_METHODS
 from solver.equation_parser import _validate_expression
@@ -35,7 +36,7 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
-def _is_finite(value: float) -> bool:
+def _is_finite(value: float | int) -> bool:
     """Return ``True`` if *value* is a finite number (not NaN, not ±inf).
 
     Args:
@@ -122,7 +123,7 @@ def _validate_method(method: str) -> list[str]:
     return []
 
 
-def _validate_parameters(params: dict[str, object]) -> list[str]:
+def _validate_parameters(params: Mapping[str, object]) -> list[str]:
     """Validate parameter values.
 
     Args:
@@ -139,8 +140,11 @@ def _validate_parameters(params: dict[str, object]) -> list[str]:
         if isinstance(value, _np.ndarray):
             if not _np.all(_np.isfinite(value)):
                 errors.append(f"Parameter '{name}' contains non-finite values")
-        elif not _is_finite(value):
-            errors.append(f"Parameter '{name}' = {value} is not a finite number")
+        elif isinstance(value, (int, float)):
+            if not _is_finite(value):
+                errors.append(f"Parameter '{name}' = {value} is not a finite number")
+        else:
+            errors.append(f"Parameter '{name}' must be numeric, got {type(value).__name__}")
     return errors
 
 

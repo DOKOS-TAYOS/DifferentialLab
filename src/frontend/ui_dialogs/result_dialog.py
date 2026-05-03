@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import numpy as np
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
-from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from pipeline import SolverResult
 
 logger = get_logger(__name__)
+_EXTRAPOLATE_FILL: Any = "extrapolate"
 
 _MAGNITUDE_KEYS = {
     "mean",
@@ -218,8 +219,13 @@ class ResultDialog:
         sep = ttk.Separator(parent, orient=tk.VERTICAL)
         sep.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
 
-        label_kw = {"style": label_style} if label_style else {}
-        ttk.Label(parent, text="Transform:", **label_kw).pack(side=tk.LEFT, padx=(0, 4))
+        if label_style:
+            ttk.Label(parent, text="Transform:", style=label_style).pack(
+                side=tk.LEFT,
+                padx=(0, 4),
+            )
+        else:
+            ttk.Label(parent, text="Transform:").pack(side=tk.LEFT, padx=(0, 4))
         var = tk.StringVar(value=TransformKind.ORIGINAL.value)
         setattr(self, f"_transform_{prefix}_var", var)
 
@@ -396,7 +402,7 @@ class ResultDialog:
         for idx in selected:
             if idx >= y_2d.shape[0]:
                 continue
-            func = interp1d(x, y_2d[idx], kind="cubic", fill_value="extrapolate")
+            func = interp1d(x, y_2d[idx], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
             tx, ty, txlabel, tylabel = apply_transform(
                 lambda arr, f=func: f(arr),
                 kind,
@@ -434,6 +440,13 @@ class ResultDialog:
             return TransformKind(var.get())
         except ValueError:
             return TransformKind.ORIGINAL
+
+    def _require_pde_y_grid(self) -> np.ndarray:
+        """Return the PDE y-grid or raise if this dialog is misused."""
+        y_grid = self._result.y_grid
+        if y_grid is None:
+            raise ValueError("2D PDE result is missing its y-grid")
+        return y_grid
 
     def _update_solution_plot(self) -> None:
         """Regenerate the solution f(x) plot with currently selected derivatives."""
@@ -1189,12 +1202,8 @@ class ResultDialog:
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 2))
 
-        r = self._result
-        y_mid = (
-            float((r.y_grid[0] + r.y_grid[-1]) / 2)
-            if r.y_grid is not None and len(r.y_grid) > 0
-            else 0.5
-        )
+        y_grid = self._require_pde_y_grid()
+        y_mid = float((y_grid[0] + y_grid[-1]) / 2) if len(y_grid) > 0 else 0.5
 
         ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(
             side=tk.LEFT, padx=(0, 4)
@@ -1260,7 +1269,7 @@ class ResultDialog:
             raw: list[tuple[np.ndarray, np.ndarray]] = []
             txlabel = ""
             for i in range(z.shape[0]):
-                func = interp1d(x, z[i, :], kind="cubic", fill_value="extrapolate")
+                func = interp1d(x, z[i, :], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
                 tx, ty, txlabel, _tylabel = apply_transform(
                     lambda arr, f=func: f(arr),
                     kind,
@@ -1286,7 +1295,7 @@ class ResultDialog:
             raw_c: list[tuple[np.ndarray, np.ndarray]] = []
             tylabel = ""
             for j in range(z.shape[1]):
-                func = interp1d(y_grid, z[:, j], kind="cubic", fill_value="extrapolate")
+                func = interp1d(y_grid, z[:, j], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
                 ty, tz, tylabel, _tzlabel = apply_transform(
                     lambda arr, f=func: f(arr),
                     kind,
@@ -1313,6 +1322,7 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
 
@@ -1321,7 +1331,7 @@ class ResultDialog:
             axis_var = self._pde_3d_axis_var.get()
             result = self._transform_pde_along_axis(
                 r.x,
-                r.y_grid,
+                y_grid,
                 r.y,
                 axis_var,
                 kind,
@@ -1342,7 +1352,7 @@ class ResultDialog:
 
         fig = create_surface_plot(
             r.x,
-            r.y_grid,
+            y_grid,
             r.y,
             title=eq_name,
             xlabel=xlabel,
@@ -1357,6 +1367,7 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
 
@@ -1365,7 +1376,7 @@ class ResultDialog:
             axis_var = self._pde_2d_axis_var.get()
             result = self._transform_pde_along_axis(
                 r.x,
-                r.y_grid,
+                y_grid,
                 r.y,
                 axis_var,
                 kind,
@@ -1385,7 +1396,7 @@ class ResultDialog:
 
         fig = create_contour_plot(
             r.x,
-            r.y_grid,
+            y_grid,
             r.y,
             title=eq_name,
             xlabel=xlabel,
@@ -1399,6 +1410,7 @@ class ResultDialog:
         from transforms import TransformKind, apply_transform
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         kind = self._get_transform_kind("pde")
         xlabel, ylabel = self._pde_axis_labels()
 
@@ -1410,7 +1422,7 @@ class ResultDialog:
 
         if slice_var == xlabel:
             # Slice along x[0] at a fixed x[1] value
-            y_idx = int(np.argmin(np.abs(r.y_grid - slice_val)))
+            y_idx = int(np.argmin(np.abs(y_grid - slice_val)))
             data_1d = r.y[y_idx, :]
             x_1d = r.x
             slice_label = f"{ylabel}={slice_val:.3g}"
@@ -1419,7 +1431,7 @@ class ResultDialog:
             # Slice along x[1] at a fixed x[0] value
             x_idx = int(np.argmin(np.abs(r.x - slice_val)))
             data_1d = r.y[:, x_idx]
-            x_1d = r.y_grid
+            x_1d = y_grid
             slice_label = f"{xlabel}={slice_val:.3g}"
             axis_label = ylabel
 
@@ -1438,7 +1450,7 @@ class ResultDialog:
         else:
             from scipy.interpolate import interp1d
 
-            func = interp1d(x_1d, data_1d, kind="cubic", fill_value="extrapolate")
+            func = interp1d(x_1d, data_1d, kind="cubic", fill_value=_EXTRAPOLATE_FILL)
             x_min_t, x_max_t = float(x_1d[0]), float(x_1d[-1])
             tx, ty, txlabel, tylabel = apply_transform(
                 lambda arr: func(arr),
@@ -1468,19 +1480,9 @@ class ResultDialog:
         fig: Figure,
         canvas_attr: str,
     ) -> None:
-        """Destroy the old canvas in *frame* and embed *fig* in its place."""
-        import matplotlib.pyplot as plt
-
+        """Reuse the existing canvas when replacing a matplotlib figure."""
         old_canvas: FigureCanvasTkAgg | None = getattr(self, canvas_attr, None)
-        if old_canvas is not None:
-            old_fig = old_canvas.figure
-            old_canvas.get_tk_widget().destroy()
-            plt.close(old_fig)
-
-        for w in frame.winfo_children():
-            w.destroy()
-
-        canvas = embed_plot_in_tk(fig, frame)
+        canvas = replace_plot_in_tk(fig, frame, current_canvas=old_canvas)
         setattr(self, canvas_attr, canvas)
 
     # ------------------------------------------------------------------

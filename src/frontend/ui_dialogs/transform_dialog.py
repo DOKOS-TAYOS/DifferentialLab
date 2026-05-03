@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, cast
 
 import numpy as np
 
@@ -355,6 +355,8 @@ class TransformDialog:
             messagebox.showerror("Parse Error", str(exc), parent=self.win)
             return
 
+        scalar_func = cast(Callable[[np.ndarray], np.ndarray], func)
+
         kind_str = self._transform_var.get()
         try:
             kind = TransformKind(kind_str)
@@ -388,7 +390,7 @@ class TransformDialog:
         try:
             if self._show_coefficients:
                 x, y, xlabel, ylabel, metadata = get_transform_coefficients(
-                    func,
+                    scalar_func,
                     kind,
                     x_min,
                     x_max,
@@ -398,7 +400,7 @@ class TransformDialog:
                 )
             else:
                 x, y, xlabel, ylabel = apply_transform(
-                    func,
+                    scalar_func,
                     kind,
                     x_min,
                     x_max,
@@ -426,7 +428,7 @@ class TransformDialog:
         if kind == TransformKind.TAYLOR and not self._show_coefficients:
             from transforms import compute_function_samples
 
-            x_orig, y_orig = compute_function_samples(func, x_min, x_max, n_points)
+            x_orig, y_orig = compute_function_samples(scalar_func, x_min, x_max, n_points)
             self._y_original = y_orig
         else:
             self._y_original = None

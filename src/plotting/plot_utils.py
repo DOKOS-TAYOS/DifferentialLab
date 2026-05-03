@@ -9,8 +9,10 @@ if TYPE_CHECKING:
     import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 from config import get_env_from_schema
+from plotting.animation_metadata import attach_animation_metadata
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -121,7 +123,7 @@ def _new_3d_figure() -> tuple[Any, Any]:
 
 
 def _finalize_3d_plot(
-    ax: Axes,
+    ax: Axes3D,
     title: str,
     xlabel: str,
     ylabel: str,
@@ -557,7 +559,7 @@ def create_vector_animation_plot(
     dpi: int = get_env_from_schema("DPI")
 
     fig = plt.figure(figsize=(width, height), dpi=dpi)
-    ax_main = fig.add_axes([0.12, 0.15, 0.78, 0.78])
+    ax_main = fig.add_axes((0.12, 0.15, 0.78, 0.78))
 
     y_2d = np.atleast_2d(y)
     if y_2d.shape[1] != len(x):
@@ -603,13 +605,9 @@ def create_vector_animation_plot(
         i = max(0, min(idx, n_points - 1))
         new_vals = f_values[:, i]
         line_chain.set_ydata(new_vals)
-        segments = np.stack(
-            [
-                np.column_stack([j_vals, np.zeros(vector_components)]),
-                np.column_stack([j_vals, new_vals]),
-            ],
-            axis=1,
-        )
+        segments = [
+            np.array([[float(j), 0.0], [float(j), float(val)]]) for j, val in zip(j_vals, new_vals)
+        ]
         vlines_coll.set_segments(segments)
         fig.canvas.draw_idle()
 
@@ -623,13 +621,17 @@ def create_vector_animation_plot(
         ax_main.grid(True, alpha=grid_alpha)
     fig.subplots_adjust(bottom=0.12, left=0.12, right=0.95, top=0.92)
 
-    fig._animation_update = update
-    fig._animation_n_points = n_points
-    fig._animation_initial_index = time_index
-    fig._animation_x = x
-    fig._animation_f_values = f_values
-    fig._animation_vector_components = vector_components
-    return fig
+    return attach_animation_metadata(
+        fig,
+        update=update,
+        n_points=n_points,
+        initial_index=time_index,
+        extras={
+            "_animation_x": x,
+            "_animation_f_values": f_values,
+            "_animation_vector_components": vector_components,
+        },
+    )
 
 
 def create_vector_animation_3d(
@@ -724,7 +726,7 @@ def export_animation_to_mp4(
 
     frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
     num_frames = len(frame_indices)
-    fps = max(1, num_frames / max(0.5, duration_seconds))
+    fps = max(1, int(round(num_frames / max(0.5, duration_seconds))))
 
     color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
     colors = _get_colors(color_scheme, vector_components)
@@ -765,21 +767,21 @@ def export_animation_to_mp4(
     ax.set_xticklabels(_component_labels(vector_components))
     j_vals = indices
 
-    def _frame(idx: int) -> None:
+    def _frame(idx: int) -> tuple[Any, Any]:
         new_vals = f_values[:, idx]
         line_chain.set_ydata(new_vals)
-        segments = np.stack(
-            [
-                np.column_stack([j_vals, np.zeros(vector_components)]),
-                np.column_stack([j_vals, new_vals]),
-            ],
-            axis=1,
-        )
+        segments = [
+            np.array([[float(j), 0.0], [float(j), float(val)]]) for j, val in zip(j_vals, new_vals)
+        ]
         vlines_coll.set_segments(segments)
+        return line_chain, vlines_coll
+
+    def _animate(frame_number: int) -> tuple[Any, Any]:
+        return _frame(int(frame_indices[frame_number]))
 
     anim = FuncAnimation(
         fig,
-        lambda i: _frame(frame_indices[i]),
+        _animate,
         frames=num_frames,
         interval=int(1000 / fps),
         blit=False,

@@ -6,7 +6,7 @@ import ast
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
-from typing import TypeAlias
+from typing import TypeAlias, cast
 
 import numpy as np
 
@@ -16,6 +16,10 @@ from complex_problems.coupled_oscillators.result_dialog import CoupledOscillator
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
 from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
 from config.constants import SOLVER_METHODS
+from frontend.performance_guard import (
+    assess_coupled_oscillators_request,
+    confirm_performance_advisory,
+)
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -737,6 +741,16 @@ class CoupledOscillatorsDialog:
             "method": method,
         }
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually dense oscillator runs."""
+        n_oscillators = cast(int, params["n_oscillators"])
+        n_points = cast(int, params["n_points"])
+        advisory = assess_coupled_oscillators_request(
+            n_oscillators=n_oscillators,
+            n_points=n_points,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         """Validate inputs, run the solver, and open the result dialog."""
         run_solver_dialog(
@@ -747,4 +761,5 @@ class CoupledOscillatorsDialog:
             message="Solving coupled oscillators...",
             result_parent=self.parent,
             result_dialog_factory=CoupledOscillatorsResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

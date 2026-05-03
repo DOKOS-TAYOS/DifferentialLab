@@ -152,3 +152,17 @@ def test_on_solve_delegates_to_shared_background_runner() -> None:
     assert callable(kwargs["task"])
     assert callable(kwargs["on_success"])
     assert dialog.win.destroy_calls == 1
+
+
+def test_on_solve_aborts_when_heavy_request_confirmation_is_declined() -> None:
+    dialog = _build_scalar_dialog_stub()
+    solver_inputs = dialog._collect_solver_inputs()
+    dialog._collect_solver_inputs = MagicMock(return_value=solver_inputs)  # type: ignore[method-assign]
+    dialog._confirm_heavy_request = MagicMock(return_value=False)  # type: ignore[attr-defined]
+
+    with patch.object(parameters_ui, "run_task_with_loading", create=True) as run_task:
+        dialog._on_solve()
+
+    dialog._confirm_heavy_request.assert_called_once_with(solver_inputs)
+    run_task.assert_not_called()
+    assert dialog.win.destroy_calls == 0

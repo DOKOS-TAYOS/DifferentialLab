@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import cast
 
 from complex_problems.common import (
     add_how_to_config_section,
@@ -20,6 +21,7 @@ from complex_problems.common.dialog_ui import (
 )
 from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
 from config import get_env_from_schema
+from frontend.performance_guard import assess_nonlinear_waves_request, confirm_performance_advisory
 from frontend.theme import get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -228,6 +230,21 @@ class NonlinearWavesDialog:
 
         return params
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large nonlinear-wave histories."""
+        nx = cast(int, params["nx"])
+        t_min = cast(float, params["t_min"])
+        t_max = cast(float, params["t_max"])
+        dt = cast(float, params["dt"])
+        advisory = assess_nonlinear_waves_request(
+            model_type=str(params["model_type"]),
+            nx=nx,
+            t_min=t_min,
+            t_max=t_max,
+            dt=dt,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         from complex_problems.nonlinear_waves.result_dialog import NonlinearWavesResultDialog
 
@@ -239,4 +256,5 @@ class NonlinearWavesDialog:
             message="Solving nonlinear wave propagation...",
             result_parent=self.parent,
             result_dialog_factory=NonlinearWavesResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

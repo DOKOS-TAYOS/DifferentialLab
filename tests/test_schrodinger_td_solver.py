@@ -70,6 +70,39 @@ def test_schrodinger_2d_runs_and_observables_are_finite() -> None:
     assert abs(result.magnitudes["norm_drift_rel"]) < 2e-2
 
 
+def test_schrodinger_result_materializes_lazy_caches_on_demand() -> None:
+    result = solve_schrodinger_td(
+        dimension=1,
+        x_min=-6.0,
+        x_max=6.0,
+        nx=128,
+        t_min=0.0,
+        t_max=0.1,
+        dt=0.01,
+        hbar=1.0,
+        mass=1.0,
+        boundary="periodic",
+        potential_type="free",
+        packet_type="gaussian",
+        sigma=0.8,
+        x0=-1.0,
+        k0x=1.0,
+    )
+
+    assert result._magnitude_cache is None
+    assert result._phase_cache is None
+
+    magnitude = result.magnitude
+    phase = result.phase
+
+    assert result._magnitude_cache is magnitude
+    assert result._phase_cache is phase
+    assert result.magnitude is magnitude
+    assert result.phase is phase
+    np.testing.assert_allclose(magnitude, np.abs(result.psi) ** 2)
+    np.testing.assert_allclose(phase, np.angle(result.psi))
+
+
 def test_schrodinger_rejects_invalid_dimension() -> None:
     with pytest.raises(ValueError):
         solve_schrodinger_td(

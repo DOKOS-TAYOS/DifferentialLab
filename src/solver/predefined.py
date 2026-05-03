@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import yaml
 
@@ -143,7 +143,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             vector_components=vector_components if has_vector else 1,
             default_initial_conditions=list(data.get("default_initial_conditions", [0.0])),
             default_domain=list(data.get("default_domain", [0.0, 10.0])),
-            equation_type=str(data.get("equation_type", "ode")),
+            equation_type=cast(EquationType, data.get("equation_type", "ode")),
             category=str(data.get("category", "Oscillators")),
             variables=list(data.get("variables", ["x"])),
             partial_derivatives=partial_derivatives,

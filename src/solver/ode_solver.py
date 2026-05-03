@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -65,6 +65,9 @@ def _resolve_solver_params(
         rtol = get_env_from_schema("SOLVER_RTOL")
     if atol is None:
         atol = get_env_from_schema("SOLVER_ATOL")
+    max_step = cast(float, max_step)
+    rtol = cast(float, rtol)
+    atol = cast(float, atol)
 
     effective_max_step = np.inf if max_step <= 0 else max_step
 
@@ -110,9 +113,9 @@ def solve_ode(
     else:
         # If t_eval is provided, still resolve other params
         method = method or DEFAULT_SOLVER_METHOD
-        max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
-        rtol = rtol or get_env_from_schema("SOLVER_RTOL")
-        atol = atol or get_env_from_schema("SOLVER_ATOL")
+        max_step = cast(float, max_step or get_env_from_schema("SOLVER_MAX_STEP"))
+        rtol = cast(float, rtol or get_env_from_schema("SOLVER_RTOL"))
+        atol = cast(float, atol or get_env_from_schema("SOLVER_ATOL"))
         effective_max_step = np.inf if max_step <= 0 else max_step
 
     logger.info(
@@ -198,9 +201,9 @@ def solve_multipoint(
     else:
         # If t_eval is provided, still resolve other params
         method = method or DEFAULT_SOLVER_METHOD
-        max_step = max_step or get_env_from_schema("SOLVER_MAX_STEP")
-        rtol = rtol or get_env_from_schema("SOLVER_RTOL")
-        atol = atol or get_env_from_schema("SOLVER_ATOL")
+        max_step = cast(float, max_step or get_env_from_schema("SOLVER_MAX_STEP"))
+        rtol = cast(float, rtol or get_env_from_schema("SOLVER_RTOL"))
+        atol = cast(float, atol or get_env_from_schema("SOLVER_ATOL"))
         effective_max_step = np.inf if max_step <= 0 else max_step
 
     all_at_start = all(abs(xi - x_min) < 1e-12 for (_, xi, _) in conditions)

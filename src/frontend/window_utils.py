@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Sequence
+from typing import Any, cast
 
 
 def center_window(
@@ -63,7 +65,9 @@ def fit_and_center(
     padding: int = 40,
     *,
     max_ratio: float = 0.9,
-    **center_kwargs: object,
+    preserve_size: bool = False,
+    resizable: bool = False,
+    y_offset_up: int = 40,
 ) -> None:
     """Size *window* to fit its content (with minimums) and center it.
 
@@ -77,7 +81,9 @@ def fit_and_center(
         min_height: Minimum window height in pixels.
         padding: Extra pixels added to the requested size.
         max_ratio: Maximum fraction of the screen for each dimension.
-        **center_kwargs: Forwarded to :func:`center_window`.
+        preserve_size: Forwarded to :func:`center_window`.
+        resizable: Forwarded to :func:`center_window`.
+        y_offset_up: Forwarded to :func:`center_window`.
     """
     window.update_idletasks()
     req_w = window.winfo_reqwidth() + padding
@@ -93,9 +99,11 @@ def fit_and_center(
         window,
         w,
         h,
+        preserve_size=preserve_size,
         max_width_ratio=max_ratio,
         max_height_ratio=max_ratio,
-        **center_kwargs,
+        resizable=resizable,
+        y_offset_up=y_offset_up,
     )
 
 
@@ -112,8 +120,8 @@ def make_modal(dialog: tk.Toplevel, parent: tk.Tk | tk.Toplevel) -> None:
 
 
 def bind_wraplength(
-    frame: tk.Widget,
-    label_or_labels: tk.Widget | list[tk.Widget],
+    frame: tk.Misc,
+    label_or_labels: tk.Widget | Sequence[tk.Widget],
     pad: int = 20,
     min_wrap: int = 200,
     debounce_ms: int = 50,
@@ -139,7 +147,7 @@ def bind_wraplength(
             wrap = max(min_wrap, w - pad)
             for lbl in labels:
                 if lbl.winfo_exists():
-                    lbl.configure(wraplength=wrap)
+                    cast(Any, lbl).configure(wraplength=wrap)
 
     if debounce_ms > 0:
         _job: str | None = None

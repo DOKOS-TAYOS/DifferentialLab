@@ -81,6 +81,65 @@ def test_kdv_ui_defaults_stay_finite_for_long_horizon() -> None:
     assert abs(result.magnitudes["mass_drift_rel"]) < 1e-6
 
 
+def test_nlse_result_materializes_lazy_caches_on_demand() -> None:
+    result = solve_nonlinear_waves(
+        model_type="nlse",
+        x_min=-10.0,
+        x_max=10.0,
+        nx=128,
+        t_min=0.0,
+        t_max=0.1,
+        dt=0.01,
+        profile="sech",
+        amplitude=1.0,
+        sigma=1.0,
+        center=0.0,
+        beta2=1.0,
+        gamma=1.0,
+        initial_phase_k=0.0,
+    )
+
+    assert result._magnitude_cache is None
+    assert result._phase_cache is None
+
+    magnitude = result.magnitude
+    phase = result.phase
+
+    assert result._magnitude_cache is magnitude
+    assert result._phase_cache is phase
+    assert result.magnitude is magnitude
+    assert result.phase is phase
+    np.testing.assert_allclose(magnitude, np.abs(result.field) ** 2)
+    np.testing.assert_allclose(phase, np.angle(result.field))
+
+
+def test_kdv_result_keeps_phase_disabled() -> None:
+    result = solve_nonlinear_waves(
+        model_type="kdv",
+        x_min=-10.0,
+        x_max=10.0,
+        nx=128,
+        t_min=0.0,
+        t_max=0.1,
+        dt=0.01,
+        profile="sech",
+        amplitude=0.4,
+        sigma=1.0,
+        center=0.0,
+        c=0.0,
+        alpha=4.0,
+        beta_disp=1.0,
+    )
+
+    assert result._magnitude_cache is None
+    assert result.phase is None
+
+    magnitude = result.magnitude
+    assert result._magnitude_cache is magnitude
+    assert result.magnitude is magnitude
+    np.testing.assert_allclose(magnitude, result.field)
+
+
 def test_nonlinear_waves_rejects_unknown_model_type() -> None:
     with pytest.raises(ValueError):
         solve_nonlinear_waves(

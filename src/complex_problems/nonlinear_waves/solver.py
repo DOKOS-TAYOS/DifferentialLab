@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from typing import Any
 
 import numpy as np
@@ -29,13 +30,32 @@ class NonlinearWavesResult:
     x: np.ndarray
     t: np.ndarray
     field: np.ndarray  # (n_t, nx) complex for NLSE, float for KdV
-    magnitude: np.ndarray  # (n_t, nx)
-    phase: np.ndarray | None
     k: np.ndarray
     spectrum_power: np.ndarray
     invariants: dict[str, np.ndarray]
-    metadata: dict[str, Any] = field(default_factory=dict)
-    magnitudes: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = dataclass_field(default_factory=dict)
+    magnitudes: dict[str, float] = dataclass_field(default_factory=dict)
+    _phase_supported: bool = dataclass_field(default=True, repr=False)
+    _magnitude_cache: np.ndarray | None = dataclass_field(default=None, init=False, repr=False)
+    _phase_cache: np.ndarray | None = dataclass_field(default=None, init=False, repr=False)
+
+    @property
+    def magnitude(self) -> np.ndarray:
+        """Return intensity/amplitude history, materializing it only when needed."""
+        if self._magnitude_cache is None:
+            self._magnitude_cache = (
+                np.abs(self.field) ** 2 if np.iscomplexobj(self.field) else self.field
+            )
+        return self._magnitude_cache
+
+    @property
+    def phase(self) -> np.ndarray | None:
+        """Return phase history for complex fields only."""
+        if not self._phase_supported:
+            return None
+        if self._phase_cache is None:
+            self._phase_cache = np.angle(self.field)
+        return self._phase_cache
 
 
 def _build_time_grid(t_min: float, t_max: float, dt: float) -> np.ndarray:
@@ -58,7 +78,7 @@ def _simulate_nlse(
     psi0: np.ndarray,
     beta2: float,
     gamma: float,
-) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     dt = float(t[1] - t[0]) if len(t) > 1 else 0.0
     n_t, nx = len(t), len(x)
     psi_hist = np.zeros((n_t, nx), dtype=complex)
@@ -82,9 +102,8 @@ def _simulate_nlse(
             psi, dx=dx, k=k, beta2=beta2, gamma=gamma
         )
 
-    magnitude = np.abs(psi_hist) ** 2
     invariants = {"norm": norms, "momentum": momenta, "hamiltonian": energies}
-    return psi_hist, magnitude, invariants
+    return psi_hist, invariants
 
 
 def _kdv_etdrk4_coefficients(
@@ -125,7 +144,7 @@ def _simulate_kdv(
     c: float,
     alpha: float,
     beta_disp: float,
-) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     dt = float(t[1] - t[0]) if len(t) > 1 else 0.0
     n_t, nx = len(t), len(x)
     u_hist = np.zeros((n_t, nx), dtype=float)
@@ -136,8 +155,16 @@ def _simulate_kdv(
     dealias_mask = np.abs(k) <= (2.0 / 3.0) * k_max + 1e-12
     linear_op = 1j * (beta_disp * (k**3) - c * k)
 
-    if n_t > 1:
-        e, e_half, q, f1, f2, f3 = _kdv_etdrk4_coefficients(linear_op, dt=dt)
+    mass = np.zeros(n_t)
+    l2 = np.zeros(n_t)
+    hamiltonian = np.zeros(n_t)
+    mass[0], l2[0], hamiltonian[0] = compute_kdv_invariants(u, dx=dx, k=k)
+
+    if n_t == 1:
+        invariants = {"mass": mass, "l2": l2, "hamiltonian": hamiltonian}
+        return u_hist, invariants
+
+    e, e_half, q, f1, f2, f3 = _kdv_etdrk4_coefficients(linear_op, dt=dt)
     v = np.fft.fft(u)
     v[~dealias_mask] = 0.0
 
@@ -146,11 +173,6 @@ def _simulate_kdv(
         u_sq_hat = np.fft.fft(u_state * u_state)
         u_sq_hat[~dealias_mask] = 0.0
         return -0.5j * alpha * k * u_sq_hat
-
-    mass = np.zeros(n_t)
-    l2 = np.zeros(n_t)
-    hamiltonian = np.zeros(n_t)
-    mass[0], l2[0], hamiltonian[0] = compute_kdv_invariants(u, dx=dx, k=k)
 
     for step in range(1, n_t):
         n_v = _nonlinear(v)
@@ -166,9 +188,8 @@ def _simulate_kdv(
         u_hist[step] = u
         mass[step], l2[step], hamiltonian[step] = compute_kdv_invariants(u, dx=dx, k=k)
 
-    magnitude = u_hist.copy()
     invariants = {"mass": mass, "l2": l2, "hamiltonian": hamiltonian}
-    return u_hist, magnitude, invariants
+    return u_hist, invariants
 
 
 def solve_nonlinear_waves(
@@ -221,7 +242,7 @@ def solve_nonlinear_waves(
 
     if mtype == "nlse":
         psi0 = base_profile.astype(complex) * np.exp(1j * initial_phase_k * x)
-        field, magnitude, invariants = _simulate_nlse(
+        field, invariants = _simulate_nlse(
             x=x,
             t=t,
             dx=dx,
@@ -230,13 +251,12 @@ def solve_nonlinear_waves(
             beta2=beta2,
             gamma=gamma,
         )
-        phase = np.angle(field)
         final_spectrum = np.abs(np.fft.fftshift(np.fft.fft(field[-1]))) ** 2
         k_shift = np.fft.fftshift(k)
         ref = abs(invariants["norm"][0]) + 1e-12
         magnitudes = {
             "norm_drift_rel": float((invariants["norm"][-1] - invariants["norm"][0]) / ref),
-            "max_intensity": float(np.max(magnitude)),
+            "max_intensity": float(np.max(np.abs(field)) ** 2),
         }
         metadata = {
             "model_type": "nlse",
@@ -245,9 +265,10 @@ def solve_nonlinear_waves(
             "initial_phase_k": float(initial_phase_k),
             "profile": profile,
         }
+        phase_supported = True
     else:
         u0 = base_profile
-        field, magnitude, invariants = _simulate_kdv(
+        field, invariants = _simulate_kdv(
             x=x,
             t=t,
             dx=dx,
@@ -257,7 +278,6 @@ def solve_nonlinear_waves(
             alpha=alpha,
             beta_disp=beta_disp,
         )
-        phase = None
         final_spectrum = np.abs(np.fft.fftshift(np.fft.fft(field[-1]))) ** 2
         k_shift = np.fft.fftshift(k)
         ref = abs(invariants["mass"][0]) + 1e-12
@@ -272,6 +292,7 @@ def solve_nonlinear_waves(
             "beta_disp": float(beta_disp),
             "profile": profile,
         }
+        phase_supported = False
 
     metadata.update(
         {
@@ -289,11 +310,10 @@ def solve_nonlinear_waves(
         x=x,
         t=t,
         field=field,
-        magnitude=magnitude,
-        phase=phase,
         k=k_shift,
         spectrum_power=final_spectrum,
         invariants=invariants,
         metadata=metadata,
         magnitudes=magnitudes,
+        _phase_supported=phase_supported,
     )

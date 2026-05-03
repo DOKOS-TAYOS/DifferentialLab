@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 
@@ -18,23 +18,25 @@ _EPS_SIGN = 1e-12
 def _resolve_mass(masses_spec: Any, i: int, n: int) -> float:
     """Resolve mass for oscillator i."""
     if callable(masses_spec):
-        return float(masses_spec(i))
+        return float(cast(float | int, masses_spec(i)))
     if isinstance(masses_spec, (list, tuple, np.ndarray)):
-        if len(masses_spec) == 0:
+        values = np.asarray(masses_spec, dtype=float).ravel()
+        if values.size == 0:
             raise ValueError("Mass specification list cannot be empty.")
-        return float(masses_spec[i] if i < len(masses_spec) else masses_spec[-1])
+        return float(values[i] if i < values.size else values[-1])
     return float(masses_spec)
 
 
 def _resolve_k(k_spec: Any, i: int, n: int) -> float:
     """Resolve coupling constant at spring index i."""
     if callable(k_spec):
-        return float(k_spec(i))
+        return float(cast(float | int, k_spec(i)))
     if isinstance(k_spec, (list, tuple, np.ndarray)):
-        if len(k_spec) == 0:
+        values = np.asarray(k_spec, dtype=float).ravel()
+        if values.size == 0:
             raise ValueError("Coupling specification list cannot be empty.")
-        idx = min(i, len(k_spec) - 1)
-        return float(k_spec[idx])
+        idx = min(i, values.size - 1)
+        return float(values[idx])
     return float(k_spec)
 
 

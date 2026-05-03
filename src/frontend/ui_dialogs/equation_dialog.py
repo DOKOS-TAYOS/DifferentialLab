@@ -685,7 +685,7 @@ class EquationDialog:
                         canvas.yview_scroll(-1, "units")
                 return "break"
 
-            def _bind_mousewheel(w: tk.Widget) -> None:
+            def _bind_mousewheel(w: tk.Misc) -> None:
                 w.bind("<MouseWheel>", _on_mousewheel)
                 w.bind("<Button-4>", _on_mousewheel)
                 w.bind("<Button-5>", _on_mousewheel)

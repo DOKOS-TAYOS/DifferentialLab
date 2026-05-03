@@ -8,7 +8,7 @@ rewritten to ``y[...]`` via :mod:`solver.notation` before compilation.
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 
@@ -309,7 +309,7 @@ def get_difference_function(
         raise EquationParseError(f"'{function_name}' is not callable")
 
     def recur_func(n: int, y: np.ndarray) -> float:
-        return float(func(n, y, **params))
+        return float(cast(float | int, func(n, y, **params)))
 
     return recur_func
 
@@ -348,11 +348,13 @@ def _rewrite_pde_f_notation(expression: str) -> str:
     # Replace f[i,j] first (longer pattern)
     def _replace_double(m: re.Match) -> str:
         i, j = int(m.group(1)), int(m.group(2))
-        return _PDE_F_DOUBLE.get((i, j), m.group(0))
+        replacement = _PDE_F_DOUBLE.get((i, j))
+        return replacement if replacement is not None else m.group(0)
 
     def _replace_single(m: re.Match) -> str:
         idx = int(m.group(1))
-        return _PDE_F_SINGLE.get(idx, m.group(0))
+        replacement = _PDE_F_SINGLE.get(idx)
+        return replacement if replacement is not None else m.group(0)
 
     expr = _PDE_F_DOUBLE_RE.sub(_replace_double, expression)
     return _PDE_F_SINGLE_RE.sub(_replace_single, expr)

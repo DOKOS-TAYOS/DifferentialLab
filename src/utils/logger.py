@@ -11,6 +11,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import cast
 
 _CONFIGURED = False
 _LOGGER_NS = "differential_lab"
@@ -104,11 +105,11 @@ def _configure_root_logger(*, force: bool = False) -> logging.Logger:
         get_env,
     )
 
-    level_name: str = get_env("LOG_LEVEL", DEFAULT_LOG_LEVEL, str)
-    log_file: str = get_env("LOG_FILE", DEFAULT_LOG_FILE, str)
-    max_bytes: int = get_env("LOG_MAX_BYTES", DEFAULT_LOG_MAX_BYTES, int)
-    backup_count: int = get_env("LOG_BACKUP_COUNT", DEFAULT_LOG_BACKUP_COUNT, int)
-    console_requested: bool = get_env("LOG_CONSOLE", False, bool)
+    level_name = cast(str, get_env("LOG_LEVEL", DEFAULT_LOG_LEVEL, str))
+    log_file = cast(str, get_env("LOG_FILE", DEFAULT_LOG_FILE, str))
+    max_bytes = cast(int, get_env("LOG_MAX_BYTES", DEFAULT_LOG_MAX_BYTES, int))
+    backup_count = cast(int, get_env("LOG_BACKUP_COUNT", DEFAULT_LOG_BACKUP_COUNT, int))
+    console_requested = cast(bool, get_env("LOG_CONSOLE", False, bool))
 
     level = getattr(logging, level_name.upper(), logging.INFO)
     formatter = _build_formatter()

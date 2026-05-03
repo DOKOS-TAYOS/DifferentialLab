@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from complex_problems.base import ProblemDescriptor
 from complex_problems.problem_registry import (
@@ -10,6 +10,9 @@ from complex_problems.problem_registry import (
     get_problem_descriptors,
     open_problem_dialog,
 )
+
+if TYPE_CHECKING:
+    from complex_problems.complex_problems_dialog import ComplexProblemsDialog
 
 __all__ = [
     "ComplexProblemsDialog",

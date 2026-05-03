@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
+from typing import Any, cast
 
 from config import APP_NAME, APP_VERSION, get_env_from_schema
 from frontend.theme import configure_ttk_styles
@@ -53,7 +54,7 @@ class MainMenu:
         if logo_path.exists():
             logo_img = tk.PhotoImage(file=str(logo_path)).subsample(2, 2)
             logo_label = ttk.Label(main_frame, image=logo_img)
-            logo_label.image = logo_img  # Keep reference
+            cast(Any, logo_label).image = logo_img  # Keep reference
             logo_label.pack(pady=(0, padding))
 
         # Title

@@ -30,8 +30,6 @@ class SchrodingerTDResult:
     y: np.ndarray | None
     t: np.ndarray
     psi: np.ndarray
-    magnitude: np.ndarray
-    phase: np.ndarray
     potential: np.ndarray
     kx: np.ndarray
     ky: np.ndarray | None
@@ -39,6 +37,22 @@ class SchrodingerTDResult:
     invariants: dict[str, np.ndarray]
     metadata: dict[str, Any] = field(default_factory=dict)
     magnitudes: dict[str, float] = field(default_factory=dict)
+    _magnitude_cache: np.ndarray | None = field(default=None, init=False, repr=False)
+    _phase_cache: np.ndarray | None = field(default=None, init=False, repr=False)
+
+    @property
+    def magnitude(self) -> np.ndarray:
+        """Return |psi|^2, materializing it only when needed."""
+        if self._magnitude_cache is None:
+            self._magnitude_cache = np.abs(self.psi) ** 2
+        return self._magnitude_cache
+
+    @property
+    def phase(self) -> np.ndarray:
+        """Return arg(psi), materializing it only when needed."""
+        if self._phase_cache is None:
+            self._phase_cache = np.angle(self.psi)
+        return self._phase_cache
 
 
 def _build_time_grid(t_min: float, t_max: float, dt: float) -> np.ndarray:
@@ -218,8 +232,6 @@ def solve_schrodinger_td(
                 psi, x=x, dx=dx, k=kx, potential=V, hbar=hbar, mass=mass
             )
 
-        magnitude = np.abs(psi_hist) ** 2
-        phase = np.angle(psi_hist)
         spectrum_power = np.abs(np.fft.fftshift(np.fft.fft(psi_hist[-1]))) ** 2
         k_shift = np.fft.fftshift(kx)
         invariants = {
@@ -231,7 +243,7 @@ def solve_schrodinger_td(
         }
         magnitudes = {
             "norm_drift_rel": float((norm[-1] - norm[0]) / (abs(norm[0]) + 1e-12)),
-            "max_density": float(np.max(magnitude)),
+            "max_density": float(np.max(np.abs(psi_hist)) ** 2),
         }
         metadata = {
             "dimension": 1,
@@ -251,8 +263,6 @@ def solve_schrodinger_td(
             y=None,
             t=t,
             psi=psi_hist,
-            magnitude=magnitude,
-            phase=phase,
             potential=V,
             kx=k_shift,
             ky=None,
@@ -326,8 +336,6 @@ def solve_schrodinger_td(
             psi2, X=X, Y=Y, dx=dx, dy=dy, KX=KX, KY=KY, potential=V2, hbar=hbar, mass=mass
         )
 
-    magnitude2 = np.abs(psi_hist2) ** 2
-    phase2 = np.angle(psi_hist2)
     spectrum2 = np.abs(np.fft.fftshift(np.fft.fft2(psi_hist2[-1]))) ** 2
     invariants2 = {
         "norm": norm,
@@ -339,7 +347,7 @@ def solve_schrodinger_td(
     }
     magnitudes2 = {
         "norm_drift_rel": float((norm[-1] - norm[0]) / (abs(norm[0]) + 1e-12)),
-        "max_density": float(np.max(magnitude2)),
+        "max_density": float(np.max(np.abs(psi_hist2)) ** 2),
     }
     metadata2 = {
         "dimension": 2,
@@ -360,8 +368,6 @@ def solve_schrodinger_td(
         y=y,
         t=t,
         psi=psi_hist2,
-        magnitude=magnitude2,
-        phase=phase2,
         potential=V2,
         kx=np.fft.fftshift(kx),
         ky=np.fft.fftshift(ky),

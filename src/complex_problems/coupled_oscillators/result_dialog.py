@@ -17,7 +17,7 @@ from complex_problems.common.result_dialog_ui import (
 )
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
 from config import get_env_from_schema
-from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.window_utils import center_window, make_modal
 from plotting import (
@@ -369,19 +369,9 @@ class CoupledOscillatorsResultDialog:
         fig: "Figure",
         canvas_attr: str,
     ) -> None:
-        """Destroy the old canvas in frame and embed fig in its place."""
-        from matplotlib.pyplot import close as plt_close
-
+        """Reuse the existing canvas in frame when the figure changes."""
         old_canvas = getattr(self, canvas_attr, None)
-        if old_canvas is not None:
-            old_fig = old_canvas.figure
-            old_canvas.get_tk_widget().destroy()
-            plt_close(old_fig)
-
-        for w in frame.winfo_children():
-            w.destroy()
-
-        canvas = embed_plot_in_tk(fig, frame)
+        canvas = replace_plot_in_tk(fig, frame, current_canvas=old_canvas)
         setattr(self, canvas_attr, canvas)
 
     def _update_energy_plot(self) -> None:

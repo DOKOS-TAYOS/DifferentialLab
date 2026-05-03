@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
+from typing import cast
 
 from complex_problems.common import (
     add_how_to_config_section,
@@ -21,6 +22,7 @@ from complex_problems.common.dialog_ui import (
 )
 from complex_problems.schrodinger_td.solver import solve_schrodinger_td
 from config import get_env_from_schema
+from frontend.performance_guard import assess_schrodinger_request, confirm_performance_advisory
 from frontend.theme import get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -418,6 +420,24 @@ class SchrodingerTDDialog:
             "custom_packet_fn_2d": custom_packet_fn_2d,
         }
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large TDSE histories."""
+        dimension = cast(int, params["dimension"])
+        nx = cast(int, params["nx"])
+        ny = cast(int, params["ny"])
+        t_min = cast(float, params["t_min"])
+        t_max = cast(float, params["t_max"])
+        dt = cast(float, params["dt"])
+        advisory = assess_schrodinger_request(
+            dimension=dimension,
+            nx=nx,
+            ny=ny,
+            t_min=t_min,
+            t_max=t_max,
+            dt=dt,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         from complex_problems.schrodinger_td.result_dialog import (
             SchrodingerTDResultDialog,
@@ -431,4 +451,5 @@ class SchrodingerTDDialog:
             message="Solving Schrodinger TD...",
             result_parent=self.parent,
             result_dialog_factory=SchrodingerTDResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

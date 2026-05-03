@@ -10,17 +10,17 @@ from typing import Protocol, TypeVar
 from complex_problems.common.background import run_solver_with_loading
 from frontend.theme import get_font
 
-_TResult = TypeVar("_TResult")
+_TResult_contra = TypeVar("_TResult_contra", contravariant=True)
 
 
-class ResultDialogFactory(Protocol[_TResult]):
+class ResultDialogFactory(Protocol[_TResult_contra]):
     """Callable that opens a result dialog for a solved problem."""
 
     def __call__(
         self,
         parent: tk.Tk | tk.Toplevel,
         *,
-        result: _TResult,
+        result: _TResult_contra,
     ) -> object: ...
 
 
@@ -88,13 +88,14 @@ def run_solver_dialog(
     parent: tk.Tk | tk.Toplevel,
     window: tk.Toplevel,
     collect_inputs: Callable[[], dict[str, object]],
-    solver: Callable[..., _TResult],
+    solver: Callable[..., _TResult_contra],
     message: str,
     result_parent: tk.Tk | tk.Toplevel,
-    result_dialog_factory: ResultDialogFactory[_TResult],
+    result_dialog_factory: ResultDialogFactory[_TResult_contra],
     invalid_input_title: str = "Invalid input",
     error_title: str = "Solver Error",
     poll_ms: int = 100,
+    confirm_run: Callable[[dict[str, object], tk.Toplevel], bool] | None = None,
 ) -> None:
     """Validate inputs, start a solver in background, and open its result dialog."""
     try:
@@ -103,12 +104,15 @@ def run_solver_dialog(
         messagebox.showerror(invalid_input_title, str(exc), parent=window)
         return
 
+    if confirm_run is not None and not confirm_run(params, window):
+        return
+
     window.destroy()
 
-    def _task() -> _TResult:
+    def _task() -> _TResult_contra:
         return solver(**params)
 
-    def _on_success(result: _TResult) -> None:
+    def _on_success(result: _TResult_contra) -> None:
         result_dialog_factory(result_parent, result=result)
 
     run_solver_with_loading(

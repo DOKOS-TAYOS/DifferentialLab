@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from enum import Enum
 from functools import lru_cache
-from typing import Callable
+from typing import Callable, cast
 
 import numpy as np
 from numpy.polynomial import polynomial as P
@@ -39,9 +39,11 @@ def _nth_derivative(
     if n == 0:
         return f(x0)
     try:
-        from scipy.misc import derivative as scipy_deriv
+        from scipy import misc
 
-        return scipy_deriv(f, x0, n=n, dx=dx, order=2 * n + 1)
+        scipy_deriv = cast(Callable[..., float] | None, getattr(misc, "derivative", None))
+        if scipy_deriv is not None:
+            return float(scipy_deriv(f, x0, n=n, dx=dx, order=2 * n + 1))
     except (ImportError, AttributeError):
         logger.debug("scipy.misc.derivative unavailable, using central-difference fallback")
 
@@ -192,7 +194,7 @@ def _refine_fft_spectrum_in_range(
 
     y_padded = np.zeros(n_refined, dtype=complex)
     y_padded[:n_points] = y
-    fft_ref = fft.fft(y_padded)
+    fft_ref = np.asarray(fft.fft(y_padded))
     mag_ref = magnitude_fn(fft_ref, n_refined)
     freqs_ref = fft.fftfreq(n_refined, dx)[: n_refined // 2]
     freqs_ref = np.abs(freqs_ref)
@@ -373,7 +375,8 @@ def _compute_fft_spectrum(
     """
     x, y = compute_function_samples(func, x_min, x_max, n_points)
     dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-    fft_mag = np.abs(fft.fft(y)[: n_points // 2])
+    fft_vals = np.asarray(fft.fft(y))
+    fft_mag = np.abs(fft_vals[: n_points // 2])
     freqs = np.abs(fft.fftfreq(n_points, dx)[: n_points // 2])
     return _trim_and_refine_fft_spectrum(
         y,
@@ -432,7 +435,7 @@ def compute_function_samples(
         Tuple of (x, y) arrays.
     """
     x = np.linspace(x_min, x_max, n_points)
-    y = func(x)
+    y = np.asarray(func(x))
     return x, y
 
 
@@ -515,9 +518,9 @@ def apply_transform(
 
     if kind == TransformKind.HILBERT:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
-        fft_vals = fft.fft(y)
+        fft_vals = np.asarray(fft.fft(y))
         analytic_fft = fft_vals * _hilbert_filter_kernel(len(fft_vals))
-        hilbert_signal = np.imag(fft.ifft(analytic_fft))
+        hilbert_signal = np.imag(np.asarray(fft.ifft(analytic_fft)))
         return x, hilbert_signal, "x", "H[f](x)"
 
     if kind == TransformKind.Z_TRANSFORM:
@@ -622,7 +625,7 @@ def get_transform_coefficients(
     if kind == TransformKind.HILBERT:
         x, y = compute_function_samples(func, x_min, x_max, n_points)
         dx = (x_max - x_min) / (n_points - 1) if n_points > 1 else 1.0
-        fft_vals = fft.fft(y)
+        fft_vals = np.asarray(fft.fft(y))
         coeffs = _hilbert_magnitude_fn(fft_vals, len(fft_vals))
         freqs = np.abs(fft.fftfreq(len(fft_vals), dx)[: len(fft_vals) // 2])
         freqs, coeffs, _ = _trim_and_refine_fft_spectrum(

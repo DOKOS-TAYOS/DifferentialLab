@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,6 +18,10 @@ from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
 from plotting import create_contour_plot, create_solution_plot, create_surface_plot
+from plotting.animation_metadata import attach_animation_metadata
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 def _create_line_anim_figure(
@@ -26,7 +31,7 @@ def _create_line_anim_figure(
     *,
     title: str,
     ylabel: str,
-) -> "object":
+) -> Figure:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
@@ -47,10 +52,7 @@ def _create_line_anim_figure(
         ax.set_title(f"{title} (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 def _create_image_anim_figure(
@@ -59,7 +61,7 @@ def _create_image_anim_figure(
     *,
     title: str,
     symmetric: bool = False,
-) -> "object":
+) -> Figure:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
@@ -87,10 +89,7 @@ def _create_image_anim_figure(
         ax.set_title(f"{title} (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 class SchrodingerTDResultDialog:
@@ -189,10 +188,10 @@ class SchrodingerTDResultDialog:
         r = self._result
         if r.dimension == 1:
             if view == "Real":
-                y = r.psi.real
+                y = np.real(r.psi)
                 ylabel = "Re(ψ)"
             elif view == "Imag":
-                y = r.psi.imag
+                y = np.imag(r.psi)
                 ylabel = "Im(ψ)"
             else:
                 y = r.magnitude

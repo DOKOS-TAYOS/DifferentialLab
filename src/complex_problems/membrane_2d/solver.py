@@ -171,6 +171,49 @@ def _integrate_rk45(
     return u_hist, v_hist
 
 
+def _summarize_history(
+    *,
+    u_hist: np.ndarray,
+    v_hist: np.ndarray,
+    mass: float,
+    k_linear: float,
+    boundary: str,
+    alpha: float,
+    beta: float,
+    high_order_coeff: float,
+    high_order_power: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, float]:
+    """Compute history-level energy traces and extrema in one shared pass."""
+    n_t = u_hist.shape[0]
+    kinetic = np.zeros(n_t)
+    potential = np.zeros(n_t)
+    total = np.zeros(n_t)
+    max_displacement = 0.0
+    max_velocity = 0.0
+
+    for idx in range(n_t):
+        u_frame = u_hist[idx]
+        v_frame = v_hist[idx]
+        ek, ep, et = compute_energy_terms(
+            u_frame,
+            v_frame,
+            mass=mass,
+            k_linear=k_linear,
+            boundary=boundary,
+            alpha=alpha,
+            beta=beta,
+            high_order_coeff=high_order_coeff,
+            high_order_power=high_order_power,
+        )
+        kinetic[idx] = ek
+        potential[idx] = ep
+        total[idx] = et
+        max_displacement = max(max_displacement, float(np.max(np.abs(u_frame))))
+        max_velocity = max(max_velocity, float(np.max(np.abs(v_frame))))
+
+    return kinetic, potential, total, max_displacement, max_velocity
+
+
 def solve_membrane_2d(
     *,
     u0: np.ndarray,
@@ -249,32 +292,25 @@ def solve_membrane_2d(
             high_order_power=high_order_power,
         )
 
-    kinetic = np.zeros(len(t))
-    potential = np.zeros(len(t))
-    total = np.zeros(len(t))
-    for idx in range(len(t)):
-        ek, ep, et = compute_energy_terms(
-            u_hist[idx],
-            v_hist[idx],
-            mass=mass,
-            k_linear=k_linear,
-            boundary=boundary,
-            alpha=alpha,
-            beta=beta,
-            high_order_coeff=high_order_coeff,
-            high_order_power=high_order_power,
-        )
-        kinetic[idx] = ek
-        potential[idx] = ep
-        total[idx] = et
+    kinetic, potential, total, max_displacement, max_velocity = _summarize_history(
+        u_hist=u_hist,
+        v_hist=v_hist,
+        mass=mass,
+        k_linear=k_linear,
+        boundary=boundary,
+        alpha=alpha,
+        beta=beta,
+        high_order_coeff=high_order_coeff,
+        high_order_power=high_order_power,
+    )
 
     kx, ky, power = compute_fft_power_2d(u_hist[-1])
     e0 = abs(total[0]) + 1e-12
     magnitudes = {
         "energy_drift_rel": float((total[-1] - total[0]) / e0),
         "energy_drift_abs": float(total[-1] - total[0]),
-        "max_displacement": float(np.max(np.abs(u_hist))),
-        "max_velocity": float(np.max(np.abs(v_hist))),
+        "max_displacement": max_displacement,
+        "max_velocity": max_velocity,
     }
     metadata = {
         "nx": nx,

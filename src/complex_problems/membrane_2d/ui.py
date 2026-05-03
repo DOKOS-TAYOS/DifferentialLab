@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import cast
 
 import numpy as np
 
@@ -24,6 +25,7 @@ from complex_problems.common.dialog_ui import (
 from complex_problems.membrane_2d.model import build_initial_displacement
 from complex_problems.membrane_2d.solver import solve_membrane_2d
 from config import get_env_from_schema
+from frontend.performance_guard import assess_membrane_request, confirm_performance_advisory
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -351,6 +353,21 @@ class Membrane2DDialog:
             "high_order_power": high_power,
         }
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large membrane histories."""
+        u0 = cast(np.ndarray, params["u0"])
+        t_min = cast(float, params["t_min"])
+        t_max = cast(float, params["t_max"])
+        dt = cast(float, params["dt"])
+        advisory = assess_membrane_request(
+            nx=int(u0.shape[1]),
+            ny=int(u0.shape[0]),
+            t_min=t_min,
+            t_max=t_max,
+            dt=dt,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
         from complex_problems.membrane_2d.result_dialog import Membrane2DResultDialog
 
@@ -362,4 +379,5 @@ class Membrane2DDialog:
             message="Solving 2D nonlinear membrane...",
             result_parent=self.parent,
             result_dialog_factory=Membrane2DResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

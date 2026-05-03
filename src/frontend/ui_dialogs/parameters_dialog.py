@@ -7,7 +7,7 @@ import tkinter as tk
 from collections.abc import Mapping
 from dataclasses import dataclass
 from tkinter import messagebox, ttk
-from typing import Any
+from typing import Any, cast
 
 from config import (
     AVAILABLE_STATISTICS,
@@ -16,12 +16,17 @@ from config import (
     SOLVER_METHODS,
     get_env_from_schema,
 )
+from frontend.performance_guard import (
+    assess_parameters_dialog_request,
+    confirm_performance_advisory,
+)
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.background_task import BackgroundTaskFailure, run_task_with_loading
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
+from solver.predefined import EquationType
 from utils import DifferentialLabError, get_logger
 
 logger = get_logger(__name__)
@@ -969,12 +974,38 @@ class ParametersDialog:
             contour_bc_type=contour_bc_type,
         )
 
+    def _confirm_heavy_request(self, solver_inputs: _SolverInputs) -> bool:
+        """Warn before launching unusually dense standard-equation requests."""
+        if self.is_pde:
+            equation_type = "pde"
+            state_size = 1
+        elif self.is_vector:
+            equation_type = "vector_ode"
+            state_size = self.order * self.vector_components
+        elif self.equation_type == "difference":
+            equation_type = "difference"
+            state_size = self.order
+        else:
+            equation_type = self.equation_type
+            state_size = self.order
+
+        advisory = assess_parameters_dialog_request(
+            equation_type=equation_type,
+            n_points=solver_inputs.n_points,
+            state_size=state_size,
+            n_points_y=solver_inputs.n_points_y,
+        )
+        return confirm_performance_advisory(self.win, advisory)
+
     def _on_solve(self) -> None:
         """Parse inputs, run the solver pipeline, and open the result dialog."""
         try:
             solver_inputs = self._collect_solver_inputs()
         except _InputValidationError as exc:
             messagebox.showerror(exc.title, exc.message, parent=self.win)
+            return
+
+        if not self._confirm_heavy_request(solver_inputs):
             return
 
         self.win.destroy()
@@ -1000,7 +1031,7 @@ class ParametersDialog:
                 method=solver_inputs.method,
                 selected_stats=solver_inputs.selected_stats,
                 x0_list=solver_inputs.x0_list,
-                equation_type=dialog_ref.equation_type,
+                equation_type=cast(EquationType, dialog_ref.equation_type),
                 variables=dialog_ref.variables,
                 y_min=solver_inputs.y_min,
                 y_max=solver_inputs.y_max,
