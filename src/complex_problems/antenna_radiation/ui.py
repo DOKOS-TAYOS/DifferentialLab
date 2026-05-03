@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from complex_problems.antenna_radiation.solver import solve_antenna_radiation
 from complex_problems.common import (
@@ -11,10 +11,13 @@ from complex_problems.common import (
     parse_float,
     parse_positive_float,
     parse_positive_int,
-    run_solver_with_loading,
+)
+from complex_problems.common.dialog_ui import (
+    make_labeled_combo,
+    make_labeled_entry,
+    run_solver_dialog,
 )
 from config import get_env_from_schema
-from frontend.theme import get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
@@ -67,7 +70,7 @@ class AntennaRadiationDialog:
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._antenna_type_var = tk.StringVar(value="dipole")
-        at_combo = self._make_combo(
+        at_combo = make_labeled_combo(
             row,
             "Antenna type",
             self._antenna_type_var,
@@ -82,18 +85,18 @@ class AntennaRadiationDialog:
         self._power_w_var = tk.StringVar(value="10")
         self._efficiency_var = tk.StringVar(value="0.90")
         self._distance_m_var = tk.StringVar(value="50")
-        self._make_entry(row, "Frequency (MHz)", self._frequency_mhz_var, width=11)
-        self._make_entry(row, "Pₜₓ (W)", self._power_w_var, width=9)
-        self._make_entry(row, "Efficiency η", self._efficiency_var, width=10)
-        self._make_entry(row, "Observation r (m)", self._distance_m_var, width=13)
+        make_labeled_entry(row, "Frequency (MHz)", self._frequency_mhz_var, width=11)
+        make_labeled_entry(row, "Pₜₓ (W)", self._power_w_var, width=9)
+        make_labeled_entry(row, "Efficiency η", self._efficiency_var, width=10)
+        make_labeled_entry(row, "Observation r (m)", self._distance_m_var, width=13)
         ToolTip(row, "Efficiency must be between 0 and 1.")
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._n_theta_var = tk.StringVar(value="181")
         self._n_phi_var = tk.StringVar(value="360")
-        self._make_entry(row, "N_θ", self._n_theta_var, width=8)
-        self._make_entry(row, "N_φ", self._n_phi_var, width=8)
+        make_labeled_entry(row, "N_θ", self._n_theta_var, width=8)
+        make_labeled_entry(row, "N_φ", self._n_phi_var, width=8)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
         ttk.Label(body, text="Antenna parameters", style="Small.TLabel").pack(anchor=tk.W)
@@ -101,19 +104,19 @@ class AntennaRadiationDialog:
         self._dipole_row = ttk.Frame(body)
         self._dipole_row.pack(fill=tk.X, pady=pad // 2)
         self._dipole_length_var = tk.StringVar(value="0.5")
-        self._make_entry(self._dipole_row, "Length (λ)", self._dipole_length_var, width=10)
+        make_labeled_entry(self._dipole_row, "Length (λ)", self._dipole_length_var, width=10)
 
         self._loop_row = ttk.Frame(body)
         self._loop_row.pack(fill=tk.X, pady=pad // 2)
         self._loop_radius_var = tk.StringVar(value="0.10")
-        self._make_entry(self._loop_row, "Radius (λ)", self._loop_radius_var, width=10)
+        make_labeled_entry(self._loop_row, "Radius (λ)", self._loop_radius_var, width=10)
 
         self._patch_row = ttk.Frame(body)
         self._patch_row.pack(fill=tk.X, pady=pad // 2)
         self._patch_length_var = tk.StringVar(value="0.5")
         self._patch_width_var = tk.StringVar(value="0.4")
-        self._make_entry(self._patch_row, "Patch L (λ)", self._patch_length_var, width=10)
-        self._make_entry(self._patch_row, "Patch W (λ)", self._patch_width_var, width=10)
+        make_labeled_entry(self._patch_row, "Patch L (λ)", self._patch_length_var, width=10)
+        make_labeled_entry(self._patch_row, "Patch W (λ)", self._patch_width_var, width=10)
 
         self._array_row = ttk.Frame(body)
         self._array_row.pack(fill=tk.X, pady=pad // 2)
@@ -121,10 +124,10 @@ class AntennaRadiationDialog:
         self._array_spacing_var = tk.StringVar(value="0.5")
         self._array_phase_var = tk.StringVar(value="0.0")
         self._array_steer_var = tk.StringVar(value="90.0")
-        self._make_entry(self._array_row, "Elements", self._array_elements_var, width=8)
-        self._make_entry(self._array_row, "Spacing (λ)", self._array_spacing_var, width=10)
-        self._make_entry(self._array_row, "Phase (deg)", self._array_phase_var, width=10)
-        self._make_entry(self._array_row, "Steer θ (deg)", self._array_steer_var, width=12)
+        make_labeled_entry(self._array_row, "Elements", self._array_elements_var, width=8)
+        make_labeled_entry(self._array_row, "Spacing (λ)", self._array_spacing_var, width=10)
+        make_labeled_entry(self._array_row, "Phase (deg)", self._array_phase_var, width=10)
+        make_labeled_entry(self._array_row, "Steer θ (deg)", self._array_steer_var, width=12)
 
         self._btn_row = ttk.Frame(body)
         self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
@@ -136,41 +139,10 @@ class AntennaRadiationDialog:
             text="Close",
             style="Cancel.TButton",
             command=self.win.destroy,
-        ).pack(
-            side=tk.LEFT
-        )
+        ).pack(side=tk.LEFT)
 
         self._update_visibility()
         scroll.bind_new_children()
-
-    def _make_entry(
-        self, parent: ttk.Frame, label: str, var: tk.StringVar, *, width: int = 10
-    ) -> ttk.Entry:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        entry = ttk.Entry(parent, textvariable=var, width=width, font=get_font())
-        entry.pack(side=tk.LEFT, padx=(0, 12))
-        return entry
-
-    def _make_combo(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        values: tuple[str, ...],
-        *,
-        width: int = 12,
-    ) -> ttk.Combobox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        combo = ttk.Combobox(
-            parent,
-            textvariable=var,
-            values=list(values),
-            state="readonly",
-            width=width,
-            font=get_font(),
-        )
-        combo.pack(side=tk.LEFT, padx=(0, 12))
-        return combo
 
     def _update_visibility(self) -> None:
         atype = self._antenna_type_var.get()
@@ -237,27 +209,16 @@ class AntennaRadiationDialog:
         }
 
     def _on_solve(self) -> None:
-        try:
-            params = self._collect_inputs()
-        except ValueError as exc:
-            messagebox.showerror("Invalid input", str(exc), parent=self.win)
-            return
+        from complex_problems.antenna_radiation.result_dialog import (
+            AntennaRadiationResultDialog,
+        )
 
-        self.win.destroy()
-
-        def _task():
-            return solve_antenna_radiation(**params)
-
-        def _on_success(result) -> None:
-            from complex_problems.antenna_radiation.result_dialog import (
-                AntennaRadiationResultDialog,
-            )
-
-            AntennaRadiationResultDialog(self.parent, result=result)
-
-        run_solver_with_loading(
+        run_solver_dialog(
             parent=self.parent,
+            window=self.win,
+            collect_inputs=self._collect_inputs,
+            solver=solve_antenna_radiation,
             message="Solving antenna radiation...",
-            task=_task,
-            on_success=_on_success,
+            result_parent=self.parent,
+            result_dialog_factory=AntennaRadiationResultDialog,
         )

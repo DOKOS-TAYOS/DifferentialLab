@@ -5,11 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from complex_problems.coupled_oscillators import model as coupled_oscillators_model
 from complex_problems.coupled_oscillators.model import (
     build_ode_function,
     compute_normal_modes,
 )
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
+
+
+def test_private_uniform_helper_removed_from_module_namespace() -> None:
+    assert not hasattr(coupled_oscillators_model, "_is_uniform")
 
 
 def test_build_ode_linear_nonuniform_fixed_matches_spring_balance() -> None:
@@ -58,10 +63,7 @@ def test_build_ode_linear_nonuniform_periodic_matches_spring_balance() -> None:
 
     expected = np.zeros(n)
     for i in range(n):
-        expected[i] = (
-            k[i] * (x[(i + 1) % n] - x[i])
-            - k[(i - 1) % n] * (x[i] - x[(i - 1) % n])
-        )
+        expected[i] = k[i] * (x[(i + 1) % n] - x[i]) - k[(i - 1) % n] * (x[i] - x[(i - 1) % n])
     np.testing.assert_allclose(acc, expected, rtol=1e-12, atol=1e-12)
 
 
@@ -117,4 +119,3 @@ def test_solver_rejects_non_positive_mass() -> None:
             t_max=1.0,
             n_points=20,
         )
-

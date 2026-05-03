@@ -181,22 +181,6 @@ def build_ode_function(
     return ode_func
 
 
-def _is_uniform(
-    masses: float | list[float] | Callable[[int], float],
-    k_coupling: float | list[float] | Callable[[int], float],
-    n: int,
-) -> bool:
-    """True when masses and nearest-neighbor couplings are uniform."""
-    if callable(masses) or callable(k_coupling):
-        return False
-    masses_arr = _resolve_mass_array(masses, n)
-    k_arr = _resolve_k_array(k_coupling, n - 1, n)
-    return (
-        np.allclose(masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
-        and np.allclose(k_arr, k_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
-    )
-
-
 def _build_stiffness_matrix(
     n: int,
     boundary: str,
@@ -261,12 +245,8 @@ def compute_normal_modes(
     long_range = [(2, float(k_2nn)), (3, float(k_3nn)), (4, float(k_4nn))]
     long_range = [(dist, kval) for dist, kval in long_range if kval != 0.0]
 
-    uniform_mass = np.allclose(
-        masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL
-    )
-    uniform_k = np.allclose(
-        k_nearest, k_nearest[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL
-    )
+    uniform_mass = np.allclose(masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
+    uniform_k = np.allclose(k_nearest, k_nearest[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
     if boundary == "fixed" and uniform_mass and uniform_k and not long_range:
         m0 = float(masses_arr[0])
         k0 = float(k_nearest[0])
@@ -302,4 +282,3 @@ def compute_normal_modes(
     except Exception:  # pragma: no cover - fallback path
         logger.warning("Could not compute normal modes; returning identity basis")
         return np.eye(n), np.ones(n)
-

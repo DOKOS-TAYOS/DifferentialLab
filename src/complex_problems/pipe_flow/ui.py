@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from complex_problems.common import (
     add_how_to_config_section,
@@ -11,7 +11,12 @@ from complex_problems.common import (
     parse_float,
     parse_positive_float,
     parse_positive_int,
-    run_solver_with_loading,
+)
+from complex_problems.common.dialog_ui import (
+    make_labeled_combo,
+    make_labeled_entry,
+    make_labeled_spinbox,
+    run_solver_dialog,
 )
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 from config import get_env_from_schema
@@ -72,9 +77,15 @@ class PipeFlowDialog:
         self._model_var = tk.StringVar(value="steady")
         self._profile_var = tk.StringVar(value="constant")
         self._friction_var = tk.StringVar(value="auto")
-        model_combo = self._make_combo(row, "Model", self._model_var, _MODELS, width=10)
-        profile_combo = self._make_combo(row, "Profile", self._profile_var, _PROFILES, width=12)
-        self._make_combo(row, "Friction", self._friction_var, _FRICTION, width=12)
+        model_combo = make_labeled_combo(row, "Model", self._model_var, _MODELS, width=10)
+        profile_combo = make_labeled_combo(
+            row,
+            "Profile",
+            self._profile_var,
+            _PROFILES,
+            width=12,
+        )
+        make_labeled_combo(row, "Friction", self._friction_var, _FRICTION, width=12)
         model_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
         profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
@@ -82,8 +93,8 @@ class PipeFlowDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._length_var = tk.StringVar(value="20.0")
         self._nx_var = tk.StringVar(value="256")
-        self._make_entry(row, "Length L", self._length_var, width=10)
-        self._make_spinbox(row, "Nₓ", self._nx_var, from_=16, to=32768, width=8)
+        make_labeled_entry(row, "Length L", self._length_var, width=10)
+        make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=16, to=32768, width=8)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
         ttk.Label(body, text="Geometry", style="Small.TLabel").pack(anchor=tk.W)
@@ -93,16 +104,16 @@ class PipeFlowDialog:
         self._d_in_var = tk.StringVar(value="0.08")
         self._d_out_var = tk.StringVar(value="0.05")
         self._d0_var = tk.StringVar(value="0.06")
-        self._make_entry(row, "dᵢₙ (m)", self._d_in_var, width=8)
-        self._make_entry(row, "dₒᵤₜ (m)", self._d_out_var, width=8)
-        self._make_entry(row, "d₀ (m)", self._d0_var, width=8)
+        make_labeled_entry(row, "dᵢₙ (m)", self._d_in_var, width=8)
+        make_labeled_entry(row, "dₒᵤₜ (m)", self._d_out_var, width=8)
+        make_labeled_entry(row, "d₀ (m)", self._d0_var, width=8)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._amp_var = tk.StringVar(value="0.20")
         self._waves_var = tk.StringVar(value="2.0")
-        self._make_entry(row, "Sin amplitude", self._amp_var, width=10)
-        self._make_entry(row, "Sin waves", self._waves_var, width=8)
+        make_labeled_entry(row, "Sin amplitude", self._amp_var, width=10)
+        make_labeled_entry(row, "Sin waves", self._waves_var, width=8)
 
         self._custom_row = ttk.Frame(body)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
@@ -125,9 +136,9 @@ class PipeFlowDialog:
         self._rho_var = tk.StringVar(value="1000")
         self._mu_var = tk.StringVar(value="0.001")
         self._rough_var = tk.StringVar(value="1e-5")
-        self._make_entry(row, "ρ (kg/m³)", self._rho_var, width=10)
-        self._make_entry(row, "μ (Pa·s)", self._mu_var, width=10)
-        self._make_entry(row, "Roughness (m)", self._rough_var, width=10)
+        make_labeled_entry(row, "ρ (kg/m³)", self._rho_var, width=10)
+        make_labeled_entry(row, "μ (Pa·s)", self._mu_var, width=10)
+        make_labeled_entry(row, "Roughness (m)", self._rough_var, width=10)
 
         self._steady_frame = ttk.Frame(body)
         self._steady_frame.pack(fill=tk.X, pady=pad)
@@ -140,8 +151,8 @@ class PipeFlowDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._p_in_var = tk.StringVar(value="200000")
         self._p_out_var = tk.StringVar(value="190000")
-        self._make_entry(row, "pᵢₙ (Pa)", self._p_in_var, width=10)
-        self._make_entry(row, "pₒᵤₜ (Pa)", self._p_out_var, width=10)
+        make_labeled_entry(row, "pᵢₙ (Pa)", self._p_in_var, width=10)
+        make_labeled_entry(row, "pₒᵤₜ (Pa)", self._p_out_var, width=10)
 
         self._transient_frame = ttk.Frame(body)
         self._transient_frame.pack(fill=tk.X, pady=pad)
@@ -155,10 +166,10 @@ class PipeFlowDialog:
         self._p_amp_var = tk.StringVar(value="2000")
         self._p_freq_var = tk.StringVar(value="2.0")
         self._wave_speed_var = tk.StringVar(value="200")
-        self._make_entry(row, "p_base (Pa)", self._p_base_var, width=10)
-        self._make_entry(row, "p_amp (Pa)", self._p_amp_var, width=10)
-        self._make_entry(row, "p_freq (Hz)", self._p_freq_var, width=9)
-        self._make_entry(row, "Wave c (m/s)", self._wave_speed_var, width=10)
+        make_labeled_entry(row, "p_base (Pa)", self._p_base_var, width=10)
+        make_labeled_entry(row, "p_amp (Pa)", self._p_amp_var, width=10)
+        make_labeled_entry(row, "p_freq (Hz)", self._p_freq_var, width=9)
+        make_labeled_entry(row, "Wave c (m/s)", self._wave_speed_var, width=10)
 
         row = ttk.Frame(self._transient_frame)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -166,10 +177,10 @@ class PipeFlowDialog:
         self._t_max_var = tk.StringVar(value="1.0")
         self._dt_var = tk.StringVar(value="0.0005")
         self._sample_every_var = tk.StringVar(value="10")
-        self._make_entry(row, "Damping", self._damping_var, width=8)
-        self._make_entry(row, "tₘₐₓ", self._t_max_var, width=8)
-        self._make_entry(row, "Δt", self._dt_var, width=8)
-        self._make_entry(row, "sample_every", self._sample_every_var, width=10)
+        make_labeled_entry(row, "Damping", self._damping_var, width=8)
+        make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
+        make_labeled_entry(row, "Δt", self._dt_var, width=8)
+        make_labeled_entry(row, "sample_every", self._sample_every_var, width=10)
 
         self._btn_row = ttk.Frame(body)
         self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
@@ -181,64 +192,11 @@ class PipeFlowDialog:
             text="Close",
             style="Cancel.TButton",
             command=self.win.destroy,
-        ).pack(
-            side=tk.LEFT
-        )
+        ).pack(side=tk.LEFT)
 
         self._update_visibility()
 
         scroll.bind_new_children()
-
-    def _make_entry(
-        self, parent: ttk.Frame, label: str, var: tk.StringVar, *, width: int = 10
-    ) -> ttk.Entry:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        entry = ttk.Entry(parent, textvariable=var, width=width, font=get_font())
-        entry.pack(side=tk.LEFT, padx=(0, 12))
-        return entry
-
-    def _make_spinbox(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        *,
-        from_: int,
-        to: int,
-        width: int = 8,
-    ) -> ttk.Spinbox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        spin = ttk.Spinbox(
-            parent,
-            textvariable=var,
-            from_=from_,
-            to=to,
-            width=width,
-            font=get_font(),
-        )
-        spin.pack(side=tk.LEFT, padx=(0, 12))
-        return spin
-
-    def _make_combo(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        values: tuple[str, ...],
-        *,
-        width: int = 12,
-    ) -> ttk.Combobox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        combo = ttk.Combobox(
-            parent,
-            textvariable=var,
-            values=list(values),
-            state="readonly",
-            width=width,
-            font=get_font(),
-        )
-        combo.pack(side=tk.LEFT, padx=(0, 12))
-        return combo
 
     def _update_visibility(self) -> None:
         if self._profile_var.get() == "custom":
@@ -318,25 +276,14 @@ class PipeFlowDialog:
         return params
 
     def _on_solve(self) -> None:
-        try:
-            params = self._collect_inputs()
-        except ValueError as exc:
-            messagebox.showerror("Invalid input", str(exc), parent=self.win)
-            return
+        from complex_problems.pipe_flow.result_dialog import PipeFlowResultDialog
 
-        self.win.destroy()
-
-        def _task():
-            return solve_pipe_flow(**params)
-
-        def _on_success(result) -> None:
-            from complex_problems.pipe_flow.result_dialog import PipeFlowResultDialog
-
-            PipeFlowResultDialog(self.parent, result=result)
-
-        run_solver_with_loading(
+        run_solver_dialog(
             parent=self.parent,
+            window=self.win,
+            collect_inputs=self._collect_inputs,
+            solver=solve_pipe_flow,
             message="Solving pipe flow...",
-            task=_task,
-            on_success=_on_success,
+            result_parent=self.parent,
+            result_dialog_factory=PipeFlowResultDialog,
         )

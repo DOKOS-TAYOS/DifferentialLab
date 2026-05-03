@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Removed the unused internal `_is_uniform` helper from the coupled oscillators model.
+- Extracted shared internal complex-problem dialog helpers to reduce UI duplication across simpler solver dialogs.
+- Extracted shared internal result-dialog helpers to centralize embedded figure cleanup and animation reset logic.
+
 ## [0.3.2] - 2026-03-05
 
 ### Added

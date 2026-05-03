@@ -11,6 +11,10 @@ import numpy as np
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
+from complex_problems.common.result_dialog_ui import (
+    close_embedded_figures,
+    reset_embedded_animation,
+)
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
 from config import get_env_from_schema
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
@@ -150,15 +154,10 @@ class CoupledOscillatorsResultDialog:
 
     def _on_close(self) -> None:
         """Close all matplotlib figures and destroy the window."""
-        import matplotlib.pyplot as plt
-
-        for attr in ("_energy_canvas", "_em_canvas", "_anim_canvas", "_hm_canvas", "_surf_canvas"):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            ("_energy_canvas", "_em_canvas", "_anim_canvas", "_hm_canvas", "_surf_canvas"),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -207,9 +206,7 @@ class CoupledOscillatorsResultDialog:
             font=get_font(),
         )
         em_view_combo.pack(side=tk.LEFT, padx=(0, 8))
-        em_view_combo.bind(
-            "<<ComboboxSelected>>", lambda _e: self._on_em_view_change()
-        )
+        em_view_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_em_view_change())
         ttk.Label(em_ctrl, text="Select:").pack(side=tk.LEFT, padx=(16, 4))
         n = self._result.n_oscillators
         btn_bg = get_env_from_schema("UI_BUTTON_BG")
@@ -308,16 +305,8 @@ class CoupledOscillatorsResultDialog:
 
     def _update_animation(self) -> None:
         """Regenerate the animation tab."""
-        import matplotlib.pyplot as plt
-
-        if self._anim_canvas is not None and hasattr(self._anim_canvas, "figure"):
-            try:
-                plt.close(self._anim_canvas.figure)
-            except Exception:
-                pass
-            self._anim_canvas = None
-        for w in self._anim_plot_frame.winfo_children():
-            w.destroy()
+        reset_embedded_animation(self._anim_plot_frame, self._anim_canvas)
+        self._anim_canvas = None
 
         r = self._result
         n = r.n_oscillators
@@ -440,9 +429,7 @@ class CoupledOscillatorsResultDialog:
             k_arr = r.k_coupling
             coupling_types = r.metadata.get("coupling_types", ["linear"])
             nonlinear_coeff = r.metadata.get("nonlinear_coeff", 0.0)
-            has_nonlinear = (
-                "nonlinear" in coupling_types and nonlinear_coeff != 0
-            )
+            has_nonlinear = "nonlinear" in coupling_types and nonlinear_coeff != 0
 
             for i in range(n - 1):
                 delta = x[i + 1] - x[i]

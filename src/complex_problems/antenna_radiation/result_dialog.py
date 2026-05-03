@@ -8,6 +8,7 @@ from tkinter import ttk
 import numpy as np
 
 from complex_problems.antenna_radiation.solver import AntennaRadiationResult
+from complex_problems.common.result_dialog_ui import close_embedded_figures
 from config import get_env_from_schema
 from frontend.plot_embed import embed_plot_in_tk
 from frontend.window_utils import center_window, make_modal
@@ -81,21 +82,16 @@ class AntennaRadiationResultDialog:
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
-        import matplotlib.pyplot as plt
-
-        for attr in (
-            "_map_canvas",
-            "_cut_canvas",
-            "_phi_canvas",
-            "_surface_canvas",
-            "_field_canvas",
-        ):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            (
+                "_map_canvas",
+                "_cut_canvas",
+                "_phi_canvas",
+                "_surface_canvas",
+                "_field_canvas",
+            ),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:

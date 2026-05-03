@@ -8,6 +8,10 @@ from tkinter import ttk
 import numpy as np
 
 from complex_problems.aerodynamics_2d.solver import Aerodynamics2DResult
+from complex_problems.common.result_dialog_ui import (
+    close_embedded_figures,
+    reset_embedded_animation,
+)
 from config import get_env_from_schema
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
@@ -103,21 +107,16 @@ class Aerodynamics2DResultDialog:
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
-        import matplotlib.pyplot as plt
-
-        for attr in (
-            "_anim_canvas",
-            "_map_canvas",
-            "_coef_canvas",
-            "_stream_canvas",
-            "_profile_canvas",
-        ):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            (
+                "_anim_canvas",
+                "_map_canvas",
+                "_coef_canvas",
+                "_stream_canvas",
+                "_profile_canvas",
+            ),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -183,15 +182,7 @@ class Aerodynamics2DResultDialog:
         self._update_animation()
 
     def _update_animation(self) -> None:
-        import matplotlib.pyplot as plt
-
-        if self._anim_canvas is not None and hasattr(self._anim_canvas, "figure"):
-            try:
-                plt.close(self._anim_canvas.figure)
-            except Exception:
-                pass
-        for w in self._anim_frame.winfo_children():
-            w.destroy()
+        reset_embedded_animation(self._anim_frame, self._anim_canvas)
 
         view = self._view_var.get()
         if view == "vorticity":

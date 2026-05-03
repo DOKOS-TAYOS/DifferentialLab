@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from complex_problems.aerodynamics_2d.solver import solve_aerodynamics_2d
 from complex_problems.common import (
@@ -11,10 +11,14 @@ from complex_problems.common import (
     parse_float,
     parse_positive_float,
     parse_positive_int,
-    run_solver_with_loading,
+)
+from complex_problems.common.dialog_ui import (
+    make_labeled_combo,
+    make_labeled_entry,
+    make_labeled_spinbox,
+    run_solver_dialog,
 )
 from config import get_env_from_schema
-from frontend.theme import get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
@@ -70,8 +74,8 @@ class Aerodynamics2DDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._approx_var = tk.StringVar(value="nonlinear_ns")
         self._shape_var = tk.StringVar(value="cylinder")
-        self._make_combo(row, "Approximation", self._approx_var, _APPROX, width=13)
-        self._make_combo(row, "Obstacle shape", self._shape_var, _SHAPES, width=12)
+        make_labeled_combo(row, "Approximation", self._approx_var, _APPROX, width=13)
+        make_labeled_combo(row, "Obstacle shape", self._shape_var, _SHAPES, width=12)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -79,19 +83,19 @@ class Aerodynamics2DDialog:
         self._ny_var = tk.StringVar(value="64")
         self._lx_var = tk.StringVar(value="4.0")
         self._ly_var = tk.StringVar(value="2.0")
-        self._make_spinbox(row, "Nₓ", self._nx_var, from_=16, to=8192, width=8)
-        self._make_spinbox(row, "Nᵧ", self._ny_var, from_=16, to=8192, width=8)
-        self._make_entry(row, "Lₓ", self._lx_var, width=8)
-        self._make_entry(row, "Lᵧ", self._ly_var, width=8)
+        make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=16, to=8192, width=8)
+        make_labeled_spinbox(row, "Nᵧ", self._ny_var, from_=16, to=8192, width=8)
+        make_labeled_entry(row, "Lₓ", self._lx_var, width=8)
+        make_labeled_entry(row, "Lᵧ", self._ly_var, width=8)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._t_max_var = tk.StringVar(value="2.0")
         self._dt_var = tk.StringVar(value="0.002")
         self._sample_every_var = tk.StringVar(value="10")
-        self._make_entry(row, "tₘₐₓ", self._t_max_var, width=8)
-        self._make_entry(row, "Δt", self._dt_var, width=8)
-        self._make_entry(row, "sample_every", self._sample_every_var, width=10)
+        make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
+        make_labeled_entry(row, "Δt", self._dt_var, width=8)
+        make_labeled_entry(row, "sample_every", self._sample_every_var, width=10)
         ToolTip(row, "Lower Δt and/or lower sample_every increase temporal resolution.")
 
         row = ttk.Frame(body)
@@ -100,10 +104,10 @@ class Aerodynamics2DDialog:
         self._nu_var = tk.StringVar(value="0.01")
         self._u_inf_var = tk.StringVar(value="1.0")
         self._penal_var = tk.StringVar(value="0.005")
-        self._make_entry(row, "ρ", self._rho_var, width=8)
-        self._make_entry(row, "ν", self._nu_var, width=8)
-        self._make_entry(row, "U∞", self._u_inf_var, width=8)
-        self._make_entry(row, "Penalization", self._penal_var, width=10)
+        make_labeled_entry(row, "ρ", self._rho_var, width=8)
+        make_labeled_entry(row, "ν", self._nu_var, width=8)
+        make_labeled_entry(row, "U∞", self._u_inf_var, width=8)
+        make_labeled_entry(row, "Penalization", self._penal_var, width=10)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
         ttk.Label(body, text="Obstacle geometry", style="Small.TLabel").pack(anchor=tk.W)
@@ -115,11 +119,11 @@ class Aerodynamics2DDialog:
         self._size_x_var = tk.StringVar(value="0.30")
         self._size_y_var = tk.StringVar(value="0.30")
         self._attack_deg_var = tk.StringVar(value="0.0")
-        self._make_entry(row, "Center x", self._center_x_var, width=8)
-        self._make_entry(row, "Center y", self._center_y_var, width=8)
-        self._make_entry(row, "Size x", self._size_x_var, width=8)
-        self._make_entry(row, "Size y", self._size_y_var, width=8)
-        self._make_entry(row, "Attack (deg)", self._attack_deg_var, width=10)
+        make_labeled_entry(row, "Center x", self._center_x_var, width=8)
+        make_labeled_entry(row, "Center y", self._center_y_var, width=8)
+        make_labeled_entry(row, "Size x", self._size_x_var, width=8)
+        make_labeled_entry(row, "Size y", self._size_y_var, width=8)
+        make_labeled_entry(row, "Attack (deg)", self._attack_deg_var, width=10)
         ToolTip(
             row,
             "For naca0012: size x = chord, size y = thickness ratio (e.g. 0.12).",
@@ -133,57 +137,6 @@ class Aerodynamics2DDialog:
         )
 
         scroll.bind_new_children()
-
-    def _make_entry(
-        self, parent: ttk.Frame, label: str, var: tk.StringVar, *, width: int = 10
-    ) -> ttk.Entry:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        entry = ttk.Entry(parent, textvariable=var, width=width, font=get_font())
-        entry.pack(side=tk.LEFT, padx=(0, 12))
-        return entry
-
-    def _make_spinbox(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        *,
-        from_: int,
-        to: int,
-        width: int = 8,
-    ) -> ttk.Spinbox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        spin = ttk.Spinbox(
-            parent,
-            textvariable=var,
-            from_=from_,
-            to=to,
-            width=width,
-            font=get_font(),
-        )
-        spin.pack(side=tk.LEFT, padx=(0, 12))
-        return spin
-
-    def _make_combo(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        values: tuple[str, ...],
-        *,
-        width: int = 12,
-    ) -> ttk.Combobox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        combo = ttk.Combobox(
-            parent,
-            textvariable=var,
-            values=list(values),
-            state="readonly",
-            width=width,
-            font=get_font(),
-        )
-        combo.pack(side=tk.LEFT, padx=(0, 12))
-        return combo
 
     def _collect_inputs(self) -> dict[str, object]:
         nx = parse_positive_int(self._nx_var.get(), name="Nₓ", min_value=16)
@@ -228,25 +181,14 @@ class Aerodynamics2DDialog:
         }
 
     def _on_solve(self) -> None:
-        try:
-            params = self._collect_inputs()
-        except ValueError as exc:
-            messagebox.showerror("Invalid input", str(exc), parent=self.win)
-            return
+        from complex_problems.aerodynamics_2d.result_dialog import Aerodynamics2DResultDialog
 
-        self.win.destroy()
-
-        def _task():
-            return solve_aerodynamics_2d(**params)
-
-        def _on_success(result) -> None:
-            from complex_problems.aerodynamics_2d.result_dialog import Aerodynamics2DResultDialog
-
-            Aerodynamics2DResultDialog(self.parent, result=result)
-
-        run_solver_with_loading(
+        run_solver_dialog(
             parent=self.parent,
+            window=self.win,
+            collect_inputs=self._collect_inputs,
+            solver=solve_aerodynamics_2d,
             message="Solving aerodynamics 2D...",
-            task=_task,
-            on_success=_on_success,
+            result_parent=self.parent,
+            result_dialog_factory=Aerodynamics2DResultDialog,
         )
