@@ -50,6 +50,7 @@ docs/_build/
 .pytest_cache/
 .pytest_tmp*/
 pytest-cache-files-*/
+pytest_temp*/
 pytest_tmp*/
 tmp_pytest*/
 .coverage

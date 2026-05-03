@@ -11,7 +11,6 @@ from config import get_env_from_schema
 from solver import (
     FNotation,
     ODESolution,
-    compute_ode_residual_error,
     compute_statistics,
     compute_statistics_2d,
     get_difference_function,
@@ -25,7 +24,8 @@ from solver import (
     solve_pde_2d,
     validate_all_inputs,
 )
-from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN
+from solver.error_metrics import compute_ode_residual_error_from_rhs
+from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDECoefficientProvider, PDECoefficients
 from solver.predefined import EquationType
 from utils import ValidationError, build_eval_namespace, get_logger, safe_eval
 
@@ -57,6 +57,9 @@ class _DispatchResult:
     solver_quality: dict[str, Any] = field(default_factory=dict)
     y_grid: np.ndarray | None = None
     ode_func: Callable | None = None
+
+
+_PDE_SOLUTION_TERMS = ("f", "fx", "fy", "fxx", "fxy", "fyy")
 
 
 def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
@@ -297,6 +300,51 @@ def _build_neumann_array(
     return arr
 
 
+def _pde_rhs_references_solution_terms(expression: str | None) -> bool:
+    """Return whether a PDE RHS expression references f or its derivatives."""
+    if not expression:
+        return False
+    import ast
+
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return True
+    return any(
+        isinstance(node, ast.Name) and node.id in _PDE_SOLUTION_TERMS for node in ast.walk(tree)
+    )
+
+
+def _build_pde_coefficient_provider(
+    *,
+    expression: str | None,
+    vars_list: list[str],
+    parameters: dict[str, float],
+    pde_operator: str,
+) -> PDECoefficientProvider | None:
+    """Build fast PDE coefficients for coordinate-only RHS expressions."""
+    if _pde_rhs_references_solution_terms(expression):
+        return None
+
+    rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
+    operator_coefficients: dict[str, tuple[float, float, float, float, float, float]] = {
+        "neg_laplacian": (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0),
+        "laplacian": (1.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        "fxx": (1.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+        "fyy": (0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        "fx": (0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        "fy": (0.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        "fxy": (0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+    }
+    coefficients = operator_coefficients.get(pde_operator, operator_coefficients["neg_laplacian"])
+
+    def provider(x: float, y: float, params: dict[str, float]) -> PDECoefficients:
+        rhs = rhs_func(x, y, **params)
+        return (*coefficients, -rhs)
+
+    return provider
+
+
 def _dispatch_2d_pde(
     *,
     expression: str | None,
@@ -322,6 +370,12 @@ def _dispatch_2d_pde(
     """
     ny = n_points_y if n_points_y is not None else n_points
     rhs_func = parse_pde_rhs_expression(expression or "0", vars_list, parameters)
+    coefficient_provider = _build_pde_coefficient_provider(
+        expression=expression,
+        vars_list=vars_list,
+        parameters=parameters,
+        pde_operator=pde_operator,
+    )
 
     def residual(
         x: float,
@@ -418,6 +472,7 @@ def _dispatch_2d_pde(
         mask=mask,
         bc_type=bc_type_arr,
         bc_neumann_value=neumann_arr,
+        coefficient_provider=coefficient_provider,
     )
     return _DispatchResult(
         x=pde_sol.grid[0],
@@ -499,7 +554,6 @@ def _dispatch_vector_ode(
         success=solution.success,
         message=solution.message,
         n_eval=solution.n_eval,
-        error_metrics=compute_ode_residual_error(ode_func, solution.x, solution.y),
         solver_quality=_build_solver_quality(solution),
         ode_func=ode_func,
     )
@@ -550,10 +604,21 @@ def _dispatch_scalar_ode(
         success=solution.success,
         message=solution.message,
         n_eval=solution.n_eval,
-        error_metrics=compute_ode_residual_error(ode_func, solution.x, solution.y),
         solver_quality=_build_solver_quality(solution),
         ode_func=ode_func,
     )
+
+
+def _evaluate_ode_rhs_values(
+    ode_func: Callable[[float, np.ndarray], np.ndarray],
+    x: np.ndarray,
+    y: np.ndarray,
+) -> np.ndarray:
+    """Evaluate ODE RHS values once for residual metrics and display augmentation."""
+    y_2d = np.atleast_2d(y)
+    if y_2d.shape[1] != len(x):
+        y_2d = y_2d.T
+    return np.column_stack([ode_func(float(x[j]), y_2d[:, j]) for j in range(len(x))])
 
 
 @dataclass
@@ -745,23 +810,22 @@ def run_solver_pipeline(
     # ── Compute highest derivative and augment y ──────────────────────
     display_order = order
     if not is_2d_pde and equation_type != "difference" and dr.ode_func is not None:
+        y_2d = np.atleast_2d(solution_y)
+        if y_2d.shape[1] != len(solution_x):
+            y_2d = y_2d.T
+        rhs_values = _evaluate_ode_rhs_values(dr.ode_func, solution_x, y_2d)
+        dr.error_metrics = compute_ode_residual_error_from_rhs(solution_x, y_2d, rhs_values)
+
         try:
-            y_2d = np.atleast_2d(solution_y)
-            if y_2d.shape[1] != len(solution_x):
-                y_2d = y_2d.T
             n_pts = len(solution_x)
             n_comp = vector_components if is_vector else 1
-
-            dydt_all = np.column_stack(
-                [dr.ode_func(solution_x[j], y_2d[:, j]) for j in range(n_pts)]
-            )
 
             new_order = order + 1
             augmented = np.empty((n_comp * new_order, n_pts))
             for comp_i in range(n_comp):
                 for k in range(order):
                     augmented[comp_i * new_order + k] = y_2d[comp_i * order + k]
-                augmented[comp_i * new_order + order] = dydt_all[comp_i * order + order - 1]
+                augmented[comp_i * new_order + order] = rhs_values[comp_i * order + order - 1]
 
             solution_y = augmented
             display_order = new_order

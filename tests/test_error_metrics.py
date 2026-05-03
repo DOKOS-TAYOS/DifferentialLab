@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 
 from solver.equation_parser import _parse_expression
-from solver.error_metrics import compute_ode_residual_error
+from solver.error_metrics import compute_ode_residual_error, compute_ode_residual_error_from_rhs
 from solver.ode_solver import solve_ode
 
 _SOLVER_ENV = {
@@ -85,3 +85,13 @@ def test_few_points_returns_zeros() -> None:
     assert metrics["residual_max"] == 0.0
     assert metrics["residual_mean"] == 0.0
     assert metrics["residual_rms"] == 0.0
+
+
+def test_residual_error_from_precomputed_rhs_matches_exact_linear_solution() -> None:
+    x = np.array([0.0, 1.0, 2.0, 3.0])
+    y = np.array([[1.0, 3.0, 5.0, 7.0]])
+    rhs_values = np.full_like(y, fill_value=2.0)
+
+    metrics = compute_ode_residual_error_from_rhs(x, y, rhs_values)
+
+    assert metrics == {"residual_max": 0.0, "residual_mean": 0.0, "residual_rms": 0.0}

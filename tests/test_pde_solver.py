@@ -269,3 +269,25 @@ def test_mixed_dirichlet_neumann() -> None:
     for j in range(1, ny - 1):
         mid_col = nx // 2
         np.testing.assert_allclose(result.u[j, mid_col], y_vals[j], atol=0.1)
+
+
+def test_solve_pde_2d_uses_coefficient_provider_without_probing_residual() -> None:
+    def residual_should_not_be_called(*args: object, **kwargs: object) -> float:
+        raise AssertionError("generic coefficient probing should not run")
+
+    def coefficients(x: float, y: float, params: dict[str, float]) -> tuple[float, ...]:
+        return (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0)
+
+    result = solve_pde_2d(
+        residual_should_not_be_called,
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        nx=9,
+        ny=9,
+        coefficient_provider=coefficients,
+    )
+
+    assert result.success is True
+    np.testing.assert_allclose(result.u, 0.0, atol=1e-10)

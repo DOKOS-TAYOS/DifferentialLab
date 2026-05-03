@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from pipeline import SolverResult, run_solver_pipeline
+from solver.pde_solver import PDESolution
 from utils import ValidationError
 
 
@@ -205,3 +206,86 @@ def test_run_solver_pipeline_pde_2d() -> None:
     assert result.y_grid.shape == (11,)
     assert result.y.shape == (11, 11)
     np.testing.assert_allclose(result.y, 0.0, atol=1e-10)
+
+
+def test_run_solver_pipeline_pde_uses_fast_coefficients_for_coordinate_rhs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_solve_pde_2d(*args: object, **kwargs: object) -> PDESolution:
+        provider = kwargs.get("coefficient_provider")
+        captured["coefficient_provider"] = provider
+        assert callable(provider)
+        assert provider(0.25, 0.5, {}) == (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -0.75)
+        x_grid = np.linspace(0.0, 1.0, 5)
+        y_grid = np.linspace(0.0, 1.0, 5)
+        return PDESolution(
+            grid=(x_grid, y_grid),
+            u=np.zeros((5, 5)),
+            success=True,
+            message="OK",
+        )
+
+    monkeypatch.setattr("pipeline.solve_pde_2d", fake_solve_pde_2d)
+
+    run_solver_pipeline(
+        expression="x + y",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Poisson",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=5,
+        n_points_y=5,
+        method="fdm",
+        selected_stats=set(),
+        equation_type="pde",
+        variables=["x", "y"],
+    )
+
+    assert captured["coefficient_provider"] is not None
+
+
+def test_run_solver_pipeline_pde_keeps_generic_path_for_solution_terms(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_solve_pde_2d(*args: object, **kwargs: object) -> PDESolution:
+        captured["coefficient_provider"] = kwargs.get("coefficient_provider")
+        x_grid = np.linspace(0.0, 1.0, 5)
+        y_grid = np.linspace(0.0, 1.0, 5)
+        return PDESolution(
+            grid=(x_grid, y_grid),
+            u=np.zeros((5, 5)),
+            success=True,
+            message="OK",
+        )
+
+    monkeypatch.setattr("pipeline.solve_pde_2d", fake_solve_pde_2d)
+
+    run_solver_pipeline(
+        expression="f + x",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Reaction diffusion",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=5,
+        n_points_y=5,
+        method="fdm",
+        selected_stats=set(),
+        equation_type="pde",
+        variables=["x", "y"],
+    )
+
+    assert captured["coefficient_provider"] is None

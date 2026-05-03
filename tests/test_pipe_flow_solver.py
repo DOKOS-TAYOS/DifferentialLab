@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from complex_problems.pipe_flow.model import friction_factor
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 
 
@@ -79,3 +80,28 @@ def test_transient_pipe_flow_rejects_unstable_cfl() -> None:
             t_max=0.05,
             dt=0.01,
         )
+
+
+def test_default_transient_pipe_flow_configuration_is_cfl_stable() -> None:
+    result = solve_pipe_flow(model_type="transient")
+
+    assert result.magnitudes["cfl"] < 0.95
+    assert np.all(np.isfinite(result.pressure))
+    assert np.all(np.isfinite(result.velocity))
+
+
+def test_laminar_friction_does_not_evaluate_turbulent_formula(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    re = np.array([100.0, 200.0, 500.0])
+    diameter = np.array([0.05, 0.05, 0.05])
+
+    def fail_log10(values: np.ndarray) -> np.ndarray:
+        raise AssertionError("laminar friction should not evaluate Swamee-Jain")
+
+    monkeypatch.setattr(np, "log10", fail_log10)
+
+    np.testing.assert_allclose(
+        friction_factor(re, roughness=1e-5, diameter=diameter, model="laminar"),
+        64.0 / re,
+    )

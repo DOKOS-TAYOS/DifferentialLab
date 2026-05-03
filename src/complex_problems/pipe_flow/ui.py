@@ -178,7 +178,7 @@ class PipeFlowDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._damping_var = tk.StringVar(value="0.2")
         self._t_max_var = tk.StringVar(value="1.0")
-        self._dt_var = tk.StringVar(value="0.0005")
+        self._dt_var = tk.StringVar(value="0.0002")
         self._sample_every_var = tk.StringVar(value="10")
         make_labeled_entry(row, "Damping", self._damping_var, width=8)
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)

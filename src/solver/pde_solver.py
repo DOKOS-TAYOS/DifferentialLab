@@ -29,6 +29,9 @@ logger = get_logger(__name__)
 BC_DIRICHLET = "dirichlet"
 BC_NEUMANN = "neumann"
 
+PDECoefficients = tuple[float, float, float, float, float, float, float]
+PDECoefficientProvider = Callable[[float, float, dict[str, float]], PDECoefficients]
+
 
 @dataclass
 class PDESolution:
@@ -147,6 +150,7 @@ def solve_pde_2d(
     mask: np.ndarray | None = None,
     bc_type: np.ndarray | None = None,
     bc_neumann_value: np.ndarray | None = None,
+    coefficient_provider: PDECoefficientProvider | None = None,
 ) -> PDESolution:
     """Solve a general 2D linear elliptic PDE using finite differences.
 
@@ -172,6 +176,9 @@ def solve_pde_2d(
             Only boundary points are used. Default: all Dirichlet.
         bc_neumann_value: Float array (ny, nx) with normal derivative values
             for Neumann boundary points. Default: zeros.
+        coefficient_provider: Optional direct provider for linear residual
+            coefficients ``(f_xx, f_xy, f_yy, f_x, f_y, f, constant)``.
+            When provided, the solver skips finite-difference probing.
 
     Returns:
         PDESolution with grid, solution array, and mask.
@@ -250,12 +257,17 @@ def solve_pde_2d(
 
     for k, (j, i) in enumerate(np.argwhere(interior_mask)):
         try:
-            a_c, bxy, c_c, d_c, e_c, g_c, r0 = _probe_coefficients(
-                residual_func,
-                float(x[i]),
-                float(y[j]),
-                params,
-            )
+            xi = float(x[i])
+            yj = float(y[j])
+            if coefficient_provider is None:
+                a_c, bxy, c_c, d_c, e_c, g_c, r0 = _probe_coefficients(
+                    residual_func,
+                    xi,
+                    yj,
+                    params,
+                )
+            else:
+                a_c, bxy, c_c, d_c, e_c, g_c, r0 = coefficient_provider(xi, yj, params)
         except Exception as exc:
             logger.error("PDE coefficient probe failed at (%g, %g): %s", x[i], y[j], exc)
             raise SolverFailedError(f"Coefficient probe failed: {exc}") from exc

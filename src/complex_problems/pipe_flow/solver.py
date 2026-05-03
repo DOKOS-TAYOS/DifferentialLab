@@ -243,7 +243,7 @@ def solve_pipe_flow(
     wave_speed: float = 200.0,
     damping: float = 0.2,
     t_max: float = 1.0,
-    dt: float = 5.0e-4,
+    dt: float = 2.0e-4,
     sample_every: int = 10,
 ) -> PipeFlowResult:
     """Solve steady or transient 1D pipe flow."""
