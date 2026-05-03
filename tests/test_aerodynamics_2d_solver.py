@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 
 from complex_problems.aerodynamics_2d import model
+from complex_problems.aerodynamics_2d import solver as aero_solver
 from complex_problems.aerodynamics_2d.solver import solve_aerodynamics_2d
 
 
@@ -55,6 +58,29 @@ def test_stokes_approximation_runs() -> None:
     assert len(result.t) > 2
     assert np.all(np.isfinite(result.drag_coeff))
     assert np.all(np.isfinite(result.lift_coeff))
+
+
+def test_aerodynamics_keeps_expected_samples_without_linear_membership_check() -> None:
+    result = solve_aerodynamics_2d(
+        approximation="stokes",
+        nx=32,
+        ny=24,
+        lx=3.0,
+        ly=2.0,
+        t_max=0.011,
+        dt=0.002,
+        sample_every=4,
+        rho=1.0,
+        nu=0.03,
+        u_inf=0.8,
+        penalization=0.01,
+        obstacle_shape="ellipse",
+        obstacle_size_x=0.4,
+        obstacle_size_y=0.2,
+    )
+
+    np.testing.assert_allclose(result.t, [0.0, 0.008, 0.012])
+    assert "step in sample_indices" not in inspect.getsource(aero_solver.solve_aerodynamics_2d)
 
 
 def test_aerodynamics_rejects_invalid_approximation() -> None:

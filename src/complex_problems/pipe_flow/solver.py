@@ -210,7 +210,7 @@ def _solve_transient(
         p = p + (dt / 6.0) * (k1_p + 2.0 * k2_p + 2.0 * k3_p + k4_p)
         apply_bc(u, p, step * dt)
 
-        if step in sample_indices:
+        if sample_pos < n_samples and step == sample_indices[sample_pos]:
             sample(sample_pos, step * dt)
             sample_pos += 1
 

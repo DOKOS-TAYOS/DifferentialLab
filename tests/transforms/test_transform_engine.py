@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -11,6 +16,31 @@ from transforms.transform_engine import (
     compute_function_samples,
     get_transform_coefficients,
 )
+
+
+def test_transforms_package_import_is_lazy_for_scipy() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    env = {**os.environ, "PYTHONPATH": str(project_root / "src")}
+    code = (
+        "import sys\n"
+        "def has_scipy():\n"
+        "    return any(name == 'scipy' or name.startswith('scipy.') for name in sys.modules)\n"
+        "import transforms\n"
+        "print(has_scipy())\n"
+        "from transforms import apply_transform\n"
+        "print(callable(apply_transform))\n"
+        "print(has_scipy())\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == ["False", "True", "True"]
 
 
 def test_compute_function_samples() -> None:

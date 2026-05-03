@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 
+from complex_problems.pipe_flow import solver as pipe_solver
 from complex_problems.pipe_flow.model import friction_factor
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 
@@ -61,6 +64,32 @@ def test_transient_pipe_flow_runs_with_finite_fields() -> None:
     assert np.all(np.isfinite(result.pressure))
     assert np.all(np.isfinite(result.velocity))
     assert result.magnitudes["cfl"] < 0.95
+
+
+def test_transient_pipe_flow_keeps_expected_samples_without_linear_membership_check() -> None:
+    result = solve_pipe_flow(
+        model_type="transient",
+        length=20.0,
+        nx=120,
+        profile="constant",
+        d0=0.06,
+        rho=1000.0,
+        mu=1.0e-3,
+        roughness=1.0e-5,
+        friction_model="auto",
+        p_out=1.9e5,
+        p_base=2.0e5,
+        p_amp=1.5e3,
+        p_freq_hz=1.0,
+        wave_speed=150.0,
+        damping=0.2,
+        t_max=0.0055,
+        dt=0.001,
+        sample_every=4,
+    )
+
+    np.testing.assert_allclose(result.t, [0.0, 0.004, 0.006])
+    assert "step in sample_indices" not in inspect.getsource(pipe_solver._solve_transient)
 
 
 def test_transient_pipe_flow_rejects_unstable_cfl() -> None:

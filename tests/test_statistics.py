@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import solver.statistics as statistics_module
 from solver.statistics import compute_statistics, compute_statistics_2d
 
 
@@ -78,6 +79,35 @@ def test_compute_statistics_none_selected_uses_all() -> None:
     assert "min" in stats
     assert "integral" in stats
     assert "zero_crossings" in stats
+
+
+def test_compute_statistics_reuses_exponential_rate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    x = np.linspace(0.0, 1.0, 10)
+    y = np.exp(-2.0 * x)
+    calls = 0
+
+    def fake_rate(x_arg: np.ndarray, y_arg: np.ndarray) -> float:
+        nonlocal calls
+        calls += 1
+        np.testing.assert_allclose(x_arg, x)
+        np.testing.assert_allclose(y_arg, y)
+        return -2.0
+
+    monkeypatch.setattr(statistics_module, "_estimate_exponential_rate", fake_rate)
+
+    stats = compute_statistics(
+        x,
+        y,
+        selected={"exponential_rate", "half_life", "time_constant", "doubling_time"},
+    )
+
+    assert calls == 1
+    assert stats["exponential_rate"] == pytest.approx(-2.0)
+    assert stats["half_life"] == pytest.approx(np.log(2.0) / 2.0)
+    assert stats["time_constant"] == pytest.approx(0.5)
+    assert stats["doubling_time"] is None
 
 
 def test_compute_statistics_1d_y_accepted() -> None:

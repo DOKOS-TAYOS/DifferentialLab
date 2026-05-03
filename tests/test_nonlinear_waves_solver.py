@@ -113,6 +113,68 @@ def test_nlse_result_materializes_lazy_caches_on_demand() -> None:
     np.testing.assert_allclose(phase, np.angle(result.field))
 
 
+def test_nlse_store_every_keeps_aligned_history_and_final_frame() -> None:
+    kwargs = {
+        "model_type": "nlse",
+        "x_min": -10.0,
+        "x_max": 10.0,
+        "nx": 64,
+        "t_min": 0.0,
+        "t_max": 0.1,
+        "dt": 0.01,
+        "profile": "sech",
+        "amplitude": 1.0,
+        "sigma": 1.0,
+        "center": 0.0,
+        "beta2": 1.0,
+        "gamma": 1.0,
+        "initial_phase_k": 0.0,
+    }
+
+    full = solve_nonlinear_waves(**kwargs)
+    sampled = solve_nonlinear_waves(**kwargs, store_every=4)
+
+    np.testing.assert_allclose(sampled.t, [0.0, 0.04, 0.08, 0.1])
+    assert sampled.field.shape == (len(sampled.t), 64)
+    for values in sampled.invariants.values():
+        assert values.shape == sampled.t.shape
+    np.testing.assert_allclose(sampled.field[-1], full.field[-1])
+    np.testing.assert_allclose(sampled.spectrum_power, full.spectrum_power)
+    assert sampled.magnitudes["max_intensity"] == pytest.approx(full.magnitudes["max_intensity"])
+    assert sampled.metadata["solver_dt"] == pytest.approx(0.01)
+    assert sampled.metadata["solver_steps"] == 10
+    assert sampled.metadata["store_every"] == 4
+    assert sampled.metadata["stored_steps"] == len(sampled.t)
+
+
+def test_nonlinear_waves_store_every_one_matches_default() -> None:
+    kwargs = {
+        "model_type": "kdv",
+        "x_min": -10.0,
+        "x_max": 10.0,
+        "nx": 64,
+        "t_min": 0.0,
+        "t_max": 0.05,
+        "dt": 0.01,
+        "profile": "sech",
+        "amplitude": 0.4,
+        "sigma": 1.0,
+        "center": 0.0,
+        "c": 0.0,
+        "alpha": 4.0,
+        "beta_disp": 1.0,
+    }
+
+    default = solve_nonlinear_waves(**kwargs)
+    explicit = solve_nonlinear_waves(**kwargs, store_every=1)
+
+    np.testing.assert_allclose(explicit.t, default.t)
+    np.testing.assert_allclose(explicit.field, default.field)
+    for key, values in explicit.invariants.items():
+        np.testing.assert_allclose(values, default.invariants[key])
+    np.testing.assert_allclose(explicit.spectrum_power, default.spectrum_power)
+
+
 def test_kdv_result_keeps_phase_disabled() -> None:
     result = solve_nonlinear_waves(
         model_type="kdv",

@@ -78,7 +78,6 @@ _ALLOWED_NODE_TYPES: frozenset[type[ast.AST]] = frozenset(
         ast.USub,
         ast.UAdd,
         ast.Subscript,
-        ast.Attribute,
         ast.FloorDiv,
         ast.Mod,
         ast.Compare,
@@ -149,3 +148,10 @@ def validate_expression_ast(expression: str, context: str = "expression") -> Non
     for node in ast.walk(tree):
         if type(node) not in _ALLOWED_NODE_TYPES:
             raise EquationParseError(f"Disallowed construct in {context}: {type(node).__name__}")
+        if isinstance(node, ast.Name) and "__" in node.id:
+            raise EquationParseError(f"Unsafe name in {context}: {node.id}")
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                raise EquationParseError(f"Disallowed call target in {context}")
+            if node.func.id not in SAFE_MATH or not callable(SAFE_MATH[node.func.id]):
+                raise EquationParseError(f"Disallowed function call in {context}: {node.func.id}")

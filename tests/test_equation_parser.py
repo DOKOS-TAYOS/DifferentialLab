@@ -48,6 +48,19 @@ class TestValidateExpression:
         errors = _validate_expression("y[0] * 2 + x")
         assert errors == []
 
+    def test_safe_math_calls_and_subscripts_remain_allowed(self) -> None:
+        ode_func = _parse_expression("sin(x) + heaviside(y[0], 0.0)", order=1)
+
+        result = ode_func(np.pi / 2, np.array([1.0]))
+
+        np.testing.assert_allclose(result, [2.0])
+
+    def test_dunder_attribute_escape_is_rejected(self) -> None:
+        errors = _validate_expression("().__class__.__mro__[1].__subclasses__()")
+
+        assert errors
+        assert "disallowed" in errors[0].lower() or "unsafe" in errors[0].lower()
+
     def test_syntax_error_reported(self) -> None:
         errors = _validate_expression("y[0] + (")
         assert len(errors) == 1

@@ -27,7 +27,13 @@ from solver import (
 from solver.error_metrics import compute_ode_residual_error_from_rhs
 from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDECoefficientProvider, PDECoefficients
 from solver.predefined import EquationType
-from utils import ValidationError, build_eval_namespace, get_logger, safe_eval
+from utils import (
+    ValidationError,
+    build_eval_namespace,
+    get_logger,
+    safe_eval,
+    validate_expression_ast,
+)
 
 logger = get_logger(__name__)
 
@@ -159,10 +165,12 @@ def _build_mask(
     """
     if not mask_expression or not mask_expression.strip():
         return None
+    expression = mask_expression.strip()
+    validate_expression_ast(expression, "PDE mask")
     X, Y = np.meshgrid(x_grid, y_grid)
     ns = build_eval_namespace(parameters)
     ns.update({"x": X, "y": Y, "X": X, "Y": Y})
-    compiled = compile(mask_expression.strip(), "<mask>", "eval")
+    compiled = compile(expression, "<mask>", "eval")
     result = safe_eval(compiled, ns)
     return np.asarray(result, dtype=bool)
 
@@ -678,6 +686,8 @@ def run_solver_pipeline(
     mask_expression: str | None = None,
     contour_bc_expression: str | None = None,
     contour_bc_type: str | None = None,
+    augment_highest_derivative: bool = True,
+    compute_residual_metrics: bool = True,
 ) -> SolverResult:
     """Execute the full solve workflow and return data results.
 
@@ -707,6 +717,10 @@ def run_solver_pipeline(
         vector_components: Number of components for vector ODE.
         pde_operator: PDE operator type (e.g. ``"neg_laplacian"``).
         component_orders: For vector ODE, order per component (optional).
+        augment_highest_derivative: Whether to append the highest derivative
+            computed from the ODE right-hand side for display.
+        compute_residual_metrics: Whether to compute residual metrics by
+            comparing the ODE right-hand side to numerical gradients.
 
     Returns:
         A :class:`SolverResult` with solution data, statistics, and metadata.
@@ -809,28 +823,36 @@ def run_solver_pipeline(
 
     # ── Compute highest derivative and augment y ──────────────────────
     display_order = order
-    if not is_2d_pde and equation_type != "difference" and dr.ode_func is not None:
+    needs_rhs_values = augment_highest_derivative or compute_residual_metrics
+    if (
+        needs_rhs_values
+        and not is_2d_pde
+        and equation_type != "difference"
+        and dr.ode_func is not None
+    ):
         y_2d = np.atleast_2d(solution_y)
         if y_2d.shape[1] != len(solution_x):
             y_2d = y_2d.T
         rhs_values = _evaluate_ode_rhs_values(dr.ode_func, solution_x, y_2d)
-        dr.error_metrics = compute_ode_residual_error_from_rhs(solution_x, y_2d, rhs_values)
+        if compute_residual_metrics:
+            dr.error_metrics = compute_ode_residual_error_from_rhs(solution_x, y_2d, rhs_values)
 
-        try:
-            n_pts = len(solution_x)
-            n_comp = vector_components if is_vector else 1
+        if augment_highest_derivative:
+            try:
+                n_pts = len(solution_x)
+                n_comp = vector_components if is_vector else 1
 
-            new_order = order + 1
-            augmented = np.empty((n_comp * new_order, n_pts))
-            for comp_i in range(n_comp):
-                for k in range(order):
-                    augmented[comp_i * new_order + k] = y_2d[comp_i * order + k]
-                augmented[comp_i * new_order + order] = rhs_values[comp_i * order + order - 1]
+                new_order = order + 1
+                augmented = np.empty((n_comp * new_order, n_pts))
+                for comp_i in range(n_comp):
+                    for k in range(order):
+                        augmented[comp_i * new_order + k] = y_2d[comp_i * order + k]
+                    augmented[comp_i * new_order + order] = rhs_values[comp_i * order + order - 1]
 
-            solution_y = augmented
-            display_order = new_order
-        except Exception:
-            logger.debug("Could not compute highest derivative; using raw y", exc_info=True)
+                solution_y = augmented
+                display_order = new_order
+            except Exception:
+                logger.debug("Could not compute highest derivative; using raw y", exc_info=True)
 
     # ── Statistics ────────────────────────────────────────────────────
     if is_2d_pde:

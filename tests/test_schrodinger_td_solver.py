@@ -103,6 +103,36 @@ def test_schrodinger_result_materializes_lazy_caches_on_demand() -> None:
     np.testing.assert_allclose(phase, np.angle(result.psi))
 
 
+def test_schrodinger_store_every_keeps_aligned_history_and_final_frame() -> None:
+    result = solve_schrodinger_td(
+        dimension=1,
+        x_min=-6.0,
+        x_max=6.0,
+        nx=128,
+        t_min=0.0,
+        t_max=0.1,
+        dt=0.01,
+        hbar=1.0,
+        mass=1.0,
+        boundary="periodic",
+        potential_type="free",
+        packet_type="gaussian",
+        sigma=0.8,
+        x0=-1.0,
+        k0x=1.0,
+        store_every=3,
+    )
+
+    np.testing.assert_allclose(result.t, [0.0, 0.03, 0.06, 0.09, 0.1])
+    assert result.psi.shape == (len(result.t), len(result.x))
+    assert result.magnitude.shape == result.psi.shape
+    assert result.phase.shape == result.psi.shape
+    assert result.invariants["norm"].shape == result.t.shape
+    assert result.metadata["store_every"] == 3
+    assert result.metadata["solver_steps"] == 10
+    assert result.metadata["stored_steps"] == 5
+
+
 def test_schrodinger_rejects_invalid_dimension() -> None:
     with pytest.raises(ValueError):
         solve_schrodinger_td(

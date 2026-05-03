@@ -66,6 +66,16 @@ def _build_time_grid(t_min: float, t_max: float, dt: float) -> np.ndarray:
     return np.linspace(t_min, t_max, n_steps + 1)
 
 
+def _stored_step_indices(n_steps: int, store_every: int) -> np.ndarray:
+    """Return solver-step indices to keep, always including first and final."""
+    if store_every < 1:
+        raise ValueError("store_every must be >= 1.")
+    steps = np.arange(0, n_steps + 1, store_every, dtype=int)
+    if steps[-1] != n_steps:
+        steps = np.append(steps, n_steps)
+    return steps
+
+
 def _observables_1d(
     psi: np.ndarray,
     *,
@@ -160,6 +170,7 @@ def solve_schrodinger_td(
     custom_potential_fn_2d: Callable[[float, float], float] | None = None,
     custom_packet_fn_1d: Callable[[float], float] | None = None,
     custom_packet_fn_2d: Callable[[float, float], float] | None = None,
+    store_every: int = 1,
 ) -> SchrodingerTDResult:
     """Solve TDSE in 1D or 2D with split-operator spectral method."""
     if dimension not in {1, 2}:
@@ -172,8 +183,14 @@ def solve_schrodinger_td(
         raise ValueError("hbar and mass must be positive.")
     if boundary not in {"periodic", "absorbing"}:
         raise ValueError("boundary must be 'periodic' or 'absorbing'.")
+    if store_every < 1:
+        raise ValueError("store_every must be >= 1.")
 
     t = _build_time_grid(t_min, t_max, dt)
+    n_steps = len(t) - 1
+    stored_steps = _stored_step_indices(n_steps, store_every)
+    t_stored = t[stored_steps]
+    n_stored = len(stored_steps)
     x = np.linspace(x_min, x_max, nx, endpoint=False)
     dx = float((x_max - x_min) / nx)
     kx = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
@@ -206,33 +223,41 @@ def solve_schrodinger_td(
             else np.ones(nx, dtype=float)
         )
 
-        n_t = len(t)
-        psi_hist = np.zeros((n_t, nx), dtype=complex)
-        norm = np.zeros(n_t)
-        x_mean = np.zeros(n_t)
-        x_var = np.zeros(n_t)
-        p_mean = np.zeros(n_t)
-        energy = np.zeros(n_t)
+        psi_hist = np.zeros((n_stored, nx), dtype=complex)
+        norm = np.zeros(n_stored)
+        x_mean = np.zeros(n_stored)
+        x_var = np.zeros(n_stored)
+        p_mean = np.zeros(n_stored)
+        energy = np.zeros(n_stored)
 
         psi_hist[0] = psi
         norm[0], x_mean[0], x_var[0], p_mean[0], energy[0] = _observables_1d(
             psi, x=x, dx=dx, k=kx, potential=V, hbar=hbar, mass=mass
         )
+        max_density = float(np.max(np.abs(psi)) ** 2)
+        store_pos = 1
 
         kin_phase = np.exp(-1j * dt * (hbar * (kx**2) / (2.0 * mass)))
         pot_half = np.exp(-1j * V * dt / (2.0 * hbar))
-        for i in range(1, n_t):
+        for i in range(1, n_steps + 1):
             psi = pot_half * psi
             psi = np.fft.ifft(kin_phase * np.fft.fft(psi))
             psi = pot_half * psi
             if boundary == "absorbing":
                 psi = psi * mask
-            psi_hist[i] = psi
-            norm[i], x_mean[i], x_var[i], p_mean[i], energy[i] = _observables_1d(
-                psi, x=x, dx=dx, k=kx, potential=V, hbar=hbar, mass=mass
-            )
+            max_density = max(max_density, float(np.max(np.abs(psi)) ** 2))
+            if store_pos < n_stored and i == int(stored_steps[store_pos]):
+                psi_hist[store_pos] = psi
+                (
+                    norm[store_pos],
+                    x_mean[store_pos],
+                    x_var[store_pos],
+                    p_mean[store_pos],
+                    energy[store_pos],
+                ) = _observables_1d(psi, x=x, dx=dx, k=kx, potential=V, hbar=hbar, mass=mass)
+                store_pos += 1
 
-        spectrum_power = np.abs(np.fft.fftshift(np.fft.fft(psi_hist[-1]))) ** 2
+        spectrum_power = np.abs(np.fft.fftshift(np.fft.fft(psi))) ** 2
         k_shift = np.fft.fftshift(kx)
         invariants = {
             "norm": norm,
@@ -243,7 +268,7 @@ def solve_schrodinger_td(
         }
         magnitudes = {
             "norm_drift_rel": float((norm[-1] - norm[0]) / (abs(norm[0]) + 1e-12)),
-            "max_density": float(np.max(np.abs(psi_hist)) ** 2),
+            "max_density": max_density,
         }
         metadata = {
             "dimension": 1,
@@ -252,16 +277,20 @@ def solve_schrodinger_td(
             "packet_type": packet_type,
             "hbar": float(hbar),
             "mass": float(mass),
-            "dt": float(t[1] - t[0]) if len(t) > 1 else dt,
-            "t_min": float(t[0]),
-            "t_max": float(t[-1]),
+            "dt": float(t_stored[1] - t_stored[0]) if len(t_stored) > 1 else dt,
+            "solver_dt": float(dt),
+            "solver_steps": int(n_steps),
+            "store_every": int(store_every),
+            "stored_steps": int(n_stored),
+            "t_min": float(t_stored[0]),
+            "t_max": float(t_stored[-1]),
             "nx": int(nx),
         }
         return SchrodingerTDResult(
             dimension=1,
             x=x,
             y=None,
-            t=t,
+            t=t_stored,
             psi=psi_hist,
             potential=V,
             kx=k_shift,
@@ -309,34 +338,45 @@ def solve_schrodinger_td(
     )
     KX, KY = np.meshgrid(kx, ky)
 
-    n_t = len(t)
-    psi_hist2 = np.zeros((n_t, ny, nx), dtype=complex)
-    norm = np.zeros(n_t)
-    x_mean = np.zeros(n_t)
-    y_mean = np.zeros(n_t)
-    x_var = np.zeros(n_t)
-    y_var = np.zeros(n_t)
-    energy = np.zeros(n_t)
+    psi_hist2 = np.zeros((n_stored, ny, nx), dtype=complex)
+    norm = np.zeros(n_stored)
+    x_mean = np.zeros(n_stored)
+    y_mean = np.zeros(n_stored)
+    x_var = np.zeros(n_stored)
+    y_var = np.zeros(n_stored)
+    energy = np.zeros(n_stored)
 
     psi_hist2[0] = psi2
     norm[0], x_mean[0], y_mean[0], x_var[0], y_var[0], energy[0] = _observables_2d(
         psi2, X=X, Y=Y, dx=dx, dy=dy, KX=KX, KY=KY, potential=V2, hbar=hbar, mass=mass
     )
+    max_density2 = float(np.max(np.abs(psi2)) ** 2)
+    store_pos = 1
 
     kin_phase2 = np.exp(-1j * dt * (hbar * (KX**2 + KY**2) / (2.0 * mass)))
     pot_half2 = np.exp(-1j * V2 * dt / (2.0 * hbar))
-    for i in range(1, n_t):
+    for i in range(1, n_steps + 1):
         psi2 = pot_half2 * psi2
         psi2 = np.fft.ifft2(kin_phase2 * np.fft.fft2(psi2))
         psi2 = pot_half2 * psi2
         if boundary == "absorbing":
             psi2 = psi2 * mask2
-        psi_hist2[i] = psi2
-        norm[i], x_mean[i], y_mean[i], x_var[i], y_var[i], energy[i] = _observables_2d(
-            psi2, X=X, Y=Y, dx=dx, dy=dy, KX=KX, KY=KY, potential=V2, hbar=hbar, mass=mass
-        )
+        max_density2 = max(max_density2, float(np.max(np.abs(psi2)) ** 2))
+        if store_pos < n_stored and i == int(stored_steps[store_pos]):
+            psi_hist2[store_pos] = psi2
+            (
+                norm[store_pos],
+                x_mean[store_pos],
+                y_mean[store_pos],
+                x_var[store_pos],
+                y_var[store_pos],
+                energy[store_pos],
+            ) = _observables_2d(
+                psi2, X=X, Y=Y, dx=dx, dy=dy, KX=KX, KY=KY, potential=V2, hbar=hbar, mass=mass
+            )
+            store_pos += 1
 
-    spectrum2 = np.abs(np.fft.fftshift(np.fft.fft2(psi_hist2[-1]))) ** 2
+    spectrum2 = np.abs(np.fft.fftshift(np.fft.fft2(psi2))) ** 2
     invariants2 = {
         "norm": norm,
         "x_mean": x_mean,
@@ -347,7 +387,7 @@ def solve_schrodinger_td(
     }
     magnitudes2 = {
         "norm_drift_rel": float((norm[-1] - norm[0]) / (abs(norm[0]) + 1e-12)),
-        "max_density": float(np.max(np.abs(psi_hist2)) ** 2),
+        "max_density": max_density2,
     }
     metadata2 = {
         "dimension": 2,
@@ -356,9 +396,13 @@ def solve_schrodinger_td(
         "packet_type": packet_type,
         "hbar": float(hbar),
         "mass": float(mass),
-        "dt": float(t[1] - t[0]) if len(t) > 1 else dt,
-        "t_min": float(t[0]),
-        "t_max": float(t[-1]),
+        "dt": float(t_stored[1] - t_stored[0]) if len(t_stored) > 1 else dt,
+        "solver_dt": float(dt),
+        "solver_steps": int(n_steps),
+        "store_every": int(store_every),
+        "stored_steps": int(n_stored),
+        "t_min": float(t_stored[0]),
+        "t_max": float(t_stored[-1]),
         "nx": int(nx),
         "ny": int(ny),
     }
@@ -366,7 +410,7 @@ def solve_schrodinger_td(
         dimension=2,
         x=x,
         y=y,
-        t=t,
+        t=t_stored,
         psi=psi_hist2,
         potential=V2,
         kx=np.fft.fftshift(kx),

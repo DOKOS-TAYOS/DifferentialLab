@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 
-from pipeline import SolverResult, run_solver_pipeline
+from pipeline import SolverResult, _build_mask, run_solver_pipeline
 from solver.pde_solver import PDESolution
-from utils import ValidationError
+from utils import EquationParseError, ValidationError
 
 
 @patch("solver.ode_solver.get_env_from_schema")
@@ -136,6 +140,47 @@ def test_run_solver_pipeline_difference_equation() -> None:
 
 
 @patch("solver.ode_solver.get_env_from_schema")
+def test_run_solver_pipeline_can_skip_rhs_recalculation(
+    mock_ode_env: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def env_side_effect(key: str) -> object:
+        env = {
+            "SOLVER_MAX_STEP": 0.0,
+            "SOLVER_RTOL": 1e-8,
+            "SOLVER_ATOL": 1e-10,
+            "SOLVER_NUM_POINTS": 25,
+        }
+        return env.get(key, 25)
+
+    def fail_rhs_values(*args: object, **kwargs: object) -> np.ndarray:
+        raise AssertionError("RHS values should not be recomputed when both flags are disabled")
+
+    mock_ode_env.side_effect = env_side_effect
+    monkeypatch.setattr("pipeline._evaluate_ode_rhs_values", fail_rhs_values)
+
+    result = run_solver_pipeline(
+        expression="-y[0]",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Decay",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[1.0],
+        n_points=25,
+        method="RK45",
+        selected_stats={"mean"},
+        augment_highest_derivative=False,
+        compute_residual_metrics=False,
+    )
+
+    assert result.y.shape == (1, 25)
+    assert result.vector_order == 1
+    assert result.metadata["residual_max"] is None
+
+
+@patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_vector_ode(mock_ode_env: object) -> None:
     """Vector ODE: coupled system f0'=f1, f1'=-f0 (harmonic oscillator)."""
 
@@ -206,6 +251,16 @@ def test_run_solver_pipeline_pde_2d() -> None:
     assert result.y_grid.shape == (11,)
     assert result.y.shape == (11, 11)
     np.testing.assert_allclose(result.y, 0.0, atol=1e-10)
+
+
+def test_build_mask_rejects_unsafe_expression() -> None:
+    with pytest.raises(EquationParseError):
+        _build_mask(
+            "().__class__.__mro__[1].__subclasses__()",
+            np.linspace(0.0, 1.0, 5),
+            np.linspace(0.0, 1.0, 5),
+            {},
+        )
 
 
 def test_run_solver_pipeline_pde_uses_fast_coefficients_for_coordinate_rhs(
@@ -289,3 +344,28 @@ def test_run_solver_pipeline_pde_keeps_generic_path_for_solution_terms(
     )
 
     assert captured["coefficient_provider"] is None
+
+
+def test_solver_package_import_is_lazy_for_scipy() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "PYTHONPATH": str(project_root / "src")}
+    code = (
+        "import sys\n"
+        "def has_scipy():\n"
+        "    return any(name == 'scipy' or name.startswith('scipy.') for name in sys.modules)\n"
+        "import solver\n"
+        "print(has_scipy())\n"
+        "from solver import solve_ode\n"
+        "print(callable(solve_ode))\n"
+        "print(has_scipy())\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == ["False", "True", "True"]

@@ -237,7 +237,7 @@ def solve_aerodynamics_2d(
         u[obstacle_mask] = 0.0
         v[obstacle_mask] = 0.0
 
-        if step in sample_indices:
+        if sample_pos < n_samples and step == sample_indices[sample_pos]:
             speed, vort = _snapshot_fields(u, v, p, dx=dx, dy=dy)
             div = divergence_periodic(u, v, dx, dy)
             if np.any(fluid_mask):

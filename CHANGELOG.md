@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced high-resolution PDE overhead by switching masked-domain classification and sparse assembly to compact integer grids with preallocated buffers.
 - Reduced ODE residual/PDE/aerodynamics/pipe-flow overhead by reusing precomputed RHS values, adding a direct PDE coefficient fast path for coordinate-only right-hand sides, avoiding extra periodic derivative temporaries, and stabilizing transient pipe-flow defaults.
 - Deferred large Schrödinger and nonlinear-wave `magnitude`/`phase` arrays until first access, and added pre-run performance advisories for expensive solver configurations.
+- Hardened expression validation against unsafe attribute access and added opt-in solver controls for lower-memory Schrödinger histories and skipped ODE RHS post-processing.
+- Reduced transform import overhead, reused exponential-rate statistics work, and added opt-in lower-memory nonlinear-wave histories.
 - Reused result-plot canvases on view changes, debounced resize redraws, and collapsed membrane history summaries into a single energy/extrema pass.
 - Added a repo-local `pyright` configuration, tightened Tk/matplotlib typing in shared UI helpers, and cleaned transform/solver typing hotspots until `pyright` reports zero errors.
 - Refreshed user-facing dialog copy across the main UI, equation setup, transforms, results, settings, performance warnings, and advanced-problem workflows.
