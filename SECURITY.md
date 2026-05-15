@@ -19,4 +19,4 @@ Please include:
 
 ## Dependency and Code Scanning
 
-The repository uses Dependabot for Python and GitHub Actions updates, `pip-audit` for Python dependency advisories, and CodeQL for code scanning.
+The repository uses Dependabot for Python and GitHub Actions updates, `pip-audit` for Python dependency advisories, and GitHub CodeQL default setup for code scanning.

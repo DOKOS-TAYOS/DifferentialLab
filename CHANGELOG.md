@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Added Dependabot configuration for Python dependencies and GitHub Actions.
-- Added GitHub CodeQL scanning and a weekly/manual `pip-audit` dependency audit workflow.
+- Documented GitHub CodeQL default setup and added a weekly/manual `pip-audit`
+  dependency audit workflow.
 - Added a repository security policy for private vulnerability reporting.
 - Hardened expression parameter handling so unsafe parameter names are rejected and
   user parameters cannot shadow approved math functions during expression evaluation.
