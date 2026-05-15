@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from utils.update_checker import (
+    _fetch_latest_version,
     _parse_version,
     perform_git_pull,
     record_check_done,
@@ -30,6 +31,14 @@ class TestParseVersion:
     def test_invalid_returns_zero(self) -> None:
         assert _parse_version("abc") == (0,)
         assert _parse_version("") == (0,)
+
+
+class TestFetchLatestVersion:
+    def test_rejects_non_https_update_url(self) -> None:
+        with patch("utils.update_checker.urlopen") as urlopen_mock:
+            assert _fetch_latest_version("file:///C:/Users/example/pyproject.toml") is None
+
+        urlopen_mock.assert_not_called()
 
 
 class TestShouldRunCheck:

@@ -46,3 +46,9 @@ def test_empty_parameters_allowed() -> None:
     """Parameters can be None or empty."""
     func = parse_scalar_function("x + 1", parameters=None)
     np.testing.assert_allclose(func(np.array([1.0])), [2.0])
+
+
+def test_parameter_cannot_override_safe_math_function() -> None:
+    """Parameters cannot shadow approved math functions."""
+    with pytest.raises(EquationParseError, match="reserved"):
+        parse_scalar_function("sin(x)", parameters={"sin": 1.0})

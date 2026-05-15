@@ -1,39 +1,48 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Python application
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
 
 permissions:
   contents: read
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.12
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version: ${{ matrix.python-version }}
+        cache: "pip"
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+        python -m pip install -e ".[dev]"
 
     - name: Lint with ruff
       run: |
-        ruff check .
+        python -m ruff check .
+
+    - name: Check formatting with ruff
+      run: |
+        python -m ruff format . --check
 
     - name: Test with pytest
       run: |
-        pytest
+        python -m pytest
+
+    - name: Type check with pyright
+      run: |
+        python -m pyright

@@ -47,6 +47,7 @@ docs/_build/
 
 # Testing
 .tmp/
+.pytest-temp/
 .pytest_cache/
 .pytest_tmp*/
 pytest-cache-files-*/

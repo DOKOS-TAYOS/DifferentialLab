@@ -53,7 +53,13 @@ pytest
 pyright
 ```
 
-4. Update documentation for user-visible changes:
+4. Run the dependency audit when security-sensitive files changed:
+
+```bash
+python -m pip_audit
+```
+
+5. Update documentation for user-visible changes:
 
 - `README.md`
 - `docs/` pages

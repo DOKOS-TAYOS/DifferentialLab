@@ -11,6 +11,8 @@ function transforms, and specialized scientific simulation workflows.
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
 [![Version](https://img.shields.io/badge/version-0.4.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![CI](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml/badge.svg)](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml)
+[![CodeQL](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/codeql.yml/badge.svg)](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/codeql.yml)
 
 [Documentation](docs/index.md) |
 [Report Bug](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) |
@@ -52,6 +54,13 @@ function transforms, and specialized scientific simulation workflows.
 - CSV, JSON, static figure, and MP4 animation exports where supported
 - Environment-backed configuration through `.env` and the in-app `Settings` dialog
 - Rotating application logs with optional console output
+
+## Security
+
+- Report security issues privately using [SECURITY.md](SECURITY.md).
+- Local `.env`, generated outputs, update-check state, logs, caches, and virtual environments
+  are ignored by git.
+- GitHub checks include Dependabot, CodeQL, and a weekly Python dependency audit.
 
 ## Complex Problems
 
@@ -171,6 +180,7 @@ ruff check . --fix
 ruff format .
 pytest
 pyright
+python -m pip_audit
 ```
 
 Run `pyright` when it is installed in your environment.

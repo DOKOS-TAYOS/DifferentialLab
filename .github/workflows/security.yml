@@ -1,0 +1,37 @@
+name: Security checks
+
+on:
+  pull_request:
+    branches: ["main", "dev"]
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".github/workflows/security.yml"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: "pip"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e ".[dev]"
+
+    - name: Audit Python dependencies
+      run: |
+        python -m pip_audit

@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Added Dependabot configuration for Python dependencies and GitHub Actions.
+- Added GitHub CodeQL scanning and a weekly/manual `pip-audit` dependency audit workflow.
+- Added a repository security policy for private vulnerability reporting.
+- Hardened expression parameter handling so unsafe parameter names are rejected and
+  user parameters cannot shadow approved math functions during expression evaluation.
+- Restricted the update checker to HTTPS version URLs.
+
 ### Changed
 
+- Expanded CI to run on `main` and `dev` for Python 3.12 and 3.13, with ruff linting,
+  ruff format checks, pytest, and pyright.
+- Configured pytest to use the repo-local ignored `.pytest-temp` directory for
+  temporary files, avoiding Windows temp-permission issues.
 - Refreshed repository documentation to match the current 0.4.1 codebase, including
   setup/run modes, solver coverage, complex-problem plugins, configuration defaults,
   logging behavior, API docs, and the pytest/ruff/pyright workflow.

@@ -12,6 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from config import get_env_from_schema, get_project_root
@@ -85,6 +86,15 @@ def _format_path_list(paths: list[str], limit: int = 8) -> str:
 def _git_error_text(result: subprocess.CompletedProcess[str]) -> str:
     """Return best available error text from a completed git command."""
     return (result.stderr or result.stdout or "").strip()
+
+
+def _is_https_url(url: str) -> bool:
+    """Return True when *url* is a network HTTPS URL."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and bool(parsed.netloc)
 
 
 def _get_conflicted_paths(root: Path) -> list[str]:
@@ -183,6 +193,9 @@ def _fetch_latest_version(version_url: str | None = None) -> str | None:
         Version string (e.g. '0.4.1') or None if fetch failed.
     """
     url = version_url or get_env_from_schema("UPDATE_CHECK_URL")
+    if not _is_https_url(str(url)):
+        logger.debug("Update check: rejected non-HTTPS update URL: %s", url)
+        return None
 
     try:
         req = Request(url, headers={"User-Agent": "DifferentialLab-UpdateChecker/1.0"})

@@ -7,7 +7,10 @@ duplication of _SAFE_MATH, _ALLOWED_NODE_TYPES, and AST validation logic.
 from __future__ import annotations
 
 import ast
+import keyword
 import re
+from collections.abc import Mapping
+from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -97,14 +100,46 @@ _ALLOWED_NODE_TYPES: frozenset[type[ast.AST]] = frozenset(
 )
 
 
-def normalize_params(parameters: dict[str, float] | None) -> dict[str, float]:
-    """Return a mutable copy of *parameters*, or an empty dict if ``None``."""
-    return dict(parameters) if parameters else {}
+def _normalize_param_name(name: object) -> str:
+    """Validate and return a parameter name suitable for expression namespaces."""
+    if not isinstance(name, str) or not name:
+        raise EquationParseError("Parameter names must be non-empty strings")
+    if not name.isidentifier() or keyword.iskeyword(name):
+        raise EquationParseError(f"Invalid parameter name: {name}")
+    if "__" in name:
+        raise EquationParseError(f"Unsafe parameter name: {name}")
+    return name
 
 
-def build_eval_namespace(params: dict[str, float]) -> dict[str, Any]:
+def _normalize_param_value(name: str, value: object) -> float:
+    """Validate and return a finite numeric parameter value."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise EquationParseError(f"Parameter {name} must be a finite real number")
+    numeric_value = float(value)
+    if not np.isfinite(numeric_value):
+        raise EquationParseError(f"Parameter {name} must be a finite real number")
+    return numeric_value
+
+
+def normalize_params(parameters: Mapping[str, object] | None) -> dict[str, float]:
+    """Return validated numeric parameters, or an empty dict if ``None``."""
+    if not parameters:
+        return {}
+
+    normalized: dict[str, float] = {}
+    for name, value in parameters.items():
+        normalized_name = _normalize_param_name(name)
+        normalized[normalized_name] = _normalize_param_value(normalized_name, value)
+    return normalized
+
+
+def build_eval_namespace(params: Mapping[str, object] | None = None) -> dict[str, Any]:
     """Build the safe evaluation namespace combining SAFE_MATH and user params."""
-    return {**SAFE_MATH, **params}
+    safe_params = normalize_params(params)
+    reserved = sorted(set(safe_params) & set(SAFE_MATH))
+    if reserved:
+        raise EquationParseError(f"Parameter name is reserved for math functions: {reserved[0]}")
+    return {**SAFE_MATH, **safe_params}
 
 
 def safe_eval(compiled: Any, namespace: dict[str, Any]) -> Any:

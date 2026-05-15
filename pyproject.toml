@@ -36,6 +36,8 @@ dev = [
     "pytest>=8.0,<9.0",
     "pytest-cov>=6.0,<7.0",
     "ruff>=0.9,<1.0",
+    "pyright>=1.1,<2.0",
+    "pip-audit>=2.7,<3.0",
     "mypy>=1.0,<2.0",
 ]
 docs = [
@@ -57,7 +59,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --basetemp=.pytest-temp"
 
 [tool.coverage.run]
 source = ["src"]

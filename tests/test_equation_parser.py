@@ -120,3 +120,7 @@ class TestParseExpression:
         x, y = 0.0, np.array([3.0])
         dydx = ode_func(x, y)
         np.testing.assert_allclose(dydx, [3.0])
+
+    def test_parameter_name_with_dunder_is_rejected(self) -> None:
+        with pytest.raises(EquationParseError, match="Unsafe parameter name"):
+            _parse_expression("k * y[0]", order=1, parameters={"__class__": 1.0})
