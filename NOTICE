@@ -1,0 +1,37 @@
+DifferentialLab
+Copyright (c) 2026 Alejandro Mata Ali
+
+Software license
+----------------
+This software and associated documentation files are licensed under the MIT
+License. See the license.md file in this repository.
+
+Third-party software
+--------------------
+Runtime, development, and documentation Python dependencies and their reported
+licenses are summarized in THIRD_PARTY_LICENSES.md. Those packages are not
+copied into this repository; they are installed separately and remain under
+their own upstream terms. Redistributors of binaries/installers should also
+consult that file (and include full upstream license texts as required).
+
+Bundled application assets (logo / icons)
+-----------------------------------------
+The following brand assets are original artwork by the copyright holder
+(Alejandro Mata Ali) and are included under the same MIT terms as the rest of
+this project:
+
+  images/DifferentialLab_logo.png
+  images/DifferentialLab_icon.png
+  images/DifferentialLab_icon.ico
+  docs/_static/DifferentialLab_logo.png
+
+No contrary third-party stock, Creative Commons, or trademark attribution was
+found beyond ordinary editor tooling tags. PNG XMP may retain Adobe Express /
+Meta Ads editor metadata and an internal document title leftover from a
+related author project (RegressionLab); that tooling metadata does not grant
+or imply third-party ownership of the artwork.
+
+Disclaimer
+----------
+This NOTICE is for attribution and convenience only. It does not modify the
+MIT License of this project or the licenses of listed dependencies.

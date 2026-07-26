@@ -143,4 +143,8 @@ Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 MIT License. See [license.md](license.md).
 
+Asset provenance and attribution notes: [NOTICE](NOTICE).
+
 Third-party licenses: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+Citation metadata: [CITATION.cff](CITATION.cff).

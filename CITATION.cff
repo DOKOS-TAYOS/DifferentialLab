@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using these metadata.
+title: DifferentialLab
+type: software
+authors:
+  - family-names: Mata Ali
+    given-names: Alejandro
+    email: alejandro.mata.ali@gmail.com
+license: MIT
+version: 0.4.1
+date-released: "2026-02-18"
+repository-code: https://github.com/DOKOS-TAYOS/DifferentialLab
+url: https://differentiallab.readthedocs.io/en/latest/
+abstract: >-
+  Numerical solver for ODEs, difference equations, and PDEs with a Python GUI.
+  Includes SciPy integrators (RK45, Radau, BDF, and others), vector systems,
+  function transforms (Fourier, Laplace, and related), complex-problem plugins,
+  and CSV/PNG/MP4 export.
+keywords:
+  - differential-equations
+  - ODE
+  - PDE
+  - numerical-methods
+  - scientific-computing
+  - scipy
+  - tkinter
