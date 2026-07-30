@@ -1,19 +1,10 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Python application
 
 on:
   push:
-    branches: [ "main" ]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -23,29 +14,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-
+  quality:
+    name: Quality (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.12"
-        cache: "pip"
-        cache-dependency-path: pyproject.toml
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
 
-    - name: Lint with ruff
-      run: |
-        ruff check .
+      - name: Lint with Ruff
+        run: ruff check .
 
-    - name: Test with pytest
-      run: |
-        pytest
+      - name: Test with pytest
+        run: python -m pytest
+
+  required-pr-ci:
+    name: required-pr-ci
+    if: ${{ always() }}
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          if [ "$QUALITY_RESULT" != "success" ]; then
+            echo "Quality job result: $QUALITY_RESULT"
+            exit 1
+          fi
