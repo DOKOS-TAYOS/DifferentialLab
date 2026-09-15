@@ -40,7 +40,8 @@ function transforms, and specialized scientific simulation workflows.
 - Vector ODE systems with component-aware notation and visualizations
 - Difference equations and recurrence systems
 - Scalar linear elliptic 2D PDE workflows with rectangular or masked domains,
-  Dirichlet/Neumann boundaries, strict operator validation, and algebraic diagnostics
+  Dirichlet boundaries, outward-normal Neumann data (`du/dn`), globally consistent
+  ellipticity orientation, and algebraic diagnostics
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
 - Specialized complex-problem models with custom UI, solvers, diagnostics, and result dialogs
 

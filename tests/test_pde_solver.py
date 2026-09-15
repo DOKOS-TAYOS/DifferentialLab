@@ -285,6 +285,128 @@ def test_mixed_dirichlet_neumann() -> None:
         np.testing.assert_allclose(result.u[j, mid_col], y_vals[j], atol=0.1)
 
 
+@pytest.mark.parametrize(
+    ("edge", "normal_derivative"),
+    [
+        ("left", -2.0),
+        ("right", 2.0),
+        ("bottom", 3.0),
+        ("top", -3.0),
+    ],
+)
+def test_nonzero_outward_neumann_data_on_each_rectangular_edge(
+    edge: str,
+    normal_derivative: float,
+) -> None:
+    """Nonzero Neumann data uses du/dn on every rectangular edge."""
+    nx, ny = 9, 8
+    x = np.linspace(0.0, 1.0, nx)
+    y = np.linspace(0.0, 1.0, ny)
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = 1.5 + 2.0 * x_mesh - 3.0 * y_mesh
+    bc_type = np.full((ny, nx), BC_DIRICHLET, dtype=object)
+    neumann_values = np.zeros((ny, nx))
+
+    if edge == "left":
+        edge_index = (slice(1, -1), 0)
+    elif edge == "right":
+        edge_index = (slice(1, -1), -1)
+    elif edge == "bottom":
+        edge_index = (0, slice(1, -1))
+    else:
+        edge_index = (-1, slice(1, -1))
+    bc_type[edge_index] = BC_NEUMANN
+    neumann_values[edge_index] = normal_derivative
+
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        nx,
+        ny,
+        bc_values=exact,
+        bc_type=bc_type,
+        bc_neumann_value=neumann_values,
+    )
+
+    np.testing.assert_allclose(result.u[1:-1, 1:-1], exact[1:-1, 1:-1], atol=1.0e-11)
+    np.testing.assert_allclose(result.u[edge_index], exact[edge_index], atol=1.0e-11)
+
+
+def test_mixed_derivative_next_to_nonzero_neumann_boundary() -> None:
+    """The f_xy stencil eliminates a Neumann diagonal along its normal."""
+    nx = ny = 9
+    x = np.linspace(0.0, 1.0, nx)
+    y = np.linspace(0.0, 1.0, ny)
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = x_mesh * y_mesh
+    bc_type = np.full((ny, nx), BC_DIRICHLET, dtype=object)
+    bc_type[1:-1, 0] = BC_NEUMANN
+    neumann_values = np.zeros((ny, nx))
+    neumann_values[1:-1, 0] = -y[1:-1]
+
+    def coefficients(
+        x_value: float,
+        y_value: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x_value, y_value, params
+        return (-1.0, -0.5, -1.0, 0.0, 0.0, 0.0, 0.5)
+
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        nx,
+        ny,
+        bc_values=exact,
+        bc_type=bc_type,
+        bc_neumann_value=neumann_values,
+        coefficient_provider=coefficients,
+    )
+
+    np.testing.assert_allclose(result.u[1:-1, 1:-1], exact[1:-1, 1:-1], atol=1.0e-11)
+    np.testing.assert_allclose(result.u[1:-1, 0], exact[1:-1, 0], atol=1.0e-11)
+
+
+def test_mixed_derivative_rejects_ambiguous_masked_neumann_diagonal() -> None:
+    """A masked diagonal without a unique grid normal must fail clearly."""
+    nx = ny = 7
+    mask = np.ones((ny, nx), dtype=bool)
+    mask[3, 2] = False
+    bc_type = np.full((ny, nx), BC_DIRICHLET, dtype=object)
+    bc_type[3, 3] = BC_NEUMANN
+
+    def coefficients(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x, y, params
+        return (-1.0, -0.5, -1.0, 0.0, 0.0, 0.0, 0.0)
+
+    with pytest.raises(
+        SolverFailedError,
+        match=r"mixed-derivative stencil.*unique rectangular grid normal",
+    ):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            nx,
+            ny,
+            mask=mask,
+            bc_type=bc_type,
+            coefficient_provider=coefficients,
+        )
+
+
 def test_solve_pde_2d_uses_coefficient_provider_without_probing_residual() -> None:
     def residual_should_not_be_called(*args: object, **kwargs: object) -> float:
         raise AssertionError("generic coefficient probing should not run")
@@ -361,6 +483,61 @@ def test_non_elliptic_principal_operators_are_rejected(
             5,
             5,
             coefficient_provider=provider,
+        )
+
+
+@pytest.mark.parametrize("orientation", [1.0, -1.0])
+def test_globally_consistent_ellipticity_orientations_are_accepted(
+    orientation: float,
+) -> None:
+    """Uniformly positive- and negative-definite principal parts remain valid."""
+
+    def provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x, y, params
+        return (orientation, 0.0, orientation, 0.0, 0.0, 0.0, 0.0)
+
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        7,
+        7,
+        coefficient_provider=provider,
+    )
+    np.testing.assert_allclose(result.u, 0.0, atol=1.0e-12)
+
+
+def test_spatially_changing_ellipticity_orientation_is_rejected() -> None:
+    """Pointwise definite coefficients must keep one orientation globally."""
+
+    def sign_changing_provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del y, params
+        orientation = -1.0 if x < 0.5 else 1.0
+        return (orientation, 0.0, orientation, 0.0, 0.0, 0.0, 0.0)
+
+    with pytest.raises(
+        SolverFailedError,
+        match=r"ellipticity orientation changes.*negative definite.*positive definite",
+    ):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            coefficient_provider=sign_changing_provider,
         )
 
 

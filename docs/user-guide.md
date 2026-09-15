@@ -62,10 +62,13 @@ For 2D PDEs, the current solver supports real scalar linear/affine elliptic
 equations on rectangular domains and optional custom mask expressions. Boundary
 conditions can be Dirichlet or Neumann on rectangular edges, or on the contour
 of a masked domain. The principal matrix must be strictly positive or negative
-definite at every assembled point; parabolic, hyperbolic, degenerate, nonlinear,
+definite at every assembled point and must keep that orientation throughout the
+connected domain. Parabolic, hyperbolic, degenerate, sign-changing, nonlinear,
 singular, and non-finite problems are reported as solver failures instead of
-returning a plausible-looking field. Neumann data on a masked contour uses the
-grid normal rather than the exact geometric normal.
+returning a plausible-looking field. Neumann values use the outward-normal
+convention `du/dn`; the current one-sided approximation uses the grid normal.
+Mixed-derivative stencils support this elimination on rectangular edges, while
+ambiguous masked-boundary or corner diagonals are rejected explicitly.
 
 Programmatic `solve_pde_2d()` results include optional `PDEDiagnostics` with the
 discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and

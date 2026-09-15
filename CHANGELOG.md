@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hardened the scalar 2D PDE solver with strict domain, grid, mask, boundary-data,
   coefficient, affine-residual, ellipticity, sparse-solve, and finiteness validation.
+- Corrected nonzero outward-normal Neumann signs on all rectangular edges, made
+  mixed-derivative boundary elimination geometry-aware, and rejected spatially
+  inconsistent positive/negative ellipticity orientation.
 
 - Expanded CI to run on `main` and `dev` for Python 3.12 and 3.13, with ruff linting,
   ruff format checks, pytest, and pyright.

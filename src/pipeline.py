@@ -242,9 +242,10 @@ def _build_neumann_array(
     contour_bc_type: str | None,
     contour_bc_expression: str | None,
 ) -> np.ndarray | None:
-    """Build a (ny, nx) Neumann derivative values array.
+    """Build a (ny, nx) outward-normal Neumann derivative array.
 
-    Only fills values where bc_type is "neumann". Returns None if no Neumann.
+    Values use the solver's ``du/dn`` convention. Only entries where bc_type is
+    "neumann" are filled. Returns None if no Neumann condition is configured.
 
     Args:
         bc_types: Per-edge BC types.

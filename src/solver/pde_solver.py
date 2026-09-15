@@ -11,7 +11,7 @@ derivatives and mixed derivative).
 
 Supports:
 - Arbitrary domain shapes via boolean masks
-- Dirichlet and Neumann boundary conditions
+- Dirichlet and outward-normal Neumann boundary conditions
 """
 
 from __future__ import annotations
@@ -391,6 +391,58 @@ def _default_rectangular_mask(nx: int, ny: int) -> np.ndarray:
     return np.ones((ny, nx), dtype=bool)
 
 
+def _neumann_boundary_substitution(
+    boundary_i: int,
+    boundary_j: int,
+    source_i: int,
+    source_j: int,
+    nx: int,
+    ny: int,
+    hx: float,
+    hy: float,
+    interior_mask: np.ndarray,
+    normal_derivative: float,
+    *,
+    mixed_neighbor: bool,
+) -> tuple[int, int, float]:
+    """Express a Neumann boundary value using an inward grid neighbor.
+
+    For the outward-normal convention ``du/dn = q``, the one-sided relation is
+    ``u_boundary = u_inward + h*q`` on every rectangular edge. A mixed-derivative
+    diagonal must therefore map to the boundary point's inward neighbor rather
+    than to the stencil center. Masked diagonals and Neumann corners do not have
+    a unique rectangular grid normal in the current boundary representation.
+    """
+    inward_candidates: list[tuple[int, int, float]] = []
+    if boundary_i == 0:
+        inward_candidates.append((boundary_i + 1, boundary_j, hx))
+    if boundary_i == nx - 1:
+        inward_candidates.append((boundary_i - 1, boundary_j, hx))
+    if boundary_j == 0:
+        inward_candidates.append((boundary_i, boundary_j + 1, hy))
+    if boundary_j == ny - 1:
+        inward_candidates.append((boundary_i, boundary_j - 1, hy))
+
+    if len(inward_candidates) == 1:
+        inward_i, inward_j, step = inward_candidates[0]
+        if interior_mask[inward_j, inward_i]:
+            return inward_i, inward_j, step * normal_derivative
+
+    if mixed_neighbor:
+        raise SolverFailedError(
+            "A mixed-derivative stencil adjacent to a Neumann boundary requires "
+            "a unique rectangular grid normal; masked-boundary and corner "
+            f"diagonals are not supported at grid index ({boundary_i}, {boundary_j})"
+        )
+
+    delta_i = boundary_i - source_i
+    delta_j = boundary_j - source_j
+    if abs(delta_i) + abs(delta_j) != 1:
+        raise SolverFailedError("Neumann boundary elimination requires an axial interior neighbor")
+    step = hx if delta_i != 0 else hy
+    return source_i, source_j, step * normal_derivative
+
+
 def solve_pde_2d(
     residual_func: Callable[..., float],
     x_min: float,
@@ -428,8 +480,9 @@ def solve_pde_2d(
         mask: Boolean array (ny, nx). True = inside domain. None = full rectangle.
         bc_type: String array (ny, nx) with "dirichlet" or "neumann" per point.
             Only boundary points are used. Default: all Dirichlet.
-        bc_neumann_value: Float array (ny, nx) with normal derivative values
-            for Neumann boundary points. Default: zeros.
+        bc_neumann_value: Float array (ny, nx) with outward-normal derivative
+            values ``du/dn`` for Neumann boundary points. The solver uses a
+            one-sided grid-normal relation. Default: zeros.
         coefficient_provider: Optional direct provider for linear residual
             coefficients ``(f_xx, f_xy, f_yy, f_x, f_y, f, constant)``.
             When provided, the solver skips finite-difference probing.
@@ -526,6 +579,8 @@ def solve_pde_2d(
     data = np.empty(max_entries, dtype=float)
     b_vec = np.zeros(n_interior)
     entry_count = 0
+    principal_orientation: int | None = None
+    orientation_coordinate: tuple[float, float] | None = None
 
     def _append_entry(row: int, col: int, value: float) -> None:
         nonlocal entry_count
@@ -552,6 +607,20 @@ def solve_pde_2d(
                 xi,
                 yj,
             )
+            current_orientation = 1 if a_c > 0.0 else -1
+            if principal_orientation is None:
+                principal_orientation = current_orientation
+                orientation_coordinate = (xi, yj)
+            elif current_orientation != principal_orientation:
+                expected = "positive definite" if principal_orientation > 0 else "negative definite"
+                actual = "positive definite" if current_orientation > 0 else "negative definite"
+                assert orientation_coordinate is not None
+                raise SolverFailedError(
+                    "PDE ellipticity orientation changes across the connected domain: "
+                    f"expected {expected} from "
+                    f"({orientation_coordinate[0]:.12g}, {orientation_coordinate[1]:.12g}), "
+                    f"got {actual} at ({xi:.12g}, {yj:.12g})"
+                )
         except SolverFailedError:
             raise
         except Exception as exc:
@@ -567,7 +636,13 @@ def solve_pde_2d(
         center_coeff = -2.0 * a_c * inv_hx2 - 2.0 * c_c * inv_hy2 + g_c
         _append_entry(k, k, center_coeff)
 
-        def _add_neighbor(ni: int, nj: int, coeff: float) -> None:
+        def _add_neighbor(
+            ni: int,
+            nj: int,
+            coeff: float,
+            *,
+            mixed_neighbor: bool = False,
+        ) -> None:
             """Add matrix entry for neighbor or move to RHS for boundary."""
             if not (0 <= ni < nx and 0 <= nj < ny):
                 return
@@ -581,10 +656,26 @@ def solve_pde_2d(
                 return
 
             if neumann_mask[nj, ni]:
-                di, dj = ni - i, nj - j
-                h_step = hx * di if di != 0 else hy * dj
-                _append_entry(k, k, coeff)
-                b_vec[k] -= coeff * h_step * neumann_value_array[nj, ni]
+                inward_i, inward_j, boundary_offset = _neumann_boundary_substitution(
+                    ni,
+                    nj,
+                    int(i),
+                    int(j),
+                    nx,
+                    ny,
+                    hx,
+                    hy,
+                    interior_mask,
+                    float(neumann_value_array[nj, ni]),
+                    mixed_neighbor=mixed_neighbor,
+                )
+                inward_idx = int(index_grid[inward_j, inward_i])
+                if inward_idx < 0:
+                    raise SolverFailedError(
+                        "Neumann boundary elimination did not resolve to an interior point"
+                    )
+                _append_entry(k, inward_idx, coeff)
+                b_vec[k] -= coeff * boundary_offset
                 return
 
             b_vec[k] -= coeff * bc_value_array[nj, ni]
@@ -599,10 +690,10 @@ def solve_pde_2d(
 
         # f_xy stencil (cross derivative)
         if abs(bxy) > 1e-15:
-            _add_neighbor(i + 1, j + 1, bxy * inv_4hxhy)
-            _add_neighbor(i - 1, j + 1, -bxy * inv_4hxhy)
-            _add_neighbor(i + 1, j - 1, -bxy * inv_4hxhy)
-            _add_neighbor(i - 1, j - 1, bxy * inv_4hxhy)
+            _add_neighbor(i + 1, j + 1, bxy * inv_4hxhy, mixed_neighbor=True)
+            _add_neighbor(i - 1, j + 1, -bxy * inv_4hxhy, mixed_neighbor=True)
+            _add_neighbor(i + 1, j - 1, -bxy * inv_4hxhy, mixed_neighbor=True)
+            _add_neighbor(i - 1, j - 1, bxy * inv_4hxhy, mixed_neighbor=True)
 
     A = sparse.coo_matrix(
         (data[:entry_count], (rows[:entry_count], cols[:entry_count])),
@@ -668,8 +759,10 @@ def _estimate_neumann_boundary_value(
 ) -> float:
     """Estimate the solution value at a Neumann boundary point.
 
-    Uses the nearest interior neighbor's value plus h * g_N where g_N is the
-    prescribed normal derivative.
+    Uses the nearest interior neighbor's value plus ``h * g_N``, where ``g_N``
+    is the prescribed outward-normal derivative ``du/dn``. The positive grid
+    distance applies on all four edges because the step is from interior to
+    boundary in the outward direction.
 
     Args:
         bi: x-index of the boundary point.
