@@ -186,7 +186,7 @@ def _simulate_kdv(
     v[~dealias_mask] = 0.0
 
     def _nonlinear(v_hat: np.ndarray) -> np.ndarray:
-        u_state = np.fft.ifft(v_hat).real
+        u_state = np.real(np.fft.ifft(v_hat))
         u_sq_hat = np.fft.fft(u_state * u_state)
         u_sq_hat[~dealias_mask] = 0.0
         return -0.5j * alpha * k * u_sq_hat
@@ -201,7 +201,7 @@ def _simulate_kdv(
         n_c = _nonlinear(c_stage)
         v = e * v + f1 * n_v + 2.0 * f2 * (n_a + n_b) + f3 * n_c
         v[~dealias_mask] = 0.0
-        u = np.fft.ifft(v).real
+        u = np.real(np.fft.ifft(v))
         max_amplitude = max(max_amplitude, float(np.max(np.abs(u))))
         if store_pos < n_stored and step == int(stored_steps[store_pos]):
             u_hist[store_pos] = u

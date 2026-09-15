@@ -63,12 +63,12 @@ def _project_div_free_fft(
     phi_hat[mask] = -rhs_hat[mask] / k2[mask]
     phi_hat[0, 0] = 0.0
 
-    dphi_dx = np.fft.ifft2(1j * kx * phi_hat).real
-    dphi_dy = np.fft.ifft2(1j * ky * phi_hat).real
+    dphi_dx = np.real(np.fft.ifft2(1j * kx * phi_hat))
+    dphi_dy = np.real(np.fft.ifft2(1j * ky * phi_hat))
 
     u_new = u_star - dt * dphi_dx
     v_new = v_star - dt * dphi_dy
-    pressure = np.fft.ifft2(phi_hat).real / dt
+    pressure = np.real(np.fft.ifft2(phi_hat)) / dt
     return u_new, v_new, pressure
 
 
