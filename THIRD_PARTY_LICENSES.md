@@ -47,10 +47,10 @@ These libraries are used only for development and are not distributed with the a
 
 | Library        | Version Range   | License Type |
 |----------------|-----------------|--------------|
-| **pytest**    | `>=8.0,<9.0`    | MIT          |
-| **pytest-cov**| `>=6.0,<7.0`    | MIT          |
+| **pytest**    | `>=8.0,<10.0`   | MIT          |
+| **pytest-cov**| `>=6.0,<8.0`    | MIT          |
 | **ruff**      | `>=0.9,<1.0`    | MIT          |
-| **mypy**      | `>=1.0,<2.0`    | MIT          |
+| **mypy**      | `>=2.0,<3.0`    | MIT          |
 
 ---
 

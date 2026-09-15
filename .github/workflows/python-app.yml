@@ -2,15 +2,20 @@ name: Python application
 
 on:
   push:
-    branches: ["main", "dev"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "dev"]
+    branches: ["main"]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  quality:
+    name: Quality (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -18,31 +23,43 @@ jobs:
         python-version: ["3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: "pip"
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e ".[dev]"
+      - name: Install dependencies
+       run: |
+          python -m pip install --upgrade pip
+         python -m pip install -e ".[dev]"
 
-    - name: Lint with ruff
-      run: |
-        python -m ruff check .
+       - name: Lint with Ruff
+         run: ruff check .
 
-    - name: Check formatting with ruff
-      run: |
-        python -m ruff format . --check
+       - name: Check formatting with Ruff
+         run: ruff format . --check
 
-    - name: Test with pytest
-      run: |
-        python -m pytest
+       - name: Test with pytest
+         run: python -m pytest
 
-    - name: Type check with pyright
-      run: |
-        python -m pyright
+       - name: Type check with Pyright
+         run: pyright
+
+  required-pr-ci:
+    name: required-pr-ci
+    if: ${{ always() }}
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          if [ "$QUALITY_RESULT" != "success" ]; then
+            echo "Quality job result: $QUALITY_RESULT"
+             exit 1
+          fi
