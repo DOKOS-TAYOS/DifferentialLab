@@ -322,7 +322,7 @@ def solve_pde_2d(
     ).tocsr()
 
     try:
-        u_flat = spsolve(A, b_vec)
+        u_flat = np.asarray(spsolve(A, b_vec))
     except Exception as exc:
         logger.error("PDE linear solver failed: %s", exc, exc_info=True)
         raise SolverFailedError(f"Linear solver failed: {exc}") from exc
