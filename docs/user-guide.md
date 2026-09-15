@@ -58,9 +58,19 @@ Common settings include:
 - statistics to compute
 - PDE operator and visualization mode
 
-For 2D PDEs, the current UI supports rectangular domains and optional custom
-mask expressions. Boundary conditions can be Dirichlet or Neumann on rectangular
-edges, or on the contour of a masked domain.
+For 2D PDEs, the current solver supports real scalar linear/affine elliptic
+equations on rectangular domains and optional custom mask expressions. Boundary
+conditions can be Dirichlet or Neumann on rectangular edges, or on the contour
+of a masked domain. The principal matrix must be strictly positive or negative
+definite at every assembled point; parabolic, hyperbolic, degenerate, nonlinear,
+singular, and non-finite problems are reported as solver failures instead of
+returning a plausible-looking field. Neumann data on a masked contour uses the
+grid normal rather than the exact geometric normal.
+
+Programmatic `solve_pde_2d()` results include optional `PDEDiagnostics` with the
+discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and
+nonzero count. A condition estimate is included only for small systems; large
+sparse systems are never converted to dense form solely for diagnostics.
 
 ### 4. Solve and inspect
 

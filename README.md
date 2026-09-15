@@ -39,8 +39,8 @@ function transforms, and specialized scientific simulation workflows.
 - Scalar ODEs with SciPy integrators (`RK45`, `RK23`, `DOP853`, `Radau`, `BDF`, `LSODA`)
 - Vector ODE systems with component-aware notation and visualizations
 - Difference equations and recurrence systems
-- 2D PDE workflows with rectangular or masked domains, Dirichlet/Neumann boundaries,
-  and several finite-difference operators
+- Scalar linear elliptic 2D PDE workflows with rectangular or masked domains,
+  Dirichlet/Neumann boundaries, strict operator validation, and algebraic diagnostics
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
 - Specialized complex-problem models with custom UI, solvers, diagnostics, and result dialogs
 

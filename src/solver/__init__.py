@@ -21,6 +21,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "ODESolution": ("solver.ode_solver", "ODESolution"),
     "solve_multipoint": ("solver.ode_solver", "solve_multipoint"),
     "solve_ode": ("solver.ode_solver", "solve_ode"),
+    "PDEDiagnostics": ("solver.pde_solver", "PDEDiagnostics"),
+    "PDESolution": ("solver.pde_solver", "PDESolution"),
     "solve_pde_2d": ("solver.pde_solver", "solve_pde_2d"),
     "is_multivariate": ("solver.predefined", "is_multivariate"),
     "load_predefined_equations": ("solver.predefined", "load_predefined_equations"),
@@ -41,6 +43,8 @@ __all__ = [
     "ODESolution",
     "solve_multipoint",
     "solve_ode",
+    "PDEDiagnostics",
+    "PDESolution",
     "solve_pde_2d",
     "is_multivariate",
     "load_predefined_equations",
@@ -60,7 +64,7 @@ if TYPE_CHECKING:
     from solver.error_metrics import compute_ode_residual_error
     from solver.notation import FNotation, generate_derivative_labels
     from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
-    from solver.pde_solver import solve_pde_2d
+    from solver.pde_solver import PDEDiagnostics, PDESolution, solve_pde_2d
     from solver.predefined import is_multivariate, load_predefined_equations
     from solver.statistics import compute_statistics, compute_statistics_2d
     from solver.validators import validate_all_inputs

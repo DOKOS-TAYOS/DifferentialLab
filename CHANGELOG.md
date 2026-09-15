@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added structured scalar PDE diagnostics for discrete residual norms, sparse matrix size,
+  nonzero count, and a bounded small-system condition estimate.
+
 ### Security
 
 - Added Dependabot configuration for Python dependencies and GitHub Actions.
@@ -18,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restricted the update checker to HTTPS version URLs.
 
 ### Changed
+
+- Hardened the scalar 2D PDE solver with strict domain, grid, mask, boundary-data,
+  coefficient, affine-residual, ellipticity, sparse-solve, and finiteness validation.
 
 - Expanded CI to run on `main` and `dev` for Python 3.12 and 3.13, with ruff linting,
   ruff format checks, pytest, and pyright.

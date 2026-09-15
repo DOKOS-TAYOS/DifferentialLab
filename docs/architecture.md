@@ -62,10 +62,14 @@ switch views without re-solving.
 - scalar ODEs through `solve_ode()` or `solve_multipoint()`
 - vector ODEs through `get_vector_ode_function()` and `solve_ode()`
 - difference equations through `solve_difference()`
-- 2D PDEs through `solve_pde_2d()`
+- scalar linear elliptic 2D PDEs through `solve_pde_2d()`, with affine-residual
+  and ellipticity checks before sparse solution and structured algebraic diagnostics after it
 
 The returned `SolverResult` is data-only: solution arrays, statistics,
-metadata, equation type, grids, and notation context.
+metadata, equation type, grids, and notation context. The lower-level
+`PDESolution` also carries optional `PDEDiagnostics`; the condition estimate is
+deliberately limited to small systems so diagnostics do not densify large sparse
+matrices.
 
 ## Predefined Equation Catalog
 

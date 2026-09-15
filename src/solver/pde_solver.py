@@ -17,7 +17,7 @@ Supports:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 
@@ -32,6 +32,29 @@ BC_NEUMANN = "neumann"
 PDECoefficients = tuple[float, float, float, float, float, float, float]
 PDECoefficientProvider = Callable[[float, float, dict[str, float]], PDECoefficients]
 
+_AFFINITY_PROBE = (0.37, -0.61, 1.19, -0.83, 0.47, 1.31)
+_AFFINITY_TOLERANCE = 1.0e-9
+_LINEAR_RESIDUAL_TOLERANCE = 1.0e-8
+_MAX_CONDITION_ESTIMATE_SIZE = 256
+
+
+@dataclass(frozen=True)
+class PDEDiagnostics:
+    """Numerical evidence for an assembled scalar PDE solve.
+
+    The residual values describe the interior sparse system ``A @ u = b``.
+    ``condition_estimate`` is populated only for systems small enough to
+    densify within the fixed diagnostic bound.
+    """
+
+    discrete_residual_l2: float
+    discrete_residual_linf: float
+    relative_residual_l2: float
+    matrix_shape: tuple[int, int]
+    nnz: int
+    condition_estimate: float | None = None
+    warnings: tuple[str, ...] = ()
+
 
 @dataclass
 class PDESolution:
@@ -44,6 +67,7 @@ class PDESolution:
         message: Solver status message.
         n_eval: Number of iterations (if applicable).
         mask: Optional boolean mask (ny, nx). True = inside domain.
+        diagnostics: Optional structured algebraic diagnostics.
     """
 
     grid: tuple[np.ndarray, ...]
@@ -52,6 +76,7 @@ class PDESolution:
     message: str
     n_eval: int = 0
     mask: np.ndarray | None = None
+    diagnostics: PDEDiagnostics | None = None
 
 
 def _classify_mask(
@@ -92,8 +117,8 @@ def _probe_coefficients(
     residual_func: Callable[..., float],
     xi: float,
     yj: float,
-    params: dict,
-) -> tuple[float, float, float, float, float, float, float]:
+    params: dict[str, float],
+) -> PDECoefficients:
     """Probe the residual function to extract linear PDE coefficients.
 
     Given residual R(x,y,f,fx,fy,fxx,fxy,fyy) which should equal zero,
@@ -110,18 +135,247 @@ def _probe_coefficients(
     Returns:
         Tuple of (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, rhs_const).
     """
-    # R(all zeros) gives the constant part (negated RHS)
-    r0 = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params)
+    coordinate = f"({xi:.12g}, {yj:.12g})"
+
+    def evaluate(state: tuple[float, float, float, float, float, float]) -> float:
+        raw_value = residual_func(xi, yj, *state, **params)
+        return _finite_scalar(raw_value, f"Residual at {coordinate}")
+
+    # R(all zeros) gives the constant part (negated RHS).
+    zero = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    r0 = evaluate(zero)
 
     # Probe each derivative direction
-    g_f = residual_func(xi, yj, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, **params) - r0
-    d_fx = residual_func(xi, yj, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, **params) - r0
-    e_fy = residual_func(xi, yj, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, **params) - r0
-    a_fxx = residual_func(xi, yj, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, **params) - r0
-    b_fxy = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, **params) - r0
-    c_fyy = residual_func(xi, yj, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, **params) - r0
+    unit_states = (
+        (1.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        (0.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+    )
+    unit_responses: list[float] = []
+    for state in unit_states:
+        unit_responses.append(evaluate(state) - r0)
+
+    g_f, d_fx, e_fy, a_fxx, b_fxy, c_fyy = unit_responses
+    reconstructed = r0 + sum(
+        coefficient * value for coefficient, value in zip(unit_responses, _AFFINITY_PROBE)
+    )
+    actual = evaluate(_AFFINITY_PROBE)
+    scale = max(
+        1.0,
+        abs(actual),
+        abs(reconstructed),
+        abs(r0)
+        + sum(
+            abs(coefficient * value) for coefficient, value in zip(unit_responses, _AFFINITY_PROBE)
+        ),
+    )
+    if not np.isfinite(reconstructed) or abs(actual - reconstructed) > _AFFINITY_TOLERANCE * scale:
+        raise SolverFailedError(
+            "PDE residual is not affine in (f, fx, fy, fxx, fxy, fyy) "
+            f"at {coordinate}: probe mismatch {abs(actual - reconstructed):.3g}"
+        )
 
     return (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, r0)
+
+
+def _finite_scalar(value: object, name: str) -> float:
+    """Convert a scalar-like value to a finite real float."""
+    array = np.asarray(value)
+    if array.ndim != 0 or np.iscomplexobj(array):
+        raise SolverFailedError(f"{name} must be a finite real scalar")
+    try:
+        result = float(array)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must be a finite real scalar") from exc
+    if not np.isfinite(result):
+        raise SolverFailedError(f"{name} must be finite")
+    return result
+
+
+def _validate_grid_inputs(
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    nx: int,
+    ny: int,
+) -> tuple[float, float, float, float, int, int]:
+    """Validate and normalize rectangular grid inputs."""
+    bounds = tuple(
+        _finite_scalar(value, name)
+        for value, name in (
+            (x_min, "x_min"),
+            (x_max, "x_max"),
+            (y_min, "y_min"),
+            (y_max, "y_max"),
+        )
+    )
+    x_start, x_end, y_start, y_end = bounds
+    if x_start >= x_end:
+        raise SolverFailedError("x_min must be strictly less than x_max")
+    if y_start >= y_end:
+        raise SolverFailedError("y_min must be strictly less than y_max")
+
+    for value, name in ((nx, "nx"), (ny, "ny")):
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+            raise SolverFailedError(f"{name} must be an integer")
+        if int(value) < 3:
+            raise SolverFailedError("Grid must have at least 3 points per dimension")
+    return x_start, x_end, y_start, y_end, int(nx), int(ny)
+
+
+def _float_array(value: object, name: str, shape: tuple[int, int]) -> np.ndarray:
+    """Return a float array after validating its exact shape."""
+    try:
+        array = np.asarray(value, dtype=float)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must contain real numeric values") from exc
+    if array.shape != shape:
+        raise SolverFailedError(f"{name} must have shape {shape}, got {array.shape}")
+    return array
+
+
+def _validate_boundary_inputs(
+    *,
+    nx: int,
+    ny: int,
+    mask: np.ndarray | None,
+    bc_values: np.ndarray | None,
+    bc_type: np.ndarray | None,
+    bc_neumann_value: np.ndarray | None,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    """Validate masks and boundary arrays and classify the domain."""
+    shape = (ny, nx)
+    if mask is None:
+        mask_array = _default_rectangular_mask(nx, ny)
+    else:
+        raw_mask = np.asarray(mask)
+        if raw_mask.shape != shape:
+            raise SolverFailedError(f"mask must have shape {shape}, got {raw_mask.shape}")
+        if np.issubdtype(raw_mask.dtype, np.number) and not np.all(np.isfinite(raw_mask)):
+            raise SolverFailedError("mask must not contain non-finite values")
+        mask_array = np.asarray(raw_mask, dtype=bool)
+
+    values = (
+        np.zeros(shape, dtype=float)
+        if bc_values is None
+        else _float_array(bc_values, "bc_values", shape)
+    )
+    neumann_values = (
+        np.zeros(shape, dtype=float)
+        if bc_neumann_value is None
+        else _float_array(bc_neumann_value, "bc_neumann_value", shape)
+    )
+    if bc_type is None:
+        types = np.full(shape, BC_DIRICHLET, dtype=object)
+    else:
+        types = np.asarray(bc_type, dtype=object)
+        if types.shape != shape:
+            raise SolverFailedError(f"bc_type must have shape {shape}, got {types.shape}")
+
+    interior, boundary, index_grid = _classify_mask(mask_array)
+    boundary_types = types[boundary]
+    invalid = [label for label in boundary_types if label not in (BC_DIRICHLET, BC_NEUMANN)]
+    if invalid:
+        raise SolverFailedError(
+            f"bc_type boundary labels must be 'dirichlet' or 'neumann'; got {invalid[0]!r}"
+        )
+
+    neumann = boundary & (types == BC_NEUMANN)
+    dirichlet = boundary & ~neumann
+    if not np.all(np.isfinite(values[dirichlet])):
+        raise SolverFailedError("bc_values must be finite at Dirichlet boundary points")
+    if not np.all(np.isfinite(neumann_values[neumann])):
+        raise SolverFailedError("bc_neumann_value must be finite at Neumann boundary points")
+    return mask_array, values, types, neumann_values, interior, boundary, index_grid
+
+
+def _validate_coefficients(
+    coefficients: object,
+    xi: float,
+    yj: float,
+) -> PDECoefficients:
+    """Validate coefficient shape, finiteness, and scalar ellipticity."""
+    coordinate = f"({xi:.12g}, {yj:.12g})"
+    try:
+        array = np.asarray(coefficients, dtype=float)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(
+            f"PDE coefficients at {coordinate} must be seven real scalars"
+        ) from exc
+    if array.shape != (7,):
+        raise SolverFailedError(
+            f"PDE coefficients at {coordinate} must have shape (7,), got {array.shape}"
+        )
+    if not np.all(np.isfinite(array)):
+        raise SolverFailedError(f"PDE coefficients at {coordinate} must be finite")
+
+    a_c, bxy, c_c = (float(value) for value in array[:3])
+    principal = np.array(((a_c, 0.5 * bxy), (0.5 * bxy, c_c)))
+    principal_scale = float(np.max(np.abs(principal)))
+    if principal_scale <= np.finfo(float).tiny:
+        raise SolverFailedError(f"PDE principal operator is degenerate at {coordinate}")
+    eigenvalues = np.linalg.eigvalsh(principal)
+    margin = 100.0 * np.finfo(float).eps * principal_scale
+    positive = bool(np.all(eigenvalues > margin))
+    negative = bool(np.all(eigenvalues < -margin))
+    if not (positive or negative):
+        raise SolverFailedError(
+            "PDE principal operator is not strictly elliptic "
+            f"at {coordinate}: eigenvalues={eigenvalues.tolist()}"
+        )
+    return cast(PDECoefficients, tuple(float(value) for value in array))
+
+
+def _compute_diagnostics(
+    matrix: Any,
+    rhs: np.ndarray,
+    solution: np.ndarray,
+    diagnostic_warnings: tuple[str, ...],
+) -> PDEDiagnostics:
+    """Compute bounded diagnostics for the solved sparse linear system."""
+    applied = np.asarray(matrix @ solution, dtype=float)
+    residual = applied - rhs
+    residual_l2 = float(np.linalg.norm(residual))
+    residual_linf = float(np.linalg.norm(residual, ord=np.inf)) if residual.size else 0.0
+    rhs_scale = float(np.linalg.norm(rhs))
+    applied_scale = float(np.linalg.norm(applied))
+    relative_l2 = residual_l2 / max(rhs_scale, applied_scale, np.finfo(float).tiny)
+
+    condition_estimate: float | None = None
+    if matrix.shape[0] <= _MAX_CONDITION_ESTIMATE_SIZE:
+        condition_estimate = float(np.linalg.cond(matrix.toarray()))
+        rank_limit = 1.0 / (max(1, matrix.shape[0]) * np.finfo(float).eps)
+        if not np.isfinite(condition_estimate) or condition_estimate >= rank_limit:
+            raise SolverFailedError("Linear system is singular or numerically rank deficient")
+
+    residual_scale = max(1.0, rhs_scale, applied_scale)
+    if residual_l2 > _LINEAR_RESIDUAL_TOLERANCE * residual_scale:
+        raise SolverFailedError(
+            "Linear solve produced an excessive algebraic residual: "
+            f"relative L2 residual={relative_l2:.3g}"
+        )
+
+    return PDEDiagnostics(
+        discrete_residual_l2=residual_l2,
+        discrete_residual_linf=residual_linf,
+        relative_residual_l2=relative_l2,
+        matrix_shape=(int(matrix.shape[0]), int(matrix.shape[1])),
+        nnz=int(matrix.nnz),
+        condition_estimate=condition_estimate,
+        warnings=diagnostic_warnings,
+    )
 
 
 def _default_rectangular_mask(nx: int, ny: int) -> np.ndarray:
@@ -182,51 +436,81 @@ def solve_pde_2d(
 
     Returns:
         PDESolution with grid, solution array, and mask.
+
+    Raises:
+        SolverFailedError: If inputs are invalid, the residual is not affine,
+            the principal operator is not strictly elliptic, or the sparse
+            linear solve is singular, non-finite, or has excessive residual.
     """
     from scipy import sparse
-    from scipy.sparse.linalg import spsolve
+    from scipy.sparse.linalg import MatrixRankWarning, spsolve
 
     params = normalize_params(parameters)
 
-    if nx < 3 or ny < 3:
-        raise SolverFailedError("Grid must have at least 3 points per dimension")
+    x_min, x_max, y_min, y_max, nx, ny = _validate_grid_inputs(
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+        nx,
+        ny,
+    )
 
     x = np.linspace(x_min, x_max, nx)
     y = np.linspace(y_min, y_max, ny)
-    hx = (x_max - x_min) / (nx - 1) if nx > 1 else 1.0
-    hy = (y_max - y_min) / (ny - 1) if ny > 1 else 1.0
+    hx = (x_max - x_min) / (nx - 1)
+    hy = (y_max - y_min) / (ny - 1)
 
-    # Build mask
-    if mask is None:
-        mask = _default_rectangular_mask(nx, ny)
-    else:
-        mask = np.asarray(mask, dtype=bool)
-
-    # Default BC arrays
-    if bc_values is None:
-        bc_values = np.zeros((ny, nx))
-    else:
-        bc_values = np.asarray(bc_values, dtype=float)
-    if bc_neumann_value is None:
-        bc_neumann_value = np.zeros((ny, nx))
-    else:
-        bc_neumann_value = np.asarray(bc_neumann_value, dtype=float)
-
-    # Classify points
-    interior_mask, boundary_mask, index_grid = _classify_mask(mask)
+    (
+        mask_array,
+        bc_value_array,
+        _bc_type_array,
+        neumann_value_array,
+        interior_mask,
+        boundary_mask,
+        index_grid,
+    ) = _validate_boundary_inputs(
+        nx=nx,
+        ny=ny,
+        mask=mask,
+        bc_values=bc_values,
+        bc_type=bc_type,
+        bc_neumann_value=bc_neumann_value,
+    )
+    neumann_mask = boundary_mask & (_bc_type_array == BC_NEUMANN)
     n_interior = int(np.count_nonzero(interior_mask))
+    diagnostic_warnings = (
+        (
+            (
+                "Neumann conditions on masked boundaries use grid-normal, "
+                "not geometric-normal, derivatives."
+            ),
+        )
+        if mask is not None and np.any(neumann_mask)
+        else ()
+    )
 
     if n_interior <= 0:
         u = np.full((ny, nx), np.nan)
-        u[mask] = 0.0
-        u[boundary_mask] = bc_values[boundary_mask]
+        u[mask_array] = 0.0
+        dirichlet_boundary = boundary_mask & ~neumann_mask
+        u[dirichlet_boundary] = bc_value_array[dirichlet_boundary]
         return PDESolution(
             grid=(x, y),
             u=u,
             success=True,
             message="No interior points",
             n_eval=0,
-            mask=mask,
+            mask=mask_array,
+            diagnostics=PDEDiagnostics(
+                discrete_residual_l2=0.0,
+                discrete_residual_linf=0.0,
+                relative_residual_l2=0.0,
+                matrix_shape=(0, 0),
+                nnz=0,
+                condition_estimate=None,
+                warnings=diagnostic_warnings + ("No interior points were assembled.",),
+            ),
         )
 
     # Finite difference weights
@@ -242,11 +526,6 @@ def solve_pde_2d(
     data = np.empty(max_entries, dtype=float)
     b_vec = np.zeros(n_interior)
     entry_count = 0
-    neumann_mask = (
-        boundary_mask & (np.asarray(bc_type, dtype=object) == BC_NEUMANN)
-        if bc_type is not None
-        else np.zeros_like(boundary_mask)
-    )
 
     def _append_entry(row: int, col: int, value: float) -> None:
         nonlocal entry_count
@@ -260,17 +539,26 @@ def solve_pde_2d(
             xi = float(x[i])
             yj = float(y[j])
             if coefficient_provider is None:
-                a_c, bxy, c_c, d_c, e_c, g_c, r0 = _probe_coefficients(
+                raw_coefficients = _probe_coefficients(
                     residual_func,
                     xi,
                     yj,
                     params,
                 )
             else:
-                a_c, bxy, c_c, d_c, e_c, g_c, r0 = coefficient_provider(xi, yj, params)
+                raw_coefficients = coefficient_provider(xi, yj, params)
+            a_c, bxy, c_c, d_c, e_c, g_c, r0 = _validate_coefficients(
+                raw_coefficients,
+                xi,
+                yj,
+            )
+        except SolverFailedError:
+            raise
         except Exception as exc:
             logger.error("PDE coefficient probe failed at (%g, %g): %s", x[i], y[j], exc)
-            raise SolverFailedError(f"Coefficient probe failed: {exc}") from exc
+            raise SolverFailedError(
+                f"Coefficient probe failed at ({x[i]:.12g}, {y[j]:.12g}): {exc}"
+            ) from exc
 
         # RHS: -r0 (since R = operator(f) + r0 = 0  =>  operator(f) = -r0)
         b_vec[k] = -r0
@@ -296,10 +584,10 @@ def solve_pde_2d(
                 di, dj = ni - i, nj - j
                 h_step = hx * di if di != 0 else hy * dj
                 _append_entry(k, k, coeff)
-                b_vec[k] -= coeff * h_step * bc_neumann_value[nj, ni]
+                b_vec[k] -= coeff * h_step * neumann_value_array[nj, ni]
                 return
 
-            b_vec[k] -= coeff * bc_values[nj, ni]
+            b_vec[k] -= coeff * bc_value_array[nj, ni]
 
         # f_xx stencil + f_x contribution
         _add_neighbor(i - 1, j, a_c * inv_hx2 - d_c * inv_2hx)
@@ -321,17 +609,30 @@ def solve_pde_2d(
         shape=(n_interior, n_interior),
     ).tocsr()
 
+    if not np.all(np.isfinite(A.data)):
+        raise SolverFailedError("Assembled sparse matrix contains non-finite values")
+    if not np.all(np.isfinite(b_vec)):
+        raise SolverFailedError("Assembled right-hand side contains non-finite values")
+
     try:
-        u_flat = np.asarray(spsolve(A, b_vec))
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", MatrixRankWarning)
+            u_flat = np.asarray(spsolve(A, b_vec), dtype=float)
     except Exception as exc:
         logger.error("PDE linear solver failed: %s", exc, exc_info=True)
         raise SolverFailedError(f"Linear solver failed: {exc}") from exc
+
+    if u_flat.shape != (n_interior,) or not np.all(np.isfinite(u_flat)):
+        raise SolverFailedError("Linear solver returned a non-finite or invalid solution")
+    diagnostics = _compute_diagnostics(A, b_vec, u_flat, diagnostic_warnings)
 
     # Build solution: NaN outside domain, BC on boundary, solved values inside
     u = np.full((ny, nx), np.nan)
     u[interior_mask] = u_flat[index_grid[interior_mask]]
     dirichlet_boundary = boundary_mask & ~neumann_mask
-    u[dirichlet_boundary] = bc_values[dirichlet_boundary]
+    u[dirichlet_boundary] = bc_value_array[dirichlet_boundary]
 
     for bj, bi in np.argwhere(neumann_mask):
         u[bj, bi] = _estimate_neumann_boundary_value(
@@ -341,7 +642,7 @@ def solve_pde_2d(
             interior_mask,
             hx,
             hy,
-            float(bc_neumann_value[bj, bi]),
+            float(neumann_value_array[bj, bi]),
         )
 
     logger.info("PDE 2D solved: %dx%d grid, %d interior points", nx, ny, n_interior)
@@ -351,7 +652,8 @@ def solve_pde_2d(
         success=True,
         message="OK",
         n_eval=0,
-        mask=mask,
+        mask=mask_array,
+        diagnostics=diagnostics,
     )
 
 

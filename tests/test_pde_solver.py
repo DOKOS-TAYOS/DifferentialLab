@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDESolution, _classify_mask, solve_pde_2d
+from solver.pde_solver import (
+    BC_DIRICHLET,
+    BC_NEUMANN,
+    PDEDiagnostics,
+    PDESolution,
+    _classify_mask,
+    solve_pde_2d,
+)
+from utils import SolverFailedError
 
 
 def _laplace_residual(
@@ -59,6 +68,11 @@ def test_laplace_zero_bc() -> None:
     assert result.grid[1].shape == (11,)
     assert result.u.shape == (11, 11)
     np.testing.assert_allclose(result.u, 0.0, atol=1e-10)
+    assert isinstance(result.diagnostics, PDEDiagnostics)
+    assert result.diagnostics.matrix_shape == (81, 81)
+    assert result.diagnostics.nnz > 0
+    assert result.diagnostics.discrete_residual_l2 == pytest.approx(0.0)
+    assert result.diagnostics.condition_estimate is not None
 
 
 def test_laplace_with_bc_values() -> None:
@@ -291,3 +305,204 @@ def test_solve_pde_2d_uses_coefficient_provider_without_probing_residual() -> No
 
     assert result.success is True
     np.testing.assert_allclose(result.u, 0.0, atol=1e-10)
+
+
+def test_nonlinear_residual_is_rejected_at_the_probe_coordinate() -> None:
+    """A residual nonlinear in the solution state is outside the solver contract."""
+
+    def nonlinear_residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        return -fxx - fyy + f**2
+
+    with pytest.raises(SolverFailedError, match=r"not affine.*\(0\.25, 0\.25\)"):
+        solve_pde_2d(nonlinear_residual, 0.0, 1.0, 0.0, 1.0, 5, 5)
+
+
+@pytest.mark.parametrize(
+    ("principal_coefficients", "classification"),
+    [
+        ((1.0, 0.0, -1.0), "hyperbolic"),
+        ((1.0, 0.0, 0.0), "parabolic"),
+        ((1.0, 2.0, 1.0), "degenerate"),
+        ((0.0, 0.0, 0.0), "zero principal part"),
+    ],
+)
+def test_non_elliptic_principal_operators_are_rejected(
+    principal_coefficients: tuple[float, float, float],
+    classification: str,
+) -> None:
+    """Hyperbolic, parabolic, and degenerate operators must fail explicitly."""
+
+    def provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x, y, params
+        a_c, bxy, c_c = principal_coefficients
+        return (a_c, bxy, c_c, 0.0, 0.0, 0.0, 0.0)
+
+    with pytest.raises(SolverFailedError, match=r"not strictly elliptic|degenerate"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            coefficient_provider=provider,
+        )
+
+
+def test_singular_pure_neumann_system_is_rejected() -> None:
+    """The constant nullspace of a pure-Neumann Laplacian is not a success."""
+    shape = (7, 7)
+    bc_type = np.full(shape, BC_NEUMANN, dtype=object)
+
+    with pytest.raises(SolverFailedError, match=r"Linear solver failed|singular"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            shape[1],
+            shape[0],
+            bc_type=bc_type,
+        )
+
+
+def test_non_finite_domain_and_coefficients_are_rejected() -> None:
+    """Non-finite public inputs and direct coefficients fail before solving."""
+    with pytest.raises(SolverFailedError, match="x_min must be finite"):
+        solve_pde_2d(_laplace_residual, np.nan, 1.0, 0.0, 1.0, 5, 5)
+
+    def non_finite_provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x, y, params
+        return (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, np.inf)
+
+    with pytest.raises(SolverFailedError, match="coefficients.*must be finite"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            coefficient_provider=non_finite_provider,
+        )
+
+
+def test_boundary_shapes_labels_and_relevant_values_are_validated() -> None:
+    """Boundary data has an exact shape, supported labels, and finite used values."""
+    with pytest.raises(SolverFailedError, match=r"bc_values must have shape \(5, 5\)"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            bc_values=np.zeros((4, 5)),
+        )
+
+    invalid_types = np.full((5, 5), BC_DIRICHLET, dtype=object)
+    invalid_types[0, 0] = "periodic"
+    with pytest.raises(SolverFailedError, match="boundary labels"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            bc_type=invalid_types,
+        )
+
+    non_finite_boundary = np.zeros((5, 5))
+    non_finite_boundary[0, 0] = np.inf
+    with pytest.raises(SolverFailedError, match="Dirichlet boundary"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            bc_values=non_finite_boundary,
+        )
+
+
+def test_large_system_does_not_compute_a_dense_condition_estimate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Condition diagnostics must not densify systems above the fixed bound."""
+
+    def fail_if_called(*args: object, **kwargs: object) -> float:
+        raise AssertionError("dense condition estimate should not run")
+
+    monkeypatch.setattr(np.linalg, "cond", fail_if_called)
+    result = solve_pde_2d(_laplace_residual, 0.0, 1.0, 0.0, 1.0, 19, 19)
+
+    assert result.diagnostics is not None
+    assert result.diagnostics.matrix_shape == (289, 289)
+    assert result.diagnostics.condition_estimate is None
+
+
+def test_manufactured_poisson_solution_has_second_order_grid_convergence() -> None:
+    """Central differences should converge near order two on a smooth solution."""
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        del f, fx, fy, fxy, kwargs
+        exact = np.sin(np.pi * x) * np.sin(np.pi * y)
+        return -fxx - fyy - 2.0 * np.pi**2 * exact
+
+    errors: list[float] = []
+    for grid_size in (11, 21, 41):
+        result = solve_pde_2d(
+            residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            grid_size,
+            grid_size,
+        )
+        x_grid, y_grid = result.grid
+        x_mesh, y_mesh = np.meshgrid(x_grid, y_grid)
+        exact = np.sin(np.pi * x_mesh) * np.sin(np.pi * y_mesh)
+        errors.append(float(np.sqrt(np.mean((result.u - exact) ** 2))))
+
+    observed_orders = [
+        np.log(errors[index] / errors[index + 1]) / np.log(2.0) for index in range(len(errors) - 1)
+    ]
+    assert min(observed_orders) > 1.8
+    assert max(observed_orders) < 2.2
