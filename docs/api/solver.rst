@@ -27,6 +27,12 @@ solver.pde_solver
 .. automodule:: solver.pde_solver
    :members:
 
+solver.pde_types
+----------------
+
+.. automodule:: solver.pde_types
+   :members:
+
 solver.error_metrics
 --------------------
 

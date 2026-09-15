@@ -23,6 +23,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "solve_ode": ("solver.ode_solver", "solve_ode"),
     "PDEDiagnostics": ("solver.pde_solver", "PDEDiagnostics"),
     "PDESolution": ("solver.pde_solver", "PDESolution"),
+    "PDEBoundaryCondition": ("solver.pde_types", "PDEBoundaryCondition"),
+    "PDEBoundaryConditions": ("solver.pde_types", "PDEBoundaryConditions"),
+    "PDECoefficientProvider": ("solver.pde_types", "PDECoefficientProvider"),
+    "PDECoefficients": ("solver.pde_types", "PDECoefficients"),
     "solve_pde_2d": ("solver.pde_solver", "solve_pde_2d"),
     "is_multivariate": ("solver.predefined", "is_multivariate"),
     "load_predefined_equations": ("solver.predefined", "load_predefined_equations"),
@@ -45,6 +49,10 @@ __all__ = [
     "solve_ode",
     "PDEDiagnostics",
     "PDESolution",
+    "PDEBoundaryCondition",
+    "PDEBoundaryConditions",
+    "PDECoefficientProvider",
+    "PDECoefficients",
     "solve_pde_2d",
     "is_multivariate",
     "load_predefined_equations",
@@ -65,6 +73,12 @@ if TYPE_CHECKING:
     from solver.notation import FNotation, generate_derivative_labels
     from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
     from solver.pde_solver import PDEDiagnostics, PDESolution, solve_pde_2d
+    from solver.pde_types import (
+        PDEBoundaryCondition,
+        PDEBoundaryConditions,
+        PDECoefficientProvider,
+        PDECoefficients,
+    )
     from solver.predefined import is_multivariate, load_predefined_equations
     from solver.statistics import compute_statistics, compute_statistics_2d
     from solver.validators import validate_all_inputs

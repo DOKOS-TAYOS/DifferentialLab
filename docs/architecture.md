@@ -62,14 +62,24 @@ switch views without re-solving.
 - scalar ODEs through `solve_ode()` or `solve_multipoint()`
 - vector ODEs through `get_vector_ode_function()` and `solve_ode()`
 - difference equations through `solve_difference()`
-- scalar linear elliptic 2D PDEs through `solve_pde_2d()`, with affine-residual
-  and ellipticity checks before sparse solution and structured algebraic diagnostics after it
+- scalar linear elliptic 2D PDEs through `solve_pde_2d()`, with affine-residual,
+  component-aware ellipticity, structured boundary, periodic-topology, sparse-solve,
+  and algebraic-diagnostic helpers behind the compatible facade
 
 The returned `SolverResult` is data-only: solution arrays, statistics,
 metadata, equation type, grids, and notation context. The lower-level
 `PDESolution` also carries optional `PDEDiagnostics`; the condition estimate is
 deliberately limited to small systems so diagnostics do not densify large sparse
 matrices.
+
+Scalar PDE responsibilities are split without introducing a generic N-dimensional
+framework:
+
+- `pde_solver.py`: backwards-compatible scalar-2D facade;
+- `pde_types.py`: public coefficient, boundary, solution, and diagnostic types;
+- `pde_validation.py`: grid, affinity, ellipticity, and connected-component checks;
+- `pde_boundary.py`: legacy adaptation and Dirichlet/Neumann/Robin/periodic handling;
+- `pde_assembly.py`: sparse stencil assembly, periodic wrapping, solve checks, and diagnostics.
 
 ## Predefined Equation Catalog
 

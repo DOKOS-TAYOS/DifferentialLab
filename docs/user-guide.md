@@ -60,15 +60,50 @@ Common settings include:
 
 For 2D PDEs, the current solver supports real scalar linear/affine elliptic
 equations on rectangular domains and optional custom mask expressions. Boundary
-conditions can be Dirichlet or Neumann on rectangular edges, or on the contour
-of a masked domain. The principal matrix must be strictly positive or negative
-definite at every assembled point and must keep that orientation throughout the
-connected domain. Parabolic, hyperbolic, degenerate, sign-changing, nonlinear,
+conditions can be Dirichlet or Neumann through the legacy point-array API.
+Programmatic callers can instead use `PDEBoundaryCondition` and
+`PDEBoundaryConditions` for Dirichlet, outward-normal Neumann, Robin
+(`alpha*u + beta*du/dn = gamma`), and rectangular periodic axes. Periodic axes
+use a non-duplicated upper endpoint; they cannot be combined with an arbitrary
+mask because wrapped mask topology is not implemented.
+
+The principal matrix must be strictly positive or negative definite at every
+assembled point and must keep that orientation within each connected component
+of the domain. Disconnected masked components may use independent orientations.
+Parabolic, hyperbolic, degenerate, sign-changing-within-a-component, nonlinear,
 singular, and non-finite problems are reported as solver failures instead of
-returning a plausible-looking field. Neumann values use the outward-normal
-convention `du/dn`; the current one-sided approximation uses the grid normal.
-Mixed-derivative stencils support this elimination on rectangular edges, while
-ambiguous masked-boundary or corner diagonals are rejected explicitly.
+returning a plausible-looking field.
+
+Neumann and Robin use a one-sided grid-normal relation. On masked contours this
+is a grid normal, not a reconstructed geometric normal, and the limitation is
+included in diagnostics. Structured corner semantics are explicit: Dirichlet
+anchors a mixed Dirichlet/Neumann or Dirichlet/Robin corner; two Dirichlet data
+must agree; two non-Dirichlet edge conditions are rejected as ambiguous. Legacy
+corner reconstruction also fails if a unique compatible normal cannot be found;
+it never invents a zero boundary value. Mixed-derivative stencils wrap across
+periodic seams and reject ambiguous masked/corner substitutions.
+
+Example structured configuration:
+
+```python
+from solver import PDEBoundaryCondition, PDEBoundaryConditions, solve_pde_2d
+
+boundaries = PDEBoundaryConditions(
+    periodic_x=True,
+    bottom=PDEBoundaryCondition.dirichlet(0.0),
+    top=PDEBoundaryCondition.robin(alpha=2.0, beta=0.5, gamma=1.0),
+)
+solution = solve_pde_2d(
+    residual,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    64,
+    33,
+    boundary_conditions=boundaries,
+)
+```
 
 Programmatic `solve_pde_2d()` results include optional `PDEDiagnostics` with the
 discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and

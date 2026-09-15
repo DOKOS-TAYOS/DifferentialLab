@@ -8,6 +8,8 @@ import pytest
 from solver.pde_solver import (
     BC_DIRICHLET,
     BC_NEUMANN,
+    PDEBoundaryCondition,
+    PDEBoundaryConditions,
     PDEDiagnostics,
     PDESolution,
     _classify_mask,
@@ -213,6 +215,39 @@ def test_backward_compat_no_mask() -> None:
     assert not np.any(np.isnan(result.u))
 
 
+def test_legacy_optional_arguments_remain_positionally_compatible() -> None:
+    """Appending structured data must not shift any established positional argument."""
+    shape = (7, 7)
+    values = np.zeros(shape)
+    kinds = np.full(shape, BC_DIRICHLET, dtype=object)
+    neumann = np.zeros(shape)
+
+    def provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del x, y, params
+        return (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0)
+
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        shape[1],
+        shape[0],
+        values,
+        {},
+        None,
+        kinds,
+        neumann,
+        provider,
+    )
+    np.testing.assert_allclose(result.u, 0.0, atol=1.0e-12)
+
+
 # ── Neumann BC tests ─────────────────────────────────────────────────────
 
 
@@ -227,7 +262,7 @@ def test_neumann_zero_flux_bottom() -> None:
     bc_values[-1, :] = 1.0  # Top = Dirichlet 1
 
     bc_type = np.full((ny, nx), BC_DIRICHLET, dtype=object)
-    bc_type[0, :] = BC_NEUMANN  # Bottom = Neumann
+    bc_type[0, 1:-1] = BC_NEUMANN  # Open bottom edge = Neumann
 
     neumann_val = np.zeros((ny, nx))  # zero flux at bottom
 
@@ -259,8 +294,8 @@ def test_mixed_dirichlet_neumann() -> None:
     bc_values[-1, :] = 1.0  # Top = 1
 
     bc_type = np.full((ny, nx), BC_DIRICHLET, dtype=object)
-    bc_type[:, 0] = BC_NEUMANN  # Left = Neumann
-    bc_type[:, -1] = BC_NEUMANN  # Right = Neumann
+    bc_type[1:-1, 0] = BC_NEUMANN  # Open left edge = Neumann
+    bc_type[1:-1, -1] = BC_NEUMANN  # Open right edge = Neumann
 
     neumann_val = np.zeros((ny, nx))  # Zero flux on sides
 
@@ -683,3 +718,389 @@ def test_manufactured_poisson_solution_has_second_order_grid_convergence() -> No
     ]
     assert min(observed_orders) > 1.8
     assert max(observed_orders) < 2.2
+
+
+def test_structured_robin_boundary_recovers_linear_manufactured_solution() -> None:
+    """Robin substitution should be exact for a linear manufactured field."""
+    nx, ny = 11, 9
+
+    def exact(x: float, y: float) -> float:
+        return 1.0 + 2.0 * x + 3.0 * y
+
+    boundaries = PDEBoundaryConditions(
+        left=PDEBoundaryCondition.dirichlet(exact),
+        right=PDEBoundaryCondition.robin(
+            alpha=2.0,
+            beta=0.5,
+            gamma=lambda x, y: 2.0 * exact(x, y) + 1.0,
+        ),
+        bottom=PDEBoundaryCondition.dirichlet(exact),
+        top=PDEBoundaryCondition.dirichlet(exact),
+    )
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        nx,
+        ny,
+        boundary_conditions=boundaries,
+    )
+    x, y = result.grid
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    np.testing.assert_allclose(result.u, exact(x_mesh, y_mesh), atol=2.0e-12)
+
+
+def test_robin_zero_substitution_denominator_is_rejected() -> None:
+    """alpha + beta/h must not vanish in the one-sided Robin relation."""
+    boundaries = PDEBoundaryConditions(
+        right=PDEBoundaryCondition.robin(alpha=-8.0, beta=1.0, gamma=0.0)
+    )
+    with pytest.raises(SolverFailedError, match="denominator is numerically zero"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            9,
+            9,
+            boundary_conditions=boundaries,
+        )
+
+
+def test_invalid_structured_boundary_configurations_are_rejected() -> None:
+    """Structured data must be well-formed and separate from legacy arrays."""
+    zero_robin = PDEBoundaryConditions(right=PDEBoundaryCondition.robin(0.0, 0.0, 1.0))
+    with pytest.raises(SolverFailedError, match="alpha and beta cannot both be zero"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            boundary_conditions=zero_robin,
+        )
+
+    periodic_with_edge = PDEBoundaryConditions(
+        left=PDEBoundaryCondition.dirichlet(0.0),
+        periodic_x=True,
+    )
+    with pytest.raises(SolverFailedError, match="periodic x-axis cannot also define"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            boundary_conditions=periodic_with_edge,
+        )
+
+    with pytest.raises(SolverFailedError, match="cannot be combined with legacy"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            bc_values=np.zeros((7, 7)),
+            boundary_conditions=PDEBoundaryConditions(),
+        )
+
+
+def test_one_periodic_axis_uses_nonduplicated_endpoint_and_manufactured_solution() -> None:
+    """An x-periodic Helmholtz problem should wrap without duplicating x_max."""
+    boundaries = PDEBoundaryConditions(periodic_x=True)
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        del fx, fy, fxy, kwargs
+        exact = np.sin(2.0 * np.pi * x) * np.sin(np.pi * y)
+        return -fxx - fyy + f - (5.0 * np.pi**2 + 1.0) * exact
+
+    result = solve_pde_2d(
+        residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        32,
+        21,
+        boundary_conditions=boundaries,
+    )
+    x, y = result.grid
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = np.sin(2.0 * np.pi * x_mesh) * np.sin(np.pi * y_mesh)
+    assert x[-1] == pytest.approx(31.0 / 32.0)
+    assert x[-1] < 1.0
+    assert np.max(np.abs(result.u - exact)) < 8.0e-3
+
+
+def test_two_periodic_axes_solve_nonsingular_manufactured_helmholtz_problem() -> None:
+    """A positive zeroth-order term removes the periodic Laplacian nullspace."""
+    boundaries = PDEBoundaryConditions(periodic_x=True, periodic_y=True)
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        del fx, fy, fxy, kwargs
+        exact = np.sin(2.0 * np.pi * x) + 0.5 * np.cos(2.0 * np.pi * y)
+        return -fxx - fyy + f - (4.0 * np.pi**2 + 1.0) * exact
+
+    result = solve_pde_2d(
+        residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        28,
+        30,
+        boundary_conditions=boundaries,
+    )
+    x, y = result.grid
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = np.sin(2.0 * np.pi * x_mesh) + 0.5 * np.cos(2.0 * np.pi * y_mesh)
+    assert np.max(np.abs(result.u - exact)) < 8.0e-3
+
+
+def test_periodic_mixed_derivative_wraps_diagonal_neighbors() -> None:
+    """The f_xy stencil must wrap both coordinates at periodic seams."""
+    boundaries = PDEBoundaryConditions(periodic_x=True, periodic_y=True)
+    cross = 0.6
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        del fx, fy, kwargs
+        phase_x = 2.0 * np.pi * x
+        phase_y = 2.0 * np.pi * y
+        exact = np.sin(phase_x) * np.cos(phase_y)
+        exact_xy = -((2.0 * np.pi) ** 2) * np.cos(phase_x) * np.sin(phase_y)
+        forcing = 2.0 * (2.0 * np.pi) ** 2 * exact + cross * exact_xy + exact
+        return -fxx + cross * fxy - fyy + f - forcing
+
+    result = solve_pde_2d(
+        residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        32,
+        32,
+        boundary_conditions=boundaries,
+    )
+    x, y = result.grid
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = np.sin(2.0 * np.pi * x_mesh) * np.cos(2.0 * np.pi * y_mesh)
+    assert np.max(np.abs(result.u - exact)) < 1.0e-2
+
+
+def test_periodic_axis_combined_with_mask_is_rejected() -> None:
+    """Arbitrary-mask topology must not be silently wrapped."""
+    with pytest.raises(SolverFailedError, match="Periodic axes cannot be combined"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            mask=np.ones((7, 7), dtype=bool),
+            boundary_conditions=PDEBoundaryConditions(periodic_x=True),
+        )
+
+
+def test_mixed_periodic_and_robin_edges_are_consistent() -> None:
+    """A periodic x-axis can be combined with nonperiodic Robin/Dirichlet y edges."""
+    boundaries = PDEBoundaryConditions(
+        periodic_x=True,
+        bottom=PDEBoundaryCondition.dirichlet(lambda x, y: np.sin(2.0 * np.pi * x) + y),
+        top=PDEBoundaryCondition.robin(
+            alpha=2.0,
+            beta=0.5,
+            gamma=lambda x, y: 2.0 * (np.sin(2.0 * np.pi * x) + y) + 0.5,
+        ),
+    )
+
+    def residual(
+        x: float,
+        y: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fxx: float,
+        fxy: float,
+        fyy: float,
+        **kwargs: object,
+    ) -> float:
+        del fx, fy, fxy, kwargs
+        return -fxx - fyy + f - ((4.0 * np.pi**2 + 1.0) * np.sin(2.0 * np.pi * x) + y)
+
+    result = solve_pde_2d(
+        residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        32,
+        17,
+        boundary_conditions=boundaries,
+    )
+    x, y = result.grid
+    x_mesh, y_mesh = np.meshgrid(x, y)
+    exact = np.sin(2.0 * np.pi * x_mesh) + y_mesh
+    assert np.max(np.abs(result.u - exact)) < 9.0e-3
+
+
+def test_structured_corner_semantics_accept_dirichlet_anchor_and_reject_ambiguity() -> None:
+    """Corner behavior is explicit for mixed and incompatible edge conditions."""
+    anchored = PDEBoundaryConditions(
+        left=PDEBoundaryCondition.neumann(0.0),
+        bottom=PDEBoundaryCondition.dirichlet(0.0),
+    )
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        7,
+        7,
+        boundary_conditions=anchored,
+    )
+    assert result.u[0, 0] == pytest.approx(0.0)
+
+    ambiguous = PDEBoundaryConditions(
+        left=PDEBoundaryCondition.neumann(0.0),
+        bottom=PDEBoundaryCondition.robin(1.0, 1.0, 0.0),
+    )
+    with pytest.raises(SolverFailedError, match="Ambiguous structured boundary corner"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            boundary_conditions=ambiguous,
+        )
+
+    incompatible = PDEBoundaryConditions(
+        left=PDEBoundaryCondition.dirichlet(1.0),
+        bottom=PDEBoundaryCondition.dirichlet(2.0),
+    )
+    with pytest.raises(SolverFailedError, match="Incompatible Dirichlet values"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            boundary_conditions=incompatible,
+        )
+
+
+def test_legacy_ambiguous_corner_reconstruction_fails_instead_of_using_zero() -> None:
+    """Legacy corner data must never fall back to an invented zero value."""
+    kinds = np.full((7, 7), BC_DIRICHLET, dtype=object)
+    kinds[0, 0] = BC_NEUMANN
+    with pytest.raises(SolverFailedError, match="cannot be assigned a unique grid normal"):
+        solve_pde_2d(
+            _laplace_residual,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            7,
+            7,
+            bc_type=kinds,
+        )
+
+
+def test_disconnected_mask_components_may_have_independent_ellipticity_orientation() -> None:
+    """Definiteness orientation is local to each connected domain component."""
+    nx, ny = 17, 9
+    mask = np.zeros((ny, nx), dtype=bool)
+    mask[1:8, 1:7] = True
+    mask[1:8, 10:16] = True
+
+    def provider(
+        x: float,
+        y: float,
+        params: dict[str, float],
+    ) -> tuple[float, float, float, float, float, float, float]:
+        del y, params
+        orientation = -1.0 if x < 0.5 else 1.0
+        return (orientation, 0.0, orientation, 0.0, 0.0, 0.0, 0.0)
+
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        nx,
+        ny,
+        mask=mask,
+        coefficient_provider=provider,
+    )
+    np.testing.assert_allclose(result.u[mask], 0.0, atol=1.0e-12)
+
+
+def test_masked_structured_robin_reports_grid_normal_limitation() -> None:
+    """Masked Robin remains supported with an explicit diagnostic limitation."""
+    y_index, x_index = np.ogrid[:9, :9]
+    mask = np.abs(x_index - 4) + np.abs(y_index - 4) <= 3
+    boundaries = PDEBoundaryConditions(
+        contour=PDEBoundaryCondition.robin(alpha=1.0, beta=1.0, gamma=0.0)
+    )
+    result = solve_pde_2d(
+        _laplace_residual,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        9,
+        9,
+        mask=mask,
+        boundary_conditions=boundaries,
+    )
+    assert result.diagnostics is not None
+    assert any("grid-normal" in warning for warning in result.diagnostics.warnings)
+    np.testing.assert_allclose(result.u[mask], 0.0, atol=1.0e-12)
