@@ -37,6 +37,7 @@ class IVPOptions:
     jac: ODEJacobian | None = None
     vectorized: bool = False
     first_step: float | None = None
+    dense_output: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,7 +201,7 @@ def solve_ode(
         max_step=effective_max_step,
         rtol=rtol,
         atol=atol,
-        dense_output=True,
+        dense_output=resolved_options.dense_output,
         **scipy_options,
     )
 

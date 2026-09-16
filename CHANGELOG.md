@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated release, dependency, logo, and documentation metadata around their canonical sources.
 - Added conservative direct-coefficient fast paths for structurally explicit scalar 3D and
   vector PDE expressions, and compacted internal scalar 3D boundary workspaces.
+- Preserved dense interpolants for public IVP calls while skipping their allocation in the
+  sampled application pipeline, where only sampled results and event diagnostics are used.
 
 ## [0.5.0] - 2026-09-16
 

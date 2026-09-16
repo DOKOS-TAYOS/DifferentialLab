@@ -288,7 +288,7 @@ def _build_ode_event_options(
     )
     setattr(event, "terminal", event_terminal)
     setattr(event, "direction", float(event_direction))
-    return IVPOptions(events=(event,))
+    return IVPOptions(events=(event,), dense_output=False)
 
 
 def _build_bc_array(
@@ -1122,6 +1122,8 @@ def run_solver_pipeline(
         if not is_pde and equation_type != "difference"
         else None
     )
+    if ivp_options is None and not is_pde and equation_type != "difference":
+        ivp_options = IVPOptions(dense_output=False)
 
     # ── Validate ──────────────────────────────────────────────────────
     if not is_pde:

@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from pipeline import SolverResult, _build_mask, run_solver_pipeline
+from solver.ode_solver import solve_ode
 from solver.pde_solver import PDESolution
 from utils import EquationParseError, ValidationError
 
@@ -90,6 +91,53 @@ def test_run_solver_pipeline_supports_safe_terminal_event_expression(
     assert result.x[-1] <= 0.5
     assert result.metadata["solver_status"] == 1
     np.testing.assert_allclose(result.metadata["event_times"][0], [0.5], atol=1e-8)
+
+
+@patch("pipeline.solve_ode", wraps=solve_ode)
+def test_run_solver_pipeline_disables_unused_dense_output(mock_solve_ode: object) -> None:
+    """Sampled pipeline IVPs do not retain an interpolant they never consume."""
+    result = run_solver_pipeline(
+        expression="y[0]",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Dense output opt-out",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[1.0],
+        n_points=20,
+        method="RK45",
+        selected_stats=set(),
+    )
+
+    assert result.x.size == 20
+    assert mock_solve_ode.call_args.kwargs["options"].dense_output is False
+
+
+@patch("pipeline.solve_ode", wraps=solve_ode)
+def test_pipeline_events_preserve_dense_output_opt_out(mock_solve_ode: object) -> None:
+    """Constructing event options cannot restore dense output in the pipeline."""
+    result = run_solver_pipeline(
+        expression="1.0",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Event dense output opt-out",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[0.0],
+        n_points=20,
+        method="RK45",
+        selected_stats=set(),
+        event_expression="f[0] - 0.5",
+        event_terminal=True,
+        event_direction=1,
+    )
+
+    assert result.x[-1] <= 0.5
+    options = mock_solve_ode.call_args.kwargs["options"]
+    assert options.dense_output is False
+    assert len(options.events) == 1
 
 
 def test_run_solver_pipeline_rejects_unsafe_event_expression() -> None:

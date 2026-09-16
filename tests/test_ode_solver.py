@@ -74,6 +74,37 @@ def test_solve_ode_uses_env_when_args_none(mock_get_env: object) -> None:
     assert len(result.x) == 100  # from SOLVER_NUM_POINTS
 
 
+@patch("solver.ode_solver.get_env_from_schema")
+def test_solve_ode_keeps_dense_output_enabled_by_default(mock_get_env: object) -> None:
+    """The public wrapper continues exposing SciPy's dense interpolant by default."""
+    mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
+
+    result = solve_ode(
+        lambda _x, y: y,
+        (0.0, 1.0),
+        [1.0],
+        t_eval=np.array([0.0, 1.0]),
+    )
+
+    assert callable(result.raw.sol)
+
+
+@patch("solver.ode_solver.get_env_from_schema")
+def test_solve_ode_allows_dense_output_opt_out(mock_get_env: object) -> None:
+    """The explicit option avoids allocating an unused SciPy interpolant."""
+    mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
+
+    result = solve_ode(
+        lambda _x, y: y,
+        (0.0, 1.0),
+        [1.0],
+        t_eval=np.array([0.0, 1.0]),
+        options=IVPOptions(dense_output=False),
+    )
+
+    assert result.raw.sol is None
+
+
 @patch("solver.ode_solver.solve_ivp")
 @patch("solver.ode_solver.get_env_from_schema")
 def test_solve_ode_keeps_zero_max_step_sentinel_with_explicit_t_eval(
