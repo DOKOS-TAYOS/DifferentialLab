@@ -156,9 +156,8 @@ def assemble_vector_pde(
 ) -> AssembledPDE:
     """Assemble a component-major sparse block system for a vector 2D PDE.
 
-    Dynamic COO lists are used because each row can couple every component at
-    the center and at up to eight neighbors; the scalar ``9*n`` capacity bound
-    is therefore not valid for systems.
+    The COO workspace reserves the maximum of nine stencil contributions for
+    every solution component in each system row.
     """
     from scipy import sparse
 
@@ -178,9 +177,11 @@ def assemble_vector_pde(
     components = len(boundaries)
     n_points = int(np.count_nonzero(reference_boundary.unknown))
     system_size = components * n_points
-    rows: list[int] = []
-    cols: list[int] = []
-    data: list[float] = []
+    max_entries = 9 * components * system_size
+    rows = np.empty(max_entries, dtype=np.int64)
+    cols = np.empty(max_entries, dtype=np.int64)
+    data = np.empty(max_entries, dtype=float)
+    entry_count = 0
     rhs = np.zeros(system_size, dtype=float)
     component_orientations: dict[int, tuple[int, float, float]] = {}
 
@@ -192,10 +193,12 @@ def assemble_vector_pde(
 
     def append_entry(row: int, col: int, value: float) -> None:
         """Append a nonzero matrix contribution."""
+        nonlocal entry_count
         if value != 0.0:
-            rows.append(row)
-            cols.append(col)
-            data.append(value)
+            rows[entry_count] = row
+            cols[entry_count] = col
+            data[entry_count] = value
+            entry_count += 1
 
     for point_index, (j_raw, i_raw) in enumerate(np.argwhere(reference_boundary.unknown)):
         i, j = int(i_raw), int(j_raw)
@@ -317,7 +320,10 @@ def assemble_vector_pde(
                         mixed_neighbor=True,
                     )
 
-    matrix = sparse.coo_matrix((data, (rows, cols)), shape=(system_size, system_size)).tocsr()
+    matrix = sparse.coo_matrix(
+        (data[:entry_count], (rows[:entry_count], cols[:entry_count])),
+        shape=(system_size, system_size),
+    ).tocsr()
     if not np.all(np.isfinite(matrix.data)):
         raise SolverFailedError("Assembled vector PDE matrix contains non-finite values")
     if not np.all(np.isfinite(rhs)):

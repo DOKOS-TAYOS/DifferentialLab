@@ -559,9 +559,11 @@ def _assemble_pde_3d(
     from scipy import sparse
 
     n_unknown = int(np.count_nonzero(boundary.unknown))
-    rows: list[int] = []
-    cols: list[int] = []
-    data: list[float] = []
+    max_entries = 19 * n_unknown
+    rows = np.empty(max_entries, dtype=np.int64)
+    cols = np.empty(max_entries, dtype=np.int64)
+    data = np.empty(max_entries, dtype=float)
+    entry_count = 0
     rhs = np.zeros(n_unknown, dtype=float)
     orientation_reference: tuple[int, float, float, float] | None = None
     inv_hx2 = 1.0 / hx**2
@@ -576,10 +578,12 @@ def _assemble_pde_3d(
 
     def append_entry(row: int, col: int, value: float) -> None:
         """Append a nonzero sparse contribution."""
+        nonlocal entry_count
         if value != 0.0:
-            rows.append(row)
-            cols.append(col)
-            data.append(value)
+            rows[entry_count] = row
+            cols[entry_count] = col
+            data[entry_count] = value
+            entry_count += 1
 
     for row, (k_raw, j_raw, i_raw) in enumerate(np.argwhere(boundary.unknown)):
         i, j, k = int(i_raw), int(j_raw), int(k_raw)
@@ -648,7 +652,10 @@ def _assemble_pde_3d(
         for dj, dk, sign in ((1, 1, 1.0), (-1, 1, -1.0), (1, -1, -1.0), (-1, -1, 1.0)):
             add_neighbor(i, j + dj, k + dk, sign * fyz * inv_4hyhz)
 
-    matrix = sparse.coo_matrix((data, (rows, cols)), shape=(n_unknown, n_unknown)).tocsr()
+    matrix = sparse.coo_matrix(
+        (data[:entry_count], (rows[:entry_count], cols[:entry_count])),
+        shape=(n_unknown, n_unknown),
+    ).tocsr()
     if not np.all(np.isfinite(matrix.data)):
         raise SolverFailedError("Assembled 3D PDE matrix contains non-finite values")
     if not np.all(np.isfinite(rhs)):
