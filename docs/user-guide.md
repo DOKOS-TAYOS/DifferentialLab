@@ -65,6 +65,69 @@ Common settings include:
 - statistics to compute
 - PDE operator and visualization mode
 
+For an initial-value ODE, the optional **IVP Event** panel accepts a safe scalar
+expression in `x` and the current state, such as `f[0] - 1`. A zero marks an
+event. **Stop at event** makes it terminal, while direction `-1`, `0`, or `1`
+selects decreasing, either, or increasing zero crossings. Events are not applied
+to multipoint boundary-value solves.
+
+The programmatic ODE API keeps ordinary solver arguments on `solve_ode()` and
+groups less common capabilities in `IVPOptions`: event callables, an analytic
+Jacobian, vectorized RHS evaluation, and `first_step`. `ODESolution` reports
+`nfev`, `njev`, `nlu`, solver status, and event times/states while retaining
+the legacy `n_eval` field.
+
+```python
+import numpy as np
+
+from solver import BVPOptions, IVPOptions, solve_bvp, solve_ode
+
+
+def decay(x: float, y: np.ndarray) -> np.ndarray:
+    return -y
+
+
+def threshold(x: float, y: np.ndarray) -> float:
+    return float(y[0] - 0.25)
+
+
+threshold.terminal = True
+threshold.direction = -1
+ivp = solve_ode(
+    decay,
+    (0.0, 10.0),
+    [1.0],
+    options=IVPOptions(events=(threshold,)),
+)
+```
+
+`solve_bvp()` is the dedicated typed wrapper for conventional two-point
+boundary-value problems. Its default initial mesh is deterministic and bounded;
+non-convergence raises `SolverFailedError`. `solve_multipoint()` accepts
+`strategy="auto"`, `"shooting"`, or `"bvp"`. Auto uses the BVP backend only
+for compatible conditions split across the two endpoints, preserves a direct
+IVP for conditions entirely at the start, and retains shooting when any
+condition is genuinely interior. `strategy="bvp"` rejects interior or duplicate
+endpoint conditions explicitly.
+
+```python
+def oscillator(x: float, y: np.ndarray) -> np.ndarray:
+    return np.array([y[1], -y[0]])
+
+
+def boundary(ya: np.ndarray, yb: np.ndarray) -> np.ndarray:
+    return np.array([ya[0] - 1.0, yb[0]])
+
+
+bvp = solve_bvp(
+    oscillator,
+    (0.0, np.pi / 2),
+    boundary,
+    np.array([1.0, 0.0]),
+    options=BVPOptions(tol=1e-6),
+)
+```
+
 For 2D PDEs, the current solver supports real scalar linear/affine elliptic
 equations on rectangular domains and optional custom mask expressions. Boundary
 conditions can be Dirichlet or Neumann through the legacy point-array API.

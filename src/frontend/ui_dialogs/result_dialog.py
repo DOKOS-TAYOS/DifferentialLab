@@ -183,6 +183,13 @@ class ResultDialog:
             info_items.append(("Residual RMS", f"{metadata['residual_rms']:.2e}"))
         if metadata.get("n_jacobian_evals") is not None:
             info_items.append(("Jacobian evals", metadata["n_jacobian_evals"]))
+        if metadata.get("n_lu_decompositions") is not None:
+            info_items.append(("LU decompositions", metadata["n_lu_decompositions"]))
+        if metadata.get("solver_status") is not None:
+            info_items.append(("Solver status", metadata["solver_status"]))
+        if metadata.get("event_times"):
+            event_count = sum(len(times) for times in metadata["event_times"])
+            info_items.append(("Detected events", event_count))
         if metadata.get("relative_residual_l2") is not None:
             info_items.append(("Relative residual", f"{metadata['relative_residual_l2']:.2e}"))
         if metadata.get("component_relative_residual_l2") is not None:

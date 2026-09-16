@@ -84,6 +84,9 @@ class _SolverInputs:
     mask_expression: str | None
     contour_bc_expression: str | None
     contour_bc_type: str | None
+    event_expression: str | None
+    event_terminal: bool
+    event_direction: int
 
 
 class ParametersDialog:
@@ -156,6 +159,9 @@ class ParametersDialog:
         self._y0_vars: list[tk.StringVar] = []
         self._x0_vars: list[tk.StringVar] = []
         self._eq_param_vars: dict[str, tk.StringVar] = {}
+        self.event_expression_var: tk.StringVar | None = None
+        self.event_terminal_var: tk.BooleanVar | None = None
+        self.event_direction_var: tk.StringVar | None = None
 
         self._build_ui(default_y0, default_domain)
 
@@ -197,6 +203,7 @@ class ParametersDialog:
 
         # Solver method (ODE only) — right column
         self._build_solver_method_section(right_col, pad)
+        self._build_event_section(right_col, pad)
 
         # Statistics listbox (extended selection) — right column
         stats_frame = self._build_statistics_section(right_col, pad)
@@ -682,6 +689,50 @@ class ParametersDialog:
         if self.equation_type == "difference" or self.is_pde:
             self.method_frame.pack_forget()
 
+    def _build_event_section(self, parent: ttk.Frame, pad: int) -> None:
+        """Build safe optional event controls for initial-value ODE solves."""
+        event_frame = ttk.LabelFrame(parent, text="IVP Event (optional)", padding=pad)
+        event_frame.pack(fill=tk.X, pady=(0, pad))
+
+        expression_row = ttk.Frame(event_frame)
+        expression_row.pack(fill=tk.X)
+        ttk.Label(expression_row, text="Expression:").pack(side=tk.LEFT)
+        self.event_expression_var = tk.StringVar(value="")
+        expression_entry = ttk.Entry(
+            expression_row,
+            textvariable=self.event_expression_var,
+            width=24,
+            font=get_font(),
+        )
+        expression_entry.pack(side=tk.LEFT, padx=pad, fill=tk.X, expand=True)
+        ToolTip(
+            expression_entry,
+            "A safe expression in x and the ODE state (for example f[0] - 1). "
+            "A zero marks the event. Events are available for initial-value solves only.",
+        )
+
+        options_row = ttk.Frame(event_frame)
+        options_row.pack(fill=tk.X, pady=(pad, 0))
+        self.event_terminal_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            options_row,
+            text="Stop at event",
+            variable=self.event_terminal_var,
+        ).pack(side=tk.LEFT)
+        ttk.Label(options_row, text="Direction:").pack(side=tk.LEFT, padx=(2 * pad, pad))
+        self.event_direction_var = tk.StringVar(value="0")
+        ttk.Combobox(
+            options_row,
+            textvariable=self.event_direction_var,
+            values=("-1", "0", "1"),
+            state="readonly",
+            width=4,
+            font=get_font(),
+        ).pack(side=tk.LEFT)
+
+        if self.equation_type == "difference" or self.is_pde:
+            event_frame.pack_forget()
+
     def _build_statistics_section(self, parent: ttk.Frame, pad: int) -> ttk.LabelFrame:
         """Build statistics selection controls."""
         stats_frame = ttk.LabelFrame(parent, text="Statistics and Magnitudes", padding=pad)
@@ -1062,6 +1113,28 @@ class ParametersDialog:
             contour_bc_type,
         ) = self._collect_pde_options()
 
+        event_expression: str | None = None
+        event_terminal = False
+        event_direction = 0
+        if self.equation_type not in ("difference", "pde", "pde_3d", "vector_pde"):
+            if self.event_expression_var is not None:
+                event_expression = self.event_expression_var.get().strip() or None
+            if self.event_terminal_var is not None:
+                event_terminal = bool(self.event_terminal_var.get())
+            if self.event_direction_var is not None:
+                try:
+                    event_direction = int(self.event_direction_var.get())
+                except ValueError:
+                    raise _InputValidationError(
+                        "Check the event direction",
+                        "Event direction must be -1, 0, or 1.",
+                    ) from None
+                if event_direction not in (-1, 0, 1):
+                    raise _InputValidationError(
+                        "Check the event direction",
+                        "Event direction must be -1, 0, or 1.",
+                    )
+
         return _SolverInputs(
             x_min=x_min,
             x_max=x_max,
@@ -1082,6 +1155,9 @@ class ParametersDialog:
             mask_expression=mask_expression,
             contour_bc_expression=contour_bc_expression,
             contour_bc_type=contour_bc_type,
+            event_expression=event_expression,
+            event_terminal=event_terminal,
+            event_direction=event_direction,
         )
 
     def _confirm_heavy_request(self, solver_inputs: _SolverInputs) -> bool:
@@ -1165,6 +1241,9 @@ class ParametersDialog:
                 mask_expression=solver_inputs.mask_expression,
                 contour_bc_expression=solver_inputs.contour_bc_expression,
                 contour_bc_type=solver_inputs.contour_bc_type,
+                event_expression=solver_inputs.event_expression,
+                event_terminal=solver_inputs.event_terminal,
+                event_direction=solver_inputs.event_direction,
             )
 
         def _on_success(result: Any) -> None:
@@ -1184,7 +1263,7 @@ class ParametersDialog:
             when the worker thread triggers GC.
             """
             d = dialog_ref
-            vars_to_discard: list[tk.StringVar] = []
+            vars_to_discard: list[tk.Variable] = []
             vars_to_discard.extend(d._y0_vars)
             vars_to_discard.extend(d._x0_vars)
             vars_to_discard.extend(d._eq_param_vars.values())
@@ -1198,6 +1277,9 @@ class ParametersDialog:
                 "npoints_var",
                 "npoints_y_var",
                 "method_var",
+                "event_expression_var",
+                "event_terminal_var",
+                "event_direction_var",
                 "_domain_shape_var",
                 "_mask_expr_var",
                 "_contour_bc_expr_var",

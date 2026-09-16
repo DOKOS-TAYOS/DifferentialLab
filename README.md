@@ -37,7 +37,8 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## What It Solves
 
-- Scalar ODEs with SciPy integrators (`RK45`, `RK23`, `DOP853`, `Radau`, `BDF`, `LSODA`)
+- Scalar ODEs with SciPy IVP integrators, safe terminal/directional events, and a
+  dedicated endpoint-BVP backend with shooting retained for true multipoint conditions
 - Vector ODE systems with component-aware notation and visualizations
 - Difference equations and recurrence systems
 - Scalar linear elliptic 2D PDE workflows with rectangular or masked domains,

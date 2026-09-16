@@ -210,6 +210,59 @@ def get_ode_function(
     return ode_func
 
 
+def parse_ode_event_expression(
+    expression: str,
+    *,
+    state_size: int,
+    parameters: dict[str, float] | None = None,
+    notation: FNotation | None = None,
+) -> Callable[[float, np.ndarray], float]:
+    """Parse a safe scalar event expression for an ODE state.
+
+    Event expressions use the same safe math namespace and ``f``-notation
+    rewriting as ODE equations. A root of the returned scalar callable marks
+    an event for :func:`scipy.integrate.solve_ivp`.
+
+    Args:
+        expression: Scalar expression in ``x`` and the ODE state.
+        state_size: Expected length of the flat solver state.
+        parameters: Named finite scalar parameters.
+        notation: Optional scalar/vector notation used to rewrite ``f`` tokens.
+
+    Returns:
+        A scalar event callable ``event(x, y)``.
+
+    Raises:
+        EquationParseError: If the expression is unsafe, invalid, or non-scalar.
+    """
+    if isinstance(state_size, bool) or not isinstance(state_size, int) or state_size < 1:
+        raise EquationParseError("ODE event state_size must be a positive integer")
+    normalized = normalize_unicode_escapes(expression).strip()
+    if not normalized:
+        raise EquationParseError("ODE event expression cannot be empty")
+    if notation is None:
+        notation = FNotation(kind="ode", order=state_size)
+    normalized = _maybe_rewrite(normalized, notation)
+    validate_expression_ast(normalized, "ODE event expression")
+    namespace = build_eval_namespace(normalize_params(parameters))
+    compiled = _compile_and_test(
+        normalized,
+        namespace,
+        var_names=("x", "y"),
+        test_values={"y_size": state_size},
+    )
+
+    def event(x: float, y: np.ndarray) -> float:
+        """Evaluate the compiled event expression."""
+        value = safe_eval(compiled, {**namespace, "x": x, "y": y})
+        result = float(value)
+        if not np.isfinite(result):
+            raise EquationParseError("ODE event expression returned a non-finite value")
+        return result
+
+    return event
+
+
 def _parse_difference_expression(
     expression: str,
     order: int,

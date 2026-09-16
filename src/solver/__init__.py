@@ -14,6 +14,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "get_difference_function": ("solver.equation_parser", "get_difference_function"),
     "get_ode_function": ("solver.equation_parser", "get_ode_function"),
     "get_vector_ode_function": ("solver.equation_parser", "get_vector_ode_function"),
+    "parse_ode_event_expression": (
+        "solver.equation_parser",
+        "parse_ode_event_expression",
+    ),
     "parse_pde_rhs_expression": ("solver.equation_parser", "parse_pde_rhs_expression"),
     "parse_pde_3d_residual_expression": (
         "solver.equation_parser",
@@ -27,6 +31,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "FNotation": ("solver.notation", "FNotation"),
     "generate_derivative_labels": ("solver.notation", "generate_derivative_labels"),
     "ODESolution": ("solver.ode_solver", "ODESolution"),
+    "IVPOptions": ("solver.ode_solver", "IVPOptions"),
+    "BVPOptions": ("solver.ode_solver", "BVPOptions"),
+    "BVPSolution": ("solver.ode_solver", "BVPSolution"),
+    "solve_bvp": ("solver.ode_solver", "solve_bvp"),
     "solve_multipoint": ("solver.ode_solver", "solve_multipoint"),
     "solve_ode": ("solver.ode_solver", "solve_ode"),
     "PDEDiagnostics": ("solver.pde_solver", "PDEDiagnostics"),
@@ -61,6 +69,7 @@ __all__ = [
     "get_difference_function",
     "get_ode_function",
     "get_vector_ode_function",
+    "parse_ode_event_expression",
     "parse_pde_rhs_expression",
     "parse_pde_3d_residual_expression",
     "parse_vector_pde_residual_expressions",
@@ -68,6 +77,10 @@ __all__ = [
     "FNotation",
     "generate_derivative_labels",
     "ODESolution",
+    "IVPOptions",
+    "BVPOptions",
+    "BVPSolution",
+    "solve_bvp",
     "solve_multipoint",
     "solve_ode",
     "PDEDiagnostics",
@@ -103,13 +116,22 @@ if TYPE_CHECKING:
         get_difference_function,
         get_ode_function,
         get_vector_ode_function,
+        parse_ode_event_expression,
         parse_pde_3d_residual_expression,
         parse_pde_rhs_expression,
         parse_vector_pde_residual_expressions,
     )
     from solver.error_metrics import compute_ode_residual_error
     from solver.notation import FNotation, generate_derivative_labels
-    from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
+    from solver.ode_solver import (
+        BVPOptions,
+        BVPSolution,
+        IVPOptions,
+        ODESolution,
+        solve_bvp,
+        solve_multipoint,
+        solve_ode,
+    )
     from solver.pde_3d_solver import solve_pde_3d
     from solver.pde_solver import PDEDiagnostics, PDESolution, solve_pde_2d
     from solver.pde_system_solver import solve_vector_pde_2d

@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coefficient paths, strict 3x3 principal-matrix validation, mixed-derivative sparse
   stencils, six-face Dirichlet/Neumann/Robin data, periodic axes, algebraic diagnostics,
   standard-workflow dispatch, pre-run sparse-memory advice, and orthogonal slice access.
+- Added typed IVP options for events, analytic Jacobians, vectorized evaluation, and
+  first-step control; structured ODE work/status/event diagnostics; and safe terminal or
+  directional event expressions in the standard ODE dialog.
+- Added a typed SciPy BVP wrapper plus automatic, forced-shooting, and forced-BVP
+  multipoint strategies with deterministic bounded initial meshes and explicit
+  incompatible-condition failures.
 
 ### Security
 
@@ -35,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restricted the update checker to HTTPS version URLs.
 
 ### Changed
+
+- Preserved zero-valued ODE solver options through explicit `None` resolution, including
+  the `max_step=0` infinity sentinel when callers supply their own evaluation grid.
 
 - Hardened the scalar 2D PDE solver with strict domain, grid, mask, boundary-data,
   coefficient, affine-residual, ellipticity, sparse-solve, and finiteness validation.

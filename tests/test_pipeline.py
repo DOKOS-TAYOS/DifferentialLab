@@ -59,6 +59,57 @@ def test_run_solver_pipeline_success(
     np.testing.assert_allclose(result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5)
 
 
+@patch("solver.ode_solver.get_env_from_schema")
+def test_run_solver_pipeline_supports_safe_terminal_event_expression(
+    mock_ode_env: object,
+) -> None:
+    mock_ode_env.side_effect = lambda key: {
+        "SOLVER_MAX_STEP": 0.0,
+        "SOLVER_RTOL": 1e-8,
+        "SOLVER_ATOL": 1e-10,
+        "SOLVER_NUM_POINTS": 101,
+    }.get(key, 101)
+
+    result = run_solver_pipeline(
+        expression="1.0",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Linear event",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[0.0],
+        n_points=101,
+        method="RK45",
+        selected_stats=set(),
+        event_expression="f[0] - 0.5",
+        event_terminal=True,
+        event_direction=1,
+    )
+
+    assert result.x[-1] <= 0.5
+    assert result.metadata["solver_status"] == 1
+    np.testing.assert_allclose(result.metadata["event_times"][0], [0.5], atol=1e-8)
+
+
+def test_run_solver_pipeline_rejects_unsafe_event_expression() -> None:
+    with pytest.raises(EquationParseError, match="Disallowed"):
+        run_solver_pipeline(
+            expression="1.0",
+            function_name=None,
+            order=1,
+            parameters={},
+            equation_name="Unsafe event",
+            x_min=0.0,
+            x_max=1.0,
+            y0=[0.0],
+            n_points=20,
+            method="RK45",
+            selected_stats=set(),
+            event_expression="__import__('os')",
+        )
+
+
 def test_run_solver_pipeline_validation_error() -> None:
     with pytest.raises(ValidationError) as exc_info:
         run_solver_pipeline(

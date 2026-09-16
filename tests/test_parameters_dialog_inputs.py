@@ -12,10 +12,10 @@ from utils import DifferentialLabError
 
 
 class _FakeVar:
-    def __init__(self, value: str) -> None:
+    def __init__(self, value: object) -> None:
         self._value = value
 
-    def get(self) -> str:
+    def get(self) -> object:
         return self._value
 
 
@@ -67,6 +67,9 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog.xmax_var = _FakeVar("1.0")
     dialog.npoints_var = _FakeVar("50")
     dialog.method_var = _FakeVar("RK45")
+    dialog.event_expression_var = _FakeVar("f[0] - 0.5")
+    dialog.event_terminal_var = _FakeVar(True)
+    dialog.event_direction_var = _FakeVar("-1")
     dialog._eq_param_vars = {
         "a": _FakeVar("2.5"),
         "weights[3]": _FakeVar("1, 2, 3"),
@@ -102,6 +105,9 @@ def test_collect_solver_inputs_builds_scalar_pipeline_kwargs() -> None:
     assert collected.y_min is None
     assert collected.y_max is None
     assert collected.n_points_y is None
+    assert collected.event_expression == "f[0] - 0.5"
+    assert collected.event_terminal is True
+    assert collected.event_direction == -1
     assert collected.parameters["a"] == 2.5
     np.testing.assert_allclose(collected.parameters["weights"], np.array([1.0, 2.0, 3.0]))
 

@@ -10,6 +10,7 @@ import numpy as np
 from config import get_env_from_schema
 from solver import (
     FNotation,
+    IVPOptions,
     ODESolution,
     compute_statistics,
     compute_statistics_2d,
@@ -17,6 +18,7 @@ from solver import (
     get_ode_function,
     get_vector_ode_function,
     is_multivariate,
+    parse_ode_event_expression,
     parse_pde_3d_residual_expression,
     parse_pde_rhs_expression,
     parse_vector_pde_residual_expressions,
@@ -226,17 +228,57 @@ def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
         solution: ODE solution from :func:`solve_ode` or :func:`solve_multipoint`.
 
     Returns:
-        Dict with rtol, atol, and optionally n_jacobian_evals.
+        Dict with tolerances, work counters, status, and event diagnostics.
     """
     quality: dict[str, Any] = {
         "rtol": get_env_from_schema("SOLVER_RTOL"),
         "atol": get_env_from_schema("SOLVER_ATOL"),
+        "n_function_evals": solution.nfev,
+        "n_jacobian_evals": solution.njev,
+        "n_lu_decompositions": solution.nlu,
+        "solver_status": solution.status,
+        "event_times": solution.t_events,
+        "event_states": solution.y_events,
+        "method_used": solution.method_used,
     }
-    if solution.raw is not None:
-        njev = getattr(solution.raw, "njev", None)
-        if njev is not None:
-            quality["n_jacobian_evals"] = int(njev)
     return quality
+
+
+def _build_ode_event_options(
+    *,
+    event_expression: str | None,
+    event_terminal: bool,
+    event_direction: int,
+    parameters: dict[str, float],
+    order: int,
+    is_vector: bool,
+    vector_components: int,
+    component_orders: tuple[int, ...] | None,
+) -> IVPOptions | None:
+    """Compile an optional safe GUI event expression into IVP options."""
+    if event_expression is None or not event_expression.strip():
+        return None
+    if event_direction not in (-1, 0, 1):
+        raise ValidationError("ODE event direction must be -1, 0, or 1")
+
+    if is_vector:
+        notation = FNotation(
+            kind="vector_ode",
+            n_components=vector_components,
+            order=order,
+            component_orders=component_orders or (),
+        )
+    else:
+        notation = FNotation(kind="ode", order=order)
+    event = parse_ode_event_expression(
+        event_expression,
+        state_size=notation.state_size(),
+        parameters=parameters,
+        notation=notation,
+    )
+    setattr(event, "terminal", event_terminal)
+    setattr(event, "direction", float(event_direction))
+    return IVPOptions(events=(event,))
 
 
 def _build_bc_array(
@@ -814,6 +856,7 @@ def _dispatch_vector_ode(
     y0: list[float],
     n_points: int,
     method: str,
+    ivp_options: IVPOptions | None,
 ) -> _DispatchResult:
     """Dispatch a vector ODE solve.
 
@@ -829,7 +872,14 @@ def _dispatch_vector_ode(
         parameters=parameters,
     )
     t_eval = np.linspace(x_min, x_max, n_points)
-    solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+    solution = solve_ode(
+        ode_func,
+        (x_min, x_max),
+        y0,
+        method=method,
+        t_eval=t_eval,
+        options=ivp_options,
+    )
     return _DispatchResult(
         x=solution.x,
         y=solution.y,
@@ -853,6 +903,7 @@ def _dispatch_scalar_ode(
     n_points: int,
     method: str,
     x0_list: list[float] | None,
+    ivp_options: IVPOptions | None,
 ) -> _DispatchResult:
     """Dispatch a scalar ODE solve (IVP or multipoint BVP).
 
@@ -868,6 +919,8 @@ def _dispatch_scalar_ode(
     t_eval = np.linspace(x_min, x_max, n_points)
     use_multipoint = x0_list is not None and any(abs(xi - x_min) > 1e-12 for xi in x0_list)
     if use_multipoint:
+        if ivp_options is not None and ivp_options.events:
+            raise ValidationError("ODE events are supported for initial-value problems only")
         conditions = [(k, xi, ai) for k, (xi, ai) in enumerate(zip(x0_list, y0))]  # type: ignore[arg-type]
         solution = solve_multipoint(
             ode_func,
@@ -879,7 +932,14 @@ def _dispatch_scalar_ode(
             t_eval=t_eval,
         )
     else:
-        solution = solve_ode(ode_func, (x_min, x_max), y0, method=method, t_eval=t_eval)
+        solution = solve_ode(
+            ode_func,
+            (x_min, x_max),
+            y0,
+            method=method,
+            t_eval=t_eval,
+            options=ivp_options,
+        )
     return _DispatchResult(
         x=solution.x,
         y=solution.y,
@@ -970,6 +1030,9 @@ def run_solver_pipeline(
     contour_bc_type: str | None = None,
     augment_highest_derivative: bool = True,
     compute_residual_metrics: bool = True,
+    event_expression: str | None = None,
+    event_terminal: bool = False,
+    event_direction: int = 0,
 ) -> SolverResult:
     """Execute the full solve workflow and return data results.
 
@@ -1008,6 +1071,9 @@ def run_solver_pipeline(
             computed from the ODE right-hand side for display.
         compute_residual_metrics: Whether to compute residual metrics by
             comparing the ODE right-hand side to numerical gradients.
+        event_expression: Optional safe IVP event expression whose zero marks an event.
+        event_terminal: Whether the event stops integration.
+        event_direction: Crossing direction filter: ``-1``, ``0``, or ``1``.
 
     Returns:
         A :class:`SolverResult` with solution data, statistics, and metadata.
@@ -1025,6 +1091,20 @@ def run_solver_pipeline(
     is_vector = (
         vector_expressions is not None and len(vector_expressions) > 0
     ) or equation_type in ("vector_ode", "vector_pde")
+    ivp_options = (
+        _build_ode_event_options(
+            event_expression=event_expression,
+            event_terminal=event_terminal,
+            event_direction=event_direction,
+            parameters=parameters,
+            order=order,
+            is_vector=is_vector,
+            vector_components=vector_components,
+            component_orders=component_orders,
+        )
+        if not is_pde and equation_type != "difference"
+        else None
+    )
 
     # ── Validate ──────────────────────────────────────────────────────
     if not is_pde:
@@ -1133,6 +1213,7 @@ def run_solver_pipeline(
             y0=y0,
             n_points=n_points,
             method=method,
+            ivp_options=ivp_options,
         )
     else:
         dr = _dispatch_scalar_ode(
@@ -1146,6 +1227,7 @@ def run_solver_pipeline(
             n_points=n_points,
             method=method,
             x0_list=x0_list,
+            ivp_options=ivp_options,
         )
 
     solution_x = dr.x
@@ -1233,7 +1315,11 @@ def run_solver_pipeline(
         ),
         "initial_conditions": y0,
         "ic_points": x0_list if x0_list is not None else [x_min] * order,
-        "method": method if equation_type == "ode" else "fdm",
+        "method": (
+            dr.solver_quality.get("method_used", method)
+            if equation_type in ("ode", "vector_ode")
+            else "fdm"
+        ),
         "num_points": n_points,
         "solver_success": dr.success,
         "solver_message": dr.message,
@@ -1244,6 +1330,10 @@ def run_solver_pipeline(
         "residual_mean": dr.error_metrics.get("residual_mean"),
         "residual_rms": dr.error_metrics.get("residual_rms"),
         "n_jacobian_evals": dr.solver_quality.get("n_jacobian_evals"),
+        "n_lu_decompositions": dr.solver_quality.get("n_lu_decompositions"),
+        "solver_status": dr.solver_quality.get("solver_status"),
+        "event_times": dr.solver_quality.get("event_times"),
+        "event_states": dr.solver_quality.get("event_states"),
         "discrete_residual_l2": dr.solver_quality.get("discrete_residual_l2"),
         "relative_residual_l2": dr.solver_quality.get("relative_residual_l2"),
         "component_residual_l2": dr.solver_quality.get("component_residual_l2"),
