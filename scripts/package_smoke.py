@@ -18,9 +18,11 @@ def main() -> None:
     assert callable(console_entry.load())
 
     import main_program
+    from config import APP_VERSION
     from solver.predefined import load_predefined_equations
 
     assert callable(main_program.main)
+    assert APP_VERSION == package.version
     assert find_spec("pipeline") is not None
     assert load_predefined_equations()
 
