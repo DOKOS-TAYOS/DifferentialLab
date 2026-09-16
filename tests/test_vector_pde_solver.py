@@ -304,6 +304,34 @@ def test_indefinite_principal_symbol_is_rejected() -> None:
         )
 
 
+def test_principal_symbol_reports_the_first_failing_direction() -> None:
+    def provider(
+        _x: float,
+        _y: float,
+        _params: dict[str, float],
+    ) -> VectorPDECoefficients:
+        positive = np.eye(2)
+        negative = -np.eye(2)
+        zero = np.zeros((2, 2))
+        return VectorPDECoefficients(positive, zero, negative, zero, zero, zero, np.zeros(2))
+
+    with pytest.raises(
+        SolverFailedError,
+        match=r"principal symbol is not uniformly definite in sampled direction 8",
+    ):
+        solve_vector_pde_2d(
+            None,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            5,
+            5,
+            components=2,
+            coefficient_provider=provider,
+        )
+
+
 def test_principal_symbol_orientation_must_be_consistent_in_domain_component() -> None:
     def provider(
         x: float,

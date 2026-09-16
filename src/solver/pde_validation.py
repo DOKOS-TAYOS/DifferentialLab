@@ -263,40 +263,42 @@ def validate_vector_coefficients(
         f"constant at {coordinate}",
     )
 
-    orientation: int | None = None
-    for direction_index in range(_STRONG_ELLIPTICITY_DIRECTIONS):
-        angle = np.pi * direction_index / _STRONG_ELLIPTICITY_DIRECTIONS
-        direction_x = float(np.cos(angle))
-        direction_y = float(np.sin(angle))
-        symbol = (
-            matrices["fxx"] * direction_x**2
-            + matrices["fxy"] * direction_x * direction_y
-            + matrices["fyy"] * direction_y**2
+    direction_indices = np.arange(_STRONG_ELLIPTICITY_DIRECTIONS, dtype=float)
+    angles = np.pi * direction_indices / _STRONG_ELLIPTICITY_DIRECTIONS
+    direction_x = np.cos(angles)
+    direction_y = np.sin(angles)
+    symbols = (
+        matrices["fxx"] * direction_x[:, np.newaxis, np.newaxis] ** 2
+        + matrices["fxy"] * (direction_x * direction_y)[:, np.newaxis, np.newaxis]
+        + matrices["fyy"] * direction_y[:, np.newaxis, np.newaxis] ** 2
+    )
+    symmetric_symbols = 0.5 * (symbols + np.swapaxes(symbols, -1, -2))
+    symbol_scales = np.maximum(
+        np.linalg.norm(symmetric_symbols, ord=np.inf, axis=(-2, -1)),
+        np.finfo(float).tiny,
+    )
+    eigenvalues = np.linalg.eigvalsh(symmetric_symbols)
+    tolerances = _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE * symbol_scales
+    positive = np.all(eigenvalues > tolerances[:, np.newaxis], axis=1)
+    negative = np.all(eigenvalues < -tolerances[:, np.newaxis], axis=1)
+    definite = positive | negative
+    failing_directions = np.flatnonzero(~definite)
+    if failing_directions.size:
+        direction_index = int(failing_directions[0])
+        raise SolverFailedError(
+            "Vector PDE principal symbol is not uniformly definite in sampled direction "
+            f"{direction_index} at {coordinate}: direction="
+            f"({direction_x[direction_index]:.12g}, {direction_y[direction_index]:.12g}), "
+            f"eigenvalues={eigenvalues[direction_index].tolist()}, "
+            f"tolerance={tolerances[direction_index]:.3g}"
         )
-        symmetric_symbol = 0.5 * (symbol + symbol.T)
-        symbol_scale = max(
-            float(np.linalg.norm(symmetric_symbol, ord=np.inf)),
-            np.finfo(float).tiny,
+
+    orientations = np.where(positive, 1, -1)
+    if np.any(orientations != orientations[0]):
+        raise SolverFailedError(
+            "Vector PDE principal-symbol orientation changes across sampled directions "
+            f"at {coordinate}"
         )
-        eigenvalues = np.linalg.eigvalsh(symmetric_symbol)
-        tolerance = _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE * symbol_scale
-        positive = bool(np.all(eigenvalues > tolerance))
-        negative = bool(np.all(eigenvalues < -tolerance))
-        if not (positive or negative):
-            raise SolverFailedError(
-                "Vector PDE principal symbol is not uniformly definite in sampled direction "
-                f"{direction_index} at {coordinate}: direction="
-                f"({direction_x:.12g}, {direction_y:.12g}), "
-                f"eigenvalues={eigenvalues.tolist()}, tolerance={tolerance:.3g}"
-            )
-        current = 1 if positive else -1
-        if orientation is None:
-            orientation = current
-        elif current != orientation:
-            raise SolverFailedError(
-                "Vector PDE principal-symbol orientation changes across sampled directions "
-                f"at {coordinate}"
-            )
 
     normalized = VectorPDECoefficients(
         fxx=matrices["fxx"],
@@ -307,8 +309,7 @@ def validate_vector_coefficients(
         f=matrices["f"],
         constant=constant,
     )
-    assert orientation is not None
-    return normalized, orientation
+    return normalized, int(orientations[0])
 
 
 def validate_coefficients(
