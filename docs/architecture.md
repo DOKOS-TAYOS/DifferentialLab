@@ -60,7 +60,8 @@ switch views without re-solving.
 `run_solver_pipeline()` handles these paths:
 
 - scalar ODEs through `solve_ode()` or `solve_multipoint()`, with typed IVP
-  options/events and endpoint-only automatic routing to the `solve_bvp()` backend
+  options/events, an all-at-start IVP shortcut, and BVP routing for every other
+  compatible endpoint-only condition set
 - vector ODEs through `get_vector_ode_function()` and `solve_ode()`
 - difference equations through `solve_difference()`
 - scalar linear elliptic 2D PDEs through `solve_pde_2d()`, with affine-residual,
@@ -82,8 +83,9 @@ densify large sparse matrices.
 
 `ode_solver.py` keeps the legacy IVP and shooting surfaces, adds a bounded
 deterministic SciPy BVP wrapper, and exposes work counters/status/event results.
-Safe GUI event expressions are compiled by `equation_parser.py`; they reach the
-solver as ordinary callables, so the numerical layer remains independent of Tk.
+Safe GUI event expressions are compiled and checked for one finite real scalar
+result by `equation_parser.py`; they reach the solver as ordinary callables, so
+the numerical layer remains independent of Tk.
 
 PDE responsibilities are split without introducing a generic N-dimensional
 framework:

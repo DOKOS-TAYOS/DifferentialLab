@@ -532,8 +532,9 @@ def solve_multipoint(
 ) -> ODESolution:
     """Solve endpoint or true multipoint ODE conditions.
 
-    ``auto`` uses SciPy's BVP backend for conventional conditions split across
-    both domain endpoints, a direct IVP for conditions all at ``x_min``, and
+    ``auto`` first preserves the direct IVP shortcut for conditions all at
+    ``x_min``. It otherwise uses SciPy's BVP backend for every compatible
+    endpoint-only condition set, including conditions all at ``x_max``, and
     shooting for conditions containing an interior point. ``bvp`` requires a
     compatible endpoint-only condition set, while ``shooting`` always selects
     the legacy root-finding route (except the exact all-at-start IVP shortcut).
@@ -573,9 +574,7 @@ def solve_multipoint(
             "strategy='bvp' requires unique conditions located only at x_min or x_max"
         )
 
-    use_bvp = strategy == "bvp" or (
-        strategy == "auto" and sides is not None and "left" in sides and "right" in sides
-    )
+    use_bvp = strategy == "bvp" or (strategy == "auto" and sides is not None)
     if use_bvp:
         assert sides is not None
         return _solve_multipoint_bvp(

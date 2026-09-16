@@ -69,7 +69,8 @@ For an initial-value ODE, the optional **IVP Event** panel accepts a safe scalar
 expression in `x` and the current state, such as `f[0] - 1`. A zero marks an
 event. **Stop at event** makes it terminal, while direction `-1`, `0`, or `1`
 selects decreasing, either, or increasing zero crossings. Events are not applied
-to multipoint boundary-value solves.
+to multipoint boundary-value solves. Event parsing rejects vector, complex,
+Boolean, and non-finite results before integration starts.
 
 The programmatic ODE API keeps ordinary solver arguments on `solve_ode()` and
 groups less common capabilities in `IVPOptions`: event callables, an analytic
@@ -104,11 +105,11 @@ ivp = solve_ode(
 `solve_bvp()` is the dedicated typed wrapper for conventional two-point
 boundary-value problems. Its default initial mesh is deterministic and bounded;
 non-convergence raises `SolverFailedError`. `solve_multipoint()` accepts
-`strategy="auto"`, `"shooting"`, or `"bvp"`. Auto uses the BVP backend only
-for compatible conditions split across the two endpoints, preserves a direct
-IVP for conditions entirely at the start, and retains shooting when any
-condition is genuinely interior. `strategy="bvp"` rejects interior or duplicate
-endpoint conditions explicitly.
+`strategy="auto"`, `"shooting"`, or `"bvp"`. Auto preserves a direct IVP for
+compatible conditions entirely at the start. Every other compatible
+endpoint-only set uses the BVP backend, including conditions entirely at the
+right endpoint; any genuinely interior condition retains shooting.
+`strategy="bvp"` rejects interior or duplicate endpoint conditions explicitly.
 
 ```python
 def oscillator(x: float, y: np.ndarray) -> np.ndarray:

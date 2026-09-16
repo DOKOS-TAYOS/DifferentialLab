@@ -179,6 +179,7 @@ def test_solve_multipoint_all_at_start_reduces_to_ivp(mock_get_env: object) -> N
         t_eval=np.linspace(0, 10, 50),
     )
     assert result.success is True
+    assert result.method_used == "RK45"
     assert result.y.shape[0] == 2
 
 
@@ -199,6 +200,7 @@ def test_solve_multipoint_different_points(mock_get_env: object) -> None:
         t_eval=t_eval,
     )
     assert result.success is True
+    assert result.method_used == "RK45"
     assert result.y.shape[0] == 2
     np.testing.assert_allclose(result.y[0, 0], 1.0, atol=1e-5)
     # Solution at pi/2 should be close to 0 (shooting target; interpolation at grid)
@@ -234,6 +236,23 @@ def test_multipoint_auto_uses_bvp_for_endpoint_conditions(mock_get_env: object) 
     result = solve_multipoint(
         ode_func,
         conditions=[(0, 0.0, 1.0), (0, np.pi / 2, 0.0)],
+        order=2,
+        x_min=0.0,
+        x_max=np.pi / 2,
+        t_eval=np.linspace(0.0, np.pi / 2, 41),
+    )
+
+    assert result.method_used == "BVP"
+    np.testing.assert_allclose(result.y[0], np.cos(result.x), atol=2e-4)
+
+
+@patch("solver.ode_solver.get_env_from_schema")
+def test_multipoint_auto_uses_bvp_for_conditions_all_at_right(mock_get_env: object) -> None:
+    mock_get_env.side_effect = lambda k: _SOLVER_ENV.get(k, 100)
+    ode_func = _parse_expression("-y[0]", order=2)
+    result = solve_multipoint(
+        ode_func,
+        conditions=[(0, np.pi / 2, 0.0), (1, np.pi / 2, -1.0)],
         order=2,
         x_min=0.0,
         x_max=np.pi / 2,

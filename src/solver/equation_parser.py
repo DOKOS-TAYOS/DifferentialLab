@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import re
+from numbers import Real
 from typing import Any, Callable, cast
 
 import numpy as np
@@ -48,6 +49,7 @@ def _compile_and_test(
     namespace: dict[str, Any],
     var_names: str | tuple[str, ...] = ("x", "y"),
     test_values: dict[str, Any] | None = None,
+    result_validator: Callable[[Any], None] | None = None,
 ) -> Any:
     """Compile an expression and test it for evaluation errors.
 
@@ -56,6 +58,7 @@ def _compile_and_test(
         namespace: Namespace dict (typically {**SAFE_MATH, **params}).
         var_names: Variable names to include in test eval (single string or tuple).
         test_values: Override test values for variables (e.g., {"x": 0.0}).
+        result_validator: Optional validation applied to the test result.
 
     Returns:
         Compiled code object.
@@ -80,11 +83,30 @@ def _compile_and_test(
             test_ns[var_name] = np.zeros(test_values.get("y_size", 1) if test_values else 1)
 
     try:
-        safe_eval(compiled, test_ns)
+        result = safe_eval(compiled, test_ns)
+        if result_validator is not None:
+            result_validator(result)
+    except EquationParseError:
+        raise
     except Exception as exc:
         raise EquationParseError(f"Expression evaluation failed: {exc}") from exc
 
     return compiled
+
+
+def _coerce_ode_event_value(value: Any) -> float:
+    """Return one finite real event value or raise a parse error."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+        raise EquationParseError("ODE event expression must return exactly one finite real scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise EquationParseError("ODE event expression must return exactly one finite real scalar")
+    return result
+
+
+def _validate_ode_event_value(value: Any) -> None:
+    """Validate the deterministic parse-time event result."""
+    _coerce_ode_event_value(value)
 
 
 def _load_config_function(function_name: str, module_name: str = "config.equations") -> Callable:
@@ -220,8 +242,9 @@ def parse_ode_event_expression(
     """Parse a safe scalar event expression for an ODE state.
 
     Event expressions use the same safe math namespace and ``f``-notation
-    rewriting as ODE equations. A root of the returned scalar callable marks
-    an event for :func:`scipy.integrate.solve_ivp`.
+    rewriting as ODE equations. Parse-time test evaluation and every runtime
+    evaluation must produce exactly one finite real scalar. A root of the
+    returned callable marks an event for :func:`scipy.integrate.solve_ivp`.
 
     Args:
         expression: Scalar expression in ``x`` and the ODE state.
@@ -250,15 +273,13 @@ def parse_ode_event_expression(
         namespace,
         var_names=("x", "y"),
         test_values={"y_size": state_size},
+        result_validator=_validate_ode_event_value,
     )
 
     def event(x: float, y: np.ndarray) -> float:
         """Evaluate the compiled event expression."""
         value = safe_eval(compiled, {**namespace, "x": x, "y": y})
-        result = float(value)
-        if not np.isfinite(result):
-            raise EquationParseError("ODE event expression returned a non-finite value")
-        return result
+        return _coerce_ode_event_value(value)
 
     return event
 

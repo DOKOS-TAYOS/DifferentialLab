@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Preserved zero-valued ODE solver options through explicit `None` resolution, including
   the `max_step=0` infinity sentinel when callers supply their own evaluation grid.
+- Corrected automatic multipoint routing so every compatible endpoint-only condition set
+  after the all-at-start IVP shortcut uses BVP, including conditions entirely at `x_max`.
+- Reject ODE event expressions during parsing unless their test evaluation produces
+  exactly one finite real scalar.
 
 - Hardened the scalar 2D PDE solver with strict domain, grid, mask, boundary-data,
   coefficient, affine-residual, ellipticity, sparse-solve, and finiteness validation.

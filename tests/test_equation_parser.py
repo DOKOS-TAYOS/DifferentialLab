@@ -9,6 +9,7 @@ from solver.equation_parser import (
     _parse_expression,
     _validate_expression,
     normalize_unicode_escapes,
+    parse_ode_event_expression,
     parse_vector_pde_residual_expressions,
 )
 from utils import EquationParseError
@@ -125,6 +126,35 @@ class TestParseExpression:
     def test_parameter_name_with_dunder_is_rejected(self) -> None:
         with pytest.raises(EquationParseError, match="Unsafe parameter name"):
             _parse_expression("k * y[0]", order=1, parameters={"__class__": 1.0})
+
+
+class TestParseODEEventExpression:
+    def test_scalar_finite_event_is_valid(self) -> None:
+        event = parse_ode_event_expression(
+            "sin(x) + f[0] - threshold", state_size=2, parameters={"threshold": 0.5}
+        )
+
+        result = event(np.pi / 2, np.array([0.25, 0.0]))
+
+        np.testing.assert_allclose(result, 0.75)
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "y",
+            "[y[0], y[1]]",
+            "(y[0],)",
+            "1j",
+            "1e309",
+            "True",
+        ],
+    )
+    def test_non_scalar_or_non_real_finite_event_is_rejected_during_parse(
+        self,
+        expression: str,
+    ) -> None:
+        with pytest.raises(EquationParseError, match="exactly one finite real scalar"):
+            parse_ode_event_expression(expression, state_size=2)
 
 
 class TestVectorPDEResidualParser:
