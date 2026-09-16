@@ -190,6 +190,11 @@ def embed_animation_plot_in_tk(
                 pass
             _play_job = None
 
+    # Result dialogs can replace or close an animation while a playback callback
+    # is pending on the toplevel.  Expose its cancellation through the canvas so
+    # the shared cleanup path owns the complete animation lifecycle.
+    setattr(canvas, "_stop_animation", _on_stop)
+
     if update_fn is not None and n_points > 0:
         scale = ttk.Scale(
             ctrl_frame,

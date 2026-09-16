@@ -31,7 +31,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   - 10 difference equations
   - 12 2D PDE examples
   - 1 coupled Vector PDE example
-- Complex problem plugins: 7 registered modules
+- Advanced Problems: 7 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
 
@@ -54,7 +54,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 - Cartesian scalar PDE views plus polar re-sampling for visualization; coordinate transforms
   are display-only and never alter the solved equation
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
-- Specialized complex-problem models with custom UI, solvers, diagnostics, and result dialogs
+- Advanced Problems subsystem with specialized models, custom UI, solvers, diagnostics, and result dialogs
 
 ## Core Features
 
@@ -73,10 +73,11 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   are ignored by git.
 - GitHub checks include Dependabot, CodeQL default setup, and a weekly Python dependency audit.
 
-## Complex Problems
+## Advanced Problems
 
-The main menu exposes these through `Advanced Problems`; internally this is the
-`Complex Problems` plugin subsystem.
+`Advanced Problems` is a seven-plugin subsystem. Internally, its Python package
+is named `complex_problems`; each plugin provides its own configuration dialog,
+solver, structured result, and result dialog.
 
 Current modules:
 

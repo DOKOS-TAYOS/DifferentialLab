@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -50,6 +50,18 @@ def test_close_embedded_figure_closes_canvas_figure() -> None:
         result_dialog_ui.close_embedded_figure(canvas)
 
     close_figure.assert_called_once_with(figure)
+
+
+def test_close_embedded_figure_stops_pending_animation_before_closing() -> None:
+    result_dialog_ui = _load_result_dialog_ui_module()
+    canvas = _FakeCanvas(figure=_FakeFigure())
+    stop_animation = MagicMock()
+    canvas._stop_animation = stop_animation  # type: ignore[attr-defined]
+
+    with patch("matplotlib.pyplot.close"):
+        result_dialog_ui.close_embedded_figure(canvas)
+
+    stop_animation.assert_called_once_with()
 
 
 def test_close_embedded_figure_ignores_missing_or_failing_figures() -> None:

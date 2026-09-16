@@ -1,6 +1,6 @@
-# Complex Problems Guide
+# Advanced Problems Guide
 
-`Complex Problems` is a plugin subsystem where each problem contributes a
+`Advanced Problems` is a seven-plugin subsystem where each problem contributes a
 specialized UI, solver, and result dialog.
 
 ## Plugin Contract

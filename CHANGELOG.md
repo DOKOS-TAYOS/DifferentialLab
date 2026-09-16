@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added parameterized Advanced Problems contract smoke coverage for all seven registered
+  plugins, including lazy descriptors, callable dialog entry points, and finite
+  representative numerical solves.
 - Added display-only Cartesian/polar, cylindrical, and spherical coordinate utilities with
   deterministic singular-origin vector bases; scalar 2D polar re-sampling, Vector PDE
   component/magnitude/quiver/stream/radial-tangential views, and shared 3D slice extraction.
@@ -45,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Stabilized Advanced Problems cleanup by cancelling pending Tk animation playback when
+  a result view is replaced or its dialog closes.
 - Restricted planar Vector PDE views (quiver, stream, and radial/tangential) to
   exactly two components, preserving component and magnitude views for larger systems.
 - Corrected cylindrical vector-component transforms so every returned component uses

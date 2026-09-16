@@ -11,6 +11,13 @@ def close_embedded_figure(canvas: object | None) -> None:
     if canvas is None:
         return
 
+    stop_animation = getattr(canvas, "_stop_animation", None)
+    if callable(stop_animation):
+        try:
+            stop_animation()
+        except Exception:
+            pass
+
     figure = getattr(canvas, "figure", None)
     if figure is None:
         return
