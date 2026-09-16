@@ -9,7 +9,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![CI](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml/badge.svg)](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml)
 
@@ -21,7 +21,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## Current State
 
-- App version: `0.4.1`
+- App version: `0.5.0`
 - Python: `>=3.12`
 - Package name: `differential-lab`
 - GUI: Tkinter/ttk with embedded Matplotlib figures

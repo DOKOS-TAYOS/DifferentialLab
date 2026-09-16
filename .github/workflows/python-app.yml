@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev]" build
 
       - name: Lint with Ruff
         run: ruff check .
@@ -44,22 +44,76 @@ jobs:
         run: ruff format . --check
 
       - name: Test with pytest
-        run: python -m pytest
+        run: python -m pytest --cov --cov-fail-under=70
 
       - name: Type check with Pyright
         run: pyright
 
+      - name: Build source and wheel distributions
+        run: python -m build
+
+      - name: Clean-install package smoke test
+        run: |
+          python -m venv .package-smoke
+          .package-smoke/bin/python -m pip install --upgrade pip
+          .package-smoke/bin/python -m pip install dist/*.whl
+          .package-smoke/bin/python scripts/package_smoke.py
+
+  platform-smoke:
+    name: Package smoke (${{ matrix.os }}, Python 3.12)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Clean-install package smoke test
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          python -m venv .package-smoke
+          .\.package-smoke\Scripts\python.exe -m pip install --upgrade pip
+          .\.package-smoke\Scripts\python.exe -m pip install (Get-ChildItem dist\*.whl).FullName
+          .\.package-smoke\Scripts\python.exe scripts\package_smoke.py
+
+      - name: Clean-install package smoke test
+        shell: bash
+        if: runner.os == 'macOS'
+        run: |
+          python -m venv .package-smoke
+          .package-smoke/bin/python -m pip install --upgrade pip
+          .package-smoke/bin/python -m pip install dist/*.whl
+          .package-smoke/bin/python scripts/package_smoke.py
+
   required-pr-ci:
     name: required-pr-ci
     if: ${{ always() }}
-    needs: [quality]
+    needs: [quality, platform-smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Verify required jobs
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
+          PLATFORM_SMOKE_RESULT: ${{ needs.platform-smoke.result }}
         run: |
           if [ "$QUALITY_RESULT" != "success" ]; then
             echo "Quality job result: $QUALITY_RESULT"
+            exit 1
+          fi
+          if [ "$PLATFORM_SMOKE_RESULT" != "success" ]; then
+            echo "Platform smoke job result: $PLATFORM_SMOKE_RESULT"
             exit 1
           fi

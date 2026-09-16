@@ -15,7 +15,7 @@ workflows. The current repository includes:
 
 ## Repository Snapshot
 
-- Version: `0.4.1`
+- Version: `0.5.0`
 - Python: `>=3.12`
 - Predefined equation catalog: 120 entries
 - Complex problem plugins: 7 registered modules

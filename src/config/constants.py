@@ -3,7 +3,7 @@
 from typing import Final
 
 APP_NAME: Final[str] = "DifferentialLab"
-APP_VERSION: Final[str] = "0.4.1"
+APP_VERSION: Final[str] = "0.5.0"
 
 SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "RK45": "Runge-Kutta 4(5) — general-purpose explicit method",

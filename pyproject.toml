@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "differential-lab"
-version = "0.4.1"
+version = "0.5.0"
 description = "DifferentialLab — Numerical ODE solver with Tkinter GUI, predefined equations, and professional visualizations"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Alejandro Mata Ali", email = "alejandro.mata.ali@gmail.com"}
 ]
@@ -18,7 +18,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Physics",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
@@ -50,8 +49,14 @@ docs = [
 [project.scripts]
 differential-lab = "main_program:main"
 
+[tool.setuptools]
+py-modules = ["main_program", "pipeline"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+config = ["equations/*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -62,10 +67,14 @@ python_functions = "test_*"
 addopts = "-v --tb=short --basetemp=.pytest-temp"
 
 [tool.coverage.run]
-source = ["src"]
+source = [
+    "src/solver",
+    "src/utils",
+]
 omit = ["tests/*"]
 
 [tool.coverage.report]
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

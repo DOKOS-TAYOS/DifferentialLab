@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-16
+
 ### Added
 
 - Added parameterized Advanced Problems contract smoke coverage for all seven registered
@@ -48,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Hardened package distribution contents, clean-install smoke verification, and cross-platform CI;
+  CI now enforces at least 70% coverage for the tested runtime core.
 - Stabilized Advanced Problems cleanup by cancelling pending Tk animation playback when
   a result view is replaced or its dialog closes.
 - Restricted planar Vector PDE views (quiver, stream, and radial/tangential) to
