@@ -1,9 +1,27 @@
 """Application constants for DifferentialLab."""
 
+import tomllib
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Final
 
 APP_NAME: Final[str] = "DifferentialLab"
-APP_VERSION: Final[str] = "0.5.0"
+
+
+def _get_app_version() -> str:
+    """Return source project metadata or installed distribution metadata."""
+    pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    if pyproject.exists():
+        return tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+
+    try:
+        return version("differential-lab")
+    except PackageNotFoundError:
+        msg = "DifferentialLab package metadata is unavailable. Install the package to run it."
+        raise RuntimeError(msg) from None
+
+
+APP_VERSION: Final[str] = _get_app_version()
 
 SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "RK45": "Runge-Kutta 4(5) — general-purpose explicit method",

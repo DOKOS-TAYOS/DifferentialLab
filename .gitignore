@@ -56,4 +56,3 @@ pytest_tmp*/
 tmp_pytest*/
 .coverage
 htmlcov/
-.mypy_cache/

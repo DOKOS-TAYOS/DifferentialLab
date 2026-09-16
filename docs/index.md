@@ -1,4 +1,4 @@
-![DifferentialLab Logo](_static/DifferentialLab_logo.png)
+![DifferentialLab Logo](../images/DifferentialLab_logo.png)
 
 # DifferentialLab Documentation
 
@@ -15,9 +15,8 @@ workflows. The current repository includes:
 
 ## Repository Snapshot
 
-- Version: `0.5.0`
 - Python: `>=3.12`
-- Predefined equation catalog: 120 entries
+- Predefined equation catalog: [`src/config/equations/`](../src/config/equations/)
 - Complex problem plugins: 7 registered modules
 - Configuration source of truth: `src/config/env.py`
 - Main entry point: `src/main_program.py`
