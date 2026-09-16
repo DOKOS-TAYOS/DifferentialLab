@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import textwrap
 from collections.abc import Callable
 from dataclasses import dataclass, fields, is_dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -17,7 +22,6 @@ from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 from complex_problems.problem_registry import (
     _REGISTRATIONS,
-    ProblemRegistration,
     ProblemRegistry,
 )
 from complex_problems.schrodinger_td.solver import solve_schrodinger_td
@@ -150,6 +154,52 @@ _SMOKE_CASES: tuple[_SmokeCase, ...] = (
 )
 
 
+_LAZY_LOADING_CONTRACT_SCRIPT = """
+import sys
+
+from complex_problems import PROBLEM_REGISTRY
+from complex_problems.problem_registry import (
+    _REGISTRATIONS,
+    ProblemRegistry,
+    get_problem_descriptors,
+)
+
+plugin_modules = tuple(registration.module_path for registration in _REGISTRATIONS)
+
+
+def loaded_plugin_modules() -> set[str]:
+    return {module_path for module_path in plugin_modules if module_path in sys.modules}
+
+
+assert not loaded_plugin_modules()
+
+# Constructing another registry and accessing the public lazy mapping must not
+# materialize plugin descriptors.
+constructed_registry = ProblemRegistry(_REGISTRATIONS)
+lazy_mapping = PROBLEM_REGISTRY
+assert constructed_registry is not None
+assert lazy_mapping is not None
+assert not loaded_plugin_modules()
+
+descriptors = get_problem_descriptors()
+assert loaded_plugin_modules() == set(plugin_modules)
+assert len(descriptors) == len(plugin_modules) == len(set(descriptors))
+assert set(descriptors) == {
+    "coupled_oscillators",
+    "membrane_2d",
+    "nonlinear_waves",
+    "schrodinger_td",
+    "antenna_radiation",
+    "aerodynamics_2d",
+    "pipe_flow",
+}
+for descriptor in descriptors.values():
+    assert descriptor.id.strip()
+    assert descriptor.name.strip()
+    assert descriptor.description.strip()
+"""
+
+
 def _assert_finite_arrays(value: object) -> None:
     """Assert every numerical array in a structured solver result is finite."""
     if isinstance(value, np.ndarray):
@@ -167,19 +217,25 @@ def _assert_finite_arrays(value: object) -> None:
         assert bool(np.isfinite(value))
 
 
-@pytest.mark.parametrize("registration", _REGISTRATIONS, ids=lambda item: item.module_path)
-def test_registered_plugin_contract_is_lazy_and_valid(registration: ProblemRegistration) -> None:
-    """Every registration lazily imports a plugin with a valid dialog entry point."""
-    registry = ProblemRegistry((registration,))
+def test_registered_plugin_contract_is_lazy_and_valid_in_isolated_interpreter() -> None:
+    """The public registry defers all plugin imports until descriptors are requested."""
+    repository_root = Path(__file__).resolve().parents[1]
+    environment = os.environ.copy()
+    python_paths = [str(repository_root / "src")]
+    if inherited_python_path := environment.get("PYTHONPATH"):
+        python_paths.append(inherited_python_path)
+    environment["PYTHONPATH"] = os.pathsep.join(python_paths)
 
-    descriptors = registry.get_descriptors()
+    completed = subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(_LAZY_LOADING_CONTRACT_SCRIPT)],
+        cwd=repository_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
-    assert len(descriptors) == 1
-    descriptor = next(iter(descriptors.values()))
-    assert descriptor.id.strip()
-    assert descriptor.name.strip()
-    assert descriptor.description.strip()
-    assert callable(registry._plugins[descriptor.id].open_dialog)  # type: ignore[index, union-attr]
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_registered_plugin_descriptors_are_unique() -> None:
