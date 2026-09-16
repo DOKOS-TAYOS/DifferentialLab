@@ -1634,9 +1634,7 @@ class ResultDialog:
         controls.pack(fill=tk.X, padx=4, pady=4)
         ttk.Label(controls, text="View:").pack(side=tk.LEFT, padx=(0, 4))
         self._vector_pde_view_var = tk.StringVar(value="Magnitude")
-        views = ["Components", "Magnitude"]
-        if self._result.vector_components >= 2:
-            views.extend(["Quiver", "Streamlines", "Radial/Tangential"])
+        views = self._vector_pde_view_labels()
         selector = ttk.Combobox(
             controls,
             textvariable=self._vector_pde_view_var,
@@ -1664,6 +1662,13 @@ class ResultDialog:
         self._vector_pde_field_frame.pack(fill=tk.BOTH, expand=True)
         self._vector_pde_field_canvas: FigureCanvasTkAgg | None = None
         self._update_vector_pde_field()
+
+    def _vector_pde_view_labels(self) -> list[str]:
+        """Return views compatible with the Vector PDE component count."""
+        views = ["Components", "Magnitude"]
+        if self._result.vector_components == 2:
+            views.extend(["Quiver", "Streamlines", "Radial/Tangential"])
+        return views
 
     def _update_vector_pde_field(self) -> None:
         """Render the selected vector PDE field view."""

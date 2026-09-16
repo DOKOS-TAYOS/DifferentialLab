@@ -580,10 +580,11 @@ def create_vector_field_plot(
 ) -> Figure:
     """Create component, magnitude, quiver, stream, or radial field views.
 
-    Quiver, stream, and radial/tangential views use the first two components;
+    Quiver, stream, and radial/tangential views require exactly two components;
     component and magnitude views support any positive component count.
     """
     import matplotlib.pyplot as plt
+    import numpy as np
 
     from plotting.coordinates import cartesian_vector_to_polar, vector_field_data
 
@@ -611,6 +612,9 @@ def create_vector_field_plot(
         _finalize_plot(ax, title, "x", "y")
         fig.tight_layout()
         return fig
+
+    if field.shape[0] != 2:
+        raise ValueError(f"{view} view requires exactly two vector components")
 
     data = vector_field_data(x, y, field)
     x_grid, y_grid = np.meshgrid(data.x, data.y)

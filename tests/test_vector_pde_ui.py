@@ -84,6 +84,14 @@ def test_vector_pde_result_fields_include_components_and_magnitude_without_displ
     assert magnitude_label == "|f|"
 
 
+def test_three_component_vector_pde_ui_omits_planar_field_views() -> None:
+    """A Vector PDE is planar only when it has exactly two components."""
+    dialog = ResultDialog.__new__(ResultDialog)
+    dialog._result = SimpleNamespace(vector_components=3)
+
+    assert dialog._vector_pde_view_labels() == ["Components", "Magnitude"]
+
+
 def test_vector_pde_field_view_dispatches_quiver_without_display() -> None:
     """The result dialog selects the plotting view and preserves the chosen origin."""
     dialog = ResultDialog.__new__(ResultDialog)

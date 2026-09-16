@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Restricted planar Vector PDE views (quiver, stream, and radial/tangential) to
+  exactly two components, preserving component and magnitude views for larger systems.
+- Corrected cylindrical vector-component transforms so every returned component uses
+  the common broadcast shape of its vector and coordinate inputs.
 - Preserved zero-valued ODE solver options through explicit `None` resolution, including
   the `max_step=0` infinity sentinel when callers supply their own evaluation grid.
 - Corrected automatic multipoint routing so every compatible endpoint-only condition set

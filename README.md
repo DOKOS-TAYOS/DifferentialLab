@@ -46,7 +46,8 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   component-aware ellipticity validation, and algebraic diagnostics
 - Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
   component-aware boundaries, sparse block assembly, component/magnitude views, and
-  Cartesian quiver, stream, and radial/tangential visualizations
+  Cartesian quiver, stream, and radial/tangential visualizations for exactly
+  two-component systems
 - Scalar linear elliptic PDEs on rectangular 3D grids with all six second-order
   coefficients, Dirichlet/Neumann/Robin faces, periodic axes, sparse diagnostics,
   pre-run memory advice, and selectable coordinate-labelled orthogonal result slices

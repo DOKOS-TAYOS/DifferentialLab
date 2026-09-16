@@ -299,9 +299,10 @@ not a proof for every direction.
 component-major: `component * n_unknown_points + point_index`. Diagnostics
 report global residuals, per-equation residuals, matrix shape and nonzero count.
 A dense condition estimate remains limited to systems of at most 256 unknowns.
-The result dialog provides every component field plus the Euclidean magnitude;
-two-component output is marked as a planar vector field in metadata for later
-quiver/stream visualization.
+The result dialog provides every component field plus the Euclidean magnitude.
+Only exactly two-component output is treated as a planar vector field and can
+use quiver, stream, or radial/tangential visualizations; systems with any other
+positive component count retain component and magnitude views.
 
 ### 4. Solve and inspect
 

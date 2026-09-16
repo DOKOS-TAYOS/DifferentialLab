@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
+from plotting import create_vector_field_plot
 from plotting.coordinates import (
     cartesian_to_cylindrical,
     cartesian_to_polar,
@@ -59,6 +61,26 @@ def test_3d_vector_component_round_trips() -> None:
     np.testing.assert_allclose(spherical_vector_to_cartesian(*spherical, x, y, z), (vx, vy, vz))
 
 
+def test_cylindrical_vector_transforms_broadcast_scalar_axial_component() -> None:
+    """Cylindrical vector conversions broadcast an axial scalar over a 2D grid."""
+    x, y = np.meshgrid(np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+    vx = x + y
+    vy = x - y
+    axial = 7.0
+
+    cylindrical = cartesian_vector_to_cylindrical(vx, vy, axial, x, y)
+    assert all(component.shape == x.shape for component in cylindrical)
+    cartesian = cylindrical_vector_to_cartesian(*cylindrical, x, y)
+    assert all(component.shape == x.shape for component in cartesian)
+    np.testing.assert_allclose(cartesian, (vx, vy, np.full_like(x, axial)))
+
+    inverse_with_scalar_axial = cylindrical_vector_to_cartesian(
+        cylindrical[0], cylindrical[1], axial, x, y
+    )
+    assert all(component.shape == x.shape for component in inverse_with_scalar_axial)
+    np.testing.assert_allclose(inverse_with_scalar_axial, (vx, vy, np.full_like(x, axial)))
+
+
 def test_polar_resampling_preserves_shape_and_invalid_regions() -> None:
     """Polar display data has predictable dimensions and keeps source masks."""
     x = np.linspace(-1.0, 1.0, 5)
@@ -76,6 +98,24 @@ def test_vector_plot_data_computes_magnitude_and_validates_shape() -> None:
     components = np.array([[[3.0, 0.0]], [[4.0, 5.0]]])
     field = vector_field_data([0.0, 1.0], [0.0], components)
     np.testing.assert_allclose(field.magnitude, [[5.0, 5.0]])
+
+
+def test_three_component_fields_reject_planar_views_but_support_other_views() -> None:
+    """Only exactly two components may be rendered as a planar vector field."""
+    components = np.ones((3, 2, 2))
+    with pytest.raises(ValueError, match="shape \\(2, len\\(y\\), len\\(x\\)\\)"):
+        vector_field_data([0.0, 1.0], [0.0, 1.0], components)
+
+    for view in ("components", "magnitude"):
+        figure = create_vector_field_plot(
+            np.array([0.0, 1.0]), np.array([0.0, 1.0]), components, view=view
+        )
+        figure.clf()
+    for view in ("quiver", "stream", "radial_tangential"):
+        with pytest.raises(ValueError, match="requires exactly two vector components"):
+            create_vector_field_plot(
+                np.array([0.0, 1.0]), np.array([0.0, 1.0]), components, view=view
+            )
 
 
 def test_extract_scalar_3d_slice_uses_documented_public_axis_order() -> None:

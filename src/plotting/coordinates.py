@@ -147,17 +147,27 @@ def polar_vector_to_cartesian(
 def cartesian_vector_to_cylindrical(
     vx: ArrayLike, vy: ArrayLike, vz: ArrayLike, x: ArrayLike, y: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Express a Cartesian vector in the cylindrical basis."""
-    radial, tangential = cartesian_vector_to_polar(vx, vy, x, y)
-    return radial, tangential, np.asarray(vz, dtype=float)
+    """Express a Cartesian vector in the cylindrical basis.
+
+    Every returned component has the common broadcast shape of the vector and
+    coordinate inputs.
+    """
+    vx_arr, vy_arr, axial_arr, x_arr, y_arr = _arrays(vx, vy, vz, x, y)
+    radial, tangential = cartesian_vector_to_polar(vx_arr, vy_arr, x_arr, y_arr)
+    return radial, tangential, axial_arr
 
 
 def cylindrical_vector_to_cartesian(
     radial: ArrayLike, tangential: ArrayLike, axial: ArrayLike, x: ArrayLike, y: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
-    """Express cylindrical vector components in the Cartesian basis."""
-    vx, vy = polar_vector_to_cartesian(radial, tangential, x, y)
-    return vx, vy, np.asarray(axial, dtype=float)
+    """Express cylindrical vector components in the Cartesian basis.
+
+    Every returned component has the common broadcast shape of the vector and
+    coordinate inputs.
+    """
+    radial_arr, tangential_arr, axial_arr, x_arr, y_arr = _arrays(radial, tangential, axial, x, y)
+    vx, vy = polar_vector_to_cartesian(radial_arr, tangential_arr, x_arr, y_arr)
+    return vx, vy, axial_arr
 
 
 def cartesian_vector_to_spherical(
@@ -242,13 +252,13 @@ def resample_scalar_to_polar(
 
 
 def vector_field_data(x: ArrayLike, y: ArrayLike, components: ArrayLike) -> VectorFieldData:
-    """Validate the first two vector components and compute their magnitude."""
+    """Validate an exactly two-component planar field and compute its magnitude."""
     x_arr = np.asarray(x, dtype=float)
     y_arr = np.asarray(y, dtype=float)
     field = np.asarray(components, dtype=float)
     expected_shape = (len(y_arr), len(x_arr))
-    if field.ndim != 3 or field.shape[0] < 2 or field.shape[1:] != expected_shape:
-        raise ValueError("components must have shape (at least 2, len(y), len(x))")
+    if field.ndim != 3 or field.shape[0] != 2 or field.shape[1:] != expected_shape:
+        raise ValueError("components must have shape (2, len(y), len(x))")
     u, v = field[0], field[1]
     return VectorFieldData(x=x_arr, y=y_arr, u=u, v=v, magnitude=np.hypot(u, v))
 
