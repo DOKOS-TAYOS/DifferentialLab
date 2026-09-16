@@ -44,7 +44,15 @@ def _resolve_mass_array(
     masses_spec: float | list[float] | Callable[[int], float],
     n: int,
 ) -> np.ndarray:
-    masses = np.array([_resolve_mass(masses_spec, i, n) for i in range(n)], dtype=float)
+    if callable(masses_spec):
+        masses = np.fromiter((float(masses_spec(i)) for i in range(n)), dtype=float, count=n)
+    elif isinstance(masses_spec, (list, tuple, np.ndarray)):
+        values = np.asarray(masses_spec, dtype=float).ravel()
+        if values.size == 0:
+            raise ValueError("Mass specification list cannot be empty.")
+        masses = np.pad(values[:n], (0, max(0, n - values.size)), mode="edge")
+    else:
+        masses = np.full(n, float(masses_spec), dtype=float)
     if np.any(masses <= 0):
         raise ValueError("All masses must be positive.")
     return masses
@@ -57,7 +65,17 @@ def _resolve_k_array(
 ) -> np.ndarray:
     if n_springs <= 0:
         return np.zeros(0, dtype=float)
-    k_arr = np.array([_resolve_k(k_spec, i, n) for i in range(n_springs)], dtype=float)
+    if callable(k_spec):
+        k_arr = np.fromiter(
+            (float(k_spec(i)) for i in range(n_springs)), dtype=float, count=n_springs
+        )
+    elif isinstance(k_spec, (list, tuple, np.ndarray)):
+        values = np.asarray(k_spec, dtype=float).ravel()
+        if values.size == 0:
+            raise ValueError("Coupling specification list cannot be empty.")
+        k_arr = np.pad(values[:n_springs], (0, max(0, n_springs - values.size)), mode="edge")
+    else:
+        k_arr = np.full(n_springs, float(k_spec), dtype=float)
     if np.any(k_arr < 0):
         raise ValueError("Coupling constants must be non-negative.")
     return k_arr

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Consolidated release, dependency, logo, and documentation metadata around their canonical sources.
+- Vectorized safe custom membrane initial-displacement expressions while retaining scalar callable
+  fallback, removed a redundant fixed-boundary acceleration copy, and normalized coupled-oscillator
+  mass/coupling specifications once per solve.
 - Added conservative direct-coefficient fast paths for structurally explicit scalar 3D and
   vector PDE expressions, and compacted internal scalar 3D boundary workspaces.
 - Preserved dense interpolants for public IVP calls while skipping their allocation in the

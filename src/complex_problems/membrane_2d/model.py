@@ -6,6 +6,8 @@ from collections.abc import Callable
 
 import numpy as np
 
+from complex_problems.common.expression import CompiledScalarExpression
+
 _SHAPES = {"gaussian", "mode", "random", "custom"}
 
 
@@ -61,7 +63,6 @@ def acceleration_field(
 
     a = force / mass
     if boundary == "fixed":
-        a = a.copy()
         a[0, :] = 0.0
         a[-1, :] = 0.0
         a[:, 0] = 0.0
@@ -88,7 +89,7 @@ def build_initial_displacement(
     mode_y: int = 1,
     center_x: float = 0.5,
     center_y: float = 0.5,
-    custom_fn: Callable[[float, float], float] | None = None,
+    custom_fn: Callable[[float, float], float] | CompiledScalarExpression | None = None,
     random_seed: int = 0,
     boundary: str = "fixed",
 ) -> np.ndarray:
@@ -121,10 +122,25 @@ def build_initial_displacement(
     else:
         if custom_fn is None:
             raise ValueError("Custom shape selected but no expression provided.")
-        u = np.array(
-            [[custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)] for j in range(ny)],
-            dtype=float,
-        )
+        if isinstance(custom_fn, CompiledScalarExpression):
+            try:
+                evaluated = custom_fn.evaluate_array(X, Y)
+                u = np.broadcast_to(evaluated, X.shape).copy()
+                if u.shape != X.shape:
+                    raise ValueError("Custom expression must produce the grid shape.")
+            except (TypeError, ValueError):
+                u = np.array(
+                    [
+                        [custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)]
+                        for j in range(ny)
+                    ],
+                    dtype=float,
+                )
+        else:
+            u = np.array(
+                [[custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)] for j in range(ny)],
+                dtype=float,
+            )
 
     if boundary == "fixed":
         u = u.copy()
