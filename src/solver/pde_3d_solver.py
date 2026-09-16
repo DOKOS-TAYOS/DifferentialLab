@@ -650,7 +650,7 @@ def _assemble_pde_3d(
                 return
             if not boundary.boundary[neighbor_k, neighbor_j, neighbor_i]:
                 return
-            if boundary.kind[neighbor_k, neighbor_j, neighbor_i] == BC_DIRICHLET:
+            if boundary.kind[neighbor_k, neighbor_j, neighbor_i] == _DIRICHLET_CODE:
                 rhs[row] -= coefficient * boundary.gamma[neighbor_k, neighbor_j, neighbor_i]
                 return
             inward_i, inward_j, inward_k, factor, offset = _boundary_substitution_3d(

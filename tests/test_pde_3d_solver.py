@@ -7,10 +7,17 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from solver.pde_3d_solver import _boundary_substitution_3d, _prepare_boundary_3d, solve_pde_3d
+import solver.pde_3d_solver as pde_3d_solver
+from solver.pde_3d_solver import (
+    _assemble_pde_3d,
+    _boundary_substitution_3d,
+    _prepare_boundary_3d,
+    solve_pde_3d,
+)
 from solver.pde_types import (
     PDEBoundaryCondition3D,
     PDEBoundaryConditions3D,
+    PDECoefficients3D,
     PDEDiagnostics,
     PDESolution3D,
 )
@@ -38,6 +45,78 @@ def test_prepared_boundary_uses_compact_kind_and_inward_direction_arrays() -> No
     assert (inward_i, inward_j, inward_k) == (1, 2, 2)
     assert factor == pytest.approx(1.0)
     assert offset == pytest.approx(0.5)
+
+
+def test_assembler_uses_direct_path_for_dirichlet_neighbors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dirichlet neighbors contribute their value without boundary substitution."""
+    grid = np.linspace(0.0, 1.0, 3)
+    boundary = _prepare_boundary_3d(
+        PDEBoundaryConditions3D(
+            x_min=PDEBoundaryCondition3D.dirichlet(2.0),
+            x_max=PDEBoundaryCondition3D.dirichlet(2.0),
+            y_min=PDEBoundaryCondition3D.dirichlet(2.0),
+            y_max=PDEBoundaryCondition3D.dirichlet(2.0),
+            z_min=PDEBoundaryCondition3D.dirichlet(2.0),
+            z_max=PDEBoundaryCondition3D.dirichlet(2.0),
+        ),
+        x=grid,
+        y=grid,
+        z=grid,
+        hx=0.5,
+        hy=0.5,
+        hz=0.5,
+    )
+    coefficients: PDECoefficients3D = (
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+
+    def coefficient_at(
+        _x: float,
+        _y: float,
+        _z: float,
+    ) -> tuple[PDECoefficients3D, int]:
+        """Return a constant positive-definite Laplacian."""
+        return coefficients, 1
+
+    def fail_if_substitution_is_called(
+        _boundary: object,
+        _i: int,
+        _j: int,
+        _k: int,
+    ) -> tuple[int, int, int, float, float]:
+        """Reject the non-Dirichlet elimination path in this regression test."""
+        raise AssertionError("Dirichlet neighbors must not use boundary substitution")
+
+    monkeypatch.setattr(
+        pde_3d_solver,
+        "_boundary_substitution_3d",
+        fail_if_substitution_is_called,
+    )
+    assembled = _assemble_pde_3d(
+        grid,
+        grid,
+        grid,
+        hx=0.5,
+        hy=0.5,
+        hz=0.5,
+        boundary=boundary,
+        coefficient_at=coefficient_at,
+    )
+
+    assert assembled.matrix.shape == (1, 1)
+    assert assembled.rhs == pytest.approx([-48.0])
 
 
 def _negative_laplacian_residual(
