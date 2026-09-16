@@ -30,6 +30,10 @@ from solver import (
     solve_vector_pde_2d,
     validate_all_inputs,
 )
+from solver.equation_parser import (
+    build_pde_3d_coefficient_provider,
+    build_vector_pde_coefficient_provider,
+)
 from solver.error_metrics import compute_ode_residual_error_from_rhs
 from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDECoefficientProvider, PDECoefficients
 from solver.pde_types import (
@@ -142,6 +146,11 @@ def _dispatch_3d_pde(
     if len(vars_list) != 3:
         raise ValidationError("PDE 3D requires exactly three spatial variables")
     parsed_residual = parse_pde_3d_residual_expression(expression or "0", vars_list, parameters)
+    coefficient_provider = build_pde_3d_coefficient_provider(
+        expression or "0",
+        vars_list,
+        parameters,
+    )
 
     def residual(
         x: float,
@@ -186,7 +195,7 @@ def _dispatch_3d_pde(
         bc_types=bc_types,
     )
     solution = solve_pde_3d(
-        residual,
+        None if coefficient_provider is not None else residual,
         x_min,
         x_max,
         y_min,
@@ -197,6 +206,7 @@ def _dispatch_3d_pde(
         ny,
         nz,
         parameters=parameters,
+        coefficient_provider=coefficient_provider,
         boundary_conditions=boundaries,
     )
     quality: dict[str, Any] = {}
@@ -759,6 +769,12 @@ def _dispatch_vector_pde(
         vars_list,
         parameters,
     )
+    coefficient_provider = build_vector_pde_coefficient_provider(
+        vector_expressions or [],
+        vector_components,
+        vars_list,
+        parameters,
+    )
     ny = n_points if n_points_y is None else n_points_y
     x_grid = np.linspace(x_min, x_max, n_points)
     y_grid = np.linspace(y_min, y_max, ny)
@@ -773,7 +789,7 @@ def _dispatch_vector_pde(
         contour_bc_type=contour_bc_type,
     )
     solution = solve_vector_pde_2d(
-        residual,
+        None if coefficient_provider is not None else residual,
         x_min,
         x_max,
         y_min,
@@ -783,6 +799,7 @@ def _dispatch_vector_pde(
         components=vector_components,
         parameters=parameters,
         mask=mask,
+        coefficient_provider=coefficient_provider,
         boundary_conditions=boundaries,
     )
     quality: dict[str, Any] = {}

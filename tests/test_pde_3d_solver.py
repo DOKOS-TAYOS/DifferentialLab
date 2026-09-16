@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from solver.pde_3d_solver import solve_pde_3d
+from solver.pde_3d_solver import _boundary_substitution_3d, _prepare_boundary_3d, solve_pde_3d
 from solver.pde_types import (
     PDEBoundaryCondition3D,
     PDEBoundaryConditions3D,
@@ -15,6 +15,29 @@ from solver.pde_types import (
     PDESolution3D,
 )
 from utils import SolverFailedError
+
+
+def test_prepared_boundary_uses_compact_kind_and_inward_direction_arrays() -> None:
+    """Internal 3D boundary storage preserves substitutions without object/index grids."""
+    grid = np.linspace(0.0, 1.0, 5)
+    prepared = _prepare_boundary_3d(
+        PDEBoundaryConditions3D(x_min=PDEBoundaryCondition3D.neumann(2.0)),
+        x=grid,
+        y=grid,
+        z=grid,
+        hx=0.25,
+        hy=0.25,
+        hz=0.25,
+    )
+
+    assert prepared.kind.dtype == np.uint8
+    assert prepared.inward_direction.dtype == np.uint8
+    assert not hasattr(prepared, "inward_i")
+    assert not hasattr(prepared, "step")
+    inward_i, inward_j, inward_k, factor, offset = _boundary_substitution_3d(prepared, 0, 2, 2)
+    assert (inward_i, inward_j, inward_k) == (1, 2, 2)
+    assert factor == pytest.approx(1.0)
+    assert offset == pytest.approx(0.5)
 
 
 def _negative_laplacian_residual(

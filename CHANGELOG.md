@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Consolidated release, dependency, logo, and documentation metadata around their canonical sources.
+- Added conservative direct-coefficient fast paths for structurally explicit scalar 3D and
+  vector PDE expressions, and compacted internal scalar 3D boundary workspaces.
 
 ## [0.5.0] - 2026-09-16
 

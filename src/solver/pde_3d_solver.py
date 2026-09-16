@@ -29,6 +29,21 @@ _AFFINITY_PROBE_3D = (0.37, -0.61, 1.19, -0.83, 0.47, 1.31, -1.07, 0.73, -0.29, 
 _AFFINITY_TOLERANCE = 1.0e-9
 _BOUNDARY_RTOL = 1.0e-10
 _BOUNDARY_ATOL = 1.0e-12
+_DIRICHLET_CODE = np.uint8(0)
+_NEUMANN_CODE = np.uint8(1)
+_ROBIN_CODE = np.uint8(2)
+_NO_INWARD_DIRECTION = np.uint8(255)
+_BOUNDARY_KIND_CODES = {
+    BC_DIRICHLET: _DIRICHLET_CODE,
+    BC_NEUMANN: _NEUMANN_CODE,
+    BC_ROBIN: _ROBIN_CODE,
+}
+_INWARD_X_PLUS = 0
+_INWARD_X_MINUS = 1
+_INWARD_Y_PLUS = 2
+_INWARD_Y_MINUS = 3
+_INWARD_Z_PLUS = 4
+_INWARD_Z_MINUS = 5
 
 
 @dataclass(frozen=True)
@@ -42,10 +57,10 @@ class _PreparedBoundary3D:
     alpha: np.ndarray
     beta: np.ndarray
     gamma: np.ndarray
-    inward_i: np.ndarray
-    inward_j: np.ndarray
-    inward_k: np.ndarray
-    step: np.ndarray
+    inward_direction: np.ndarray
+    hx: float
+    hy: float
+    hz: float
     periodic_x: bool
     periodic_y: bool
     periodic_z: bool
@@ -336,19 +351,16 @@ def _prepare_boundary_3d(
     boundary = ~unknown
     index_grid = np.full(shape, -1, dtype=np.int64)
     index_grid[unknown] = np.arange(int(np.count_nonzero(unknown)), dtype=np.int64)
-    kinds = np.full(shape, BC_DIRICHLET, dtype=object)
+    kinds = np.full(shape, _DIRICHLET_CODE, dtype=np.uint8)
     alpha = np.ones(shape, dtype=float)
     beta = np.zeros(shape, dtype=float)
     gamma = np.zeros(shape, dtype=float)
-    inward_i = np.full(shape, -1, dtype=np.int64)
-    inward_j = np.full(shape, -1, dtype=np.int64)
-    inward_k = np.full(shape, -1, dtype=np.int64)
-    steps = np.zeros(shape, dtype=float)
+    inward_direction = np.full(shape, _NO_INWARD_DIRECTION, dtype=np.uint8)
     default = PDEBoundaryCondition3D.dirichlet()
 
     for k_raw, j_raw, i_raw in np.argwhere(boundary):
         i, j, k = int(i_raw), int(j_raw), int(k_raw)
-        candidates: list[tuple[tuple[str, float, float, float], tuple[int, int, int], float]] = []
+        candidates: list[tuple[tuple[str, float, float, float], int, float]] = []
         if not conditions.periodic_x and i == 0:
             candidates.append(
                 (
@@ -362,7 +374,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i + 1, j, k),
+                    _INWARD_X_PLUS,
                     hx,
                 )
             )
@@ -379,7 +391,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i - 1, j, k),
+                    _INWARD_X_MINUS,
                     hx,
                 )
             )
@@ -396,7 +408,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i, j + 1, k),
+                    _INWARD_Y_PLUS,
                     hy,
                 )
             )
@@ -413,7 +425,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i, j - 1, k),
+                    _INWARD_Y_MINUS,
                     hy,
                 )
             )
@@ -430,7 +442,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i, j, k + 1),
+                    _INWARD_Z_PLUS,
                     hz,
                 )
             )
@@ -447,7 +459,7 @@ def _prepare_boundary_3d(
                         z=z,
                         shape=shape,
                     ),
-                    (i, j, k - 1),
+                    _INWARD_Z_MINUS,
                     hz,
                 )
             )
@@ -471,10 +483,10 @@ def _prepare_boundary_3d(
                 "Ambiguous 3D boundary edge/corner "
                 f"({i}, {j}, {k}): multiple non-Dirichlet faces do not define one grid normal"
             )
-        values, inward, step = selected
-        kinds[k, j, i], alpha[k, j, i], beta[k, j, i], gamma[k, j, i] = values
-        inward_i[k, j, i], inward_j[k, j, i], inward_k[k, j, i] = inward
-        steps[k, j, i] = step
+        values, direction, step = selected
+        kinds[k, j, i] = _BOUNDARY_KIND_CODES[values[0]]
+        alpha[k, j, i], beta[k, j, i], gamma[k, j, i] = values[1:]
+        inward_direction[k, j, i] = direction
         if values[0] != BC_DIRICHLET:
             denominator = values[1] + values[2] / step
             scale = max(1.0, abs(values[1]), abs(values[2] / step))
@@ -492,10 +504,10 @@ def _prepare_boundary_3d(
         alpha=alpha,
         beta=beta,
         gamma=gamma,
-        inward_i=inward_i,
-        inward_j=inward_j,
-        inward_k=inward_k,
-        step=steps,
+        inward_direction=inward_direction,
+        hx=hx,
+        hy=hy,
+        hz=hz,
         periodic_x=conditions.periodic_x,
         periodic_y=conditions.periodic_y,
         periodic_z=conditions.periodic_z,
@@ -509,7 +521,23 @@ def _boundary_substitution_3d(
     k: int,
 ) -> tuple[int, int, int, float, float]:
     """Return inward point and affine boundary substitution coefficients."""
-    step = float(boundary.step[k, j, i])
+    direction = int(boundary.inward_direction[k, j, i])
+    if direction == _INWARD_X_PLUS:
+        inward_i, inward_j, inward_k, step = i + 1, j, k, boundary.hx
+    elif direction == _INWARD_X_MINUS:
+        inward_i, inward_j, inward_k, step = i - 1, j, k, boundary.hx
+    elif direction == _INWARD_Y_PLUS:
+        inward_i, inward_j, inward_k, step = i, j + 1, k, boundary.hy
+    elif direction == _INWARD_Y_MINUS:
+        inward_i, inward_j, inward_k, step = i, j - 1, k, boundary.hy
+    elif direction == _INWARD_Z_PLUS:
+        inward_i, inward_j, inward_k, step = i, j, k + 1, boundary.hz
+    elif direction == _INWARD_Z_MINUS:
+        inward_i, inward_j, inward_k, step = i, j, k - 1, boundary.hz
+    else:
+        raise SolverFailedError(
+            f"3D boundary topology is inconsistent at grid index ({i}, {j}, {k})"
+        )
     alpha = float(boundary.alpha[k, j, i])
     beta = float(boundary.beta[k, j, i])
     gamma = float(boundary.gamma[k, j, i])
@@ -517,9 +545,9 @@ def _boundary_substitution_3d(
     factor = (beta / step) / denominator
     offset = gamma / denominator
     return (
-        int(boundary.inward_i[k, j, i]),
-        int(boundary.inward_j[k, j, i]),
-        int(boundary.inward_k[k, j, i]),
+        inward_i,
+        inward_j,
+        inward_k,
         factor,
         offset,
     )
@@ -665,9 +693,9 @@ def _assemble_pde_3d(
 
 def _apply_boundary_values_3d(u: np.ndarray, boundary: _PreparedBoundary3D) -> None:
     """Fill Dirichlet faces and reconstruct Neumann/Robin faces."""
-    dirichlet = boundary.boundary & (boundary.kind == BC_DIRICHLET)
+    dirichlet = boundary.boundary & (boundary.kind == _DIRICHLET_CODE)
     u[dirichlet] = boundary.gamma[dirichlet]
-    for k_raw, j_raw, i_raw in np.argwhere(boundary.boundary & (boundary.kind != BC_DIRICHLET)):
+    for k_raw, j_raw, i_raw in np.argwhere(boundary.boundary & (boundary.kind != _DIRICHLET_CODE)):
         i, j, k = int(i_raw), int(j_raw), int(k_raw)
         inward_i, inward_j, inward_k, factor, offset = _boundary_substitution_3d(boundary, i, j, k)
         inward_value = float(u[inward_k, inward_j, inward_i])

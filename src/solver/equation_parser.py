@@ -15,6 +15,7 @@ from typing import Any, Callable, cast
 import numpy as np
 
 from solver.notation import FNotation, _rewrite_f_expression
+from solver.pde_types import PDECoefficients3D, VectorPDECoefficientProvider, VectorPDECoefficients
 from utils import (
     EquationParseError,
     build_eval_namespace,
@@ -555,6 +556,173 @@ def parse_pde_3d_residual_expression(
 _VECTOR_PDE_STATE_NAMES = ("f", "fx", "fy", "fxx", "fxy", "fyy")
 
 
+def _contains_pde_state(node: ast.AST, state_names: tuple[str, ...]) -> bool:
+    """Return whether an AST fragment references any PDE solution-state family."""
+    return any(isinstance(child, ast.Name) and child.id in state_names for child in ast.walk(node))
+
+
+def _signed_node(node: ast.expr, sign: int) -> ast.expr:
+    """Return ``node`` with an outer sign suitable for a coefficient expression."""
+    if sign > 0:
+        return node
+    return ast.UnaryOp(op=ast.USub(), operand=node)
+
+
+def _combine_sum(nodes: list[ast.expr]) -> ast.expr | None:
+    """Combine additive AST fragments without introducing symbolic simplification."""
+    if not nodes:
+        return None
+    combined = nodes[0]
+    for node in nodes[1:]:
+        combined = ast.BinOp(left=combined, op=ast.Add(), right=node)
+    return combined
+
+
+def _compile_coordinate_evaluator(
+    nodes: list[ast.expr],
+    *,
+    namespace: dict[str, Any],
+    coordinate_names: tuple[str, ...],
+    filename: str,
+) -> Callable[[tuple[float, ...], dict[str, float]], float]:
+    """Compile one state-free coordinate expression for a conservative fast path."""
+    expression = _combine_sum(nodes)
+    if expression is None:
+        return lambda coordinates, params: 0.0
+    compiled = compile(ast.fix_missing_locations(ast.Expression(body=expression)), filename, "eval")
+    if not any(
+        isinstance(node, ast.Name) and node.id in coordinate_names for node in ast.walk(expression)
+    ):
+        value = float(safe_eval(compiled, namespace))
+        return lambda coordinates, params: value
+
+    def evaluate(coordinates: tuple[float, ...], params: dict[str, float]) -> float:
+        """Evaluate the already validated state-free coordinate expression."""
+        local_namespace = {**namespace, **params}
+        local_namespace.update(zip(coordinate_names, coordinates, strict=True))
+        return float(safe_eval(compiled, local_namespace))
+
+    return evaluate
+
+
+def _collect_affine_terms(
+    node: ast.expr,
+    *,
+    state_names: tuple[str, ...],
+    state_key: Callable[[ast.expr], object | None],
+) -> dict[object, list[ast.expr]] | None:
+    """Recognize only explicit sums of one state term times a state-free factor.
+
+    This intentionally rejects divisions, powers, nested products, and function calls
+    involving solution-state terms. It is a narrow structural recognizer, not a
+    symbolic algebra system; rejected expressions remain on the affinity-probe path.
+    """
+    terms: dict[object, list[ast.expr]] = {"constant": []}
+
+    def add_term(key: object, factor: ast.expr, sign: int) -> None:
+        terms.setdefault(key, []).append(_signed_node(factor, sign))
+
+    def visit(current: ast.expr, sign: int) -> bool:
+        if isinstance(current, ast.BinOp) and isinstance(current.op, ast.Add):
+            return visit(current.left, sign) and visit(current.right, sign)
+        if isinstance(current, ast.BinOp) and isinstance(current.op, ast.Sub):
+            return visit(current.left, sign) and visit(current.right, -sign)
+        if isinstance(current, ast.UnaryOp) and isinstance(current.op, ast.UAdd):
+            return visit(current.operand, sign)
+        if isinstance(current, ast.UnaryOp) and isinstance(current.op, ast.USub):
+            return visit(current.operand, -sign)
+
+        key = state_key(current)
+        if key is not None:
+            add_term(key, ast.Constant(value=1.0), sign)
+            return True
+        if isinstance(current, ast.BinOp) and isinstance(current.op, ast.Mult):
+            left_key = state_key(current.left)
+            right_key = state_key(current.right)
+            if left_key is not None and not _contains_pde_state(current.right, state_names):
+                add_term(left_key, current.right, sign)
+                return True
+            if right_key is not None and not _contains_pde_state(current.left, state_names):
+                add_term(right_key, current.left, sign)
+                return True
+            if not _contains_pde_state(current, state_names):
+                add_term("constant", current, sign)
+                return True
+            return False
+        if not _contains_pde_state(current, state_names):
+            add_term("constant", current, sign)
+            return True
+        return False
+
+    return terms if visit(node, 1) else None
+
+
+def build_pde_3d_coefficient_provider(
+    expression: str,
+    variables: list[str],
+    parameters: dict[str, float] | None = None,
+) -> Callable[[float, float, float, dict[str, float]], PDECoefficients3D] | None:
+    """Build direct coefficients for a narrowly explicit affine 3D expression.
+
+    Arbitrary expressions deliberately return ``None`` so the solver retains its
+    complete twelve-call residual-affinity validation.
+    """
+    if len(variables) != 3:
+        return None
+    normalized = _rewrite_pde_f_notation(
+        _rewrite_indexed_vars(normalize_unicode_escapes(expression))
+    )
+    validate_expression_ast(normalized, "PDE 3D coefficient fast path")
+    tree = ast.parse(normalized, mode="eval")
+    state_names = ("f", "fx", "fy", "fz", "fxx", "fxy", "fxz", "fyy", "fyz", "fzz")
+
+    def scalar_key(node: ast.expr) -> object | None:
+        if isinstance(node, ast.Name) and node.id in state_names:
+            return node.id
+        return None
+
+    terms = _collect_affine_terms(tree.body, state_names=state_names, state_key=scalar_key)
+    if terms is None:
+        return None
+    coordinate_names = tuple(
+        _INDEXED_VAR_NAMES[index] if variable.startswith("x[") else variable
+        for index, variable in enumerate(variables)
+    )
+    namespace = build_eval_namespace(normalize_params(parameters))
+    evaluators = {
+        name: _compile_coordinate_evaluator(
+            terms.get(name, []),
+            namespace=namespace,
+            coordinate_names=coordinate_names,
+            filename=f"<pde_3d_coefficient_{name}>",
+        )
+        for name in (*state_names, "constant")
+    }
+    output_order = (
+        "fxx",
+        "fyy",
+        "fzz",
+        "fxy",
+        "fxz",
+        "fyz",
+        "fx",
+        "fy",
+        "fz",
+        "f",
+        "constant",
+    )
+
+    def provider(x: float, y: float, z: float, params: dict[str, float]) -> PDECoefficients3D:
+        """Evaluate direct coefficients from the already proven affine structure."""
+        coordinates = (x, y, z)
+        return cast(
+            PDECoefficients3D,
+            tuple(evaluators[name](coordinates, params) for name in output_order),
+        )
+
+    return provider
+
+
 def _validate_vector_pde_state_access(
     tree: ast.AST,
     *,
@@ -593,6 +761,116 @@ def _validate_vector_pde_state_access(
                 f"Vector PDE equation {equation_index} must access {node.id} with an explicit "
                 "component index"
             )
+
+
+def build_vector_pde_coefficient_provider(
+    expressions: list[str],
+    components: int,
+    variables: list[str],
+    parameters: dict[str, float] | None = None,
+) -> VectorPDECoefficientProvider | None:
+    """Build direct matrices for structurally explicit affine vector PDE expressions.
+
+    The recognizer accepts only additive terms with one literal-indexed state access
+    multiplied by a state-free factor. All other expressions keep the full coupled
+    affinity probe, including cross-component validation.
+    """
+    if len(expressions) != components or len(variables) != 2:
+        return None
+    normalized_expressions = [
+        _rewrite_indexed_vars(normalize_unicode_escapes(expression)) for expression in expressions
+    ]
+    for equation_index, expression in enumerate(normalized_expressions):
+        validate_expression_ast(expression, f"vector PDE coefficient fast path {equation_index}")
+    trees = [ast.parse(expression, mode="eval") for expression in normalized_expressions]
+    for equation_index, tree in enumerate(trees):
+        _validate_vector_pde_state_access(
+            tree,
+            components=components,
+            equation_index=equation_index,
+        )
+
+    def vector_key(node: ast.expr) -> object | None:
+        if not isinstance(node, ast.Subscript) or not isinstance(node.value, ast.Name):
+            return None
+        if node.value.id not in _VECTOR_PDE_STATE_NAMES:
+            return None
+        if not isinstance(node.slice, ast.Constant) or type(node.slice.value) is not int:
+            return None
+        return node.value.id, node.slice.value
+
+    term_sets: list[dict[object, list[ast.expr]]] = []
+    for tree in trees:
+        terms = _collect_affine_terms(
+            tree.body,
+            state_names=_VECTOR_PDE_STATE_NAMES,
+            state_key=vector_key,
+        )
+        if terms is None:
+            return None
+        term_sets.append(terms)
+
+    coordinate_names = tuple(
+        _INDEXED_VAR_NAMES[index] if variable.startswith("x[") else variable
+        for index, variable in enumerate(variables)
+    )
+    namespace = build_eval_namespace(normalize_params(parameters))
+    evaluators: dict[
+        tuple[int, str, int], Callable[[tuple[float, ...], dict[str, float]], float]
+    ] = {}
+    for equation_index, terms in enumerate(term_sets):
+        for state_name in _VECTOR_PDE_STATE_NAMES:
+            for component_index in range(components):
+                evaluator_key = equation_index, state_name, component_index
+                evaluators[evaluator_key] = _compile_coordinate_evaluator(
+                    terms.get((state_name, component_index), []),
+                    namespace=namespace,
+                    coordinate_names=coordinate_names,
+                    filename=(
+                        f"<vector_pde_coefficient_{equation_index}_{state_name}_{component_index}>"
+                    ),
+                )
+        evaluators[equation_index, "constant", 0] = _compile_coordinate_evaluator(
+            terms["constant"],
+            namespace=namespace,
+            coordinate_names=coordinate_names,
+            filename=f"<vector_pde_constant_{equation_index}>",
+        )
+
+    def provider(x: float, y: float, params: dict[str, float]) -> VectorPDECoefficients:
+        """Evaluate direct matrices from the already proven affine structure."""
+        coordinates = (x, y)
+
+        def matrix(state_name: str) -> np.ndarray:
+            """Evaluate one coefficient matrix with stable equation/component order."""
+            return np.array(
+                [
+                    [
+                        evaluators[equation_index, state_name, component_index](coordinates, params)
+                        for component_index in range(components)
+                    ]
+                    for equation_index in range(components)
+                ],
+                dtype=float,
+            )
+
+        return VectorPDECoefficients(
+            fxx=matrix("fxx"),
+            fxy=matrix("fxy"),
+            fyy=matrix("fyy"),
+            fx=matrix("fx"),
+            fy=matrix("fy"),
+            f=matrix("f"),
+            constant=np.array(
+                [
+                    evaluators[equation_index, "constant", 0](coordinates, params)
+                    for equation_index in range(components)
+                ],
+                dtype=float,
+            ),
+        )
+
+    return provider
 
 
 def parse_vector_pde_residual_expressions(

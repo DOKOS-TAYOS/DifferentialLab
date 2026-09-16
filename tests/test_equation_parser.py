@@ -8,11 +8,63 @@ import pytest
 from solver.equation_parser import (
     _parse_expression,
     _validate_expression,
+    build_pde_3d_coefficient_provider,
+    build_vector_pde_coefficient_provider,
     normalize_unicode_escapes,
     parse_ode_event_expression,
     parse_vector_pde_residual_expressions,
 )
 from utils import EquationParseError
+
+
+def test_explicit_affine_3d_expression_builds_direct_coefficients() -> None:
+    """A structurally explicit affine 3D expression needs no residual probing."""
+    provider = build_pde_3d_coefficient_provider(
+        "-fxx - y*fyy - 2*fzz + fxy + x*fx - f + sin(x) + y*z",
+        ["x", "y", "z"],
+    )
+
+    assert provider is not None
+    np.testing.assert_allclose(
+        provider(0.2, 0.3, 0.4, {}),
+        (-1.0, -0.3, -2.0, 1.0, 0.0, 0.0, 0.2, 0.0, 0.0, -1.0, np.sin(0.2) + 0.12),
+    )
+
+
+def test_nonstructural_3d_expression_keeps_affinity_probe_path() -> None:
+    """Division by a solution term is not a safe direct-coefficient form."""
+    assert build_pde_3d_coefficient_provider("fxx / (1 + f)", ["x", "y", "z"]) is None
+
+
+def test_explicit_affine_vector_expression_builds_coupled_direct_matrices() -> None:
+    """Literal component accesses retain all matrix rows and columns in the fast path."""
+    provider = build_vector_pde_coefficient_provider(
+        [
+            "-fxx[0] + 0.25*fxx[1] - fyy[0] + f[1] - x",
+            "0.5*fxx[0] - fyy[1] + y*f[0] - y",
+        ],
+        2,
+        ["x", "y"],
+    )
+
+    assert provider is not None
+    coefficients = provider(0.2, 0.3, {})
+    np.testing.assert_allclose(coefficients.fxx, ((-1.0, 0.25), (0.5, 0.0)))
+    np.testing.assert_allclose(coefficients.fyy, ((-1.0, 0.0), (0.0, -1.0)))
+    np.testing.assert_allclose(coefficients.f, ((0.0, 1.0), (0.3, 0.0)))
+    np.testing.assert_allclose(coefficients.constant, (-0.2, -0.3))
+
+
+def test_nonlinear_vector_expression_keeps_complete_affinity_probe_path() -> None:
+    """A product of two state entries is deliberately not recognized as affine."""
+    assert (
+        build_vector_pde_coefficient_provider(
+            ["fxx[0] + f[0] * f[1]", "fxx[1]"],
+            2,
+            ["x", "y"],
+        )
+        is None
+    )
 
 
 class TestNormalizeUnicodeEscapes:
