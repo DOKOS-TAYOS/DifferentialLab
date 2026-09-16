@@ -82,3 +82,29 @@ def test_vector_pde_result_fields_include_components_and_magnitude_without_displ
     magnitude, magnitude_label = dialog._selected_pde_field("_field")
     np.testing.assert_allclose(magnitude, [[5.0, 2.0], [1.0, 13.0]])
     assert magnitude_label == "|f|"
+
+
+def test_vector_pde_field_view_dispatches_quiver_without_display() -> None:
+    """The result dialog selects the plotting view and preserves the chosen origin."""
+    dialog = ResultDialog.__new__(ResultDialog)
+    dialog._result = SimpleNamespace(
+        x=np.array([0.0, 1.0]),
+        y=np.array([[[1.0, 2.0]], [[3.0, 4.0]]]),
+        metadata={"equation_name": "Vector field"},
+    )
+    dialog._vector_pde_view_var = _FakeVar("Quiver")
+    dialog._vector_pde_origin_x_var = _FakeVar("1.5")
+    dialog._vector_pde_origin_y_var = _FakeVar("-2")
+    dialog._vector_pde_field_frame = object()
+    dialog._require_pde_y_grid = lambda: np.array([0.0])  # type: ignore[method-assign]
+    captured: dict[str, object] = {}
+    dialog._replace_plot = lambda frame, figure, canvas: captured.update(  # type: ignore[method-assign]
+        frame=frame, figure=figure, canvas=canvas
+    )
+
+    with patch("plotting.create_vector_field_plot", return_value="figure") as create_plot:
+        dialog._update_vector_pde_field()
+
+    assert create_plot.call_args.kwargs["view"] == "quiver"
+    assert create_plot.call_args.kwargs["origin"] == (1.5, -2.0)
+    assert captured["figure"] == "figure"

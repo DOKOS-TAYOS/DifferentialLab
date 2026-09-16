@@ -14,3 +14,9 @@ plotting.animation_metadata
 
 .. automodule:: plotting.animation_metadata
    :members:
+
+plotting.coordinates
+--------------------
+
+.. automodule:: plotting.coordinates
+   :members:

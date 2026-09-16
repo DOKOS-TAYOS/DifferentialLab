@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 
@@ -1205,6 +1205,7 @@ class ResultDialog:
     def _update_pde_3d_slice(self) -> None:
         """Render the selected XY, XZ, or YZ scalar slice."""
         from plotting import create_contour_plot
+        from plotting.coordinates import extract_scalar_3d_slice
 
         result = self._result
         if result.y_grid is None or result.z_grid is None:
@@ -1213,32 +1214,32 @@ class ResultDialog:
         labels = [
             variables[index] if len(variables) > index else "xyz"[index] for index in range(3)
         ]
-        plane = self._pde_3d_slice_plane_var.get()
+        selected_plane = self._pde_3d_slice_plane_var.get()
+        plane: Literal["XY", "XZ", "YZ"] = (
+            cast(Literal["XY", "XZ", "YZ"], selected_plane)
+            if selected_plane in {"XY", "XZ", "YZ"}
+            else "XY"
+        )
         try:
             requested_index = int(self._pde_3d_slice_index_var.get())
         except ValueError:
             requested_index = 0
-        field = np.asarray(result.y)
-        if plane == "XY":
-            index = max(0, min(len(result.z_grid) - 1, requested_index))
-            axis_1, axis_2, values = result.x, result.y_grid, field[index, :, :]
-            axis_1_label, axis_2_label = labels[0], labels[1]
-            fixed_label = f"{labels[2]}={result.z_grid[index]:.4g}"
-        elif plane == "XZ":
-            index = max(0, min(len(result.y_grid) - 1, requested_index))
-            axis_1, axis_2, values = result.x, result.z_grid, field[:, index, :]
-            axis_1_label, axis_2_label = labels[0], labels[2]
-            fixed_label = f"{labels[1]}={result.y_grid[index]:.4g}"
-        else:
-            index = max(0, min(len(result.x) - 1, requested_index))
-            axis_1, axis_2, values = result.y_grid, result.z_grid, field[:, :, index]
-            axis_1_label, axis_2_label = labels[1], labels[2]
-            fixed_label = f"{labels[0]}={result.x[index]:.4g}"
+        slice_data = extract_scalar_3d_slice(
+            result.x,
+            result.y_grid,
+            result.z_grid,
+            result.y,
+            plane,
+            requested_index,
+        )
+        label_indexes = {"XY": (0, 1, 2), "XZ": (0, 2, 1), "YZ": (1, 2, 0)}[plane]
+        axis_1_label, axis_2_label, fixed_axis_label = (labels[index] for index in label_indexes)
+        fixed_label = f"{fixed_axis_label}={slice_data.fixed_coordinate:.4g}"
         equation_name = result.metadata.get("equation_name", "PDE 3D")
         figure = create_contour_plot(
-            axis_1,
-            axis_2,
-            values,
+            slice_data.axis_1,
+            slice_data.axis_2,
+            slice_data.values,
             title=f"{equation_name} — {plane} slice at {fixed_label}",
             xlabel=axis_1_label,
             ylabel=axis_2_label,
@@ -1305,6 +1306,30 @@ class ResultDialog:
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_2d_canvas: FigureCanvasTkAgg | None = None
         self._update_pde_2d()
+
+        if self._result.equation_type == "pde":
+            polar_tab = ttk.Frame(nb)
+            nb.add(polar_tab, text="  Polar View  ")
+            polar_ctrl = ttk.Frame(polar_tab)
+            polar_ctrl.pack(fill=tk.X, padx=4, pady=4)
+            ttk.Label(polar_ctrl, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+            self._pde_polar_origin_x_var = tk.StringVar(value="0")
+            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_x_var, width=7).pack(
+                side=tk.LEFT, padx=(0, 6)
+            )
+            ttk.Label(polar_ctrl, text="y:").pack(side=tk.LEFT, padx=(0, 3))
+            self._pde_polar_origin_y_var = tk.StringVar(value="0")
+            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_y_var, width=7).pack(
+                side=tk.LEFT, padx=(0, 6)
+            )
+            ttk.Button(polar_ctrl, text="Update", command=self._update_pde_polar).pack(side=tk.LEFT)
+            self._pde_polar_frame = ttk.Frame(polar_tab)
+            self._pde_polar_frame.pack(fill=tk.BOTH, expand=True)
+            self._pde_polar_canvas: FigureCanvasTkAgg | None = None
+            self._update_pde_polar()
+
+        if self._result.equation_type == "vector_pde":
+            self._build_vector_pde_field_tab()
 
         # --- Tab 3: Transform (1D slice) ---
         trans_tab = ttk.Frame(nb)
@@ -1577,6 +1602,101 @@ class ResultDialog:
             ylabel=ylabel,
         )
         self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
+
+    def _update_pde_polar(self) -> None:
+        """Render a scalar PDE field resampled for a polar display."""
+        from plotting import create_polar_contour_plot
+
+        try:
+            origin = (
+                float(self._pde_polar_origin_x_var.get()),
+                float(self._pde_polar_origin_y_var.get()),
+            )
+        except ValueError:
+            origin = (0.0, 0.0)
+        y_grid = self._require_pde_y_grid()
+        xlabel, ylabel = self._pde_axis_labels()
+        eq_name = self._result.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        figure = create_polar_contour_plot(
+            self._result.x,
+            y_grid,
+            np.asarray(self._result.y),
+            title=f"{eq_name} — polar view about ({origin[0]:.4g}, {origin[1]:.4g})",
+            origin=origin,
+        )
+        self._replace_plot(self._pde_polar_frame, figure, "_pde_polar_canvas")
+
+    def _build_vector_pde_field_tab(self) -> None:
+        """Build field-specific views without duplicating the plot canvas lifecycle."""
+        tab = ttk.Frame(self._notebook)
+        self._notebook.add(tab, text="  Vector Field  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(controls, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        self._vector_pde_view_var = tk.StringVar(value="Magnitude")
+        views = ["Components", "Magnitude"]
+        if self._result.vector_components >= 2:
+            views.extend(["Quiver", "Streamlines", "Radial/Tangential"])
+        selector = ttk.Combobox(
+            controls,
+            textvariable=self._vector_pde_view_var,
+            values=views,
+            state="readonly",
+            width=19,
+            font=get_font(),
+        )
+        selector.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(controls, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+        self._vector_pde_origin_x_var = tk.StringVar(value="0")
+        ttk.Entry(controls, textvariable=self._vector_pde_origin_x_var, width=7).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(controls, text="y:").pack(side=tk.LEFT, padx=(0, 3))
+        self._vector_pde_origin_y_var = tk.StringVar(value="0")
+        ttk.Entry(controls, textvariable=self._vector_pde_origin_y_var, width=7).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._update_vector_pde_field())
+        ttk.Button(controls, text="Update", command=self._update_vector_pde_field).pack(
+            side=tk.LEFT
+        )
+        self._vector_pde_field_frame = ttk.Frame(tab)
+        self._vector_pde_field_frame.pack(fill=tk.BOTH, expand=True)
+        self._vector_pde_field_canvas: FigureCanvasTkAgg | None = None
+        self._update_vector_pde_field()
+
+    def _update_vector_pde_field(self) -> None:
+        """Render the selected vector PDE field view."""
+        from plotting import create_vector_field_plot
+
+        view_map = {
+            "Components": "components",
+            "Magnitude": "magnitude",
+            "Quiver": "quiver",
+            "Streamlines": "stream",
+            "Radial/Tangential": "radial_tangential",
+        }
+        selected = self._vector_pde_view_var.get()
+        try:
+            origin = (
+                float(self._vector_pde_origin_x_var.get()),
+                float(self._vector_pde_origin_y_var.get()),
+            )
+        except ValueError:
+            origin = (0.0, 0.0)
+        figure = create_vector_field_plot(
+            self._result.x,
+            self._require_pde_y_grid(),
+            np.asarray(self._result.y),
+            view=view_map.get(selected, "magnitude"),
+            origin=origin,
+            title=f"{self._result.metadata.get('equation_name', 'Vector PDE')} — {selected}",
+        )
+        self._replace_plot(
+            self._vector_pde_field_frame,
+            figure,
+            "_vector_pde_field_canvas",
+        )
 
     def _update_pde_transform(self) -> None:
         """Render a 1D transform of a slice through the PDE solution."""

@@ -524,6 +524,132 @@ def create_contour_plot(
     return fig
 
 
+def create_polar_contour_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    title: str = "f(r, θ)",
+    *,
+    origin: tuple[float, float] = (0.0, 0.0),
+    radial_points: int = 160,
+    angular_points: int = 180,
+) -> Figure:
+    """Create a polar re-sampled contour plot from Cartesian scalar data."""
+    import matplotlib.pyplot as plt
+
+    from plotting.coordinates import resample_scalar_to_polar
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+    sampled = resample_scalar_to_polar(
+        x,
+        y,
+        z,
+        origin=origin,
+        radial_points=radial_points,
+        angular_points=angular_points,
+    )
+    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi, subplot_kw={"projection": "polar"})
+    angle_grid, radius_grid = np.meshgrid(sampled.angle, sampled.radius, indexing="ij")
+    mesh = ax.pcolormesh(
+        angle_grid,
+        radius_grid,
+        np.ma.masked_invalid(sampled.values),
+        cmap=get_env_from_schema("PLOT_SURFACE_CMAP"),
+        shading="auto",
+    )
+    fig.colorbar(mesh, ax=ax, shrink=get_env_from_schema("PLOT_COLORBAR_SHRINK"))
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    ax.set_xlabel("azimuth θ (rad)")
+    ax.set_ylabel("radius r")
+    fig.tight_layout()
+    return fig
+
+
+def create_vector_field_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    components: np.ndarray,
+    *,
+    view: str = "magnitude",
+    origin: tuple[float, float] = (0.0, 0.0),
+    title: str = "Vector field",
+) -> Figure:
+    """Create component, magnitude, quiver, stream, or radial field views.
+
+    Quiver, stream, and radial/tangential views use the first two components;
+    component and magnitude views support any positive component count.
+    """
+    import matplotlib.pyplot as plt
+
+    from plotting.coordinates import cartesian_vector_to_polar, vector_field_data
+
+    field = np.asarray(components, dtype=float)
+    if field.ndim != 3 or field.shape[1:] != (len(y), len(x)) or field.shape[0] < 1:
+        raise ValueError("components must have shape (components, len(y), len(x))")
+    _apply_plot_style()
+    cmap = get_env_from_schema("PLOT_SURFACE_CMAP")
+    if view == "components":
+        fig, axes = plt.subplots(1, field.shape[0], squeeze=False)
+        for index, axis in enumerate(axes[0]):
+            image = axis.pcolormesh(
+                x, y, np.ma.masked_invalid(field[index]), cmap=cmap, shading="auto"
+            )
+            fig.colorbar(image, ax=axis)
+            _finalize_plot(axis, f"f[{index}]", "x", "y")
+        fig.suptitle(title)
+        fig.tight_layout()
+        return fig
+    if view == "magnitude":
+        magnitude = np.linalg.norm(field, axis=0)
+        fig, ax = _new_figure()
+        image = ax.pcolormesh(x, y, np.ma.masked_invalid(magnitude), cmap=cmap, shading="auto")
+        fig.colorbar(image, ax=ax)
+        _finalize_plot(ax, title, "x", "y")
+        fig.tight_layout()
+        return fig
+
+    data = vector_field_data(x, y, field)
+    x_grid, y_grid = np.meshgrid(data.x, data.y)
+    fig, ax = _new_figure()
+    if view == "quiver":
+        stride = max(1, int(np.ceil(max(len(x), len(y)) / 25)))
+        ax.quiver(
+            x_grid[::stride, ::stride],
+            y_grid[::stride, ::stride],
+            data.u[::stride, ::stride],
+            data.v[::stride, ::stride],
+            data.magnitude[::stride, ::stride],
+            cmap=cmap,
+        )
+    elif view == "stream":
+        ax.streamplot(data.x, data.y, data.u, data.v, color=data.magnitude, cmap=cmap)
+    elif view == "radial_tangential":
+        radial, tangential = cartesian_vector_to_polar(
+            data.u, data.v, x_grid - origin[0], y_grid - origin[1]
+        )
+        plt.close(fig)
+        fig, axes = plt.subplots(1, 2, squeeze=False)
+        for axis, component, label in zip(axes[0], (radial, tangential), ("radial", "tangential")):
+            image = axis.pcolormesh(
+                x, y, np.ma.masked_invalid(component), cmap=cmap, shading="auto"
+            )
+            fig.colorbar(image, ax=axis, label=f"{label} component")
+            axis.plot(origin[0], origin[1], "ko", markersize=3)
+            _finalize_plot(axis, label.capitalize(), "x", "y")
+        fig.suptitle(title)
+        fig.tight_layout()
+        return fig
+    else:
+        raise ValueError("view must be components, magnitude, quiver, stream, or radial_tangential")
+    _finalize_plot(ax, title, "x", "y")
+    fig.tight_layout()
+    return fig
+
+
 def create_vector_animation_plot(
     x: np.ndarray,
     y: np.ndarray,

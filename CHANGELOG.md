@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added display-only Cartesian/polar, cylindrical, and spherical coordinate utilities with
+  deterministic singular-origin vector bases; scalar 2D polar re-sampling, Vector PDE
+  component/magnitude/quiver/stream/radial-tangential views, and shared 3D slice extraction.
 - Added structured scalar PDE diagnostics for discrete residual norms, sparse matrix size,
   nonzero count, and a bounded small-system condition estimate.
 - Added structured scalar-2D Dirichlet, Neumann, and Robin boundary objects plus
