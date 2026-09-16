@@ -11,6 +11,7 @@ from utils.export import (
     _export_csv,
     _export_json,
     _make_serializable,
+    export_csv_to_path,
 )
 
 
@@ -55,6 +56,24 @@ class TestExportCsv:
         _export_csv(x, y, filepath)
         content = filepath.read_text()
         assert "f0" in content and "f1" in content
+
+    def test_vector_pde_writes_components_and_magnitude(self, tmp_path: Path) -> None:
+        x = np.array([0.0, 1.0])
+        y_grid = np.array([0.0, 1.0])
+        fields = np.array(
+            [
+                [[3.0, 0.0], [0.0, 5.0]],
+                [[4.0, 2.0], [1.0, 12.0]],
+            ]
+        )
+        filepath = tmp_path / "vector_pde.csv"
+
+        export_csv_to_path(x, fields, filepath, y_grid=y_grid)
+
+        rows = filepath.read_text().strip().splitlines()
+        assert rows[0] == "x,y,f0,f1,magnitude"
+        assert rows[1].endswith(",3.0,4.0,5.0")
+        assert len(rows) == 5
 
 
 class TestExportJson:

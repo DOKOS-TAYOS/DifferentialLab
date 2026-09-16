@@ -125,7 +125,11 @@ class ParametersDialog:
         self.display_formula = (
             display_formula
             if display_formula is not None
-            else (expression or f"<function:{function_name}>")
+            else (
+                "; ".join(vector_expressions)
+                if vector_expressions
+                else (expression or f"<function:{function_name}>")
+            )
         )
         self.parameters_schema = parameters_schema or {}
         self.equation_type = equation_type
@@ -134,9 +138,9 @@ class ParametersDialog:
         self.vector_components = vector_components
         self.is_vector = (
             vector_expressions is not None and len(vector_expressions) > 0
-        ) or equation_type == "vector_ode"
+        ) or equation_type in ("vector_ode", "vector_pde")
         self.pde_operator = pde_operator
-        self.is_pde = equation_type == "pde" or len(self.variables) > 1
+        self.is_pde = equation_type in ("pde", "vector_pde") or len(self.variables) > 1
         self.component_orders = component_orders
 
         self.win = tk.Toplevel(parent)
@@ -470,7 +474,11 @@ class ParametersDialog:
             # Rectangular boundary conditions
             self._rect_bc_frame = ttk.LabelFrame(
                 left_col,
-                text="Boundary Conditions",
+                text=(
+                    "Shared Boundary Conditions (all components)"
+                    if self.equation_type == "vector_pde"
+                    else "Boundary Conditions"
+                ),
                 padding=pad,
             )
             self._rect_bc_frame.pack(fill=tk.X, pady=(0, pad))
@@ -516,7 +524,11 @@ class ParametersDialog:
             # Contour boundary conditions (hidden by default)
             self._contour_bc_frame = ttk.LabelFrame(
                 left_col,
-                text="Contour Boundary Conditions",
+                text=(
+                    "Shared Contour Boundary (all components)"
+                    if self.equation_type == "vector_pde"
+                    else "Contour Boundary Conditions"
+                ),
                 padding=pad,
             )
             row_cbc_type = ttk.Frame(self._contour_bc_frame)
@@ -978,7 +990,7 @@ class ParametersDialog:
         """Warn before launching unusually dense standard-equation requests."""
         if self.is_pde:
             equation_type = "pde"
-            state_size = 1
+            state_size = self.vector_components if self.equation_type == "vector_pde" else 1
         elif self.is_vector:
             equation_type = "vector_ode"
             state_size = self.order * self.vector_components

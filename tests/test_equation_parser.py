@@ -9,6 +9,7 @@ from solver.equation_parser import (
     _parse_expression,
     _validate_expression,
     normalize_unicode_escapes,
+    parse_vector_pde_residual_expressions,
 )
 from utils import EquationParseError
 
@@ -124,3 +125,60 @@ class TestParseExpression:
     def test_parameter_name_with_dunder_is_rejected(self) -> None:
         with pytest.raises(EquationParseError, match="Unsafe parameter name"):
             _parse_expression("k * y[0]", order=1, parameters={"__class__": 1.0})
+
+
+class TestVectorPDEResidualParser:
+    def test_exact_component_notation_returns_vector(self) -> None:
+        residual = parse_vector_pde_residual_expressions(
+            [
+                "fxx[0] + fyy[0] + 0.5*f[1] + x",
+                "fxy[0] + fxx[1] + fyy[1] - 0.25*fy[0] + y",
+            ],
+            2,
+            ["x", "y"],
+        )
+        zeros = np.zeros(2)
+        result = residual(
+            0.2,
+            0.3,
+            np.array([1.0, 2.0]),
+            zeros,
+            np.array([4.0, 0.0]),
+            np.array([3.0, 5.0]),
+            np.array([7.0, 0.0]),
+            np.array([11.0, 13.0]),
+        )
+
+        np.testing.assert_allclose(result, [15.2, 24.3])
+
+    @pytest.mark.parametrize(
+        ("expression", "message"),
+        [
+            ("f[2]", "outside"),
+            ("fx[-1]", "integer literals"),
+            ("f[0, 1]", "integer literals"),
+            ("f[i]", "integer literals"),
+            ("f", "explicit component index"),
+            ("weights[0]", "subscripts only"),
+            ("f[0].real", "Disallowed construct"),
+        ],
+    )
+    def test_invalid_or_unsafe_component_access_is_rejected(
+        self,
+        expression: str,
+        message: str,
+    ) -> None:
+        with pytest.raises(EquationParseError, match=message):
+            parse_vector_pde_residual_expressions(
+                [expression, "fxx[1] + fyy[1]"],
+                2,
+                ["x", "y"],
+            )
+
+    def test_expression_count_must_match_system_length(self) -> None:
+        with pytest.raises(EquationParseError, match="exactly 2.*got 1"):
+            parse_vector_pde_residual_expressions(
+                ["fxx[0] + fyy[0]"],
+                2,
+                ["x", "y"],
+            )

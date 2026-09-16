@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,8 +12,10 @@ from solver.pde_types import (
     BC_NEUMANN,
     BC_ROBIN,
     BoundaryData,
+    ComponentBoundaryCondition,
     PDEBoundaryCondition,
     PDEBoundaryConditions,
+    VectorPDEBoundaryConditions,
 )
 from solver.pde_validation import connected_component_labels, finite_scalar
 from utils import SolverFailedError
@@ -418,6 +421,74 @@ def prepare_boundary(
         bc_type=bc_type,
         bc_neumann_value=bc_neumann_value,
     )
+
+
+def _broadcast_component_condition(
+    value: ComponentBoundaryCondition | None,
+    *,
+    components: int,
+    name: str,
+) -> tuple[PDEBoundaryCondition | None, ...]:
+    """Expand one explicitly shared or per-component boundary field."""
+    if value is None:
+        return (None,) * components
+    if isinstance(value, PDEBoundaryCondition):
+        return (value,) * components
+    if isinstance(value, (str, bytes, np.ndarray)) or not isinstance(value, Sequence):
+        raise SolverFailedError(
+            f"Vector boundary {name} must be one PDEBoundaryCondition or a component sequence"
+        )
+    values = tuple(value)
+    if len(values) != components:
+        raise SolverFailedError(
+            f"Vector boundary {name} sequence must have length {components}, got {len(values)}; "
+            "length-one sequences are not broadcast"
+        )
+    if any(item is not None and not isinstance(item, PDEBoundaryCondition) for item in values):
+        raise SolverFailedError(
+            f"Vector boundary {name} entries must be PDEBoundaryCondition values or None"
+        )
+    return values
+
+
+def prepare_vector_boundaries(
+    conditions: VectorPDEBoundaryConditions | None,
+    *,
+    components: int,
+    mask: np.ndarray | None,
+    x: np.ndarray,
+    y: np.ndarray,
+) -> tuple[PreparedBoundary, ...]:
+    """Prepare vector boundaries by reusing scalar topology and substitution rules.
+
+    A single condition object is shared. A sequence is component-specific and
+    must have exactly ``components`` entries; no sequence broadcasting occurs.
+    """
+    if conditions is None:
+        conditions = VectorPDEBoundaryConditions()
+    if not isinstance(conditions, VectorPDEBoundaryConditions):
+        raise SolverFailedError("boundary_conditions must be a VectorPDEBoundaryConditions object")
+    expanded = {
+        name: _broadcast_component_condition(
+            getattr(conditions, name),
+            components=components,
+            name=name,
+        )
+        for name in ("left", "right", "bottom", "top", "contour")
+    }
+    prepared: list[PreparedBoundary] = []
+    for component in range(components):
+        scalar = PDEBoundaryConditions(
+            left=expanded["left"][component],
+            right=expanded["right"][component],
+            bottom=expanded["bottom"][component],
+            top=expanded["top"][component],
+            contour=expanded["contour"][component],
+            periodic_x=conditions.periodic_x,
+            periodic_y=conditions.periodic_y,
+        )
+        prepared.append(_prepare_structured(scalar, mask=mask, x=x, y=y))
+    return tuple(prepared)
 
 
 def wrapped_neighbor(

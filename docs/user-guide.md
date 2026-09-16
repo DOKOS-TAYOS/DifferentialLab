@@ -24,9 +24,10 @@ The standard solver path currently supports:
 - Difference equation
 - PDE
 - Vector ODE
+- Vector PDE
 
 You can use the predefined YAML catalog or write custom expressions.
-The current catalog has 120 entries:
+The current catalog has 121 entries:
 
 | Type | Entries |
 |---|---:|
@@ -34,6 +35,7 @@ The current catalog has 120 entries:
 | Vector ODE | 50 |
 | Difference equation | 10 |
 | PDE | 12 |
+| Vector PDE | 1 |
 
 The catalog files live in `src/config/equations/`.
 
@@ -45,6 +47,8 @@ For custom expressions:
 - Vector notation: `f[i,k]`, where `i` is the component and `k` is the derivative order
 - Difference notation: `f[0]` for the current term and `n` for the index
 - PDE expressions may use variables such as `x`, `y`, `f`, `fx`, `fy`, `fxx`, `fxy`, and `fyy`
+- Vector PDE uses one residual expression per equation and only the explicit state
+  notation `f[i]`, `fx[i]`, `fy[i]`, `fxx[i]`, `fxy[i]`, and `fyy[i]`
 
 Typical safe math functions are available (`sin`, `cos`, `exp`, `log`, `sqrt`, etc.).
 
@@ -109,6 +113,89 @@ Programmatic `solve_pde_2d()` results include optional `PDEDiagnostics` with the
 discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and
 nonzero count. A condition estimate is included only for small systems; large
 sparse systems are never converted to dense form solely for diagnostics.
+
+Vector PDE is part of the same standard `Solve Equation` workflow. The custom
+editor supports 1–4 components and interprets every expression as a residual
+equal to zero. Indexes are integer literals starting at zero; an out-of-range,
+indirect, or unsafe subscript is rejected before solver dispatch. The standard
+boundary panel deliberately labels its Dirichlet/Neumann data as shared by all
+components.
+
+The programmatic API is `solve_vector_pde_2d()`. It represents
+
+```text
+sum_q (Axx[p,q] u_q,xx + Axy[p,q] u_q,xy + Ayy[p,q] u_q,yy
+       + Ax[p,q] u_q,x + Ay[p,q] u_q,y + A0[p,q] u_q) + r[p] = 0
+```
+
+with six real `(m, m)` matrices and one `(m,)` constant vector in
+`VectorPDECoefficients`. Provide either a direct coefficient provider or a
+residual returning exactly `(m,)`; the residual path probes every state family
+and every source component, then checks two dense all-component probes for
+matrix affinity. It does not support nonlinear systems.
+
+```python
+import numpy as np
+
+from solver import (
+    PDEBoundaryCondition,
+    VectorPDEBoundaryConditions,
+    VectorPDECoefficients,
+    solve_vector_pde_2d,
+)
+
+shared_zero = PDEBoundaryCondition.dirichlet(0.0)
+boundaries = VectorPDEBoundaryConditions(
+    left=shared_zero,
+    right=shared_zero,
+    bottom=shared_zero,
+    top=shared_zero,
+)
+
+
+def coefficients(x: float, y: float, params: dict[str, float]) -> VectorPDECoefficients:
+    principal = np.array([[1.0, 0.2], [0.2, 1.0]])
+    zero = np.zeros((2, 2))
+    coupling = np.array([[0.0, 1.0], [1.0, 0.0]])
+    return VectorPDECoefficients(principal, zero, principal, zero, zero, coupling, np.zeros(2))
+
+
+solution = solve_vector_pde_2d(
+    None,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    33,
+    33,
+    components=2,
+    coefficient_provider=coefficients,
+    boundary_conditions=boundaries,
+)
+```
+
+A single `PDEBoundaryCondition` on an edge is explicitly shared. A sequence is
+component-specific and must contain exactly `m` entries; a length-one sequence
+is rejected rather than implicitly broadcast. Neumann and Robin retain the
+physical outward-normal `du/dn` convention. All components share one mask and
+periodic topology. Periodic axes reuse the scalar non-duplicated endpoint and
+wrapping convention; arbitrary masks plus periodicity are rejected.
+
+The strong-ellipticity screen evaluates the symmetric part of
+`Axx*ξx**2 + Axy*ξx*ξy + Ayy*ξy**2` at 32 equally spaced unit directions on
+`[0, π)`. Each sampled symbol must be positive definite or negative definite
+with eigenvalue magnitude greater than `1e-10` times its infinity-norm scale;
+the orientation must agree across directions and throughout each connected
+spatial component. This deterministic sampled check is a numerical validation,
+not a proof for every direction.
+
+`VectorPDESolution.u` has shape `(m, ny, nx)`. Internally the sparse system is
+component-major: `component * n_unknown_points + point_index`. Diagnostics
+report global residuals, per-equation residuals, matrix shape and nonzero count.
+A dense condition estimate remains limited to systems of at most 256 unknowns.
+The result dialog provides every component field plus the Euclidean magnitude;
+two-component output is marked as a planar vector field in metadata for later
+quiver/stream visualization.
 
 ### 4. Solve and inspect
 

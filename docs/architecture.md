@@ -65,14 +65,17 @@ switch views without re-solving.
 - scalar linear elliptic 2D PDEs through `solve_pde_2d()`, with affine-residual,
   component-aware ellipticity, structured boundary, periodic-topology, sparse-solve,
   and algebraic-diagnostic helpers behind the compatible facade
+- linear strongly elliptic Vector PDE systems through `solve_vector_pde_2d()`, with
+  matrix-affinity probing, sampled principal-symbol validation, explicit component
+  boundary broadcasting, and component-major sparse block assembly
 
 The returned `SolverResult` is data-only: solution arrays, statistics,
 metadata, equation type, grids, and notation context. The lower-level
-`PDESolution` also carries optional `PDEDiagnostics`; the condition estimate is
+`PDESolution` and `VectorPDESolution` carry structured diagnostics; the condition estimate is
 deliberately limited to small systems so diagnostics do not densify large sparse
 matrices.
 
-Scalar PDE responsibilities are split without introducing a generic N-dimensional
+PDE responsibilities are split without introducing a generic N-dimensional
 framework:
 
 - `pde_solver.py`: backwards-compatible scalar-2D facade;
@@ -80,6 +83,7 @@ framework:
 - `pde_validation.py`: grid, affinity, ellipticity, and connected-component checks;
 - `pde_boundary.py`: legacy adaptation and Dirichlet/Neumann/Robin/periodic handling;
 - `pde_assembly.py`: sparse stencil assembly, periodic wrapping, solve checks, and diagnostics.
+- `pde_system_solver.py`: dedicated public Vector PDE facade and component-major output mapping.
 
 ## Predefined Equation Catalog
 
@@ -89,6 +93,7 @@ The catalog is loaded from:
 - `src/config/equations/vector_ode.yaml`
 - `src/config/equations/difference.yaml`
 - `src/config/equations/pde.yaml`
+- `src/config/equations/vector_pde.yaml`
 
 Current catalog size:
 
@@ -98,6 +103,7 @@ Current catalog size:
 | Vector ODE | 50 |
 | Difference equation | 10 |
 | PDE | 12 |
+| Vector PDE | 1 |
 
 `solver.predefined.load_predefined_equations()` caches the parsed catalog after
 the first successful load.

@@ -4,7 +4,7 @@
 
 # DifferentialLab
 
-Desktop numerical lab for ODEs, vector ODEs, difference equations, 2D PDEs,
+Desktop numerical lab for ODEs, vector ODEs, difference equations, scalar and vector 2D PDEs,
 function transforms, and specialized scientific simulation workflows.
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
@@ -25,11 +25,12 @@ function transforms, and specialized scientific simulation workflows.
 - Python: `>=3.12`
 - Package name: `differential-lab`
 - GUI: Tkinter/ttk with embedded Matplotlib figures
-- Predefined catalog: 120 equations loaded from YAML
+- Predefined catalog: 121 equations loaded from YAML
   - 48 ODEs
   - 50 vector ODE systems
   - 10 difference equations
   - 12 2D PDE examples
+  - 1 coupled Vector PDE example
 - Complex problem plugins: 7 registered modules
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
@@ -42,6 +43,8 @@ function transforms, and specialized scientific simulation workflows.
 - Scalar linear elliptic 2D PDE workflows with rectangular or masked domains,
   structured Dirichlet/Neumann/Robin boundaries, non-duplicated periodic axes,
   component-aware ellipticity validation, and algebraic diagnostics
+- Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
+  component-aware boundaries, sparse block assembly, and component/magnitude views
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
 - Specialized complex-problem models with custom UI, solvers, diagnostics, and result dialogs
 

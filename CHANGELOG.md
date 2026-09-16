@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nonzero count, and a bounded small-system condition estimate.
 - Added structured scalar-2D Dirichlet, Neumann, and Robin boundary objects plus
   mathematically wrapped one-axis/two-axis periodic grids with non-duplicated endpoints.
+- Added linear strongly elliptic Vector PDE systems in 2D with six matrix-valued
+  operator coefficients, full coupled residual-affinity probing, sampled principal-symbol
+  validation, explicit shared/component boundary rules, component-major sparse assembly,
+  global/per-component diagnostics, and one coupled catalog example.
+- Integrated `Vector PDE` into the standard equation, parameter, result, and export flow
+  with safe indexed residual notation and component/magnitude field views.
 
 ### Security
 

@@ -136,6 +136,27 @@ def _export_csv_2d(
     return filepath
 
 
+def _export_csv_vector_2d(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    u: np.ndarray,
+    filepath: Path,
+) -> Path:
+    """Write a ``(m, ny, nx)`` Vector PDE field and magnitude to CSV."""
+    _ensure_parent_dir(filepath)
+    x_mesh, y_mesh = np.meshgrid(x_grid, y_grid)
+    components = [u[index].ravel() for index in range(u.shape[0])]
+    magnitude = np.linalg.norm(u, axis=0).ravel()
+    data = np.column_stack((x_mesh.ravel(), y_mesh.ravel(), *components, magnitude))
+    headers = ["x", "y", *(f"f{index}" for index in range(u.shape[0])), "magnitude"]
+    with open(filepath, "w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+        writer.writerows(data.tolist())
+    logger.info("CSV exported (Vector PDE 2D): %s", filepath)
+    return filepath
+
+
 def export_csv_to_path(
     x: np.ndarray,
     y: np.ndarray,
@@ -147,14 +168,17 @@ def export_csv_to_path(
 
     Args:
         x: Independent variable values (1D) or x grid for 2D.
-        y: Solution values. For 2D PDE: shape (ny, nx).
+        y: Solution values. For scalar 2D PDE: shape ``(ny, nx)``; for
+            Vector PDE: shape ``(m, ny, nx)``.
         filepath: Destination path.
         y_grid: For 2D PDE, the y grid. If provided with 2D y, uses 2D CSV format.
 
     Returns:
         The path that was written.
     """
-    if y_grid is not None and y.ndim == 2:
+    if y_grid is not None and y.ndim == 3:
+        _export_csv_vector_2d(x, y_grid, y, filepath)
+    elif y_grid is not None and y.ndim == 2:
         _export_csv_2d(x, y_grid, y, filepath)
     else:
         _export_csv(x, y, filepath)

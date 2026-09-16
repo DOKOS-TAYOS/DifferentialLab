@@ -7,6 +7,7 @@ rewritten to ``y[...]`` via :mod:`solver.notation` before compilation.
 
 from __future__ import annotations
 
+import ast
 import re
 from typing import Any, Callable, cast
 
@@ -441,6 +442,143 @@ def parse_pde_rhs_expression(
         return float(safe_eval(compiled, local_ns))
 
     return rhs_func
+
+
+_VECTOR_PDE_STATE_NAMES = ("f", "fx", "fy", "fxx", "fxy", "fyy")
+
+
+def _validate_vector_pde_state_access(
+    tree: ast.AST,
+    *,
+    components: int,
+    equation_index: int,
+) -> None:
+    """Require exact, in-range ``state_name[component]`` vector PDE access."""
+    approved_targets: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Subscript):
+            continue
+        if not isinstance(node.value, ast.Name) or node.value.id not in _VECTOR_PDE_STATE_NAMES:
+            raise EquationParseError(
+                f"Vector PDE equation {equation_index} permits subscripts only on "
+                + ", ".join(f"{name}[i]" for name in _VECTOR_PDE_STATE_NAMES)
+            )
+        index = node.slice
+        if not isinstance(index, ast.Constant) or type(index.value) is not int:
+            raise EquationParseError(
+                f"Vector PDE equation {equation_index} component indexes must be integer literals"
+            )
+        if not 0 <= index.value < components:
+            raise EquationParseError(
+                f"Vector PDE equation {equation_index} component index {index.value} "
+                f"is outside [0, {components})"
+            )
+        approved_targets.add(id(node.value))
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Name)
+            and node.id in _VECTOR_PDE_STATE_NAMES
+            and id(node) not in approved_targets
+        ):
+            raise EquationParseError(
+                f"Vector PDE equation {equation_index} must access {node.id} with an explicit "
+                "component index"
+            )
+
+
+def parse_vector_pde_residual_expressions(
+    expressions: list[str],
+    components: int,
+    variables: list[str],
+    parameters: dict[str, float] | None = None,
+) -> Callable[..., np.ndarray]:
+    """Parse one safe residual expression per vector PDE equation.
+
+    Solution state is available only through ``f[i]``, ``fx[i]``,
+    ``fy[i]``, ``fxx[i]``, ``fxy[i]``, and ``fyy[i]`` with literal indexes in
+    ``[0, components)``. The returned callable produces an ``(m,)`` vector.
+    """
+    if isinstance(components, bool) or not isinstance(components, int) or components < 1:
+        raise EquationParseError("Vector PDE component count must be a positive integer")
+    if len(expressions) != components:
+        raise EquationParseError(
+            f"Vector PDE requires exactly {components} residual expressions, got {len(expressions)}"
+        )
+    internal_vars = [
+        _INDEXED_VAR_NAMES[index] if variable.startswith("x[") else variable
+        for index, variable in enumerate(variables)
+        if index < len(_INDEXED_VAR_NAMES)
+    ]
+    if len(internal_vars) != 2:
+        raise EquationParseError("Vector PDE expressions require exactly two spatial variables")
+    params = normalize_params(parameters)
+    reserved = set(_VECTOR_PDE_STATE_NAMES) | set(internal_vars)
+    conflict = sorted(reserved & set(params))
+    if conflict:
+        raise EquationParseError(
+            f"Parameter name is reserved in vector PDE expressions: {conflict[0]}"
+        )
+    namespace = build_eval_namespace(params)
+    compiled_list: list[Any] = []
+    for equation_index, raw_expression in enumerate(expressions):
+        expression = _rewrite_indexed_vars(normalize_unicode_escapes(raw_expression))
+        validate_expression_ast(expression, f"vector PDE equation {equation_index}")
+        tree = ast.parse(expression, mode="eval")
+        _validate_vector_pde_state_access(
+            tree,
+            components=components,
+            equation_index=equation_index,
+        )
+        compiled_list.append(compile(tree, f"<vector_pde_{equation_index}>", "eval"))
+
+    test_state = {name: np.zeros(components, dtype=float) for name in _VECTOR_PDE_STATE_NAMES}
+    test_namespace = {
+        **namespace,
+        internal_vars[0]: 0.0,
+        internal_vars[1]: 0.0,
+        **test_state,
+    }
+    for equation_index, compiled in enumerate(compiled_list):
+        try:
+            value = safe_eval(compiled, test_namespace)
+            array = np.asarray(value)
+            if array.ndim != 0 or np.iscomplexobj(array) or not np.isfinite(float(array)):
+                raise ValueError("result must be a finite real scalar")
+        except Exception as exc:
+            raise EquationParseError(
+                f"Vector PDE equation {equation_index} evaluation failed: {exc}"
+            ) from exc
+
+    def residual_func(
+        x: float,
+        y: float,
+        f: np.ndarray,
+        fx: np.ndarray,
+        fy: np.ndarray,
+        fxx: np.ndarray,
+        fxy: np.ndarray,
+        fyy: np.ndarray,
+        **kwargs: Any,
+    ) -> np.ndarray:
+        local_namespace = {
+            **namespace,
+            **kwargs,
+            internal_vars[0]: x,
+            internal_vars[1]: y,
+            "f": f,
+            "fx": fx,
+            "fy": fy,
+            "fxx": fxx,
+            "fxy": fxy,
+            "fyy": fyy,
+        }
+        return np.asarray(
+            [float(safe_eval(compiled, local_namespace)) for compiled in compiled_list],
+            dtype=float,
+        )
+
+    return residual_func
 
 
 def _parse_vector_expression(

@@ -183,6 +183,20 @@ class ResultDialog:
             info_items.append(("Residual RMS", f"{metadata['residual_rms']:.2e}"))
         if metadata.get("n_jacobian_evals") is not None:
             info_items.append(("Jacobian evals", metadata["n_jacobian_evals"]))
+        if metadata.get("relative_residual_l2") is not None:
+            info_items.append(("Relative residual", f"{metadata['relative_residual_l2']:.2e}"))
+        if metadata.get("component_relative_residual_l2") is not None:
+            component_values = metadata["component_relative_residual_l2"]
+            info_items.append(
+                (
+                    "Component residuals",
+                    ", ".join(f"{float(value):.2e}" for value in component_values),
+                )
+            )
+        if metadata.get("matrix_shape") is not None:
+            info_items.append(("Sparse system", metadata["matrix_shape"]))
+        if metadata.get("nnz") is not None:
+            info_items.append(("Sparse nnz", metadata["nnz"]))
         for label, value in info_items:
             row = ttk.Frame(info_section.content)
             row.pack(fill=tk.X, pady=1)
@@ -282,7 +296,7 @@ class ResultDialog:
         r = self._result
         eq_type = r.equation_type
 
-        is_2d_pde = eq_type == "pde" and r.y_grid is not None
+        is_2d_pde = eq_type in ("pde", "vector_pde") and r.y_grid is not None
 
         if is_2d_pde:
             self._build_pde_tabs()
@@ -1149,6 +1163,7 @@ class ResultDialog:
         ).pack(side=tk.LEFT, padx=(0, 4))
 
         self._build_transform_controls(surf_ctrl, self._update_pde_3d, "pde_3d")
+        self._add_vector_pde_field_selector(surf_ctrl, "_pde_3d_field_var", self._update_pde_3d)
 
         self._pde_3d_frame = ttk.Frame(surf_tab)
         self._pde_3d_frame.pack(fill=tk.BOTH, expand=True)
@@ -1174,6 +1189,11 @@ class ResultDialog:
         ).pack(side=tk.LEFT, padx=(0, 4))
 
         self._build_transform_controls(contour_ctrl, self._update_pde_2d, "pde_2d")
+        self._add_vector_pde_field_selector(
+            contour_ctrl,
+            "_pde_2d_field_var",
+            self._update_pde_2d,
+        )
 
         self._pde_2d_frame = ttk.Frame(contour_tab)
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
@@ -1222,6 +1242,11 @@ class ResultDialog:
             "pde",
             label_style="Small.TLabel",
         )
+        self._add_vector_pde_field_selector(
+            trans_ctrl,
+            "_pde_slice_field_var",
+            self._update_pde_transform,
+        )
 
         ttk.Button(
             trans_ctrl,
@@ -1233,6 +1258,47 @@ class ResultDialog:
         self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_trans_canvas: FigureCanvasTkAgg | None = None
         self._update_pde_transform()
+
+    def _add_vector_pde_field_selector(
+        self,
+        parent: ttk.Frame,
+        variable_name: str,
+        callback: Callable[[], None],
+    ) -> None:
+        """Add a component/magnitude selector only for Vector PDE results."""
+        if self._result.equation_type != "vector_pde":
+            return
+        labels = [f"Component {index}" for index in range(self._result.vector_components)]
+        labels.append("Magnitude")
+        ttk.Label(parent, text="Field:").pack(side=tk.LEFT, padx=(8, 4))
+        variable = tk.StringVar(value=labels[0])
+        setattr(self, variable_name, variable)
+        combo = ttk.Combobox(
+            parent,
+            textvariable=variable,
+            values=labels,
+            state="readonly",
+            width=13,
+            font=get_font(),
+        )
+        combo.pack(side=tk.LEFT, padx=(0, 4))
+        combo.bind("<<ComboboxSelected>>", lambda _event: callback())
+
+    def _selected_pde_field(self, variable_name: str) -> tuple[np.ndarray, str]:
+        """Return the selected scalar field and its display label."""
+        result = self._result
+        if result.equation_type != "vector_pde":
+            return np.asarray(result.y), "f"
+        variable = getattr(self, variable_name, None)
+        label = variable.get() if variable is not None else "Component 0"
+        if label == "Magnitude":
+            return np.linalg.norm(result.y, axis=0), "|f|"
+        try:
+            component = int(label.rsplit(" ", 1)[1])
+        except (IndexError, ValueError):
+            component = 0
+        component = max(0, min(result.vector_components - 1, component))
+        return np.asarray(result.y[component]), f"f[{component}]"
 
     def _pde_axis_labels(self) -> tuple[str, str]:
         """Return (xlabel, ylabel) from metadata variable names."""
@@ -1325,6 +1391,7 @@ class ResultDialog:
         y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        field, field_label = self._selected_pde_field("_pde_3d_field_var")
 
         kind = self._get_transform_kind("pde_3d")
         if kind != TransformKind.ORIGINAL:
@@ -1332,7 +1399,7 @@ class ResultDialog:
             result = self._transform_pde_along_axis(
                 r.x,
                 y_grid,
-                r.y,
+                field,
                 axis_var,
                 kind,
             )
@@ -1345,7 +1412,7 @@ class ResultDialog:
                     title=f"{eq_name} — {kind.value}",
                     xlabel=pxl,
                     ylabel=pyl,
-                    zlabel="|F|",
+                    zlabel=field_label,
                 )
                 self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
                 return
@@ -1353,11 +1420,11 @@ class ResultDialog:
         fig = create_surface_plot(
             r.x,
             y_grid,
-            r.y,
-            title=eq_name,
+            field,
+            title=f"{eq_name} — {field_label}" if r.equation_type == "vector_pde" else eq_name,
             xlabel=xlabel,
             ylabel=ylabel,
-            zlabel="f",
+            zlabel=field_label,
         )
         self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
 
@@ -1370,6 +1437,7 @@ class ResultDialog:
         y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        field, field_label = self._selected_pde_field("_pde_2d_field_var")
 
         kind = self._get_transform_kind("pde_2d")
         if kind != TransformKind.ORIGINAL:
@@ -1377,7 +1445,7 @@ class ResultDialog:
             result = self._transform_pde_along_axis(
                 r.x,
                 y_grid,
-                r.y,
+                field,
                 axis_var,
                 kind,
             )
@@ -1397,8 +1465,8 @@ class ResultDialog:
         fig = create_contour_plot(
             r.x,
             y_grid,
-            r.y,
-            title=eq_name,
+            field,
+            title=f"{eq_name} — {field_label}" if r.equation_type == "vector_pde" else eq_name,
             xlabel=xlabel,
             ylabel=ylabel,
         )
@@ -1413,6 +1481,7 @@ class ResultDialog:
         y_grid = self._require_pde_y_grid()
         kind = self._get_transform_kind("pde")
         xlabel, ylabel = self._pde_axis_labels()
+        field, field_label = self._selected_pde_field("_pde_slice_field_var")
 
         slice_var = self._pde_slice_var.get()
         try:
@@ -1423,14 +1492,14 @@ class ResultDialog:
         if slice_var == xlabel:
             # Slice along x[0] at a fixed x[1] value
             y_idx = int(np.argmin(np.abs(y_grid - slice_val)))
-            data_1d = r.y[y_idx, :]
+            data_1d = field[y_idx, :]
             x_1d = r.x
             slice_label = f"{ylabel}={slice_val:.3g}"
             axis_label = xlabel
         else:
             # Slice along x[1] at a fixed x[0] value
             x_idx = int(np.argmin(np.abs(r.x - slice_val)))
-            data_1d = r.y[:, x_idx]
+            data_1d = field[:, x_idx]
             x_1d = y_grid
             slice_label = f"{xlabel}={slice_val:.3g}"
             axis_label = ylabel
@@ -1443,9 +1512,9 @@ class ResultDialog:
                 np.atleast_2d(data_1d),
                 title=f"{eq_name} \u2014 slice at {slice_label}",
                 xlabel=axis_label,
-                ylabel="f",
+                ylabel=field_label,
                 selected_derivatives=[0],
-                labels=["f"],
+                labels=[field_label],
             )
         else:
             from scipy.interpolate import interp1d

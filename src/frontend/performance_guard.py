@@ -70,8 +70,9 @@ def assess_parameters_dialog_request(
     if equation_type == "pde":
         ny = n_points if n_points_y is None else n_points_y
         grid_points = n_points * ny
+        system_points = grid_points * max(1, state_size)
         severity = _severity_from_thresholds(
-            value=grid_points,
+            value=system_points,
             warn_threshold=_WARN_PDE_GRID_POINTS,
             confirm_threshold=_CONFIRM_PDE_GRID_POINTS,
         )
@@ -82,7 +83,9 @@ def assess_parameters_dialog_request(
             title="Large PDE grid request",
             message=(
                 f"This PDE run will assemble a {n_points:,} x {ny:,} grid "
-                f"({grid_points:,} points). High-resolution PDE grids can take noticeably longer "
+                f"({grid_points:,} points"
+                + (f" across {state_size:,} components" if state_size > 1 else "")
+                + "). High-resolution PDE systems can take noticeably longer "
                 "to assemble, solve, plot, and export."
             ),
         )

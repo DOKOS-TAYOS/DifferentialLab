@@ -26,6 +26,19 @@ def test_assess_parameters_dialog_request_warns_for_dense_output_grid() -> None:
     assert "plotting and exporting" in advisory.message
 
 
+def test_vector_pde_components_are_included_in_grid_cost() -> None:
+    advisory = assess_parameters_dialog_request(
+        equation_type="pde",
+        n_points=200,
+        n_points_y=200,
+        state_size=4,
+    )
+
+    assert advisory is not None
+    assert advisory.severity == "warn"
+    assert "4 components" in advisory.message
+
+
 def test_assess_time_history_request_requires_confirmation_for_large_history() -> None:
     advisory = assess_time_history_request(
         label="2D membrane",

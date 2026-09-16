@@ -15,6 +15,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "get_ode_function": ("solver.equation_parser", "get_ode_function"),
     "get_vector_ode_function": ("solver.equation_parser", "get_vector_ode_function"),
     "parse_pde_rhs_expression": ("solver.equation_parser", "parse_pde_rhs_expression"),
+    "parse_vector_pde_residual_expressions": (
+        "solver.equation_parser",
+        "parse_vector_pde_residual_expressions",
+    ),
     "compute_ode_residual_error": ("solver.error_metrics", "compute_ode_residual_error"),
     "FNotation": ("solver.notation", "FNotation"),
     "generate_derivative_labels": ("solver.notation", "generate_derivative_labels"),
@@ -28,6 +32,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PDECoefficientProvider": ("solver.pde_types", "PDECoefficientProvider"),
     "PDECoefficients": ("solver.pde_types", "PDECoefficients"),
     "solve_pde_2d": ("solver.pde_solver", "solve_pde_2d"),
+    "VectorPDEBoundaryConditions": ("solver.pde_types", "VectorPDEBoundaryConditions"),
+    "VectorPDECoefficientProvider": ("solver.pde_types", "VectorPDECoefficientProvider"),
+    "VectorPDECoefficients": ("solver.pde_types", "VectorPDECoefficients"),
+    "VectorPDEDiagnostics": ("solver.pde_types", "VectorPDEDiagnostics"),
+    "VectorPDEResidual": ("solver.pde_types", "VectorPDEResidual"),
+    "VectorPDESolution": ("solver.pde_types", "VectorPDESolution"),
+    "solve_vector_pde_2d": ("solver.pde_system_solver", "solve_vector_pde_2d"),
     "is_multivariate": ("solver.predefined", "is_multivariate"),
     "load_predefined_equations": ("solver.predefined", "load_predefined_equations"),
     "compute_statistics": ("solver.statistics", "compute_statistics"),
@@ -41,6 +52,7 @@ __all__ = [
     "get_ode_function",
     "get_vector_ode_function",
     "parse_pde_rhs_expression",
+    "parse_vector_pde_residual_expressions",
     "compute_ode_residual_error",
     "FNotation",
     "generate_derivative_labels",
@@ -54,6 +66,13 @@ __all__ = [
     "PDECoefficientProvider",
     "PDECoefficients",
     "solve_pde_2d",
+    "VectorPDEBoundaryConditions",
+    "VectorPDECoefficientProvider",
+    "VectorPDECoefficients",
+    "VectorPDEDiagnostics",
+    "VectorPDEResidual",
+    "VectorPDESolution",
+    "solve_vector_pde_2d",
     "is_multivariate",
     "load_predefined_equations",
     "compute_statistics",
@@ -68,16 +87,24 @@ if TYPE_CHECKING:
         get_ode_function,
         get_vector_ode_function,
         parse_pde_rhs_expression,
+        parse_vector_pde_residual_expressions,
     )
     from solver.error_metrics import compute_ode_residual_error
     from solver.notation import FNotation, generate_derivative_labels
     from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
     from solver.pde_solver import PDEDiagnostics, PDESolution, solve_pde_2d
+    from solver.pde_system_solver import solve_vector_pde_2d
     from solver.pde_types import (
         PDEBoundaryCondition,
         PDEBoundaryConditions,
         PDECoefficientProvider,
         PDECoefficients,
+        VectorPDEBoundaryConditions,
+        VectorPDECoefficientProvider,
+        VectorPDECoefficients,
+        VectorPDEDiagnostics,
+        VectorPDEResidual,
+        VectorPDESolution,
     )
     from solver.predefined import is_multivariate, load_predefined_equations
     from solver.statistics import compute_statistics, compute_statistics_2d

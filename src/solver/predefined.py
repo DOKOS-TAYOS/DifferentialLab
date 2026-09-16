@@ -13,16 +13,16 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _EQUATIONS_DIR = Path(__file__).resolve().parent.parent / "config" / "equations"
-_EQUATION_FILES = ["ode.yaml", "vector_ode.yaml", "difference.yaml", "pde.yaml"]
+_EQUATION_FILES = ["ode.yaml", "vector_ode.yaml", "difference.yaml", "pde.yaml", "vector_pde.yaml"]
 _cache: dict[str, PredefinedEquation] | None = None
 
 
-EquationType = Literal["ode", "difference", "pde", "vector_ode"]
+EquationType = Literal["ode", "difference", "pde", "vector_ode", "vector_pde"]
 
 
 @dataclass
 class PredefinedEquation:
-    """Predefined equation (ODE, difference, PDE, or vector ODE) loaded from YAML.
+    """Predefined scalar or vector ODE, difference equation, or PDE loaded from YAML.
 
     formula is always required for display. Either expression or function_name
     must be set for execution. If function_name is set, the equation is resolved by
@@ -38,12 +38,14 @@ class PredefinedEquation:
         parameters: Mapping of param name to ``{default, description}``.
         expression: Python expression for execution (optional if function_name set).
         function_name: Name of function in config.equations to import (optional).
-        vector_expressions: For vector ODEs, list of expressions (one per component).
-        vector_components: Number of components [f_0, f_1, ...] for vector ODEs.
+        vector_expressions: Per-component vector ODE expressions or per-equation
+            Vector PDE residual expressions.
+        vector_components: Number of vector components [f_0, f_1, ...].
         default_initial_conditions: Default y0 vector.
         default_domain: Default ``[x_min, x_max]`` for ODE or ``[n_min, n_max]`` for difference.
             For PDE: ``[x_min, x_max, y_min, y_max, ...]`` per variable.
-        equation_type: ``"ode"`` (differential), ``"difference"``, ``"pde"``, or ``"vector_ode"``.
+        equation_type: ``"ode"``, ``"difference"``, ``"pde"``, ``"vector_ode"``,
+            or ``"vector_pde"``.
         category: Display category (e.g. ``"Oscillators"``, ``"Population"``) for UI grouping.
         variables: Independent variable names, e.g. ``["x"]`` for 1D, ``["x","y"]`` for 2D.
             If absent or ``["x"]``, treated as 1D ODE.
@@ -118,7 +120,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
         eq_type_str: str = data.get("equation_type", "ode")
         has_vector = (
             vector_expressions is not None and len(vector_expressions) > 0
-        ) or eq_type_str == "vector_ode"
+        ) or eq_type_str in ("vector_ode", "vector_pde")
         if not expression and not function_name and not has_vector:
             logger.warning(
                 "Equation '%s' has neither expression, function_name, nor vector_expressions; "

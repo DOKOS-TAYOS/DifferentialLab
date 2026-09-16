@@ -33,6 +33,12 @@ solver.pde_types
 .. automodule:: solver.pde_types
    :members:
 
+solver.pde_system_solver
+------------------------
+
+.. automodule:: solver.pde_system_solver
+   :members:
+
 solver.error_metrics
 --------------------
 

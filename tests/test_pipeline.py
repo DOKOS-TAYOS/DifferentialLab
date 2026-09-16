@@ -253,6 +253,67 @@ def test_run_solver_pipeline_pde_2d() -> None:
     np.testing.assert_allclose(result.y, 0.0, atol=1e-10)
 
 
+def test_run_solver_pipeline_vector_pde_dispatches_without_display() -> None:
+    """Vector PDE is a standard data-only pipeline route, not an Advanced Problem."""
+    result = run_solver_pipeline(
+        expression=None,
+        function_name=None,
+        order=2,
+        parameters={},
+        equation_name="Coupled elliptic system",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=9,
+        n_points_y=7,
+        method="fdm",
+        selected_stats={"mean", "l2_norm"},
+        equation_type="vector_pde",
+        variables=["x", "y"],
+        vector_expressions=[
+            "fxx[0] + fyy[0] + 0.2*fxx[1] + 0.2*fyy[1] + f[1]",
+            "0.2*fxx[0] + 0.2*fyy[0] + fxx[1] + fyy[1] + f[0]",
+        ],
+        vector_components=2,
+    )
+
+    assert result.equation_type == "vector_pde"
+    assert result.is_vector is True
+    assert result.vector_components == 2
+    assert result.y.shape == (2, 7, 9)
+    assert result.y_grid is not None
+    assert result.metadata["matrix_shape"] == (70, 70)
+    assert len(result.metadata["component_residual_l2"]) == 2
+    assert set(result.statistics) == {"magnitude", "component_0", "component_1"}
+    np.testing.assert_allclose(result.y, 0.0)
+
+
+def test_vector_pde_pipeline_rejects_component_index_before_solver() -> None:
+    with pytest.raises(EquationParseError, match=r"outside \[0, 2\)"):
+        run_solver_pipeline(
+            expression=None,
+            function_name=None,
+            order=2,
+            parameters={},
+            equation_name="Invalid Vector PDE",
+            x_min=0.0,
+            x_max=1.0,
+            y_min=0.0,
+            y_max=1.0,
+            y0=[],
+            n_points=5,
+            n_points_y=5,
+            method="fdm",
+            selected_stats=set(),
+            equation_type="vector_pde",
+            variables=["x", "y"],
+            vector_expressions=["fxx[2] + fyy[0]", "fxx[1] + fyy[1]"],
+            vector_components=2,
+        )
+
+
 def test_build_mask_rejects_unsafe_expression() -> None:
     with pytest.raises(EquationParseError):
         _build_mask(

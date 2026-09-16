@@ -1,7 +1,8 @@
-"""Typed data structures for scalar finite-difference PDE solvers."""
+"""Typed data structures for scalar and vector finite-difference PDE solvers."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Callable, Literal, TypeAlias
 
@@ -18,6 +19,7 @@ BoundaryData: TypeAlias = float | np.ndarray | BoundaryValueFunction
 # (u_xx, u_xy, u_yy, u_x, u_y, u, affine constant)
 PDECoefficients: TypeAlias = tuple[float, float, float, float, float, float, float]
 PDECoefficientProvider: TypeAlias = Callable[[float, float, dict[str, float]], PDECoefficients]
+VectorPDEResidual: TypeAlias = Callable[..., np.ndarray]
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,56 @@ class PDEBoundaryConditions:
     periodic_y: bool = False
 
 
+ComponentBoundaryCondition: TypeAlias = PDEBoundaryCondition | Sequence[PDEBoundaryCondition | None]
+
+
+@dataclass(frozen=True)
+class VectorPDEBoundaryConditions:
+    """Boundary configuration for a vector PDE system.
+
+    Each edge or contour accepts either one :class:`PDEBoundaryCondition`,
+    which is explicitly shared by every component, or a sequence whose length
+    is exactly the system component count. A length-one sequence is not
+    broadcast. On rectangular edges, use ``None`` in a component sequence to
+    request the same default zero-Dirichlet behavior as an omitted scalar
+    edge. A masked contour must provide a condition for every component.
+
+    Periodicity is shared by the system because all components use one grid
+    and one domain mask.
+    """
+
+    left: ComponentBoundaryCondition | None = None
+    right: ComponentBoundaryCondition | None = None
+    bottom: ComponentBoundaryCondition | None = None
+    top: ComponentBoundaryCondition | None = None
+    contour: ComponentBoundaryCondition | None = None
+    periodic_x: bool = False
+    periodic_y: bool = False
+
+
+@dataclass(frozen=True)
+class VectorPDECoefficients:
+    """Coefficients of an ``m``-component linear PDE system.
+
+    The six operator fields have shape ``(m, m)``. Rows select the residual
+    equation and columns select the differentiated solution component.
+    ``constant`` has shape ``(m,)``.
+    """
+
+    fxx: np.ndarray
+    fxy: np.ndarray
+    fyy: np.ndarray
+    fx: np.ndarray
+    fy: np.ndarray
+    f: np.ndarray
+    constant: np.ndarray
+
+
+VectorPDECoefficientProvider: TypeAlias = Callable[
+    [float, float, dict[str, float]], VectorPDECoefficients
+]
+
+
 @dataclass(frozen=True)
 class PDEDiagnostics:
     """Numerical evidence for an assembled scalar PDE solve.
@@ -92,6 +144,22 @@ class PDEDiagnostics:
     discrete_residual_l2: float
     discrete_residual_linf: float
     relative_residual_l2: float
+    matrix_shape: tuple[int, int]
+    nnz: int
+    condition_estimate: float | None = None
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class VectorPDEDiagnostics:
+    """Global and per-equation evidence for a vector PDE sparse solve."""
+
+    discrete_residual_l2: float
+    discrete_residual_linf: float
+    relative_residual_l2: float
+    component_residual_l2: tuple[float, ...]
+    component_residual_linf: tuple[float, ...]
+    component_relative_residual_l2: tuple[float, ...]
     matrix_shape: tuple[int, int]
     nnz: int
     condition_estimate: float | None = None
@@ -113,3 +181,21 @@ class PDESolution:
     n_eval: int = 0
     mask: np.ndarray | None = None
     diagnostics: PDEDiagnostics | None = None
+
+
+@dataclass
+class VectorPDESolution:
+    """Solution of a linear vector PDE system on one shared 2D grid.
+
+    ``u`` always has public shape ``(m, ny, nx)``. Sparse unknowns use stable
+    component-major indexing: ``component * n_unknown_points + point_index``.
+    Values outside an arbitrary shared mask are NaN.
+    """
+
+    grid: tuple[np.ndarray, np.ndarray]
+    u: np.ndarray
+    success: bool
+    message: str
+    n_eval: int = 0
+    mask: np.ndarray | None = None
+    diagnostics: VectorPDEDiagnostics | None = None

@@ -7,11 +7,14 @@ from typing import cast
 
 import numpy as np
 
-from solver.pde_types import PDECoefficients
+from solver.pde_types import PDECoefficients, VectorPDECoefficients, VectorPDEResidual
 from utils import SolverFailedError
 
 _AFFINITY_PROBE = (0.37, -0.61, 1.19, -0.83, 0.47, 1.31)
 _AFFINITY_TOLERANCE = 1.0e-9
+_VECTOR_AFFINITY_TOLERANCE = 1.0e-9
+_STRONG_ELLIPTICITY_DIRECTIONS = 32
+_STRONG_ELLIPTICITY_RELATIVE_TOLERANCE = 1.0e-10
 
 
 def finite_scalar(value: object, name: str) -> float:
@@ -26,6 +29,34 @@ def finite_scalar(value: object, name: str) -> float:
     if not np.isfinite(result):
         raise SolverFailedError(f"{name} must be finite")
     return result
+
+
+def finite_vector(value: object, size: int, name: str) -> np.ndarray:
+    """Convert a vector-like value to a finite real array of exact length ``size``."""
+    try:
+        raw = np.asarray(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must be a finite real vector of shape ({size},)") from exc
+    if np.iscomplexobj(raw):
+        raise SolverFailedError(f"{name} must be a finite real vector of shape ({size},)")
+    try:
+        result = np.asarray(value, dtype=float)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must be a finite real vector of shape ({size},)") from exc
+    if result.shape != (size,):
+        raise SolverFailedError(f"{name} must have shape ({size},), got {result.shape}")
+    if not np.all(np.isfinite(result)):
+        raise SolverFailedError(f"{name} must be finite")
+    return result
+
+
+def validate_component_count(components: int) -> int:
+    """Validate and normalize a vector PDE component count."""
+    if isinstance(components, (bool, np.bool_)) or not isinstance(components, (int, np.integer)):
+        raise SolverFailedError("components must be an integer")
+    if int(components) < 1:
+        raise SolverFailedError("components must be at least 1")
+    return int(components)
 
 
 def validate_grid_inputs(
@@ -102,6 +133,182 @@ def probe_coefficients(
         )
     g_f, d_fx, e_fy, a_fxx, b_fxy, c_fyy = responses
     return (a_fxx, b_fxy, c_fyy, d_fx, e_fy, g_f, r0)
+
+
+def probe_vector_coefficients(
+    residual_func: VectorPDEResidual,
+    xi: float,
+    yj: float,
+    components: int,
+    params: dict[str, float],
+) -> VectorPDECoefficients:
+    """Recover all coefficient matrices and verify full-state residual affinity.
+
+    Every state family is perturbed in every component, so off-diagonal
+    responses are recovered. Two deterministic dense probes then vary all six
+    vector arguments simultaneously and compare the actual residual with the
+    complete matrix-affine reconstruction.
+    """
+    coordinate = f"({xi:.12g}, {yj:.12g})"
+
+    def evaluate(state: np.ndarray) -> np.ndarray:
+        vectors = [state[index].copy() for index in range(6)]
+        try:
+            raw = residual_func(xi, yj, *vectors, **params)
+        except SolverFailedError:
+            raise
+        except Exception as exc:
+            raise SolverFailedError(
+                f"Vector PDE residual evaluation failed at {coordinate}: {exc}"
+            ) from exc
+        return finite_vector(raw, components, f"Vector PDE residual at {coordinate}")
+
+    zero_state = np.zeros((6, components), dtype=float)
+    constant = evaluate(zero_state)
+    responses = np.empty((6, components, components), dtype=float)
+    for state_index in range(6):
+        for component in range(components):
+            basis = zero_state.copy()
+            basis[state_index, component] = 1.0
+            responses[state_index, :, component] = evaluate(basis) - constant
+
+    row_indices = np.arange(1, 7, dtype=float)[:, np.newaxis]
+    component_indices = np.arange(1, components + 1, dtype=float)[np.newaxis, :]
+    probes = (
+        0.19 * row_indices - 0.31 * component_indices + 0.07 * row_indices * component_indices,
+        np.cos(row_indices * component_indices) + 0.13 * row_indices - 0.17 * component_indices,
+    )
+    for probe_number, probe in enumerate(probes, start=1):
+        reconstructed = constant.copy()
+        for state_index in range(6):
+            reconstructed += responses[state_index] @ probe[state_index]
+        actual = evaluate(probe)
+        scale = max(
+            1.0,
+            float(np.linalg.norm(actual, ord=np.inf)),
+            float(np.linalg.norm(reconstructed, ord=np.inf)),
+            float(np.linalg.norm(constant, ord=np.inf))
+            + sum(
+                float(np.linalg.norm(responses[index] @ probe[index], ord=np.inf))
+                for index in range(6)
+            ),
+        )
+        mismatch = float(np.linalg.norm(actual - reconstructed, ord=np.inf))
+        if mismatch > _VECTOR_AFFINITY_TOLERANCE * scale:
+            raise SolverFailedError(
+                "Vector PDE residual is not affine in the complete coupled state "
+                "(f, fx, fy, fxx, fxy, fyy) "
+                f"at {coordinate}: dense probe {probe_number} mismatch {mismatch:.3g}"
+            )
+
+    return VectorPDECoefficients(
+        fxx=responses[3],
+        fxy=responses[4],
+        fyy=responses[5],
+        fx=responses[1],
+        fy=responses[2],
+        f=responses[0],
+        constant=constant,
+    )
+
+
+def _finite_matrix(value: object, components: int, name: str) -> np.ndarray:
+    """Validate one real finite square system matrix."""
+    expected = (components, components)
+    try:
+        raw = np.asarray(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must be a finite real matrix of shape {expected}") from exc
+    if np.iscomplexobj(raw):
+        raise SolverFailedError(f"{name} must be a finite real matrix of shape {expected}")
+    try:
+        result = np.asarray(value, dtype=float)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SolverFailedError(f"{name} must be a finite real matrix of shape {expected}") from exc
+    if result.shape != expected:
+        raise SolverFailedError(f"{name} must have shape {expected}, got {result.shape}")
+    if not np.all(np.isfinite(result)):
+        raise SolverFailedError(f"{name} must be finite")
+    return result
+
+
+def validate_vector_coefficients(
+    coefficients: object,
+    xi: float,
+    yj: float,
+    components: int,
+) -> tuple[VectorPDECoefficients, int]:
+    """Validate matrix coefficients and sampled strong ellipticity.
+
+    For 32 equally spaced unoriented unit directions on ``[0, pi)``, this
+    checks the eigenvalues of the symmetric part of
+    ``Axx*xi_x**2 + Axy*xi_x*xi_y + Ayy*xi_y**2``. Every sampled symbol must
+    be strictly positive or strictly negative definite relative to its own
+    infinity-norm scale, and all directions must have one orientation. This
+    deterministic numerical screen is not a mathematical proof between the
+    sampled directions.
+    """
+    coordinate = f"({xi:.12g}, {yj:.12g})"
+    if not isinstance(coefficients, VectorPDECoefficients):
+        raise SolverFailedError(
+            f"Vector PDE coefficients at {coordinate} must be a VectorPDECoefficients object"
+        )
+    matrices = {
+        name: _finite_matrix(getattr(coefficients, name), components, f"{name} at {coordinate}")
+        for name in ("fxx", "fxy", "fyy", "fx", "fy", "f")
+    }
+    constant = finite_vector(
+        coefficients.constant,
+        components,
+        f"constant at {coordinate}",
+    )
+
+    orientation: int | None = None
+    for direction_index in range(_STRONG_ELLIPTICITY_DIRECTIONS):
+        angle = np.pi * direction_index / _STRONG_ELLIPTICITY_DIRECTIONS
+        direction_x = float(np.cos(angle))
+        direction_y = float(np.sin(angle))
+        symbol = (
+            matrices["fxx"] * direction_x**2
+            + matrices["fxy"] * direction_x * direction_y
+            + matrices["fyy"] * direction_y**2
+        )
+        symmetric_symbol = 0.5 * (symbol + symbol.T)
+        symbol_scale = max(
+            float(np.linalg.norm(symmetric_symbol, ord=np.inf)),
+            np.finfo(float).tiny,
+        )
+        eigenvalues = np.linalg.eigvalsh(symmetric_symbol)
+        tolerance = _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE * symbol_scale
+        positive = bool(np.all(eigenvalues > tolerance))
+        negative = bool(np.all(eigenvalues < -tolerance))
+        if not (positive or negative):
+            raise SolverFailedError(
+                "Vector PDE principal symbol is not uniformly definite in sampled direction "
+                f"{direction_index} at {coordinate}: direction="
+                f"({direction_x:.12g}, {direction_y:.12g}), "
+                f"eigenvalues={eigenvalues.tolist()}, tolerance={tolerance:.3g}"
+            )
+        current = 1 if positive else -1
+        if orientation is None:
+            orientation = current
+        elif current != orientation:
+            raise SolverFailedError(
+                "Vector PDE principal-symbol orientation changes across sampled directions "
+                f"at {coordinate}"
+            )
+
+    normalized = VectorPDECoefficients(
+        fxx=matrices["fxx"],
+        fxy=matrices["fxy"],
+        fyy=matrices["fyy"],
+        fx=matrices["fx"],
+        fy=matrices["fy"],
+        f=matrices["f"],
+        constant=constant,
+    )
+    assert orientation is not None
+    return normalized, orientation
 
 
 def validate_coefficients(
