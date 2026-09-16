@@ -6,8 +6,8 @@ This document lists the third-party libraries used and their licenses, to facili
 with their terms when redistributing DifferentialLab (as source code, installable package, binary,
 or installer).
 
-> Note: This list is based on the dependencies declared in `pyproject.toml` (and the matching
-> `requirements.txt`). If you add or remove dependencies, update this file.
+> Note: This list is based on the dependencies declared in `pyproject.toml`. If you add or
+> remove dependencies, update this file.
 
 ---
 

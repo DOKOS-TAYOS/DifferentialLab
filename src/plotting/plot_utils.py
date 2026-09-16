@@ -109,7 +109,6 @@ def _new_3d_figure() -> tuple[Any, Any]:
         Tuple of ``(fig, ax)`` with 3D projection.
     """
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
     _apply_plot_style()
     width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")

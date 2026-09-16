@@ -8,7 +8,7 @@ Numerical ODE, difference-equation, and PDE solver with a desktop GUI for scienc
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![Version](https://img.shields.io/github/v/release/DOKOS-TAYOS/DifferentialLab?style=for-the-badge&label=version)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 
 [Documentation](docs/index.md) |

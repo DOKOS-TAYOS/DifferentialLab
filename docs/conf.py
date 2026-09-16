@@ -6,28 +6,26 @@ from pathlib import Path
 _project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_project_root / "src"))
 
+from config import APP_VERSION  # noqa: E402
+
 # -- Project information -----------------------------------------------------
 
 project = "DifferentialLab"
 author = "Alejandro Mata Ali"
-copyright = "2026, Alejandro Mata Ali"  # noqa: A001
-release = "0.4.1"
-version = "0.4"
+copyright = "2026, Alejandro Mata Ali"
+release = APP_VERSION
+version = ".".join(APP_VERSION.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
     "myst_parser",
 ]
-
-# Enable autosummary for :autosummary: directives (used in API index)
-autosummary_generate = True
 
 source_suffix = {
     ".rst": "restructuredtext",
@@ -93,4 +91,3 @@ html_theme_options = {
     "titles_only": False,
     "includehidden": True,
 }
-templates_path = ["_templates"]

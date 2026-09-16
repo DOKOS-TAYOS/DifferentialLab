@@ -17,6 +17,7 @@ from config.env import (
     get_env,
     get_env_from_schema,
     initialize_and_validate_config,
+    write_default_env_file,
     write_env_file,
 )
 from config.paths import (
@@ -44,6 +45,7 @@ __all__ = [
     "get_env",
     "get_env_from_schema",
     "initialize_and_validate_config",
+    "write_default_env_file",
     "write_env_file",
     # paths
     "generate_output_basename",

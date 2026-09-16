@@ -1,9 +1,30 @@
 """Application constants for DifferentialLab."""
 
+import tomllib
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
+from pathlib import Path
 from typing import Final
 
+
+def _read_checkout_version() -> str:
+    """Read the project version from pyproject.toml in a source checkout."""
+    project_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    with project_path.open("rb") as project_file:
+        project_data = tomllib.load(project_file)
+    return str(project_data["project"]["version"])
+
+
+def _get_app_version() -> str:
+    """Get the installed package version, falling back to the source checkout."""
+    try:
+        return package_version("differential-lab")
+    except PackageNotFoundError:
+        return _read_checkout_version()
+
+
 APP_NAME: Final[str] = "DifferentialLab"
-APP_VERSION: Final[str] = "0.4.1"
+APP_VERSION: Final[str] = _get_app_version()
 
 SOLVER_METHOD_DESCRIPTIONS: Final[dict[str, str]] = {
     "RK45": "Runge-Kutta 4(5) — general-purpose explicit method",

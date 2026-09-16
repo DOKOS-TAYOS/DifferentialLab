@@ -2,7 +2,7 @@
 
 DifferentialLab reads configuration from `.env` in the project root.
 
-- Use `.env.example` as template.
+- Setup generates `.env` from the defaults in `ENV_SCHEMA`.
 - Or use the in-app `Configuration` dialog (recommended).
 - On startup, values are validated against `ENV_SCHEMA` (`src/config/env.py`).
 - Invalid values are automatically replaced with defaults and logged.

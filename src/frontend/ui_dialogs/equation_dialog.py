@@ -454,9 +454,6 @@ class EquationDialog:
         self._vec_n_refresh_id: str | None = None
         self._vec_n_var.trace_add("write", self._on_vec_n_change)
 
-        # Dummy order var for compatibility (actual orders come from per-component spinboxes)
-        self.custom_order_var = tk.StringVar(value="2")
-
         # Mode: per-component boxes or bulk expression
         mode_frame = ttk.Frame(ci)
         mode_frame.pack(fill=tk.X, pady=(0, pad))
@@ -715,8 +712,6 @@ class EquationDialog:
             style="Small.TLabel",
         )
         self._pde_vars_label.pack(side=tk.LEFT, padx=(pad, 0))
-
-        self.custom_order_var = tk.StringVar(value="2")
 
         # Operator selector (LHS of the PDE)
         op_row = ttk.Frame(ci)

@@ -13,6 +13,7 @@ from config.env import (
     get_current_env_values,
     get_env,
     get_env_from_schema,
+    write_default_env_file,
     write_env_file,
 )
 
@@ -67,6 +68,15 @@ class TestGetCurrentEnvValues:
 
 
 class TestWriteEnvFile:
+    def test_writes_schema_defaults(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        env_path = tmp_path / ".env"
+        monkeypatch.setenv("UI_BACKGROUND", "not-the-schema-default")
+
+        write_default_env_file(env_path)
+
+        content = env_path.read_text(encoding="utf-8")
+        assert 'UI_BACKGROUND="#181818"' in content
+
     def test_writes_file(self, tmp_path: Path) -> None:
         env_path = tmp_path / ".env"
         values = {item["key"]: str(item["default"]) for item in ENV_SCHEMA[:3]}

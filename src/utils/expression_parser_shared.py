@@ -110,7 +110,7 @@ def build_eval_namespace(params: dict[str, float]) -> dict[str, Any]:
 
 def safe_eval(compiled: Any, namespace: dict[str, Any]) -> Any:
     """Evaluate a compiled expression in a sandboxed namespace."""
-    return eval(compiled, {"__builtins__": {}}, namespace)  # noqa: S307
+    return eval(compiled, {"__builtins__": {}}, namespace)
 
 
 def validate_exclusive_args(

@@ -52,19 +52,15 @@ python -m pip install --upgrade pip
 
 echo.
 echo [5/6] Installing dependencies...
-pip install -r requirements.txt
+python -m pip install --editable .
 
 echo.
 echo [6/6] Setting up environment file...
 if exist .env (
     echo        .env file already exists, skipping
 ) else (
-    if exist .env.example (
-        copy .env.example .env >nul
-        echo        .env file created from .env.example
-    ) else (
-        echo        Warning: .env.example not found, skipping .env creation
-    )
+    python -c "from pathlib import Path; from config.env import write_default_env_file; write_default_env_file(Path('.env'))"
+    echo        .env file created from ENV_SCHEMA defaults
 )
 
 echo.

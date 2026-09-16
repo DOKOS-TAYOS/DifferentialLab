@@ -596,15 +596,19 @@ def get_current_env_values() -> dict[str, str]:
     Returns:
         Dictionary mapping each schema key to its string value.
     """
-    result: dict[str, str] = {}
-    for item in ENV_SCHEMA:
-        key = item["key"]
-        val = get_env_from_schema(key)
-        if item["cast_type"] is bool:
-            result[key] = "true" if val else "false"
-        else:
-            result[key] = str(val)
-    return result
+    return _stringify_env_values(
+        {item["key"]: get_env_from_schema(item["key"]) for item in ENV_SCHEMA}
+    )
+
+
+def _stringify_env_values(values: dict[str, Any]) -> dict[str, str]:
+    """Convert schema values to the string representation used in ``.env`` files."""
+    return {
+        item["key"]: ("true" if values[item["key"]] else "false")
+        if item["cast_type"] is bool
+        else str(values[item["key"]])
+        for item in ENV_SCHEMA
+    }
 
 
 def write_env_file(env_path: Path, values: dict[str, str]) -> None:
@@ -628,6 +632,12 @@ def write_env_file(env_path: Path, values: dict[str, str]) -> None:
             value = f'"{value}"'
         lines.append(f"{key}={value}")
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_default_env_file(env_path: Path) -> None:
+    """Write a ``.env`` file containing the defaults declared in ``ENV_SCHEMA``."""
+    defaults = {item["key"]: item["default"] for item in ENV_SCHEMA}
+    write_env_file(env_path, _stringify_env_values(defaults))
 
 
 def initialize_and_validate_config() -> None:
