@@ -157,26 +157,53 @@ def _export_csv_vector_2d(
     return filepath
 
 
+def _export_csv_3d(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    u: np.ndarray,
+    filepath: Path,
+) -> Path:
+    """Write a scalar ``(nz, ny, nx)`` PDE field as x/y/z/f rows."""
+    expected_shape = (len(z_grid), len(y_grid), len(x_grid))
+    if u.shape != expected_shape:
+        raise ValueError(f"Scalar PDE 3D data must have shape {expected_shape}, got {u.shape}")
+    _ensure_parent_dir(filepath)
+    z_mesh, y_mesh, x_mesh = np.meshgrid(z_grid, y_grid, x_grid, indexing="ij")
+    data = np.column_stack((x_mesh.ravel(), y_mesh.ravel(), z_mesh.ravel(), u.ravel()))
+    with open(filepath, "w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["x", "y", "z", "f"])
+        writer.writerows(data.tolist())
+    logger.info("CSV exported (scalar PDE 3D): %s", filepath)
+    return filepath
+
+
 def export_csv_to_path(
     x: np.ndarray,
     y: np.ndarray,
     filepath: Path,
     *,
     y_grid: np.ndarray | None = None,
+    z_grid: np.ndarray | None = None,
 ) -> Path:
     """Export solution data to CSV at the given path.
 
     Args:
         x: Independent variable values (1D) or x grid for 2D.
         y: Solution values. For scalar 2D PDE: shape ``(ny, nx)``; for
-            Vector PDE: shape ``(m, ny, nx)``.
+            Vector PDE: shape ``(m, ny, nx)``; for scalar 3D PDE:
+            shape ``(nz, ny, nx)``.
         filepath: Destination path.
         y_grid: For 2D PDE, the y grid. If provided with 2D y, uses 2D CSV format.
+        z_grid: For scalar 3D PDE, the z grid.
 
     Returns:
         The path that was written.
     """
-    if y_grid is not None and y.ndim == 3:
+    if y_grid is not None and z_grid is not None and y.ndim == 3:
+        _export_csv_3d(x, y_grid, z_grid, y, filepath)
+    elif y_grid is not None and y.ndim == 3:
         _export_csv_vector_2d(x, y_grid, y, filepath)
     elif y_grid is not None and y.ndim == 2:
         _export_csv_2d(x, y_grid, y, filepath)

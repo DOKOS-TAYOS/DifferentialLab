@@ -23,6 +23,7 @@ The standard solver path currently supports:
 - ODE
 - Difference equation
 - PDE
+- PDE 3D
 - Vector ODE
 - Vector PDE
 
@@ -47,6 +48,8 @@ For custom expressions:
 - Vector notation: `f[i,k]`, where `i` is the component and `k` is the derivative order
 - Difference notation: `f[0]` for the current term and `n` for the index
 - PDE expressions may use variables such as `x`, `y`, `f`, `fx`, `fy`, `fxx`, `fxy`, and `fyy`
+- PDE 3D residuals use `x`, `y`, `z`; `f`, `fx`, `fy`, `fz`; and `fxx`, `fxy`,
+  `fxz`, `fyy`, `fyz`, `fzz`
 - Vector PDE uses one residual expression per equation and only the explicit state
   notation `f[i]`, `fx[i]`, `fy[i]`, `fxx[i]`, `fxy[i]`, and `fyy[i]`
 
@@ -113,6 +116,45 @@ Programmatic `solve_pde_2d()` results include optional `PDEDiagnostics` with the
 discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and
 nonzero count. A condition estimate is included only for small systems; large
 sparse systems are never converted to dense form solely for diagnostics.
+
+Scalar `PDE 3D` is also available in the standard `Solve Equation` workflow.
+Its custom expression is the complete residual equal to zero, for example
+`-fxx - fyy - fzz - 3*pi**2*sin(pi*x)*sin(pi*y)*sin(pi*z)`. The current
+release intentionally supports rectangular grids only; arbitrary 3D masks,
+vector-valued 3D systems, and a generic N-dimensional solver are not included.
+The parameter dialog accepts six Dirichlet or outward-normal Neumann faces and
+shows a sparse-work/memory advisory before unusually large runs. Programmatic
+callers also have Robin faces and periodic axes:
+
+```python
+from solver import PDEBoundaryCondition3D, PDEBoundaryConditions3D, solve_pde_3d
+
+boundaries = PDEBoundaryConditions3D(
+    periodic_x=True,
+    y_min=PDEBoundaryCondition3D.dirichlet(0.0),
+    y_max=PDEBoundaryCondition3D.robin(alpha=2.0, beta=0.5, gamma=1.0),
+    z_min=PDEBoundaryCondition3D.dirichlet(0.0),
+    z_max=PDEBoundaryCondition3D.dirichlet(0.0),
+)
+solution = solve_pde_3d(
+    residual,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    32,
+    25,
+    25,
+    boundary_conditions=boundaries,
+)
+```
+
+`PDESolution3D.u` has shape `(nz, ny, nx)`. Periodic axes omit the duplicated
+upper endpoint. Diagnostics use the same residual/matrix structure as scalar
+2D results. The initial result UI provides selectable XY, XZ, and YZ slices;
+coordinate-aware visualization is intentionally left to the later visualization work.
 
 Vector PDE is part of the same standard `Solve Equation` workflow. The custom
 editor supports 1–4 components and interprets every expression as a residual

@@ -17,7 +17,7 @@ _EQUATION_FILES = ["ode.yaml", "vector_ode.yaml", "difference.yaml", "pde.yaml",
 _cache: dict[str, PredefinedEquation] | None = None
 
 
-EquationType = Literal["ode", "difference", "pde", "vector_ode", "vector_pde"]
+EquationType = Literal["ode", "difference", "pde", "pde_3d", "vector_ode", "vector_pde"]
 
 
 @dataclass
@@ -45,7 +45,7 @@ class PredefinedEquation:
         default_domain: Default ``[x_min, x_max]`` for ODE or ``[n_min, n_max]`` for difference.
             For PDE: ``[x_min, x_max, y_min, y_max, ...]`` per variable.
         equation_type: ``"ode"``, ``"difference"``, ``"pde"``, ``"vector_ode"``,
-            or ``"vector_pde"``.
+            ``"pde_3d"``, or ``"vector_pde"``.
         category: Display category (e.g. ``"Oscillators"``, ``"Population"``) for UI grouping.
         variables: Independent variable names, e.g. ``["x"]`` for 1D, ``["x","y"]`` for 2D.
             If absent or ``["x"]``, treated as 1D ODE.

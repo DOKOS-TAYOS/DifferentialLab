@@ -75,6 +75,20 @@ class TestExportCsv:
         assert rows[1].endswith(",3.0,4.0,5.0")
         assert len(rows) == 5
 
+    def test_scalar_pde_3d_writes_xyz_and_value(self, tmp_path: Path) -> None:
+        x = np.array([0.0, 1.0])
+        y_grid = np.array([0.0, 2.0])
+        z_grid = np.array([0.0, 3.0])
+        field = np.arange(8, dtype=float).reshape(2, 2, 2)
+        filepath = tmp_path / "pde_3d.csv"
+
+        export_csv_to_path(x, field, filepath, y_grid=y_grid, z_grid=z_grid)
+
+        rows = filepath.read_text().strip().splitlines()
+        assert rows[0] == "x,y,z,f"
+        assert rows[-1] == "1.0,2.0,3.0,7.0"
+        assert len(rows) == 9
+
 
 class TestExportJson:
     def test_writes_metadata_and_statistics(self, tmp_path: Path) -> None:

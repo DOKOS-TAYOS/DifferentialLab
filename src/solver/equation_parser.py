@@ -320,17 +320,22 @@ _INDEXED_VAR_NAMES = ["x", "y", "z", "w"]
 _INDEXED_VAR_RE = re.compile(r"\bx\[([0-3])\]")
 
 # PDE RHS notation: f[k] = f_{x[k]}, f[i,j] = f_{x[i],x[j]}
-# x[0]=x, x[1]=y. So f[0]=fx, f[1]=fy, f[0,0]=fxx, f[0,1]=fxy, f[1,0]=fxy, f[1,1]=fyy
+# x[0]=x, x[1]=y, x[2]=z. Mixed partial indexes are symmetric.
 # Bare f (no brackets) = solution value
-_PDE_F_SINGLE: dict[int, str] = {0: "fx", 1: "fy"}
+_PDE_F_SINGLE: dict[int, str] = {0: "fx", 1: "fy", 2: "fz"}
 _PDE_F_DOUBLE: dict[tuple[int, int], str] = {
     (0, 0): "fxx",
     (0, 1): "fxy",
     (1, 0): "fxy",
     (1, 1): "fyy",
+    (0, 2): "fxz",
+    (2, 0): "fxz",
+    (1, 2): "fyz",
+    (2, 1): "fyz",
+    (2, 2): "fzz",
 }
-_PDE_F_DOUBLE_RE = re.compile(r"\bf\[([0-1]),([0-1])\]")
-_PDE_F_SINGLE_RE = re.compile(r"\bf\[([0-1])\]")
+_PDE_F_DOUBLE_RE = re.compile(r"\bf\[([0-2]),([0-2])\]")
+_PDE_F_SINGLE_RE = re.compile(r"\bf\[([0-2])\]")
 
 
 def _rewrite_pde_f_notation(expression: str) -> str:
@@ -425,6 +430,19 @@ def parse_pde_rhs_expression(
 
     namespace = build_eval_namespace(params)
     pde_solution_vars = ("f", "fx", "fy", "fxx", "fxy", "fyy")
+    if len(internal_vars) >= 3:
+        pde_solution_vars = (
+            "f",
+            "fx",
+            "fy",
+            "fz",
+            "fxx",
+            "fxy",
+            "fxz",
+            "fyy",
+            "fyz",
+            "fzz",
+        )
     test_values: dict[str, Any] = {var: 0.0 for var in internal_vars}
     test_values.update({v: 0.0 for v in pde_solution_vars})
     compiled = _compile_and_test(
@@ -442,6 +460,22 @@ def parse_pde_rhs_expression(
         return float(safe_eval(compiled, local_ns))
 
     return rhs_func
+
+
+def parse_pde_3d_residual_expression(
+    expression: str,
+    variables: list[str],
+    parameters: dict[str, float] | None = None,
+) -> Callable[..., float]:
+    """Parse a safe scalar 3D residual using the documented PDE notation.
+
+    The expression may use ``x``, ``y``, ``z`` and ``f``, ``fx``, ``fy``,
+    ``fz``, ``fxx``, ``fxy``, ``fxz``, ``fyy``, ``fyz``, ``fzz``. Indexed
+    coordinate/derivative notation is rewritten consistently.
+    """
+    if len(variables) != 3:
+        raise EquationParseError("PDE 3D expressions require exactly three spatial variables")
+    return parse_pde_rhs_expression(expression, variables, parameters)
 
 
 _VECTOR_PDE_STATE_NAMES = ("f", "fx", "fy", "fxx", "fxy", "fyy")

@@ -297,8 +297,11 @@ class ResultDialog:
         eq_type = r.equation_type
 
         is_2d_pde = eq_type in ("pde", "vector_pde") and r.y_grid is not None
+        is_3d_pde = eq_type == "pde_3d" and r.y_grid is not None and r.z_grid is not None
 
-        if is_2d_pde:
+        if is_3d_pde:
+            self._build_pde_3d_slice_tabs()
+        elif is_2d_pde:
             self._build_pde_tabs()
         elif eq_type == "vector_ode" or (r.is_vector and r.vector_components > 1):
             self._build_vector_ode_tabs()
@@ -1139,6 +1142,102 @@ class ResultDialog:
 
     # ── PDE ──────────────────────────────────────────────────────────
 
+    def _build_pde_3d_slice_tabs(self) -> None:
+        """Build component-free orthogonal slice access for scalar PDE 3D."""
+        tab = ttk.Frame(self._notebook)
+        self._notebook.add(tab, text="  Orthogonal Slice  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(controls, text="Plane:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_slice_plane_var = tk.StringVar(value="XY")
+        plane_combo = ttk.Combobox(
+            controls,
+            textvariable=self._pde_3d_slice_plane_var,
+            values=["XY", "XZ", "YZ"],
+            state="readonly",
+            width=4,
+            font=get_font(),
+        )
+        plane_combo.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(controls, text="Fixed-axis index:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_slice_index_var = tk.StringVar(value="0")
+        self._pde_3d_slice_index_combo = ttk.Combobox(
+            controls,
+            textvariable=self._pde_3d_slice_index_var,
+            state="readonly",
+            width=7,
+            font=get_font(),
+        )
+        self._pde_3d_slice_index_combo.pack(side=tk.LEFT, padx=(0, 4))
+
+        def refresh_indices() -> None:
+            """Refresh valid fixed-axis indexes and redraw the selected slice."""
+            result = self._result
+            plane = self._pde_3d_slice_plane_var.get()
+            size = (
+                len(result.z_grid)
+                if plane == "XY" and result.z_grid is not None
+                else len(result.y_grid)
+                if plane == "XZ" and result.y_grid is not None
+                else len(result.x)
+            )
+            values = [str(index) for index in range(size)]
+            self._pde_3d_slice_index_combo.configure(values=values)
+            self._pde_3d_slice_index_var.set(str(size // 2))
+            self._update_pde_3d_slice()
+
+        plane_combo.bind("<<ComboboxSelected>>", lambda _event: refresh_indices())
+        self._pde_3d_slice_index_combo.bind(
+            "<<ComboboxSelected>>", lambda _event: self._update_pde_3d_slice()
+        )
+        self._pde_3d_slice_frame = ttk.Frame(tab)
+        self._pde_3d_slice_frame.pack(fill=tk.BOTH, expand=True)
+        self._pde_3d_slice_canvas: FigureCanvasTkAgg | None = None
+        refresh_indices()
+
+    def _update_pde_3d_slice(self) -> None:
+        """Render the selected XY, XZ, or YZ scalar slice."""
+        from plotting import create_contour_plot
+
+        result = self._result
+        if result.y_grid is None or result.z_grid is None:
+            raise ValueError("PDE 3D result is missing its y/z grids")
+        variables = result.metadata.get("variables", ["x", "y", "z"])
+        labels = [
+            variables[index] if len(variables) > index else "xyz"[index] for index in range(3)
+        ]
+        plane = self._pde_3d_slice_plane_var.get()
+        try:
+            requested_index = int(self._pde_3d_slice_index_var.get())
+        except ValueError:
+            requested_index = 0
+        field = np.asarray(result.y)
+        if plane == "XY":
+            index = max(0, min(len(result.z_grid) - 1, requested_index))
+            axis_1, axis_2, values = result.x, result.y_grid, field[index, :, :]
+            axis_1_label, axis_2_label = labels[0], labels[1]
+            fixed_label = f"{labels[2]}={result.z_grid[index]:.4g}"
+        elif plane == "XZ":
+            index = max(0, min(len(result.y_grid) - 1, requested_index))
+            axis_1, axis_2, values = result.x, result.z_grid, field[:, index, :]
+            axis_1_label, axis_2_label = labels[0], labels[2]
+            fixed_label = f"{labels[1]}={result.y_grid[index]:.4g}"
+        else:
+            index = max(0, min(len(result.x) - 1, requested_index))
+            axis_1, axis_2, values = result.y_grid, result.z_grid, field[:, :, index]
+            axis_1_label, axis_2_label = labels[1], labels[2]
+            fixed_label = f"{labels[0]}={result.x[index]:.4g}"
+        equation_name = result.metadata.get("equation_name", "PDE 3D")
+        figure = create_contour_plot(
+            axis_1,
+            axis_2,
+            values,
+            title=f"{equation_name} — {plane} slice at {fixed_label}",
+            xlabel=axis_1_label,
+            ylabel=axis_2_label,
+        )
+        self._replace_plot(self._pde_3d_slice_frame, figure, "_pde_3d_slice_canvas")
+
     def _build_pde_tabs(self) -> None:
         """Solution 3D (surface) + Solution 2D (contour) + Phase Space slice."""
         nb = self._notebook
@@ -1616,7 +1715,7 @@ class ResultDialog:
         r = self._result
 
         def export_fn(path: Path) -> None:
-            export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid)
+            export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid, z_grid=r.z_grid)
 
         self._save_export_file(
             export_fn,

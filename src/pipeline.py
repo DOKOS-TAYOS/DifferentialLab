@@ -17,18 +17,25 @@ from solver import (
     get_ode_function,
     get_vector_ode_function,
     is_multivariate,
+    parse_pde_3d_residual_expression,
     parse_pde_rhs_expression,
     parse_vector_pde_residual_expressions,
     solve_difference,
     solve_multipoint,
     solve_ode,
     solve_pde_2d,
+    solve_pde_3d,
     solve_vector_pde_2d,
     validate_all_inputs,
 )
 from solver.error_metrics import compute_ode_residual_error_from_rhs
 from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDECoefficientProvider, PDECoefficients
-from solver.pde_types import PDEBoundaryCondition, VectorPDEBoundaryConditions
+from solver.pde_types import (
+    PDEBoundaryCondition,
+    PDEBoundaryCondition3D,
+    PDEBoundaryConditions3D,
+    VectorPDEBoundaryConditions,
+)
 from solver.predefined import EquationType
 from utils import (
     ValidationError,
@@ -54,6 +61,7 @@ class _DispatchResult:
         error_metrics: Residual error metrics (ODE only).
         solver_quality: Solver parameters and metadata.
         y_grid: For 2D PDE, the y-axis grid. None otherwise.
+        z_grid: For 3D PDE, the z-axis grid. None otherwise.
         ode_func: ODE function used (for residual computation). None for PDE/difference.
     """
 
@@ -65,11 +73,150 @@ class _DispatchResult:
     error_metrics: dict[str, float] = field(default_factory=dict)
     solver_quality: dict[str, Any] = field(default_factory=dict)
     y_grid: np.ndarray | None = None
+    z_grid: np.ndarray | None = None
     ode_func: Callable | None = None
 
 
 _PDE_SOLUTION_TERMS = ("f", "fx", "fy", "fxx", "fxy", "fyy")
 _MAX_VECTOR_PDE_COMPONENTS = 4
+
+
+def _shared_pde_3d_boundaries(
+    *,
+    variables: list[str],
+    parameters: dict[str, float],
+    bc_expressions: list[str] | None,
+    bc_types: list[str] | None,
+) -> PDEBoundaryConditions3D:
+    """Build six scalar face conditions for the standard PDE 3D workflow."""
+
+    def condition(kind: str, expression: str) -> PDEBoundaryCondition3D:
+        """Parse one face expression accepting all three coordinates."""
+        parsed = parse_pde_rhs_expression(expression or "0", variables, parameters)
+
+        def value(x: float, y: float, z: float) -> float:
+            return parsed(x, y, z)
+
+        if kind == BC_NEUMANN:
+            return PDEBoundaryCondition3D.neumann(value)
+        if kind == BC_DIRICHLET:
+            return PDEBoundaryCondition3D.dirichlet(value)
+        raise ValidationError(
+            "Standard PDE 3D boundaries currently support Dirichlet or Neumann conditions"
+        )
+
+    expressions = list(bc_expressions or [])
+    expressions.extend(["0"] * (6 - len(expressions)))
+    kinds = list(bc_types or [])
+    kinds.extend([BC_DIRICHLET] * (6 - len(kinds)))
+    return PDEBoundaryConditions3D(
+        z_min=condition(kinds[0], expressions[0]),
+        z_max=condition(kinds[1], expressions[1]),
+        y_min=condition(kinds[2], expressions[2]),
+        y_max=condition(kinds[3], expressions[3]),
+        x_min=condition(kinds[4], expressions[4]),
+        x_max=condition(kinds[5], expressions[5]),
+    )
+
+
+def _dispatch_3d_pde(
+    *,
+    expression: str | None,
+    vars_list: list[str],
+    parameters: dict[str, float],
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    z_min: float,
+    z_max: float,
+    n_points: int,
+    n_points_y: int | None,
+    n_points_z: int | None,
+    bc_expressions: list[str] | None,
+    bc_types: list[str] | None,
+) -> _DispatchResult:
+    """Dispatch a scalar residual-form PDE 3D solve."""
+    if len(vars_list) != 3:
+        raise ValidationError("PDE 3D requires exactly three spatial variables")
+    parsed_residual = parse_pde_3d_residual_expression(expression or "0", vars_list, parameters)
+
+    def residual(
+        x: float,
+        y: float,
+        z: float,
+        f: float,
+        fx: float,
+        fy: float,
+        fz: float,
+        fxx: float,
+        fxy: float,
+        fxz: float,
+        fyy: float,
+        fyz: float,
+        fzz: float,
+        **kwargs: Any,
+    ) -> float:
+        """Evaluate the parsed residual with explicitly named solution state."""
+        return parsed_residual(
+            x,
+            y,
+            z,
+            f=f,
+            fx=fx,
+            fy=fy,
+            fz=fz,
+            fxx=fxx,
+            fxy=fxy,
+            fxz=fxz,
+            fyy=fyy,
+            fyz=fyz,
+            fzz=fzz,
+            **kwargs,
+        )
+
+    ny = n_points if n_points_y is None else n_points_y
+    nz = n_points if n_points_z is None else n_points_z
+    boundaries = _shared_pde_3d_boundaries(
+        variables=vars_list,
+        parameters=parameters,
+        bc_expressions=bc_expressions,
+        bc_types=bc_types,
+    )
+    solution = solve_pde_3d(
+        residual,
+        x_min,
+        x_max,
+        y_min,
+        y_max,
+        z_min,
+        z_max,
+        n_points,
+        ny,
+        nz,
+        parameters=parameters,
+        boundary_conditions=boundaries,
+    )
+    quality: dict[str, Any] = {}
+    if solution.diagnostics is not None:
+        quality = {
+            "discrete_residual_l2": solution.diagnostics.discrete_residual_l2,
+            "relative_residual_l2": solution.diagnostics.relative_residual_l2,
+            "matrix_shape": solution.diagnostics.matrix_shape,
+            "nnz": solution.diagnostics.nnz,
+            "condition_estimate": solution.diagnostics.condition_estimate,
+            "pde_warnings": solution.diagnostics.warnings,
+        }
+    return _DispatchResult(
+        x=solution.grid[0],
+        y=solution.u,
+        success=solution.success,
+        message=solution.message,
+        n_eval=solution.n_eval,
+        solver_quality=quality,
+        y_grid=solution.grid[1],
+        z_grid=solution.grid[2],
+    )
 
 
 def _build_solver_quality(solution: ODESolution) -> dict[str, Any]:
@@ -763,12 +910,14 @@ class SolverResult:
     Attributes:
         x: Independent variable values (1D) or x grid for 2D PDE.
         y: Solution array — shape ``(n_vars, n_points)``, ``(ny, nx)`` for scalar
-            PDE, or ``(m, ny, nx)`` for Vector PDE.
+            2D PDE, ``(nz, ny, nx)`` for scalar 3D PDE, or ``(m, ny, nx)`` for
+            Vector PDE.
         statistics: Computed statistics dict.
         metadata: Equation info, solver parameters, domain, etc.
         equation_type: ``"ode"``, ``"difference"``, ``"pde"``, ``"vector_ode"``,
             or ``"vector_pde"``.
         y_grid: For 2D PDE, the y-axis grid. ``None`` otherwise.
+        z_grid: For 3D PDE, the z-axis grid. ``None`` otherwise.
         is_vector: Whether the equation is a vector ODE or Vector PDE.
         vector_components: Number of vector components.
         vector_order: Display order (derivatives per component).
@@ -781,6 +930,7 @@ class SolverResult:
     metadata: dict[str, Any]
     equation_type: str = "ode"
     y_grid: np.ndarray | None = None  # For 2D PDE: y-axis grid
+    z_grid: np.ndarray | None = None  # For 3D PDE: z-axis grid
     is_vector: bool = False
     vector_components: int = 1
     vector_order: int = 1
@@ -806,6 +956,9 @@ def run_solver_pipeline(
     y_min: float | None = None,
     y_max: float | None = None,
     n_points_y: int | None = None,
+    z_min: float | None = None,
+    z_max: float | None = None,
+    n_points_z: int | None = None,
     vector_expressions: list[str] | None = None,
     vector_components: int = 1,
     pde_operator: str = "neg_laplacian",
@@ -843,6 +996,9 @@ def run_solver_pipeline(
         y_min: For 2D PDE, domain y start.
         y_max: For 2D PDE, domain y end.
         n_points_y: For 2D PDE, number of y grid points.
+        z_min: For 3D PDE, domain z start.
+        z_max: For 3D PDE, domain z end.
+        n_points_z: For 3D PDE, number of z grid points.
         vector_expressions: Per-component expressions for vector ODE, or one
             residual expression per equation for Vector PDE.
         vector_components: Number of vector components.
@@ -863,8 +1019,9 @@ def run_solver_pipeline(
     """
     vars_list = variables if variables else ["x"]
     is_vector_pde = equation_type == "vector_pde"
-    is_pde = equation_type in ("pde", "vector_pde") or is_multivariate(vars_list)
-    is_2d_pde = is_pde and len(vars_list) >= 2
+    is_3d_pde = equation_type == "pde_3d"
+    is_pde = equation_type in ("pde", "pde_3d", "vector_pde") or is_multivariate(vars_list)
+    is_2d_pde = is_pde and not is_3d_pde and len(vars_list) >= 2
     is_vector = (
         vector_expressions is not None and len(vector_expressions) > 0
     ) or equation_type in ("vector_ode", "vector_pde")
@@ -892,7 +1049,27 @@ def run_solver_pipeline(
             raise ValidationError(msg)
 
     # ── Dispatch to equation-type-specific solver ─────────────────────
-    if is_vector_pde:
+    if is_3d_pde:
+        if y_min is None or y_max is None or z_min is None or z_max is None:
+            logger.warning("PDE 3D validation failed: y and z bounds required")
+            raise ValidationError("PDE 3D requires y_min, y_max, z_min, and z_max")
+        dr = _dispatch_3d_pde(
+            expression=expression,
+            vars_list=vars_list,
+            parameters=parameters,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=float(y_min),
+            y_max=float(y_max),
+            z_min=float(z_min),
+            z_max=float(z_max),
+            n_points=n_points,
+            n_points_y=n_points_y,
+            n_points_z=n_points_z,
+            bc_expressions=bc_expressions,
+            bc_types=bc_types,
+        )
+    elif is_vector_pde:
         if y_min is None or y_max is None:
             logger.warning("Vector PDE validation failed: y_min and y_max required")
             raise ValidationError("Vector PDE requires y_min and y_max for a 2D domain")
@@ -979,7 +1156,7 @@ def run_solver_pipeline(
     needs_rhs_values = augment_highest_derivative or compute_residual_metrics
     if (
         needs_rhs_values
-        and not is_2d_pde
+        and not is_pde
         and equation_type != "difference"
         and dr.ode_func is not None
     ):
@@ -1008,7 +1185,18 @@ def run_solver_pipeline(
                 logger.debug("Could not compute highest derivative; using raw y", exc_info=True)
 
     # ── Statistics ────────────────────────────────────────────────────
-    if is_vector_pde:
+    if is_3d_pde:
+        y_grid = cast(np.ndarray, dr.y_grid)
+        z_grid = cast(np.ndarray, dr.z_grid)
+        stats = {
+            "central_xy_slice": compute_statistics_2d(
+                solution_x,
+                y_grid,
+                solution_y[len(z_grid) // 2],
+                selected_stats,
+            )
+        }
+    elif is_vector_pde:
         y_grid = cast(np.ndarray, dr.y_grid)
         magnitude = np.linalg.norm(solution_y, axis=0)
         stats = {"magnitude": compute_statistics_2d(solution_x, y_grid, magnitude, selected_stats)}
@@ -1037,7 +1225,9 @@ def run_solver_pipeline(
         "order": order,
         "parameters": parameters,
         "domain": (
-            [x_min, x_max, y_min, y_max]
+            [x_min, x_max, y_min, y_max, z_min, z_max]
+            if is_3d_pde
+            else [x_min, x_max, y_min, y_max]
             if (is_pde and y_min is not None and y_max is not None)
             else [x_min, x_max]
         ),
@@ -1095,7 +1285,8 @@ def run_solver_pipeline(
         statistics=stats,
         metadata=metadata,
         equation_type=equation_type,
-        y_grid=dr.y_grid if is_2d_pde else None,
+        y_grid=dr.y_grid if (is_2d_pde or is_3d_pde) else None,
+        z_grid=dr.z_grid if is_3d_pde else None,
         is_vector=is_vector,
         vector_components=vector_components if is_vector else 1,
         vector_order=display_order,

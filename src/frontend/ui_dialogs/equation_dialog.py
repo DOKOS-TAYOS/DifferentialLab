@@ -107,6 +107,13 @@ class EquationDialog:
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
+            text="PDE 3D",
+            variable=self._equation_type_var,
+            value="pde_3d",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
             text="Vector PDE",
             variable=self._equation_type_var,
             value="vector_pde",
@@ -321,6 +328,12 @@ class EquationDialog:
                 "Indexes are zero-based and must be within the component count. "
                 "Each expression is a residual equal to zero."
             )
+        elif eq_type == "pde_3d":
+            hint_title = "Write a scalar linear elliptic residual equal to zero."
+            hint_detail = (
+                "Use x, y, z; f, fx, fy, fz; and fxx, fxy, fxz, fyy, fyz, fzz.\n"
+                "Example: -fxx - fyy - fzz - 3*pi**2*sin(pi*x)*sin(pi*y)*sin(pi*z)"
+            )
         elif eq_type == "pde":
             hint_title = "Select the left-hand operator and write the right-hand expression."
             hint_detail = (
@@ -375,6 +388,8 @@ class EquationDialog:
             self._build_custom_vector_ode(ci, pad, _btn_bg, _fg, _font)
         elif eq_type == "vector_pde":
             self._build_custom_vector_pde(ci, pad, _btn_bg, _fg, _font)
+        elif eq_type == "pde_3d":
+            self._build_custom_pde_3d(ci, pad, _btn_bg, _fg, _font)
         elif eq_type == "pde":
             self._build_custom_pde(ci, pad, _btn_bg, _fg, _font)
         else:
@@ -790,6 +805,33 @@ class EquationDialog:
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: k, \u03b1")
 
+    def _build_custom_pde_3d(
+        self,
+        ci: ttk.Frame,
+        pad: int,
+        btn_bg: str,
+        fg: str,
+        font: Any,
+    ) -> None:
+        """Build the residual-form custom editor for scalar PDE 3D."""
+        self.custom_order_var = tk.StringVar(value="2")
+        ttk.Label(ci, text="Residual expression (equals zero):").pack(anchor=tk.W)
+        self.custom_expr = tk.Text(
+            ci,
+            height=4,
+            width=60,
+            bg=btn_bg,
+            fg=fg,
+            insertbackground=fg,
+            font=font,
+        )
+        self.custom_expr.pack(fill=tk.X, pady=(4, pad))
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+
     def _build_custom_vector_pde(
         self,
         ci: ttk.Frame,
@@ -949,6 +991,8 @@ class EquationDialog:
             self._on_next_custom_vector()
         elif eq_type == "vector_pde":
             self._on_next_custom_vector_pde()
+        elif eq_type == "pde_3d":
+            self._on_next_custom_pde_3d()
         elif eq_type == "pde":
             self._on_next_custom_pde()
         else:
@@ -1139,6 +1183,37 @@ class EquationDialog:
             equation_type="pde",
             variables=variables,
             pde_operator=pde_operator,
+        )
+
+    def _on_next_custom_pde_3d(self) -> None:
+        """Validate a custom scalar 3D residual and open its grid dialog."""
+        from utils import normalize_unicode_escapes
+
+        expression = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
+        if not expression:
+            messagebox.showwarning(
+                "Add an expression",
+                "Write the PDE 3D residual before continuing.",
+                parent=self.win,
+            )
+            return
+        params = self._parse_custom_params()
+        if params is None:
+            return
+        self.win.destroy()
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            self.parent,
+            expression=expression,
+            function_name=None,
+            order=2,
+            parameters=params,
+            equation_name="Custom PDE 3D",
+            default_y0=[],
+            default_domain=[0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+            equation_type="pde_3d",
+            variables=["x", "y", "z"],
         )
 
     def _on_next_custom_vector_pde(self) -> None:

@@ -335,6 +335,16 @@ def solve_sparse_pde(
 
     from scipy.sparse.linalg import MatrixRankWarning, spsolve
 
+    if assembled.matrix.shape[0] > 0:
+        constant_probe = np.ones(assembled.matrix.shape[1], dtype=float)
+        constant_image = np.asarray(assembled.matrix @ constant_probe, dtype=float)
+        row_scale = float(np.max(np.asarray(np.abs(assembled.matrix).sum(axis=1))))
+        null_tolerance = 100.0 * np.finfo(float).eps * max(1.0, row_scale)
+        if float(np.linalg.norm(constant_image, ord=np.inf)) <= null_tolerance:
+            raise SolverFailedError(
+                "Linear system is singular: the constant field is in its numerical nullspace"
+            )
+
     try:
         with warning_control.catch_warnings():
             warning_control.simplefilter("error", MatrixRankWarning)

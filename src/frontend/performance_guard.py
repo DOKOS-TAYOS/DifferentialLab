@@ -13,6 +13,8 @@ _WARN_OUTPUT_POINTS = 50_000
 _CONFIRM_OUTPUT_POINTS = 250_000
 _WARN_PDE_GRID_POINTS = 150_000
 _CONFIRM_PDE_GRID_POINTS = 750_000
+_WARN_PDE_3D_UNKNOWNS = 75_000
+_CONFIRM_PDE_3D_UNKNOWNS = 300_000
 _WARN_HISTORY_BYTES = 128 * _MIB
 _CONFIRM_HISTORY_BYTES = 512 * _MIB
 
@@ -110,6 +112,31 @@ def assess_parameters_dialog_request(
                 else "."
             )
             + " Dense output can make solving, plotting and exporting noticeably slower."
+        ),
+    )
+
+
+def assess_pde_3d_request(*, nx: int, ny: int, nz: int) -> PerformanceAdvisory | None:
+    """Estimate scalar 3D sparse-system work and memory before GUI execution."""
+    grid_points = max(0, nx) * max(0, ny) * max(0, nz)
+    unknowns = max(0, nx - 2) * max(0, ny - 2) * max(0, nz - 2)
+    severity = _severity_from_thresholds(
+        value=unknowns,
+        warn_threshold=_WARN_PDE_3D_UNKNOWNS,
+        confirm_threshold=_CONFIRM_PDE_3D_UNKNOWNS,
+    )
+    if severity is None:
+        return None
+    estimated_nnz = 19 * unknowns
+    estimated_bytes = estimated_nnz * 16 + (unknowns + 1) * 8 + grid_points * 16
+    return PerformanceAdvisory(
+        severity=severity,
+        title="Large PDE 3D grid request",
+        message=(
+            f"This PDE 3D run will assemble a {nx:,} x {ny:,} x {nz:,} grid "
+            f"({grid_points:,} points, about {unknowns:,} unknowns and up to "
+            f"{estimated_nnz:,} stencil entries). The sparse solve and working arrays may "
+            f"need roughly {_format_bytes(estimated_bytes)} before solver overhead."
         ),
     )
 

@@ -18,6 +18,7 @@ from config import (
 )
 from frontend.performance_guard import (
     assess_parameters_dialog_request,
+    assess_pde_3d_request,
     confirm_performance_advisory,
 )
 from frontend.theme import get_contrast_foreground, get_font
@@ -75,6 +76,9 @@ class _SolverInputs:
     y_min: float | None
     y_max: float | None
     n_points_y: int | None
+    z_min: float | None
+    z_max: float | None
+    n_points_z: int | None
     bc_expressions: list[str] | None
     bc_types: list[str] | None
     mask_expression: str | None
@@ -140,7 +144,7 @@ class ParametersDialog:
             vector_expressions is not None and len(vector_expressions) > 0
         ) or equation_type in ("vector_ode", "vector_pde")
         self.pde_operator = pde_operator
-        self.is_pde = equation_type in ("pde", "vector_pde") or len(self.variables) > 1
+        self.is_pde = equation_type in ("pde", "pde_3d", "vector_pde") or len(self.variables) > 1
         self.component_orders = component_orders
 
         self.win = tk.Toplevel(parent)
@@ -304,6 +308,9 @@ class ParametersDialog:
         self.ymin_var: tk.StringVar | None = None
         self.ymax_var: tk.StringVar | None = None
         self.npoints_y_var: tk.StringVar | None = None
+        self.zmin_var: tk.StringVar | None = None
+        self.zmax_var: tk.StringVar | None = None
+        self.npoints_z_var: tk.StringVar | None = None
         if self.is_pde and len(default_domain) >= 4:
             pde_label_1 = "x[1]"
             row_y = ttk.Frame(domain_frame)
@@ -321,8 +328,31 @@ class ParametersDialog:
             row_ny = ttk.Frame(domain_frame)
             row_ny.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_ny, text=f"Grid points ({pde_label_1}):").pack(side=tk.LEFT)
-            self.npoints_y_var = tk.StringVar(value="1000")
+            self.npoints_y_var = tk.StringVar(
+                value="25" if self.equation_type == "pde_3d" else "1000"
+            )
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
+                side=tk.LEFT, padx=pad
+            )
+
+        if self.equation_type == "pde_3d" and len(default_domain) >= 6:
+            row_z = ttk.Frame(domain_frame)
+            row_z.pack(fill=tk.X, pady=(pad, 0))
+            ttk.Label(row_z, text="x[2]ₘᵢₙ:").pack(side=tk.LEFT)
+            self.zmin_var = tk.StringVar(value=str(default_domain[4]))
+            ttk.Entry(row_z, textvariable=self.zmin_var, width=12, font=get_font()).pack(
+                side=tk.LEFT, padx=pad
+            )
+            ttk.Label(row_z, text="x[2]ₘₐₓ:").pack(side=tk.LEFT)
+            self.zmax_var = tk.StringVar(value=str(default_domain[5]))
+            ttk.Entry(row_z, textvariable=self.zmax_var, width=12, font=get_font()).pack(
+                side=tk.LEFT, padx=pad
+            )
+            row_nz = ttk.Frame(domain_frame)
+            row_nz.pack(fill=tk.X, pady=(pad, 0))
+            ttk.Label(row_nz, text="Grid points (x[2]):").pack(side=tk.LEFT)
+            self.npoints_z_var = tk.StringVar(value="25")
+            ttk.Entry(row_nz, textvariable=self.npoints_z_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
 
@@ -411,7 +441,9 @@ class ParametersDialog:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_n, text="Grid points (x[0]):").pack(side=tk.LEFT)
-            self.npoints_var = tk.StringVar(value="1000")
+            self.npoints_var = tk.StringVar(
+                value="25" if self.equation_type == "pde_3d" else "1000"
+            )
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )
@@ -447,7 +479,11 @@ class ParametersDialog:
             shape_combo = ttk.Combobox(
                 row_shape,
                 textvariable=self._domain_shape_var,
-                values=["Rectangle", "Custom contour"],
+                values=(
+                    ["Rectangle"]
+                    if self.equation_type == "pde_3d"
+                    else ["Rectangle", "Custom contour"]
+                ),
                 state="readonly",
                 width=18,
                 font=get_font(),
@@ -485,12 +521,23 @@ class ParametersDialog:
 
             idx0 = "x[0]"
             idx1 = "x[1]"
-            boundaries = [
-                (f"{idx1} = {idx1}\u2098\u1d62\u2099 (bottom)", idx0),
-                (f"{idx1} = {idx1}\u2098\u2090\u2093 (top)", idx0),
-                (f"{idx0} = {idx0}\u2098\u1d62\u2099 (left)", idx1),
-                (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
-            ]
+            if self.equation_type == "pde_3d":
+                idx2 = "x[2]"
+                boundaries = [
+                    (f"{idx2} = {idx2}\u2098\u1d62\u2099 (z min)", "x, y, z"),
+                    (f"{idx2} = {idx2}\u2098\u2090\u2093 (z max)", "x, y, z"),
+                    (f"{idx1} = {idx1}\u2098\u1d62\u2099 (y min)", "x, y, z"),
+                    (f"{idx1} = {idx1}\u2098\u2090\u2093 (y max)", "x, y, z"),
+                    (f"{idx0} = {idx0}\u2098\u1d62\u2099 (x min)", "x, y, z"),
+                    (f"{idx0} = {idx0}\u2098\u2090\u2093 (x max)", "x, y, z"),
+                ]
+            else:
+                boundaries = [
+                    (f"{idx1} = {idx1}\u2098\u1d62\u2099 (bottom)", idx0),
+                    (f"{idx1} = {idx1}\u2098\u2090\u2093 (top)", idx0),
+                    (f"{idx0} = {idx0}\u2098\u1d62\u2099 (left)", idx1),
+                    (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
+                ]
             for label_text, free_var in boundaries:
                 row = ttk.Frame(self._rect_bc_frame)
                 row.pack(fill=tk.X, pady=1)
@@ -845,6 +892,32 @@ class ParametersDialog:
             )
         return y_min, y_max, n_points, n_points_y
 
+    def _parse_pde_3d_domain_and_grid(
+        self,
+    ) -> tuple[float, float, int, int, float, float, int]:
+        """Parse y/z bounds and all three grid sizes for a rectangular PDE 3D."""
+        y_min, y_max, n_points, n_points_y = self._parse_pde_domain_and_grid()
+        if self.zmin_var is None or self.zmax_var is None or self.npoints_z_var is None:
+            raise _InputValidationError(
+                "Check the PDE 3D domain",
+                "zₘᵢₙ, zₘₐₓ, and the z grid size are required.",
+            )
+        try:
+            z_min = float(self.zmin_var.get())
+            z_max = float(self.zmax_var.get())
+            n_points_z = int(self.npoints_z_var.get())
+        except ValueError:
+            raise _InputValidationError(
+                "Check the PDE 3D domain",
+                "z bounds must be numbers and z grid points must be an integer.",
+            ) from None
+        if n_points_z > _MAX_PDE_GRID:
+            raise _InputValidationError(
+                "Grid size is too large",
+                f"PDE grid is limited to {_MAX_PDE_GRID} points per axis.",
+            )
+        return y_min, y_max, n_points, n_points_y, z_min, z_max, n_points_z
+
     def _parse_ic_points(self) -> list[float]:
         """Parse per-initial-condition x positions."""
         subscripts = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
@@ -929,8 +1002,24 @@ class ParametersDialog:
         parameters = self._parse_equation_parameters()
         x_min, x_max = self._parse_domain()
 
-        if self.is_pde:
+        if self.equation_type == "pde_3d":
+            (
+                y_min,
+                y_max,
+                n_points,
+                n_points_y,
+                z_min,
+                z_max,
+                n_points_z,
+            ) = self._parse_pde_3d_domain_and_grid()
+            y0 = []
+            x0_list = None
+            method = "fdm"
+        elif self.is_pde:
             y_min, y_max, n_points, n_points_y = self._parse_pde_domain_and_grid()
+            z_min = None
+            z_max = None
+            n_points_z = None
             y0: list[float] = []
             x0_list = None
             method = "fdm"
@@ -939,6 +1028,9 @@ class ParametersDialog:
             y_min = None
             y_max = None
             n_points_y = None
+            z_min = None
+            z_max = None
+            n_points_z = None
             x0_list = None
             method = "iteration"
             y0 = self._parse_initial_conditions()
@@ -953,6 +1045,9 @@ class ParametersDialog:
             y_min = None
             y_max = None
             n_points_y = None
+            z_min = None
+            z_max = None
+            n_points_z = None
             x0_list = self._parse_ic_points()
             method = self.method_var.get()
             y0 = self._parse_initial_conditions()
@@ -979,6 +1074,9 @@ class ParametersDialog:
             y_min=y_min,
             y_max=y_max,
             n_points_y=n_points_y,
+            z_min=z_min,
+            z_max=z_max,
+            n_points_z=n_points_z,
             bc_expressions=bc_expressions,
             bc_types=bc_types,
             mask_expression=mask_expression,
@@ -988,6 +1086,13 @@ class ParametersDialog:
 
     def _confirm_heavy_request(self, solver_inputs: _SolverInputs) -> bool:
         """Warn before launching unusually dense standard-equation requests."""
+        if self.equation_type == "pde_3d":
+            advisory = assess_pde_3d_request(
+                nx=solver_inputs.n_points,
+                ny=solver_inputs.n_points_y or solver_inputs.n_points,
+                nz=solver_inputs.n_points_z or solver_inputs.n_points,
+            )
+            return confirm_performance_advisory(self.win, advisory)
         if self.is_pde:
             equation_type = "pde"
             state_size = self.vector_components if self.equation_type == "vector_pde" else 1
@@ -1048,6 +1153,9 @@ class ParametersDialog:
                 y_min=solver_inputs.y_min,
                 y_max=solver_inputs.y_max,
                 n_points_y=solver_inputs.n_points_y,
+                z_min=solver_inputs.z_min,
+                z_max=solver_inputs.z_max,
+                n_points_z=solver_inputs.n_points_z,
                 vector_expressions=dialog_ref.vector_expressions,
                 vector_components=dialog_ref.vector_components,
                 pde_operator=dialog_ref.pde_operator,

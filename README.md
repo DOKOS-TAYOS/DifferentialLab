@@ -4,8 +4,8 @@
 
 # DifferentialLab
 
-Desktop numerical lab for ODEs, vector ODEs, difference equations, scalar and vector 2D PDEs,
-function transforms, and specialized scientific simulation workflows.
+Desktop numerical lab for ODEs, vector ODEs, difference equations, scalar 2D/3D PDEs,
+vector 2D PDEs, function transforms, and specialized scientific simulation workflows.
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
@@ -45,6 +45,9 @@ function transforms, and specialized scientific simulation workflows.
   component-aware ellipticity validation, and algebraic diagnostics
 - Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
   component-aware boundaries, sparse block assembly, and component/magnitude views
+- Scalar linear elliptic PDEs on rectangular 3D grids with all six second-order
+  coefficients, Dirichlet/Neumann/Robin faces, periodic axes, sparse diagnostics,
+  pre-run memory advice, and selectable orthogonal result slices
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
 - Specialized complex-problem models with custom UI, solvers, diagnostics, and result dialogs
 

@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   global/per-component diagnostics, and one coupled catalog example.
 - Integrated `Vector PDE` into the standard equation, parameter, result, and export flow
   with safe indexed residual notation and component/magnitude field views.
+- Added a dedicated scalar linear elliptic PDE 3D solver with affine residual and direct
+  coefficient paths, strict 3x3 principal-matrix validation, mixed-derivative sparse
+  stencils, six-face Dirichlet/Neumann/Robin data, periodic axes, algebraic diagnostics,
+  standard-workflow dispatch, pre-run sparse-memory advice, and orthogonal slice access.
 
 ### Security
 
@@ -41,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   types into focused modules while preserving the `solve_pde_2d()` legacy signature.
 - Made corner behavior explicit, removed the zero-valued Neumann reconstruction fallback,
   and validate ellipticity orientation independently in each connected mask component.
+- Detect a constant-field numerical nullspace before sparse PDE solves, including large
+  periodic Laplacian systems whose zero right-hand side can otherwise hide singularity.
 
 - Expanded CI to run on `main` and `dev` for Python 3.12 and 3.13, with ruff linting,
   ruff format checks, pytest, and pyright.

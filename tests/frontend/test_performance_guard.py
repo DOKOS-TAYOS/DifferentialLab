@@ -7,6 +7,7 @@ from unittest.mock import patch
 from frontend.performance_guard import (
     PerformanceAdvisory,
     assess_parameters_dialog_request,
+    assess_pde_3d_request,
     assess_time_history_request,
     confirm_performance_advisory,
 )
@@ -37,6 +38,17 @@ def test_vector_pde_components_are_included_in_grid_cost() -> None:
     assert advisory is not None
     assert advisory.severity == "warn"
     assert "4 components" in advisory.message
+
+
+def test_pde_3d_advisory_estimates_sparse_system_and_memory() -> None:
+    advisory = assess_pde_3d_request(nx=50, ny=50, nz=50)
+
+    assert advisory is not None
+    assert advisory.severity == "warn"
+    assert advisory.title == "Large PDE 3D grid request"
+    assert "125,000 points" in advisory.message
+    assert "unknowns" in advisory.message
+    assert "stencil entries" in advisory.message
 
 
 def test_assess_time_history_request_requires_confirmation_for_large_history() -> None:

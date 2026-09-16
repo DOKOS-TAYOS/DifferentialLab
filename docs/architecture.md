@@ -68,12 +68,15 @@ switch views without re-solving.
 - linear strongly elliptic Vector PDE systems through `solve_vector_pde_2d()`, with
   matrix-affinity probing, sampled principal-symbol validation, explicit component
   boundary broadcasting, and component-major sparse block assembly
+- scalar linear elliptic 3D PDEs through `solve_pde_3d()`, with a strict 3x3 principal
+  matrix, rectangular six-face topology, periodic wrapping, 19-point mixed-derivative
+  assembly, and public `(nz, ny, nx)` output
 
 The returned `SolverResult` is data-only: solution arrays, statistics,
 metadata, equation type, grids, and notation context. The lower-level
-`PDESolution` and `VectorPDESolution` carry structured diagnostics; the condition estimate is
-deliberately limited to small systems so diagnostics do not densify large sparse
-matrices.
+`PDESolution`, `PDESolution3D`, and `VectorPDESolution` carry structured diagnostics;
+the condition estimate is deliberately limited to small systems so diagnostics do not
+densify large sparse matrices.
 
 PDE responsibilities are split without introducing a generic N-dimensional
 framework:
@@ -84,6 +87,8 @@ framework:
 - `pde_boundary.py`: legacy adaptation and Dirichlet/Neumann/Robin/periodic handling;
 - `pde_assembly.py`: sparse stencil assembly, periodic wrapping, solve checks, and diagnostics.
 - `pde_system_solver.py`: dedicated public Vector PDE facade and component-major output mapping.
+- `pde_3d_solver.py`: dedicated rectangular scalar-3D validation, boundary topology,
+  sparse assembly, and z/y/x output mapping.
 
 ## Predefined Equation Catalog
 

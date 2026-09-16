@@ -15,11 +15,31 @@ BC_ROBIN = "robin"
 BoundaryKind: TypeAlias = Literal["dirichlet", "neumann", "robin"]
 BoundaryValueFunction: TypeAlias = Callable[[float, float], float]
 BoundaryData: TypeAlias = float | np.ndarray | BoundaryValueFunction
+BoundaryValueFunction3D: TypeAlias = Callable[[float, float, float], float]
+BoundaryData3D: TypeAlias = float | np.ndarray | BoundaryValueFunction3D
 
 # (u_xx, u_xy, u_yy, u_x, u_y, u, affine constant)
 PDECoefficients: TypeAlias = tuple[float, float, float, float, float, float, float]
 PDECoefficientProvider: TypeAlias = Callable[[float, float, dict[str, float]], PDECoefficients]
 VectorPDEResidual: TypeAlias = Callable[..., np.ndarray]
+
+# (u_xx, u_yy, u_zz, u_xy, u_xz, u_yz, u_x, u_y, u_z, u, affine constant)
+PDECoefficients3D: TypeAlias = tuple[
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+]
+PDECoefficientProvider3D: TypeAlias = Callable[
+    [float, float, float, dict[str, float]], PDECoefficients3D
+]
 
 
 @dataclass(frozen=True)
@@ -80,6 +100,61 @@ class PDEBoundaryConditions:
     contour: PDEBoundaryCondition | None = None
     periodic_x: bool = False
     periodic_y: bool = False
+
+
+@dataclass(frozen=True)
+class PDEBoundaryCondition3D:
+    """One scalar boundary condition on a rectangular 3D face.
+
+    ``value`` is the prescribed solution for Dirichlet, ``du/dn`` for
+    Neumann, and ``gamma`` for Robin. Callable data receives ``(x, y, z)``;
+    arrays must have public solution shape ``(nz, ny, nx)``.
+    """
+
+    kind: BoundaryKind
+    value: BoundaryData3D = 0.0
+    alpha: BoundaryData3D = 0.0
+    beta: BoundaryData3D = 0.0
+
+    @classmethod
+    def dirichlet(cls, value: BoundaryData3D = 0.0) -> PDEBoundaryCondition3D:
+        """Create a Dirichlet condition ``u = value``."""
+        return cls(BC_DIRICHLET, value)
+
+    @classmethod
+    def neumann(cls, value: BoundaryData3D = 0.0) -> PDEBoundaryCondition3D:
+        """Create an outward-normal Neumann condition ``du/dn = value``."""
+        return cls(BC_NEUMANN, value)
+
+    @classmethod
+    def robin(
+        cls,
+        alpha: BoundaryData3D,
+        beta: BoundaryData3D,
+        gamma: BoundaryData3D,
+    ) -> PDEBoundaryCondition3D:
+        """Create a Robin condition ``alpha*u + beta*du/dn = gamma``."""
+        return cls(BC_ROBIN, gamma, alpha, beta)
+
+
+@dataclass(frozen=True)
+class PDEBoundaryConditions3D:
+    """Boundary configuration for a rectangular scalar 3D PDE.
+
+    Periodic axes use non-duplicated upper endpoints and cannot also define
+    conditions on their corresponding pair of faces. Omitted non-periodic
+    faces default to homogeneous Dirichlet conditions.
+    """
+
+    x_min: PDEBoundaryCondition3D | None = None
+    x_max: PDEBoundaryCondition3D | None = None
+    y_min: PDEBoundaryCondition3D | None = None
+    y_max: PDEBoundaryCondition3D | None = None
+    z_min: PDEBoundaryCondition3D | None = None
+    z_max: PDEBoundaryCondition3D | None = None
+    periodic_x: bool = False
+    periodic_y: bool = False
+    periodic_z: bool = False
 
 
 ComponentBoundaryCondition: TypeAlias = PDEBoundaryCondition | Sequence[PDEBoundaryCondition | None]
@@ -199,3 +274,19 @@ class VectorPDESolution:
     n_eval: int = 0
     mask: np.ndarray | None = None
     diagnostics: VectorPDEDiagnostics | None = None
+
+
+@dataclass
+class PDESolution3D:
+    """Solution of a scalar linear elliptic PDE on a rectangular 3D grid.
+
+    ``u`` always has public shape ``(nz, ny, nx)`` and ``grid`` contains
+    ``(x, y, z)``. A periodic axis omits its duplicated upper endpoint.
+    """
+
+    grid: tuple[np.ndarray, np.ndarray, np.ndarray]
+    u: np.ndarray
+    success: bool
+    message: str
+    n_eval: int = 0
+    diagnostics: PDEDiagnostics | None = None

@@ -39,6 +39,12 @@ solver.pde_system_solver
 .. automodule:: solver.pde_system_solver
    :members:
 
+solver.pde_3d_solver
+--------------------
+
+.. automodule:: solver.pde_3d_solver
+   :members:
+
 solver.error_metrics
 --------------------
 
