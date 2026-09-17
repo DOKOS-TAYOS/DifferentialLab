@@ -8,41 +8,33 @@ from typing import Any, Callable, cast
 import numpy as np
 
 from config import get_env_from_schema
-from solver import (
-    FNotation,
-    IVPOptions,
-    ODESolution,
-    compute_statistics,
-    compute_statistics_2d,
+from solver.equation_parser import (
+    build_pde_3d_coefficient_provider,
+    build_vector_pde_coefficient_provider,
     get_difference_function,
     get_ode_function,
     get_vector_ode_function,
-    is_multivariate,
     parse_ode_event_expression,
     parse_pde_3d_residual_expression,
     parse_pde_rhs_expression,
     parse_vector_pde_residual_expressions,
-    solve_difference,
-    solve_multipoint,
-    solve_ode,
-    solve_pde_2d,
-    solve_pde_3d,
-    solve_vector_pde_2d,
-    validate_all_inputs,
-)
-from solver.equation_parser import (
-    build_pde_3d_coefficient_provider,
-    build_vector_pde_coefficient_provider,
 )
 from solver.error_metrics import compute_ode_residual_error_from_rhs
-from solver.pde_solver import BC_DIRICHLET, BC_NEUMANN, PDECoefficientProvider, PDECoefficients
+from solver.notation import FNotation
+from solver.ode_solver import IVPOptions, ODESolution, solve_multipoint, solve_ode
 from solver.pde_types import (
+    BC_DIRICHLET,
+    BC_NEUMANN,
     PDEBoundaryCondition,
     PDEBoundaryCondition3D,
     PDEBoundaryConditions3D,
+    PDECoefficientProvider,
+    PDECoefficients,
     VectorPDEBoundaryConditions,
 )
-from solver.predefined import EquationType
+from solver.predefined import EquationType, is_multivariate
+from solver.statistics import compute_statistics, compute_statistics_2d
+from solver.validators import validate_all_inputs
 from utils import (
     ValidationError,
     build_eval_namespace,
@@ -85,6 +77,34 @@ class _DispatchResult:
 
 _PDE_SOLUTION_TERMS = ("f", "fx", "fy", "fxx", "fxy", "fyy")
 _MAX_VECTOR_PDE_COMPONENTS = 4
+
+
+def solve_difference(*args: Any, **kwargs: Any) -> Any:
+    """Lazily dispatch to the difference-equation backend."""
+    from solver.difference_solver import solve_difference as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def solve_pde_2d(*args: Any, **kwargs: Any) -> Any:
+    """Lazily dispatch to the scalar 2D PDE backend."""
+    from solver.pde_solver import solve_pde_2d as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def solve_pde_3d(*args: Any, **kwargs: Any) -> Any:
+    """Lazily dispatch to the scalar 3D PDE backend."""
+    from solver.pde_3d_solver import solve_pde_3d as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def solve_vector_pde_2d(*args: Any, **kwargs: Any) -> Any:
+    """Lazily dispatch to the vector 2D PDE backend."""
+    from solver.pde_system_solver import solve_vector_pde_2d as implementation
+
+    return implementation(*args, **kwargs)
 
 
 def _shared_pde_3d_boundaries(

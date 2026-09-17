@@ -76,8 +76,17 @@ class ResultDialog:
         # Canvas references for cleanup
         self._canvases: list[FigureCanvasTkAgg] = []
 
+        # Allocate the final window geometry before creating Matplotlib canvases.
+        # FigureCanvasTkAgg uses its parent's allocated size during the first draw.
+        self._set_window_geometry()
         self._build_ui()
+        self.win.update_idletasks()
+        self._build_plot_tabs()
+        make_modal(self.win, parent)
+        logger.info("Result dialog displayed")
 
+    def _set_window_geometry(self) -> None:
+        """Set the dialog geometry before the initial plot canvas is embedded."""
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
         win_w = int(screen_w * 0.94)
@@ -85,8 +94,6 @@ class ResultDialog:
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
         self.win.minsize(_LEFT_MIN_WIDTH + 500, 500)
-        make_modal(self.win, parent)
-        logger.info("Result dialog displayed")
 
     # ------------------------------------------------------------------
     # UI construction
@@ -138,8 +145,6 @@ class ResultDialog:
 
         self._notebook = ttk.Notebook(right_frame)
         self._notebook.pack(fill=tk.BOTH, expand=True)
-
-        self._build_plot_tabs()
 
     def _build_left_panel(
         self,

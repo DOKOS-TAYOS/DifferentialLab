@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Deferred PDE backend imports until a PDE route is selected, reducing the standard ODE cold start.
+- Sized and materialized ResultDialog before embedding its initial Matplotlib canvas.
 - Consolidated release, dependency, logo, and documentation metadata around their canonical sources.
 - Vectorized safe custom membrane initial-displacement expressions while retaining scalar callable
   fallback, removed a redundant fixed-boundary acceleration copy, and normalized coupled-oscillator
