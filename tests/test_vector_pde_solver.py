@@ -329,7 +329,7 @@ def test_principal_symbol_reports_the_first_failing_direction() -> None:
         _y: float,
         _params: dict[str, float],
     ) -> VectorPDECoefficients:
-        positive = np.eye(2)
+        positive = np.nextafter(1.0, 2.0) * np.eye(2)
         negative = -np.eye(2)
         zero = np.zeros((2, 2))
         return VectorPDECoefficients(positive, zero, negative, zero, zero, zero, np.zeros(2))

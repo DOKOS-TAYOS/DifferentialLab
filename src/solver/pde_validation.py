@@ -20,15 +20,20 @@ _STRONG_ELLIPTICITY_ANGLES = (
 )
 _STRONG_ELLIPTICITY_DIRECTION_X = np.cos(_STRONG_ELLIPTICITY_ANGLES)
 _STRONG_ELLIPTICITY_DIRECTION_Y = np.sin(_STRONG_ELLIPTICITY_ANGLES)
-_STRONG_ELLIPTICITY_DIRECTION_X_SQUARED = (
-    _STRONG_ELLIPTICITY_DIRECTION_X[:, np.newaxis, np.newaxis] ** 2
+_STRONG_ELLIPTICITY_DIRECTION_X_SQUARED_VALUES = _STRONG_ELLIPTICITY_DIRECTION_X**2
+_STRONG_ELLIPTICITY_DIRECTION_ABSOLUTE_XY = np.abs(
+    _STRONG_ELLIPTICITY_DIRECTION_X * _STRONG_ELLIPTICITY_DIRECTION_Y
 )
+_STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED_VALUES = _STRONG_ELLIPTICITY_DIRECTION_Y**2
+_STRONG_ELLIPTICITY_DIRECTION_X_SQUARED = _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED_VALUES[
+    :, np.newaxis, np.newaxis
+]
 _STRONG_ELLIPTICITY_DIRECTION_XY = (
     _STRONG_ELLIPTICITY_DIRECTION_X * _STRONG_ELLIPTICITY_DIRECTION_Y
 )[:, np.newaxis, np.newaxis]
-_STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED = (
-    _STRONG_ELLIPTICITY_DIRECTION_Y[:, np.newaxis, np.newaxis] ** 2
-)
+_STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED = _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED_VALUES[
+    :, np.newaxis, np.newaxis
+]
 
 
 def finite_scalar(value: object, name: str) -> float:
@@ -279,10 +284,10 @@ def validate_vector_coefficients(
     For 32 equally spaced unoriented unit directions on ``[0, pi)``, this
     checks the eigenvalues of the symmetric part of
     ``Axx*xi_x**2 + Axy*xi_x*xi_y + Ayy*xi_y**2``. Every sampled symbol must
-    be strictly positive or strictly negative definite relative to its own
-    infinity-norm scale, and all directions must have one orientation. This
-    deterministic numerical screen is not a mathematical proof between the
-    sampled directions.
+    be strictly positive or strictly negative definite relative to a
+    pre-cancellation infinity-norm bound, and all directions must have one
+    orientation. This deterministic numerical screen is not a mathematical
+    proof between the sampled directions.
     """
     coordinate = f"({xi:.12g}, {yj:.12g})"
     if not isinstance(coefficients, VectorPDECoefficients):
@@ -299,14 +304,43 @@ def validate_vector_coefficients(
         f"constant at {coordinate}",
     )
 
-    symbols = (
-        matrices["fxx"] * _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED
-        + matrices["fxy"] * _STRONG_ELLIPTICITY_DIRECTION_XY
-        + matrices["fyy"] * _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED
-    )
-    symmetric_symbols = 0.5 * (symbols + np.swapaxes(symbols, -1, -2))
+    principal_matrices = matrices["fxx"], matrices["fxy"], matrices["fyy"]
+    if components == 2:
+        fxx, fxy, fyy = principal_matrices
+        symbols = (
+            fxx * _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED
+            + fxy * _STRONG_ELLIPTICITY_DIRECTION_XY
+            + fyy * _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED
+        )
+        symmetric_symbols = 0.5 * (symbols + np.swapaxes(symbols, -1, -2))
+        fxx_scale = max(
+            abs(fxx[0, 0]) + 0.5 * abs(fxx[0, 1] + fxx[1, 0]),
+            abs(fxx[1, 1]) + 0.5 * abs(fxx[0, 1] + fxx[1, 0]),
+        )
+        fxy_scale = max(
+            abs(fxy[0, 0]) + 0.5 * abs(fxy[0, 1] + fxy[1, 0]),
+            abs(fxy[1, 1]) + 0.5 * abs(fxy[0, 1] + fxy[1, 0]),
+        )
+        fyy_scale = max(
+            abs(fyy[0, 0]) + 0.5 * abs(fyy[0, 1] + fyy[1, 0]),
+            abs(fyy[1, 1]) + 0.5 * abs(fyy[0, 1] + fyy[1, 0]),
+        )
+    else:
+        symmetric_principal_matrices = np.stack(
+            tuple(0.5 * (matrix + matrix.T) for matrix in principal_matrices)
+        )
+        symmetric_symbols = (
+            symmetric_principal_matrices[0] * _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED
+            + symmetric_principal_matrices[1] * _STRONG_ELLIPTICITY_DIRECTION_XY
+            + symmetric_principal_matrices[2] * _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED
+        )
+        fxx_scale, fxy_scale, fyy_scale = np.max(
+            np.sum(np.abs(symmetric_principal_matrices), axis=-1), axis=-1
+        )
     symbol_scales = np.maximum(
-        np.linalg.norm(symmetric_symbols, ord=np.inf, axis=(-2, -1)),
+        fxx_scale * _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED_VALUES
+        + fxy_scale * _STRONG_ELLIPTICITY_DIRECTION_ABSOLUTE_XY
+        + fyy_scale * _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED_VALUES,
         np.finfo(float).tiny,
     )
     tolerances = _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE * symbol_scales
