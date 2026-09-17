@@ -64,6 +64,71 @@ class _FakeCanvas:
         self.draw_calls += 1
 
 
+class _FakePackedWidget:
+    def __init__(self) -> None:
+        self.config_calls: list[dict[str, object]] = []
+        self.pack_calls: list[dict[str, object]] = []
+
+    def config(self, **kwargs: object) -> None:
+        self.config_calls.append(kwargs)
+
+    def pack(self, **kwargs: object) -> None:
+        self.pack_calls.append(kwargs)
+
+
+class _FakeEmbeddedCanvas:
+    def __init__(self, figure: Figure, master: object) -> None:
+        self.figure = figure
+        self.master = master
+        self._widget = _FakePackedWidget()
+        self.draw_calls = 0
+
+    def get_tk_widget(self) -> _FakePackedWidget:
+        return self._widget
+
+    def draw(self) -> None:
+        self.draw_calls += 1
+
+
+class _FakeNavigationToolbar:
+    def __init__(self, canvas: object, parent: object) -> None:
+        self.canvas = canvas
+        self.parent = parent
+        self.update_calls = 0
+        self.pack_calls: list[dict[str, object]] = []
+
+    def update(self) -> None:
+        self.update_calls += 1
+
+    def pack(self, **kwargs: object) -> None:
+        self.pack_calls.append(kwargs)
+
+
+class _FakeFrame:
+    def __init__(self, parent: object) -> None:
+        self.parent = parent
+        self.pack_calls: list[dict[str, object]] = []
+
+    def pack(self, **kwargs: object) -> None:
+        self.pack_calls.append(kwargs)
+
+
+class _FakeVariable:
+    def __init__(self, value: object = None) -> None:
+        self.value = value
+
+    def get(self) -> object:
+        return self.value
+
+    def set(self, value: object) -> None:
+        self.value = value
+
+
+class _FakeParent:
+    def winfo_toplevel(self) -> _FakeParent:
+        return self
+
+
 def test_bind_resize_handler_debounces_and_rebinds() -> None:
     widget = _FakeWidget()
     canvas = _FakeCanvas(widget, Figure())
@@ -84,6 +149,53 @@ def test_bind_resize_handler_debounces_and_rebinds() -> None:
     plot_embed._bind_resize_handler(canvas, Figure())
     assert first_handler_id in canvas.disconnected
     assert widget.cancelled == ["job-1"]
+
+
+def test_embed_plot_in_tk_accepts_runtime_figure() -> None:
+    figure = Figure()
+    parent = object()
+
+    with (
+        patch(
+            "matplotlib.backends.backend_tkagg.FigureCanvasTkAgg",
+            _FakeEmbeddedCanvas,
+        ),
+        patch.object(plot_embed, "_bind_resize_handler") as bind_resize_handler,
+    ):
+        canvas = plot_embed.embed_plot_in_tk(figure, parent, toolbar=False)
+
+    assert isinstance(canvas, _FakeEmbeddedCanvas)
+    assert canvas.figure is figure
+    assert canvas.master is parent
+    assert canvas.draw_calls == 1
+    bind_resize_handler.assert_called_once_with(canvas, figure)
+
+
+def test_embed_animation_plot_in_tk_accepts_runtime_figure() -> None:
+    figure = Figure()
+    parent = _FakeParent()
+
+    with (
+        patch(
+            "matplotlib.backends.backend_tkagg.FigureCanvasTkAgg",
+            _FakeEmbeddedCanvas,
+        ),
+        patch(
+            "matplotlib.backends._backend_tk.NavigationToolbar2Tk",
+            _FakeNavigationToolbar,
+        ),
+        patch.object(plot_embed.ttk, "Frame", _FakeFrame),
+        patch.object(plot_embed.tk, "IntVar", _FakeVariable),
+        patch.object(plot_embed.tk, "StringVar", _FakeVariable),
+        patch.object(plot_embed, "_bind_resize_handler") as bind_resize_handler,
+    ):
+        canvas = plot_embed.embed_animation_plot_in_tk(figure, parent)
+
+    assert isinstance(canvas, _FakeEmbeddedCanvas)
+    assert canvas.figure is figure
+    assert canvas.draw_calls == 1
+    assert callable(getattr(canvas, "_stop_animation"))
+    bind_resize_handler.assert_called_once_with(canvas, figure)
 
 
 def test_replace_plot_in_tk_reuses_existing_canvas() -> None:

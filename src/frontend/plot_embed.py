@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 import warnings
 from tkinter import ttk
-from typing import TYPE_CHECKING, Callable, cast
+from typing import TYPE_CHECKING, Callable
 
 from config import get_env_from_schema
 from frontend.theme import get_font
@@ -85,7 +85,7 @@ def _bind_resize_handler(
 
 
 def embed_animation_plot_in_tk(
-    fig: object,
+    fig: Figure,
     parent: tk.Widget,
     *,
     on_export_mp4: Callable[[float], None] | None = None,
@@ -106,7 +106,7 @@ def embed_animation_plot_in_tk(
     from matplotlib.backends._backend_tk import NavigationToolbar2Tk
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-    figure = cast(Figure, fig)
+    figure = fig
     update_fn = getattr(figure, "_animation_update", None)
     n_points = getattr(figure, "_animation_n_points", 0)
     initial_idx = getattr(figure, "_animation_initial_index", 0)
@@ -239,7 +239,7 @@ def embed_animation_plot_in_tk(
 
 
 def embed_plot_in_tk(
-    fig: object,
+    fig: Figure,
     parent: tk.Widget,
     toolbar: bool = True,
 ) -> FigureCanvasTkAgg:
@@ -256,7 +256,7 @@ def embed_plot_in_tk(
     from matplotlib.backends._backend_tk import NavigationToolbar2Tk
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-    figure = cast(Figure, fig)
+    figure = fig
     canvas = FigureCanvasTkAgg(figure, master=parent)
 
     if toolbar:
