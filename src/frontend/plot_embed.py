@@ -84,6 +84,41 @@ def _bind_resize_handler(
     setattr(canvas, "_resize_handler_id", handler_id)
 
 
+def _get_canvas_size_in_pixels(
+    canvas: FigureCanvasTkAgg,
+    fallback_figure: Figure,
+) -> tuple[int, int] | None:
+    """Return the current drawable canvas size, when it is available."""
+    widget = canvas.get_tk_widget()
+    try:
+        width_px = int(widget.winfo_width())
+        height_px = int(widget.winfo_height())
+    except (AttributeError, tk.TclError, TypeError, ValueError):
+        width_px = height_px = 0
+
+    if width_px > 1 and height_px > 1:
+        return width_px, height_px
+
+    try:
+        width_px, height_px = canvas.get_width_height(physical=True)
+    except (AttributeError, TypeError, ValueError):
+        width_px = height_px = 0
+
+    if width_px > 1 and height_px > 1:
+        return int(width_px), int(height_px)
+
+    try:
+        width_inches, height_inches = fallback_figure.get_size_inches()
+        width_px = round(float(width_inches) * float(fallback_figure.dpi))
+        height_px = round(float(height_inches) * float(fallback_figure.dpi))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    if width_px > 1 and height_px > 1:
+        return width_px, height_px
+    return None
+
+
 def embed_animation_plot_in_tk(
     fig: Figure,
     parent: tk.Widget,
@@ -300,6 +335,15 @@ def replace_plot_in_tk(
         _bind_resize_handler(current_canvas, fig)
         current_canvas.draw()
         return current_canvas
+
+    canvas_size = _get_canvas_size_in_pixels(current_canvas, old_fig)
+    if canvas_size is not None:
+        width_px, height_px = canvas_size
+        fig.set_size_inches(
+            width_px / fig.dpi,
+            height_px / fig.dpi,
+            forward=False,
+        )
 
     current_canvas.figure = fig
     fig.set_canvas(current_canvas)

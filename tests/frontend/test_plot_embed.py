@@ -10,10 +10,12 @@ from frontend import plot_embed
 
 
 class _FakeWidget:
-    def __init__(self) -> None:
+    def __init__(self, width: int = 1, height: int = 1) -> None:
         self.after_calls: list[tuple[int, object]] = []
         self.cancelled: list[str] = []
         self.exists = True
+        self.width = width
+        self.height = height
 
     def after(self, delay_ms: int, callback: object) -> str:
         job_id = f"job-{len(self.after_calls) + 1}"
@@ -25,6 +27,12 @@ class _FakeWidget:
 
     def winfo_exists(self) -> bool:
         return self.exists
+
+    def winfo_width(self) -> int:
+        return self.width
+
+    def winfo_height(self) -> int:
+        return self.height
 
 
 class _FakeToolbar:
@@ -44,6 +52,7 @@ class _FakeCanvas:
         self._connections: dict[int, tuple[str, object]] = {}
         self.disconnected: list[int] = []
         self.draw_calls = 0
+        self.draw_sizes: list[tuple[float, float]] = []
 
     def get_tk_widget(self) -> _FakeWidget:
         return self._widget
@@ -59,6 +68,8 @@ class _FakeCanvas:
 
     def draw(self) -> None:
         self.draw_calls += 1
+        width, height = self.figure.get_size_inches()
+        self.draw_sizes.append((float(width), float(height)))
 
     def draw_idle(self) -> None:
         self.draw_calls += 1
@@ -222,4 +233,29 @@ def test_replace_plot_in_tk_reuses_existing_canvas() -> None:
     assert canvas.draw_calls == 1
     bind_resize_handler.assert_called_once_with(canvas, new_fig)
     close_figure.assert_called_once_with(old_fig)
+    embed_plot.assert_not_called()
+
+
+def test_replace_plot_in_tk_matches_existing_canvas_dimensions() -> None:
+    widget = _FakeWidget(width=1200, height=600)
+    old_fig = Figure(figsize=(12, 6), dpi=100)
+    new_fig = Figure(figsize=(6, 4), dpi=100)
+    canvas = _FakeCanvas(widget, old_fig)
+
+    with (
+        patch.object(plot_embed, "_bind_resize_handler"),
+        patch("frontend.plot_embed.embed_plot_in_tk") as embed_plot,
+        patch("matplotlib.pyplot.close"),
+    ):
+        reused = plot_embed.replace_plot_in_tk(
+            new_fig,
+            parent=object(),
+            current_canvas=canvas,
+        )
+
+    assert reused is canvas
+    assert new_fig.get_size_inches().tolist() == [12.0, 6.0]
+    assert canvas.draw_sizes == [(12.0, 6.0)]
+    assert canvas.toolbar.canvas is canvas
+    assert canvas.toolbar.update_calls == 1
     embed_plot.assert_not_called()
