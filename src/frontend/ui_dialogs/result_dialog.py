@@ -75,13 +75,15 @@ class ResultDialog:
 
         # Canvas references for cleanup
         self._canvases: list[FigureCanvasTkAgg] = []
+        self._initial_plot_callbacks: list[Callable[[], None]] = []
 
-        # Allocate the final window geometry before creating Matplotlib canvases.
-        # FigureCanvasTkAgg uses its parent's allocated size during the first draw.
+        # Allocate the final window geometry before creating Matplotlib canvases,
+        # then materialize every plot frame before the first canvas is embedded.
         self._set_window_geometry()
         self._build_ui()
-        self.win.update_idletasks()
         self._build_plot_tabs()
+        self.win.update_idletasks()
+        self._render_initial_plots()
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")
 
@@ -322,6 +324,17 @@ class ResultDialog:
         else:
             self._build_ode_scalar_tabs()
 
+    def _queue_initial_plot(self, callback: Callable[[], None]) -> None:
+        """Defer an initial plot until all tab frames have been laid out."""
+        self._initial_plot_callbacks.append(callback)
+
+    def _render_initial_plots(self) -> None:
+        """Render each initial plot after Tk has materialized its parent frame."""
+        callbacks = self._initial_plot_callbacks
+        self._initial_plot_callbacks = []
+        for callback in callbacks:
+            callback()
+
     # ── ODE scalar / difference ──────────────────────────────────────
 
     def _build_ode_scalar_tabs(self) -> None:
@@ -349,7 +362,7 @@ class ResultDialog:
         self._sol_plot_frame = ttk.Frame(sol_tab)
         self._sol_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._sol_canvas: FigureCanvasTkAgg | None = None
-        self._update_solution_plot()
+        self._queue_initial_plot(self._update_solution_plot)
 
         # --- Tab 2: Phase Space ---
         order = r.vector_order
@@ -405,7 +418,7 @@ class ResultDialog:
             self._phase_plot_frame = ttk.Frame(phase_tab)
             self._phase_plot_frame.pack(fill=tk.BOTH, expand=True)
             self._phase_canvas: FigureCanvasTkAgg | None = None
-            self._update_phase_plot()
+            self._queue_initial_plot(self._update_phase_plot)
 
     def _apply_transform_multi(
         self,
@@ -669,7 +682,7 @@ class ResultDialog:
         self._vec_sol_plot_frame = ttk.Frame(sol_tab)
         self._vec_sol_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_sol_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_solution_plot()
+        self._queue_initial_plot(self._update_vec_solution_plot)
 
         # --- Tab 2: Phase Space 2D ---
         phase_tab = ttk.Frame(nb)
@@ -725,7 +738,7 @@ class ResultDialog:
         self._vec_phase_plot_frame = ttk.Frame(phase_tab)
         self._vec_phase_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_phase_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_phase_plot()
+        self._queue_initial_plot(self._update_vec_phase_plot)
 
         # --- Tab 3: Phase Space 3D ---
         phase3d_tab = ttk.Frame(nb)
@@ -797,7 +810,7 @@ class ResultDialog:
         self._vec_phase3d_plot_frame = ttk.Frame(phase3d_tab)
         self._vec_phase3d_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_phase3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_phase_3d()
+        self._queue_initial_plot(self._update_vec_phase_3d)
 
         # --- Tab 4: Animation ---
         anim_tab = ttk.Frame(nb)
@@ -823,7 +836,7 @@ class ResultDialog:
 
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
-        self._update_animation()
+        self._queue_initial_plot(self._update_animation)
 
         # --- Tab 5: 3D Surface ---
         tab_3d = ttk.Frame(nb)
@@ -849,7 +862,7 @@ class ResultDialog:
         self._3d_plot_frame = ttk.Frame(tab_3d)
         self._3d_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_3d_plot()
+        self._queue_initial_plot(self._update_3d_plot)
 
     def _update_vec_solution_plot(self) -> None:
         """Regenerate vector ODE solution plot."""
@@ -1182,7 +1195,7 @@ class ResultDialog:
         )
         self._pde_3d_slice_index_combo.pack(side=tk.LEFT, padx=(0, 4))
 
-        def refresh_indices() -> None:
+        def refresh_indices(*, render: bool = True) -> None:
             """Refresh valid fixed-axis indexes and redraw the selected slice."""
             result = self._result
             plane = self._pde_3d_slice_plane_var.get()
@@ -1196,7 +1209,8 @@ class ResultDialog:
             values = [str(index) for index in range(size)]
             self._pde_3d_slice_index_combo.configure(values=values)
             self._pde_3d_slice_index_var.set(str(size // 2))
-            self._update_pde_3d_slice()
+            if render:
+                self._update_pde_3d_slice()
 
         plane_combo.bind("<<ComboboxSelected>>", lambda _event: refresh_indices())
         self._pde_3d_slice_index_combo.bind(
@@ -1205,7 +1219,8 @@ class ResultDialog:
         self._pde_3d_slice_frame = ttk.Frame(tab)
         self._pde_3d_slice_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_slice_canvas: FigureCanvasTkAgg | None = None
-        refresh_indices()
+        refresh_indices(render=False)
+        self._queue_initial_plot(self._update_pde_3d_slice)
 
     def _update_pde_3d_slice(self) -> None:
         """Render the selected XY, XZ, or YZ scalar slice."""
@@ -1280,7 +1295,7 @@ class ResultDialog:
         self._pde_3d_frame = ttk.Frame(surf_tab)
         self._pde_3d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_3d()
+        self._queue_initial_plot(self._update_pde_3d)
 
         # --- Tab 2: 2D Contour ---
         contour_tab = ttk.Frame(nb)
@@ -1310,7 +1325,7 @@ class ResultDialog:
         self._pde_2d_frame = ttk.Frame(contour_tab)
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_2d_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_2d()
+        self._queue_initial_plot(self._update_pde_2d)
 
         if self._result.equation_type == "pde":
             polar_tab = ttk.Frame(nb)
@@ -1331,7 +1346,7 @@ class ResultDialog:
             self._pde_polar_frame = ttk.Frame(polar_tab)
             self._pde_polar_frame.pack(fill=tk.BOTH, expand=True)
             self._pde_polar_canvas: FigureCanvasTkAgg | None = None
-            self._update_pde_polar()
+            self._queue_initial_plot(self._update_pde_polar)
 
         if self._result.equation_type == "vector_pde":
             self._build_vector_pde_field_tab()
@@ -1393,7 +1408,7 @@ class ResultDialog:
         self._pde_trans_frame = ttk.Frame(trans_tab)
         self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_trans_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_transform()
+        self._queue_initial_plot(self._update_pde_transform)
 
     def _add_vector_pde_field_selector(
         self,
@@ -1666,7 +1681,7 @@ class ResultDialog:
         self._vector_pde_field_frame = ttk.Frame(tab)
         self._vector_pde_field_frame.pack(fill=tk.BOTH, expand=True)
         self._vector_pde_field_canvas: FigureCanvasTkAgg | None = None
-        self._update_vector_pde_field()
+        self._queue_initial_plot(self._update_vector_pde_field)
 
     def _vector_pde_view_labels(self) -> list[str]:
         """Return views compatible with the Vector PDE component count."""
