@@ -203,17 +203,31 @@ def _validate_coefficients_3d(
     principal_scale = float(np.max(np.abs(principal)))
     if principal_scale <= np.finfo(float).tiny:
         raise SolverFailedError(f"3D PDE principal operator is degenerate at {coordinate}")
-    eigenvalues = np.linalg.eigvalsh(principal)
     margin = 100.0 * np.finfo(float).eps * principal_scale
-    positive = bool(np.all(eigenvalues > margin))
-    negative = bool(np.all(eigenvalues < -margin))
+    positive = _is_strictly_positive_definite_3d(principal, margin)
+    negative = _is_strictly_positive_definite_3d(-principal, margin)
     if not (positive or negative):
+        eigenvalues = np.linalg.eigvalsh(principal)
         raise SolverFailedError(
             "3D PDE principal operator is not strictly elliptic "
             f"at {coordinate}: eigenvalues={eigenvalues.tolist()}"
         )
     normalized = cast(PDECoefficients3D, tuple(float(value) for value in array))
     return normalized, 1 if positive else -1
+
+
+def _is_strictly_positive_definite_3d(principal: np.ndarray, margin: float) -> bool:
+    """Apply Sylvester's criterion to ``principal - margin * I``."""
+    a = float(principal[0, 0]) - margin
+    b = float(principal[1, 1]) - margin
+    c = float(principal[2, 2]) - margin
+    d = float(principal[0, 1])
+    e = float(principal[0, 2])
+    f = float(principal[1, 2])
+    first_minor = a
+    second_minor = a * b - d * d
+    determinant = a * b * c + 2.0 * d * e * f - a * f * f - b * e * e - c * d * d
+    return bool(first_minor > 0.0 and second_minor > 0.0 and determinant > 0.0)
 
 
 def _evaluate_boundary_data(
@@ -613,8 +627,11 @@ def _assemble_pde_3d(
             data[entry_count] = value
             entry_count += 1
 
-    for row, (k_raw, j_raw, i_raw) in enumerate(np.argwhere(boundary.unknown)):
-        i, j, k = int(i_raw), int(j_raw), int(k_raw)
+    _, grid_height, grid_width = boundary.unknown.shape
+    plane_size = grid_height * grid_width
+    for row, flat_index in enumerate(np.flatnonzero(boundary.unknown)):
+        k, remainder = divmod(int(flat_index), plane_size)
+        j, i = divmod(remainder, grid_width)
         xi, yj, zk = float(x[i]), float(y[j]), float(z[k])
         coefficients, orientation = coefficient_at(xi, yj, zk)
         if orientation_reference is None:

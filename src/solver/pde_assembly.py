@@ -64,8 +64,9 @@ def assemble_scalar_pde(
         data[entry_count] = value
         entry_count += 1
 
-    for row, (j_raw, i_raw) in enumerate(np.argwhere(boundary.unknown)):
-        i, j = int(i_raw), int(j_raw)
+    grid_width = boundary.unknown.shape[1]
+    for row, flat_index in enumerate(np.flatnonzero(boundary.unknown)):
+        j, i = divmod(int(flat_index), grid_width)
         xi, yj = float(x[i]), float(y[j])
         coefficients, orientation = coefficient_at(xi, yj)
         component = int(boundary.component_labels[j, i])
@@ -200,8 +201,9 @@ def assemble_vector_pde(
             data[entry_count] = value
             entry_count += 1
 
-    for point_index, (j_raw, i_raw) in enumerate(np.argwhere(reference_boundary.unknown)):
-        i, j = int(i_raw), int(j_raw)
+    grid_width = reference_boundary.unknown.shape[1]
+    for point_index, flat_index in enumerate(np.flatnonzero(reference_boundary.unknown)):
+        j, i = divmod(int(flat_index), grid_width)
         xi, yj = float(x[i]), float(y[j])
         coefficients, orientation = coefficient_at(xi, yj)
         domain_component = int(reference_boundary.component_labels[j, i])

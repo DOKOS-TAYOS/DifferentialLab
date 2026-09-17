@@ -12,6 +12,7 @@ from solver.pde_3d_solver import (
     _assemble_pde_3d,
     _boundary_substitution_3d,
     _prepare_boundary_3d,
+    _validate_coefficients_3d,
     solve_pde_3d,
 )
 from solver.pde_types import (
@@ -215,6 +216,50 @@ def test_non_elliptic_or_degenerate_principal_operator_is_rejected(
             5,
             coefficient_provider=provider,
         )
+
+
+@pytest.mark.parametrize(
+    ("coefficients", "orientation"),
+    [
+        ((1.0, 1.5, 2.0, 0.2, -0.1, 0.3, 0.0, 0.0, 0.0, 0.0, 0.0), 1),
+        ((-1.0, -1.5, -2.0, -0.2, 0.1, -0.3, 0.0, 0.0, 0.0, 0.0, 0.0), -1),
+    ],
+)
+def test_direct_3d_validation_preserves_definite_orientation(
+    coefficients: tuple[float, ...],
+    orientation: int,
+) -> None:
+    """The Sylvester fast path preserves positive and negative orientation."""
+    _, actual_orientation = _validate_coefficients_3d(coefficients, 0.25, 0.5, 0.75)
+
+    assert actual_orientation == orientation
+
+
+def test_direct_3d_validation_rejects_near_margin_and_indefinite_operators() -> None:
+    """The strict margin is retained for near-degenerate and indefinite operators."""
+    margin = 100.0 * np.finfo(float).eps
+    near_margin = (1.0, 1.0, 0.5 * margin, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    indefinite = (1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    for coefficients in (near_margin, indefinite):
+        with pytest.raises(SolverFailedError, match="not strictly elliptic"):
+            _validate_coefficients_3d(coefficients, 0.25, 0.5, 0.75)
+
+
+@pytest.mark.parametrize(
+    "coefficients, message",
+    [
+        ((1.0,) * 10, r"shape \(11,\)"),
+        ((1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, np.inf), "must be finite"),
+    ],
+)
+def test_direct_3d_validation_rejects_wrong_shape_and_non_finite_data(
+    coefficients: tuple[float, ...],
+    message: str,
+) -> None:
+    """The fast path remains behind the existing shape and finiteness checks."""
+    with pytest.raises(SolverFailedError, match=message):
+        _validate_coefficients_3d(coefficients, 0.25, 0.5, 0.75)
 
 
 def test_non_finite_direct_coefficients_are_rejected() -> None:

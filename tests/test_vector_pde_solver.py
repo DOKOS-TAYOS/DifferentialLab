@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import solver.pde_validation as pde_validation
 from solver import (
     PDEBoundaryCondition,
     VectorPDEBoundaryConditions,
@@ -302,6 +303,24 @@ def test_indefinite_principal_symbol_is_rejected() -> None:
             components=2,
             coefficient_provider=provider,
         )
+
+
+def test_two_component_definiteness_fast_path_avoids_spectral_decomposition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valid 2x2 symbols use the equivalent Sylvester criterion."""
+    identity = np.eye(2)
+    zero = np.zeros((2, 2))
+    coefficients = VectorPDECoefficients(identity, zero, identity, zero, zero, zero, np.zeros(2))
+
+    def fail_if_called(_symbols: np.ndarray) -> np.ndarray:
+        """Reject an eigensolver call on the valid fast path."""
+        raise AssertionError("valid two-component symbols must not require eigvalsh")
+
+    monkeypatch.setattr(pde_validation.np.linalg, "eigvalsh", fail_if_called)
+    _, orientation = pde_validation.validate_vector_coefficients(coefficients, 0.25, 0.75, 2)
+
+    assert orientation == 1
 
 
 def test_principal_symbol_reports_the_first_failing_direction() -> None:

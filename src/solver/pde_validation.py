@@ -15,6 +15,20 @@ _AFFINITY_TOLERANCE = 1.0e-9
 _VECTOR_AFFINITY_TOLERANCE = 1.0e-9
 _STRONG_ELLIPTICITY_DIRECTIONS = 32
 _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE = 1.0e-10
+_STRONG_ELLIPTICITY_ANGLES = (
+    np.pi * np.arange(_STRONG_ELLIPTICITY_DIRECTIONS, dtype=float) / _STRONG_ELLIPTICITY_DIRECTIONS
+)
+_STRONG_ELLIPTICITY_DIRECTION_X = np.cos(_STRONG_ELLIPTICITY_ANGLES)
+_STRONG_ELLIPTICITY_DIRECTION_Y = np.sin(_STRONG_ELLIPTICITY_ANGLES)
+_STRONG_ELLIPTICITY_DIRECTION_X_SQUARED = (
+    _STRONG_ELLIPTICITY_DIRECTION_X[:, np.newaxis, np.newaxis] ** 2
+)
+_STRONG_ELLIPTICITY_DIRECTION_XY = (
+    _STRONG_ELLIPTICITY_DIRECTION_X * _STRONG_ELLIPTICITY_DIRECTION_Y
+)[:, np.newaxis, np.newaxis]
+_STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED = (
+    _STRONG_ELLIPTICITY_DIRECTION_Y[:, np.newaxis, np.newaxis] ** 2
+)
 
 
 def finite_scalar(value: object, name: str) -> float:
@@ -232,6 +246,28 @@ def _finite_matrix(value: object, components: int, name: str) -> np.ndarray:
     return result
 
 
+def _two_by_two_definiteness(
+    symbols: np.ndarray,
+    tolerances: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Classify 2x2 symbols with Sylvester's exact definiteness criterion."""
+    upper_left = symbols[:, 0, 0]
+    lower_right = symbols[:, 1, 1]
+    off_diagonal = symbols[:, 0, 1]
+    positive_upper_left = upper_left - tolerances
+    positive_lower_right = lower_right - tolerances
+    positive = (positive_upper_left > 0.0) & (
+        positive_upper_left * positive_lower_right - off_diagonal**2 > 0.0
+    )
+
+    negative_upper_left = -upper_left - tolerances
+    negative_lower_right = -lower_right - tolerances
+    negative = (negative_upper_left > 0.0) & (
+        negative_upper_left * negative_lower_right - off_diagonal**2 > 0.0
+    )
+    return positive, negative
+
+
 def validate_vector_coefficients(
     coefficients: object,
     xi: float,
@@ -263,32 +299,34 @@ def validate_vector_coefficients(
         f"constant at {coordinate}",
     )
 
-    direction_indices = np.arange(_STRONG_ELLIPTICITY_DIRECTIONS, dtype=float)
-    angles = np.pi * direction_indices / _STRONG_ELLIPTICITY_DIRECTIONS
-    direction_x = np.cos(angles)
-    direction_y = np.sin(angles)
     symbols = (
-        matrices["fxx"] * direction_x[:, np.newaxis, np.newaxis] ** 2
-        + matrices["fxy"] * (direction_x * direction_y)[:, np.newaxis, np.newaxis]
-        + matrices["fyy"] * direction_y[:, np.newaxis, np.newaxis] ** 2
+        matrices["fxx"] * _STRONG_ELLIPTICITY_DIRECTION_X_SQUARED
+        + matrices["fxy"] * _STRONG_ELLIPTICITY_DIRECTION_XY
+        + matrices["fyy"] * _STRONG_ELLIPTICITY_DIRECTION_Y_SQUARED
     )
     symmetric_symbols = 0.5 * (symbols + np.swapaxes(symbols, -1, -2))
     symbol_scales = np.maximum(
         np.linalg.norm(symmetric_symbols, ord=np.inf, axis=(-2, -1)),
         np.finfo(float).tiny,
     )
-    eigenvalues = np.linalg.eigvalsh(symmetric_symbols)
     tolerances = _STRONG_ELLIPTICITY_RELATIVE_TOLERANCE * symbol_scales
-    positive = np.all(eigenvalues > tolerances[:, np.newaxis], axis=1)
-    negative = np.all(eigenvalues < -tolerances[:, np.newaxis], axis=1)
+    if components == 2:
+        positive, negative = _two_by_two_definiteness(symmetric_symbols, tolerances)
+    else:
+        eigenvalues = np.linalg.eigvalsh(symmetric_symbols)
+        positive = np.all(eigenvalues > tolerances[:, np.newaxis], axis=1)
+        negative = np.all(eigenvalues < -tolerances[:, np.newaxis], axis=1)
     definite = positive | negative
     failing_directions = np.flatnonzero(~definite)
     if failing_directions.size:
         direction_index = int(failing_directions[0])
+        if components == 2:
+            eigenvalues = np.linalg.eigvalsh(symmetric_symbols)
         raise SolverFailedError(
             "Vector PDE principal symbol is not uniformly definite in sampled direction "
             f"{direction_index} at {coordinate}: direction="
-            f"({direction_x[direction_index]:.12g}, {direction_y[direction_index]:.12g}), "
+            f"({_STRONG_ELLIPTICITY_DIRECTION_X[direction_index]:.12g}, "
+            f"{_STRONG_ELLIPTICITY_DIRECTION_Y[direction_index]:.12g}), "
             f"eigenvalues={eigenvalues[direction_index].tolist()}, "
             f"tolerance={tolerances[direction_index]:.3g}"
         )
