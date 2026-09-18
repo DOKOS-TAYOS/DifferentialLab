@@ -141,6 +141,10 @@ def test_spectrum_power_history_is_lazy_cached_for_both_models(model_type: str) 
     assert spectrum_history.shape == (len(result.t), len(result.k))
     assert spectrum_history.dtype == np.float32
     assert result.spectrum_power_history is spectrum_history
+    expected = np.stack(
+        [np.abs(np.fft.fftshift(np.fft.fft(frame))) ** 2 for frame in result.field]
+    ).astype(np.float32)
+    np.testing.assert_allclose(spectrum_history, expected, rtol=1e-6, atol=1e-5)
     np.testing.assert_allclose(spectrum_history[-1], result.spectrum_power, rtol=2e-6, atol=1e-5)
 
 

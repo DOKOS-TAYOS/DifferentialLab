@@ -64,8 +64,11 @@ class NonlinearWavesResult:
     def spectrum_power_history(self) -> np.ndarray:
         """Return the lazily materialized shifted FFT-power history."""
         if self._spectrum_power_history_cache is None:
-            spectrum = np.fft.fftshift(np.fft.fft(self.field, axis=-1), axes=-1)
-            self._spectrum_power_history_cache = np.asarray(np.abs(spectrum) ** 2, dtype=np.float32)
+            history = np.empty(self.field.shape, dtype=np.float32)
+            for index, frame in enumerate(self.field):
+                spectrum = np.fft.fftshift(np.fft.fft(frame))
+                np.square(np.abs(spectrum), out=history[index], casting="unsafe")
+            self._spectrum_power_history_cache = history
         return self._spectrum_power_history_cache
 
 

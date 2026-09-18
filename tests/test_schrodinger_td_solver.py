@@ -70,10 +70,37 @@ def test_schrodinger_2d_runs_and_observables_are_finite() -> None:
     assert spectrum_history.shape == (len(result.t), len(result.y), len(result.x))
     assert spectrum_history.dtype == np.float32
     assert result.spectrum_power_history is spectrum_history
+    expected = np.empty_like(spectrum_history)
+    for index, frame in enumerate(result.psi):
+        expected[index] = np.abs(np.fft.fftshift(np.fft.fft2(frame))) ** 2
+    np.testing.assert_allclose(spectrum_history, expected, rtol=1e-6, atol=1e-5)
     np.testing.assert_allclose(spectrum_history[-1], result.spectrum_power, rtol=2e-6, atol=1e-5)
     assert np.all(np.isfinite(result.magnitude))
     assert np.all(np.isfinite(result.invariants["energy"]))
     assert abs(result.magnitudes["norm_drift_rel"]) < 2e-2
+
+
+def test_schrodinger_1d_spectrum_history_keeps_lazy_cached_fft() -> None:
+    result = solve_schrodinger_td(
+        dimension=1,
+        x_min=-6.0,
+        x_max=6.0,
+        nx=64,
+        t_min=0.0,
+        t_max=0.05,
+        dt=0.01,
+    )
+
+    assert result._spectrum_power_history_cache is None
+    history = result.spectrum_power_history
+    expected = np.stack(
+        [np.abs(np.fft.fftshift(np.fft.fft(frame))) ** 2 for frame in result.psi]
+    ).astype(np.float32)
+    assert history.shape == result.psi.shape
+    assert history.dtype == np.float32
+    np.testing.assert_allclose(history, expected, rtol=1e-6, atol=1e-5)
+    np.testing.assert_allclose(history[-1], result.spectrum_power, rtol=2e-6, atol=1e-5)
+    assert result.spectrum_power_history is history
 
 
 def test_schrodinger_result_materializes_lazy_caches_on_demand() -> None:

@@ -105,6 +105,38 @@ def test_1d_potential_remains_static() -> None:
     embed_animation.assert_not_called()
 
 
+def test_2d_spectrum_tab_initializes_only_on_first_selection() -> None:
+    dialog = _make_dialog(_make_result())
+    spectrum_tab = object()
+    dialog._spectrum_tab = spectrum_tab
+    dialog._spectrum_tab_initialized = False
+    build_tab = MagicMock()
+    dialog._build_spectrum_tab = build_tab  # type: ignore[method-assign]
+
+    class _NotebookStub:
+        def __init__(self) -> None:
+            self.selected = object()
+
+        def select(self) -> object:
+            return self.selected
+
+        def nametowidget(self, _selected: object) -> object:
+            return self.selected
+
+    notebook = _NotebookStub()
+    dialog._on_notebook_tab_changed(SimpleNamespace(widget=notebook))
+    build_tab.assert_not_called()
+    assert dialog._spectrum_tab_initialized is False
+
+    notebook.selected = spectrum_tab
+    dialog._on_notebook_tab_changed(SimpleNamespace(widget=notebook))
+    build_tab.assert_called_once_with(spectrum_tab)
+    assert dialog._spectrum_tab_initialized is True
+
+    dialog._on_notebook_tab_changed(SimpleNamespace(widget=notebook))
+    build_tab.assert_called_once_with(spectrum_tab)
+
+
 def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
     dialog = _make_dialog(_make_result())
     payload = dialog._get_spectrum_animation_payload()

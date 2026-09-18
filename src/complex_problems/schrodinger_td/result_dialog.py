@@ -6,7 +6,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 
@@ -200,7 +200,12 @@ class SchrodingerTDResultDialog:
 
         tab_spec = ttk.Frame(nb)
         nb.add(tab_spec, text="  Spectrum  ")
-        self._build_spectrum_tab(tab_spec)
+        if self._result.dimension == 1:
+            self._build_spectrum_tab(tab_spec)
+        else:
+            self._spectrum_tab = tab_spec
+            self._spectrum_tab_initialized = False
+            nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
         tab_inv = ttk.Frame(nb)
         nb.add(tab_inv, text="  Expectations  ")
@@ -215,6 +220,16 @@ class SchrodingerTDResultDialog:
         ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
             side=tk.RIGHT
         )
+
+    def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
+        """Initialize the deferred 2D Spectrum tab on its first selection."""
+        if self._spectrum_tab_initialized:
+            return
+        notebook = cast(ttk.Notebook, event.widget)
+        selected_tab = notebook.nametowidget(notebook.select())
+        if selected_tab is self._spectrum_tab:
+            self._build_spectrum_tab(self._spectrum_tab)
+            self._spectrum_tab_initialized = True
 
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = ttk.Frame(parent)
