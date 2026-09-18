@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Kept Tk-backed parameter state out of solver workers and deferred cyclic garbage collection
+  until their Tk-thread completion callbacks, preventing 3D PDE solves from leaving the loading
+  dialog open after Tk finalizer thread errors.
 - Deferred PDE backend imports until a PDE route is selected, reducing the standard ODE cold start.
 - Sized and materialized ResultDialog before embedding its initial Matplotlib canvas.
 - Synchronized replacement Matplotlib figures with the existing Tk canvas dimensions to prevent stale plot regions.

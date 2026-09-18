@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import queue
 import threading
 import tkinter as tk
@@ -13,6 +14,11 @@ from typing import Any, TypeVar
 from frontend.ui_dialogs.loading_dialog import LoadingDialog
 
 _TResult = TypeVar("_TResult")
+
+
+_gc_guard_lock = threading.Lock()
+_active_gc_guard_count = 0
+_gc_was_enabled: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +46,35 @@ def _widget_exists(widget: tk.Tk | tk.Toplevel) -> bool:
         return True
 
 
+def _pause_cyclic_gc_for_worker() -> None:
+    """Prevent a worker allocation from finalizing an unreachable Tk cycle.
+
+    Cyclic GC is process-wide and runs in whichever thread crosses its allocation
+    threshold.  A solver thread must not be that thread while a Tk UI is active:
+    an old widget or image cycle could otherwise run its Tk finalizer there.
+    The matching restore always happens from the Tk callback below.
+    """
+    global _active_gc_guard_count, _gc_was_enabled
+    with _gc_guard_lock:
+        if _active_gc_guard_count == 0:
+            _gc_was_enabled = gc.isenabled()
+            if _gc_was_enabled:
+                gc.disable()
+        _active_gc_guard_count += 1
+
+
+def _restore_cyclic_gc_on_tk_thread() -> None:
+    """Restore cyclic GC after a worker has finished on the Tk thread."""
+    global _active_gc_guard_count, _gc_was_enabled
+    with _gc_guard_lock:
+        _active_gc_guard_count -= 1
+        if _active_gc_guard_count != 0:
+            return
+        if _gc_was_enabled:
+            gc.enable()
+        _gc_was_enabled = None
+
+
 def run_task_with_loading(
     *,
     parent: tk.Tk | tk.Toplevel,
@@ -61,10 +96,10 @@ def run_task_with_loading(
         except Exception as exc:  # pragma: no cover - exercised through injected task
             result_queue.put(("error", format_failure(exc)))
 
+    loading = LoadingDialog(parent, message=message)
+    _pause_cyclic_gc_for_worker()
     thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
-
-    loading = LoadingDialog(parent, message=message)
 
     def _poll() -> None:
         try:
@@ -73,6 +108,7 @@ def run_task_with_loading(
             parent.after(poll_ms, _poll)
             return
 
+        _restore_cyclic_gc_on_tk_thread()
         try:
             loading.destroy()
         except tk.TclError:

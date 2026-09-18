@@ -87,6 +87,9 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog.ymin_var = None
     dialog.ymax_var = None
     dialog.npoints_y_var = None
+    dialog.zmin_var = None
+    dialog.zmax_var = None
+    dialog.npoints_z_var = None
     return dialog
 
 
@@ -154,10 +157,30 @@ def test_on_solve_delegates_to_shared_background_runner() -> None:
     assert kwargs["parent"] is dialog.parent
     assert kwargs["message"] == "Solving equation..."
     assert kwargs["format_error"] is parameters_ui._format_solver_exception
-    assert kwargs["on_complete"] is not None
+    assert "on_complete" not in kwargs
     assert callable(kwargs["task"])
     assert callable(kwargs["on_success"])
+    assert all(cell.cell_contents is not dialog for cell in kwargs["task"].__closure__ or ())
     assert dialog.win.destroy_calls == 1
+
+
+def test_on_solve_releases_pde_3d_tk_vars_before_starting_worker() -> None:
+    dialog = _build_scalar_dialog_stub()
+    solver_inputs = dialog._collect_solver_inputs()
+    dialog.equation_type = "pde_3d"
+    dialog.variables = ["x", "y", "z"]
+    dialog.zmin_var = _FakeVar("0.0")
+    dialog.zmax_var = _FakeVar("1.0")
+    dialog.npoints_z_var = _FakeVar("9")
+    dialog._collect_solver_inputs = MagicMock(return_value=solver_inputs)  # type: ignore[method-assign]
+    dialog._confirm_heavy_request = MagicMock(return_value=True)  # type: ignore[method-assign]
+
+    with patch.object(parameters_ui, "run_task_with_loading", create=True):
+        dialog._on_solve()
+
+    assert dialog.zmin_var is None
+    assert dialog.zmax_var is None
+    assert dialog.npoints_z_var is None
 
 
 def test_on_solve_aborts_when_heavy_request_confirmation_is_declined() -> None:

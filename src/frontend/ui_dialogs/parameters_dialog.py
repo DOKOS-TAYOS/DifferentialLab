@@ -1201,105 +1201,96 @@ class ParametersDialog:
         if not self._confirm_heavy_request(solver_inputs):
             return
 
+        pipeline_kwargs: dict[str, Any] = {
+            "expression": self.expression,
+            "function_name": self.function_name,
+            "order": self.order,
+            "parameters": solver_inputs.parameters,
+            "equation_name": self.equation_name,
+            "x_min": solver_inputs.x_min,
+            "x_max": solver_inputs.x_max,
+            "y0": solver_inputs.y0,
+            "n_points": solver_inputs.n_points,
+            "method": solver_inputs.method,
+            "selected_stats": solver_inputs.selected_stats,
+            "x0_list": solver_inputs.x0_list,
+            "equation_type": cast(EquationType, self.equation_type),
+            "variables": self.variables,
+            "y_min": solver_inputs.y_min,
+            "y_max": solver_inputs.y_max,
+            "n_points_y": solver_inputs.n_points_y,
+            "z_min": solver_inputs.z_min,
+            "z_max": solver_inputs.z_max,
+            "n_points_z": solver_inputs.n_points_z,
+            "vector_expressions": self.vector_expressions,
+            "vector_components": self.vector_components,
+            "pde_operator": self.pde_operator,
+            "component_orders": self.component_orders,
+            "bc_expressions": solver_inputs.bc_expressions,
+            "bc_types": solver_inputs.bc_types,
+            "mask_expression": solver_inputs.mask_expression,
+            "contour_bc_expression": solver_inputs.contour_bc_expression,
+            "contour_bc_type": solver_inputs.contour_bc_type,
+            "event_expression": solver_inputs.event_expression,
+            "event_terminal": solver_inputs.event_terminal,
+            "event_direction": solver_inputs.event_direction,
+        }
+        parent = self.parent
+
         self.win.destroy()
 
-        # Keep ParametersDialog alive until _check_result runs on the main thread.
-        # Otherwise GC may collect it from the worker thread when the solver finishes,
-        # causing "RuntimeError: main thread is not in main loop" in Variable.__del__.
-        dialog_ref = self
+        # Release every Tk-backed value before the worker begins.  The task below
+        # closes over only pipeline data, so a solver-thread allocation cannot
+        # become the last reference to this dialog or one of its Tk variables.
+        vars_to_discard: list[tk.Variable] = []
+        vars_to_discard.extend(self._y0_vars)
+        vars_to_discard.extend(self._x0_vars)
+        vars_to_discard.extend(self._eq_param_vars.values())
+        vars_to_discard.extend(self._bc_vars)
+        vars_to_discard.extend(self._bc_type_vars)
+        for attr in (
+            "xmin_var",
+            "xmax_var",
+            "ymin_var",
+            "ymax_var",
+            "zmin_var",
+            "zmax_var",
+            "npoints_var",
+            "npoints_y_var",
+            "npoints_z_var",
+            "method_var",
+            "event_expression_var",
+            "event_terminal_var",
+            "event_direction_var",
+            "_domain_shape_var",
+            "_mask_expr_var",
+            "_contour_bc_expr_var",
+            "_contour_bc_type_var",
+        ):
+            if hasattr(self, attr):
+                value = getattr(self, attr)
+                if value is not None:
+                    vars_to_discard.append(value)
+                setattr(self, attr, None)
+        self._y0_vars.clear()
+        self._x0_vars.clear()
+        self._eq_param_vars.clear()
+        self._bc_vars.clear()
+        self._bc_type_vars.clear()
+        vars_to_discard.clear()
 
         def _run_solver_pipeline() -> Any:
             from pipeline import run_solver_pipeline
 
-            return run_solver_pipeline(
-                expression=dialog_ref.expression,
-                function_name=dialog_ref.function_name,
-                order=dialog_ref.order,
-                parameters=solver_inputs.parameters,
-                equation_name=dialog_ref.equation_name,
-                x_min=solver_inputs.x_min,
-                x_max=solver_inputs.x_max,
-                y0=solver_inputs.y0,
-                n_points=solver_inputs.n_points,
-                method=solver_inputs.method,
-                selected_stats=solver_inputs.selected_stats,
-                x0_list=solver_inputs.x0_list,
-                equation_type=cast(EquationType, dialog_ref.equation_type),
-                variables=dialog_ref.variables,
-                y_min=solver_inputs.y_min,
-                y_max=solver_inputs.y_max,
-                n_points_y=solver_inputs.n_points_y,
-                z_min=solver_inputs.z_min,
-                z_max=solver_inputs.z_max,
-                n_points_z=solver_inputs.n_points_z,
-                vector_expressions=dialog_ref.vector_expressions,
-                vector_components=dialog_ref.vector_components,
-                pde_operator=dialog_ref.pde_operator,
-                component_orders=dialog_ref.component_orders,
-                bc_expressions=solver_inputs.bc_expressions,
-                bc_types=solver_inputs.bc_types,
-                mask_expression=solver_inputs.mask_expression,
-                contour_bc_expression=solver_inputs.contour_bc_expression,
-                contour_bc_type=solver_inputs.contour_bc_type,
-                event_expression=solver_inputs.event_expression,
-                event_terminal=solver_inputs.event_terminal,
-                event_direction=solver_inputs.event_direction,
-            )
+            return run_solver_pipeline(**pipeline_kwargs)
 
         def _on_success(result: Any) -> None:
-            if not dialog_ref.parent.winfo_exists():
+            if not parent.winfo_exists():
                 return
 
             from frontend.ui_dialogs.result_dialog import ResultDialog
 
-            ResultDialog(dialog_ref.parent, result=result)
-
-        def _release_tk_vars() -> None:
-            """Clear all tk.StringVar references so GC doesn't call __del__ off-thread.
-
-            Variables are collected into a list and dropped in a deferred after(0)
-            callback. This ensures they are garbage-collected on the main thread,
-            avoiding "RuntimeError: main thread is not in main loop" in Variable.__del__
-            when the worker thread triggers GC.
-            """
-            d = dialog_ref
-            vars_to_discard: list[tk.Variable] = []
-            vars_to_discard.extend(d._y0_vars)
-            vars_to_discard.extend(d._x0_vars)
-            vars_to_discard.extend(d._eq_param_vars.values())
-            vars_to_discard.extend(d._bc_vars)
-            vars_to_discard.extend(d._bc_type_vars)
-            for attr in (
-                "xmin_var",
-                "xmax_var",
-                "ymin_var",
-                "ymax_var",
-                "npoints_var",
-                "npoints_y_var",
-                "method_var",
-                "event_expression_var",
-                "event_terminal_var",
-                "event_direction_var",
-                "_domain_shape_var",
-                "_mask_expr_var",
-                "_contour_bc_expr_var",
-                "_contour_bc_type_var",
-            ):
-                if hasattr(d, attr):
-                    v = getattr(d, attr)
-                    if v is not None:
-                        vars_to_discard.append(v)
-                    setattr(d, attr, None)
-            d._y0_vars.clear()
-            d._x0_vars.clear()
-            d._eq_param_vars.clear()
-            d._bc_vars.clear()
-            d._bc_type_vars.clear()
-
-            def _discard_on_main() -> None:
-                vars_to_discard.clear()
-
-            d.parent.after(0, _discard_on_main)
+            ResultDialog(parent, result=result)
 
         run_task_with_loading(
             parent=self.parent,
@@ -1307,5 +1298,4 @@ class ParametersDialog:
             task=_run_solver_pipeline,
             on_success=_on_success,
             format_error=_format_solver_exception,
-            on_complete=_release_tk_vars,
         )
