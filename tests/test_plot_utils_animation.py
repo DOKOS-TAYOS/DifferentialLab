@@ -130,6 +130,68 @@ def test_image_and_surface_animation_helpers_render_small_frame_histories() -> N
         plt.close(surface_figure)
 
 
+def test_image_animation_uses_actual_nonzero_symmetric_amplitude() -> None:
+    figure = create_image_animation_plot(
+        np.array([0.0, 1.0]),
+        np.array([[-0.05, 0.0], [0.02, 0.04]], dtype=float)[np.newaxis, ...].repeat(2, axis=0),
+        title="Low-amplitude field",
+        xlabel="x",
+        ylabel="y",
+        symmetric_color_range=True,
+    )
+    try:
+        assert figure.axes[0].images[0].get_clim() == (-0.05, 0.05)
+    finally:
+        plt.close(figure)
+
+
+def test_surface_animation_uses_full_history_amplitude_before_downsampling() -> None:
+    frames = np.zeros((2, 5, 5), dtype=float)
+    frames[1, 1, 1] = 0.2
+
+    figure = create_surface_animation_plot(
+        np.array([0.0, 1.0]),
+        np.arange(5),
+        np.arange(5),
+        frames,
+        title="Low-amplitude membrane",
+        max_render_resolution=2,
+    )
+    try:
+        axis = figure.axes[0]
+        assert axis.get_zlim() == (-0.2, 0.2)
+        assert axis.collections[0].get_clim() == (-0.2, 0.2)
+    finally:
+        plt.close(figure)
+
+
+def test_animation_helpers_use_valid_range_for_all_zero_history() -> None:
+    t = np.array([0.0, 1.0])
+    frames = np.zeros((2, 2, 3), dtype=float)
+
+    image_figure = create_image_animation_plot(
+        t,
+        frames,
+        title="Zero field",
+        xlabel="x",
+        ylabel="y",
+        symmetric_color_range=True,
+    )
+    surface_figure = create_surface_animation_plot(
+        t,
+        np.arange(3),
+        np.arange(2),
+        frames,
+        title="Zero membrane",
+    )
+    try:
+        assert image_figure.axes[0].images[0].get_clim() == (-1.0, 1.0)
+        assert surface_figure.axes[0].get_zlim() == (-1.0, 1.0)
+    finally:
+        plt.close(image_figure)
+        plt.close(surface_figure)
+
+
 def test_figure_animation_export_uses_attached_animation_payload(tmp_path: Path) -> None:
     figure = create_image_animation_plot(
         np.array([0.0, 1.0]),

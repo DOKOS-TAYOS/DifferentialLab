@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from frontend.performance_guard import (
     PerformanceAdvisory,
+    assess_membrane_request,
     assess_parameters_dialog_request,
     assess_pde_3d_request,
     assess_time_history_request,
@@ -77,6 +78,34 @@ def test_assess_time_history_request_requires_confirmation_for_large_history() -
     assert advisory.severity == "confirm"
     assert advisory.title == "Large 2D membrane history"
     assert "Continue only if this is intentional." in advisory.message
+
+
+def test_membrane_history_includes_float32_spectrum_storage() -> None:
+    advisory = assess_membrane_request(
+        nx=100,
+        ny=100,
+        t_min=0.0,
+        t_max=699.0,
+        dt=1.0,
+    )
+
+    assert advisory is not None
+    assert advisory.severity == "warn"
+    assert "133.5 MiB" in advisory.message
+    assert "4 additional byte(s) per point" in advisory.message
+
+
+def test_small_membrane_history_has_no_advisory() -> None:
+    assert (
+        assess_membrane_request(
+            nx=10,
+            ny=10,
+            t_min=0.0,
+            t_max=1.0,
+            dt=0.1,
+        )
+        is None
+    )
 
 
 def test_confirm_performance_advisory_uses_warning_and_confirmation_dialogs() -> None:

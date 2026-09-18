@@ -148,12 +148,20 @@ def assess_time_history_request(
     points_per_frame: int,
     array_count: int,
     bytes_per_value: int,
+    additional_bytes_per_point: int = 0,
 ) -> PerformanceAdvisory | None:
     """Assess the cost of storing a time history in memory."""
-    if frames <= 0 or points_per_frame <= 0 or array_count <= 0 or bytes_per_value <= 0:
+    if (
+        frames <= 0
+        or points_per_frame <= 0
+        or array_count <= 0
+        or bytes_per_value <= 0
+        or additional_bytes_per_point < 0
+    ):
         return None
 
-    total_bytes = frames * points_per_frame * array_count * bytes_per_value
+    bytes_per_point = array_count * bytes_per_value + additional_bytes_per_point
+    total_bytes = frames * points_per_frame * bytes_per_point
     severity = _severity_from_thresholds(
         value=total_bytes,
         warn_threshold=_WARN_HISTORY_BYTES,
@@ -167,8 +175,13 @@ def assess_time_history_request(
         title=f"Large {label} history",
         message=(
             f"This setup is expected to store about {frames:,} frame(s) with "
-            f"{points_per_frame:,} point(s) per frame across {array_count} array(s), "
-            f"roughly {_format_bytes(total_bytes)} of raw history data. "
+            f"{points_per_frame:,} point(s) per frame across {array_count} array(s)"
+            + (
+                f" plus {additional_bytes_per_point} additional byte(s) per point, "
+                if additional_bytes_per_point
+                else ", "
+            )
+            + f"roughly {_format_bytes(total_bytes)} of raw history data. "
             "Continue only if this is intentional."
         ),
     )
@@ -202,6 +215,7 @@ def assess_membrane_request(
         points_per_frame=max(1, nx * ny),
         array_count=2,
         bytes_per_value=8,
+        additional_bytes_per_point=4,
     )
 
 

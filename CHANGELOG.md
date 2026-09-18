@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Corrected low-amplitude membrane animation scaling and included cached float32
+  spectrum history in the membrane memory advisory.
 - Made coupled-oscillator animation labels readable for large mode counts and added
   MP4 export that matches the currently selected oscillator or mode view.
 - Set the standard Vector PDE interactive grid default to 100 × 100 while keeping

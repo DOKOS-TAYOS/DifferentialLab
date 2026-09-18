@@ -860,7 +860,9 @@ def create_image_animation_plot(
     data_min = float(np.min(frame_data))
     data_max = float(np.max(frame_data))
     if symmetric_color_range:
-        bound = max(abs(data_min), abs(data_max), 1.0)
+        bound = max(abs(data_min), abs(data_max))
+        if bound == 0.0:
+            bound = 1.0
         vmin, vmax = -bound, bound
     else:
         vmin, vmax = data_min, data_max
@@ -926,7 +928,9 @@ def create_surface_animation_plot(
     render_y = y_values[::y_step]
     render_frames = frame_data[:, ::y_step, ::x_step]
     x_grid, y_grid = np.meshgrid(render_x, render_y)
-    z_bound = max(float(np.max(np.abs(render_frames))), 1.0)
+    z_bound = float(np.max(np.abs(frame_data)))
+    if z_bound == 0.0:
+        z_bound = 1.0
 
     fig, ax = _new_3d_figure()
     surface = ax.plot_surface(
