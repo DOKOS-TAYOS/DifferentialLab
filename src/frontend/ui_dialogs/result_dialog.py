@@ -75,7 +75,9 @@ class ResultDialog:
 
         # Canvas references for cleanup
         self._canvases: list[FigureCanvasTkAgg] = []
+        self._closed = False
         self._initial_plot_callbacks: list[Callable[[], None]] = []
+        self.win.protocol("WM_DELETE_WINDOW", self._close)
 
         # Allocate the final window geometry before creating Matplotlib canvases,
         # then materialize every plot frame before the first canvas is embedded.
@@ -86,6 +88,63 @@ class ResultDialog:
         self._render_initial_plots()
         make_modal(self.win, parent)
         logger.info("Result dialog displayed")
+
+    def _close(self) -> None:
+        """Release owned plot resources and close the result window."""
+        if self._closed:
+            return
+        self._closed = True
+        self._cleanup_plots()
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _dispose_canvas(canvas: FigureCanvasTkAgg | None) -> None:
+        """Stop a canvas animation and close its Matplotlib figure."""
+        if canvas is None:
+            return
+
+        try:
+            stop_animation = getattr(canvas, "_stop_animation", None)
+        except Exception:
+            stop_animation = None
+        if callable(stop_animation):
+            try:
+                stop_animation()
+            except Exception:
+                logger.debug("Could not stop a result-dialog animation", exc_info=True)
+
+        try:
+            figure = getattr(canvas, "figure", None)
+        except Exception:
+            return
+        if figure is None:
+            return
+
+        import matplotlib.pyplot as plt
+
+        try:
+            plt.close(figure)
+        except Exception:
+            logger.debug("Could not close a result-dialog figure", exc_info=True)
+
+    def _cleanup_plots(self) -> None:
+        """Close every Matplotlib canvas currently owned by the dialog."""
+        canvases = tuple(self._canvases)
+        self._canvases.clear()
+        for canvas in canvases:
+            self._dispose_canvas(canvas)
+
+    def _register_canvas(self, canvas: FigureCanvasTkAgg) -> None:
+        """Track a canvas once so its figure is closed with the dialog."""
+        if not any(existing is canvas for existing in self._canvases):
+            self._canvases.append(canvas)
+
+    def _unregister_canvas(self, canvas: FigureCanvasTkAgg) -> None:
+        """Stop tracking a canvas that has already been disposed."""
+        self._canvases[:] = [existing for existing in self._canvases if existing is not canvas]
 
     def _set_window_geometry(self) -> None:
         """Set the dialog geometry before the initial plot canvas is embedded."""
@@ -113,7 +172,7 @@ class ResultDialog:
             btn_frame,
             text="Close",
             style="Cancel.TButton",
-            command=self.win.destroy,
+            command=self._close,
         )
         btn_close.pack()
         setup_arrow_enter_navigation([[btn_close]])
@@ -836,6 +895,7 @@ class ResultDialog:
 
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
+        self._anim_canvas: FigureCanvasTkAgg | None = None
         self._queue_initial_plot(self._update_animation)
 
         # --- Tab 5: 3D Surface ---
@@ -1114,6 +1174,11 @@ class ResultDialog:
                 deriv_offset=deriv_k,
             )
 
+        old_canvas = getattr(self, "_anim_canvas", None)
+        if old_canvas is not None:
+            self._dispose_canvas(old_canvas)
+            self._unregister_canvas(old_canvas)
+
         # Clear existing widgets
         for w in self._anim_plot_frame.winfo_children():
             w.destroy()
@@ -1121,7 +1186,12 @@ class ResultDialog:
         def _export_cb(dur: float) -> None:
             self._on_export_animation_mp4(dur, deriv_k)
 
-        embed_animation_plot_in_tk(fig, self._anim_plot_frame, on_export_mp4=_export_cb)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_plot_frame,
+            on_export_mp4=_export_cb,
+        )
+        self._register_canvas(self._anim_canvas)
 
     def _update_3d_plot(self) -> None:
         """Regenerate the 3D surface tab."""
@@ -1803,7 +1873,11 @@ class ResultDialog:
         """Reuse the existing canvas when replacing a matplotlib figure."""
         old_canvas: FigureCanvasTkAgg | None = getattr(self, canvas_attr, None)
         canvas = replace_plot_in_tk(fig, frame, current_canvas=old_canvas)
+        if old_canvas is not None and canvas is not old_canvas:
+            self._dispose_canvas(old_canvas)
+            self._unregister_canvas(old_canvas)
         setattr(self, canvas_attr, canvas)
+        self._register_canvas(canvas)
 
     # ------------------------------------------------------------------
     # Stat rendering
