@@ -33,6 +33,16 @@ from utils import DifferentialLabError, get_logger
 logger = get_logger(__name__)
 
 _MAX_PDE_GRID = 1000
+_DEFAULT_VECTOR_PDE_GRID = 100
+
+
+def _default_pde_grid_points(equation_type: str) -> int:
+    """Return the interactive default grid size for a PDE equation type."""
+    if equation_type == "pde_3d":
+        return 25
+    if equation_type == "vector_pde":
+        return _DEFAULT_VECTOR_PDE_GRID
+    return 1000
 
 
 def _format_solver_exception(exc: BaseException) -> BackgroundTaskFailure:
@@ -336,7 +346,7 @@ class ParametersDialog:
             row_ny.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_ny, text=f"Grid points ({pde_label_1}):").pack(side=tk.LEFT)
             self.npoints_y_var = tk.StringVar(
-                value="25" if self.equation_type == "pde_3d" else "1000"
+                value=str(_default_pde_grid_points(self.equation_type))
             )
             ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
@@ -448,9 +458,7 @@ class ParametersDialog:
             row_n = ttk.Frame(domain_frame)
             row_n.pack(fill=tk.X, pady=(pad, 0))
             ttk.Label(row_n, text="Grid points (x[0]):").pack(side=tk.LEFT)
-            self.npoints_var = tk.StringVar(
-                value="25" if self.equation_type == "pde_3d" else "1000"
-            )
+            self.npoints_var = tk.StringVar(value=str(_default_pde_grid_points(self.equation_type)))
             ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
                 side=tk.LEFT, padx=pad
             )

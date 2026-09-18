@@ -93,6 +93,18 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     return dialog
 
 
+@pytest.mark.parametrize(
+    ("equation_type", "expected_default"),
+    [("vector_pde", 100), ("pde", 1000), ("pde_3d", 25)],
+)
+def test_pde_grid_defaults_are_practical_and_family_specific(
+    equation_type: str,
+    expected_default: int,
+) -> None:
+    """Vector PDE uses its interactive default without changing other PDE defaults."""
+    assert parameters_ui._default_pde_grid_points(equation_type) == expected_default
+
+
 def test_collect_solver_inputs_builds_scalar_pipeline_kwargs() -> None:
     dialog = _build_scalar_dialog_stub()
 

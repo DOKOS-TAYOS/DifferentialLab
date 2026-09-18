@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Set the standard Vector PDE interactive grid default to 100 × 100 while keeping
+  larger user-selected grids behind the existing performance advisory.
 - Kept Tk-backed parameter state out of solver workers and deferred cyclic garbage collection
   until their Tk-thread completion callbacks, preventing 3D PDE solves from leaving the loading
   dialog open after Tk finalizer thread errors.

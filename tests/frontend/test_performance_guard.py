@@ -40,6 +40,19 @@ def test_vector_pde_components_are_included_in_grid_cost() -> None:
     assert "4 components" in advisory.message
 
 
+def test_large_vector_pde_request_still_requires_advisory() -> None:
+    advisory = assess_parameters_dialog_request(
+        equation_type="pde",
+        n_points=1000,
+        n_points_y=1000,
+        state_size=2,
+    )
+
+    assert advisory is not None
+    assert advisory.severity == "confirm"
+    assert "2 components" in advisory.message
+
+
 def test_pde_3d_advisory_estimates_sparse_system_and_memory() -> None:
     advisory = assess_pde_3d_request(nx=50, ny=50, nz=50)
 
