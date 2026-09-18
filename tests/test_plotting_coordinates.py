@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from plotting import create_vector_field_plot
+from plotting import create_polar_contour_plot, create_vector_field_plot
 from plotting.coordinates import (
     cartesian_to_cylindrical,
     cartesian_to_polar,
@@ -91,6 +91,22 @@ def test_polar_resampling_preserves_shape_and_invalid_regions() -> None:
     assert sampled.values.shape == (8, 7)
     assert np.isnan(sampled.values[:, 0]).all()
     assert np.isnan(sampled.values).any()
+
+
+def test_polar_contour_plot_constructs_from_cartesian_scalar_grid() -> None:
+    """Polar scalar plots construct successfully from a Cartesian grid."""
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(-1.0, 1.0, 5)
+    y = np.linspace(-1.0, 1.0, 5)
+    values = np.add.outer(y, x)
+
+    try:
+        figure = create_polar_contour_plot(x, y, values, radial_points=7, angular_points=8)
+    finally:
+        plt.close("all")
+
+    assert figure is not None
 
 
 def test_vector_plot_data_computes_magnitude_and_validates_shape() -> None:

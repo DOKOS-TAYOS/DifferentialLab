@@ -536,6 +536,7 @@ def create_polar_contour_plot(
 ) -> Figure:
     """Create a polar re-sampled contour plot from Cartesian scalar data."""
     import matplotlib.pyplot as plt
+    import numpy as np
 
     from plotting.coordinates import resample_scalar_to_polar
 
