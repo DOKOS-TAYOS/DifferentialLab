@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -12,13 +14,20 @@ from complex_problems.common.result_dialog_ui import (
     close_embedded_figures,
     reset_embedded_animation,
 )
+from complex_problems.membrane_2d.model import compute_fft_power_history_2d
 from complex_problems.membrane_2d.solver import Membrane2DResult
-from config import get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
-from plotting import create_contour_plot, create_energy_evolution_plot, create_surface_plot
-from plotting.animation_metadata import attach_animation_metadata
+from plotting import (
+    create_contour_plot,
+    create_energy_evolution_plot,
+    create_image_animation_plot,
+    create_surface_animation_plot,
+    create_surface_plot,
+    export_animated_figure_to_mp4,
+)
 from utils import get_logger
 
 if TYPE_CHECKING:
@@ -27,41 +36,44 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-def _create_field_animation_figure(
-    t: np.ndarray,
-    frames: np.ndarray,
-    *,
-    title: str,
-    cmap: str = "viridis",
-) -> Figure:
-    """Create an imshow figure compatible with embed_animation_plot_in_tk."""
-    import matplotlib.pyplot as plt
+@dataclass(frozen=True)
+class _MembraneAnimationViewPayload:
+    """Prepared data and metadata shared by a membrane view and its MP4 export."""
 
-    fig, ax = plt.subplots()
-    v_abs = float(np.max(np.abs(frames)))
-    if v_abs <= 0:
-        v_abs = 1.0
-    im = ax.imshow(
-        frames[0],
-        origin="lower",
-        cmap=cmap,
-        aspect="auto",
-        vmin=-v_abs,
-        vmax=v_abs,
+    kind: Literal["image", "surface"]
+    t: np.ndarray
+    x: np.ndarray
+    y: np.ndarray
+    frames: np.ndarray
+    title: str
+    cmap: str
+    xlabel: str
+    ylabel: str
+    symmetric_color_range: bool
+
+
+def _create_animation_figure(payload: _MembraneAnimationViewPayload) -> Figure:
+    """Build the embedded or export figure from one prepared animation payload."""
+    if payload.kind == "surface":
+        return create_surface_animation_plot(
+            payload.t,
+            payload.x,
+            payload.y,
+            payload.frames,
+            title=payload.title,
+            cmap=payload.cmap,
+        )
+    return create_image_animation_plot(
+        payload.t,
+        payload.frames,
+        title=payload.title,
+        xlabel=payload.xlabel,
+        ylabel=payload.ylabel,
+        cmap=payload.cmap,
+        x_coordinates=payload.x,
+        y_coordinates=payload.y,
+        symmetric_color_range=payload.symmetric_color_range,
     )
-    ax.set_title(f"{title}  (t={t[0]:.3g})")
-    ax.set_xlabel("x index")
-    ax.set_ylabel("y index")
-    fig.colorbar(im, ax=ax, shrink=0.8)
-    fig.tight_layout()
-
-    def _update(idx: int) -> None:
-        i = max(0, min(idx, len(t) - 1))
-        im.set_data(frames[i])
-        ax.set_title(f"{title}  (t={t[i]:.3g})")
-        fig.canvas.draw_idle()
-
-    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 class Membrane2DResultDialog:
@@ -79,6 +91,7 @@ class Membrane2DResultDialog:
         self._surface_canvas = None
         self._energy_canvas = None
         self._spec_canvas = None
+        self._spectrum_power_history = result.spectrum_power_history
 
         self._build_ui()
         self.win.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -147,13 +160,13 @@ class Membrane2DResultDialog:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
         ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        self._anim_field_var = tk.StringVar(value="Displacement")
+        self._anim_field_var = tk.StringVar(value="2D Field")
         combo = ttk.Combobox(
             ctrl,
             textvariable=self._anim_field_var,
-            values=("Displacement", "Velocity"),
+            values=("2D Field", "2D Velocity", "3D Surface", "Spectrum"),
             state="readonly",
-            width=12,
+            width=14,
             font=get_font(),
         )
         combo.pack(side=tk.LEFT)
@@ -164,18 +177,117 @@ class Membrane2DResultDialog:
         self._update_animation()
 
     def _update_animation(self) -> None:
+        """Replace the embedded animation with the selected membrane representation."""
         reset_embedded_animation(self._anim_frame, self._anim_canvas)
+        self._anim_canvas = None
+        payload = self._get_animation_view_payload()
+        fig = _create_animation_figure(payload)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_frame,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
+        )
 
-        if self._anim_field_var.get() == "Velocity":
-            frames = self._result.velocity
-            title = "Membrane velocity field"
-            cmap = "coolwarm"
-        else:
-            frames = self._result.displacement
-            title = "Membrane displacement field"
-            cmap = "viridis"
-        fig = _create_field_animation_figure(self._result.t, frames, title=title, cmap=cmap)
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_frame)
+    def _get_animation_view_payload(self) -> _MembraneAnimationViewPayload:
+        """Return the exact prepared representation selected in the animation tab."""
+        result = self._result
+        x = np.arange(result.displacement.shape[2])
+        y = np.arange(result.displacement.shape[1])
+        mode = self._anim_field_var.get()
+
+        if mode == "3D Surface":
+            return _MembraneAnimationViewPayload(
+                kind="surface",
+                t=result.t,
+                x=x,
+                y=y,
+                frames=result.displacement,
+                title="Membrane displacement surface",
+                cmap="viridis",
+                xlabel="x index",
+                ylabel="y index",
+                symmetric_color_range=True,
+            )
+        if mode == "Spectrum":
+            spectrum_history = self._spectrum_power_history
+            if spectrum_history is None:
+                _kx, _ky, spectrum_history = compute_fft_power_history_2d(result.displacement)
+                self._spectrum_power_history = spectrum_history
+            return _MembraneAnimationViewPayload(
+                kind="image",
+                t=result.t,
+                x=result.kx,
+                y=result.ky,
+                frames=spectrum_history,
+                title="2D FFT power spectrum",
+                cmap="magma",
+                xlabel="kₓ",
+                ylabel="kᵧ",
+                symmetric_color_range=False,
+            )
+        if mode == "2D Velocity":
+            return _MembraneAnimationViewPayload(
+                kind="image",
+                t=result.t,
+                x=x,
+                y=y,
+                frames=result.velocity,
+                title="Membrane velocity field",
+                cmap="coolwarm",
+                xlabel="x index",
+                ylabel="y index",
+                symmetric_color_range=True,
+            )
+        return _MembraneAnimationViewPayload(
+            kind="image",
+            t=result.t,
+            x=x,
+            y=y,
+            frames=result.displacement,
+            title="Membrane displacement field",
+            cmap="viridis",
+            xlabel="x index",
+            ylabel="y index",
+            symmetric_color_range=True,
+        )
+
+    def _on_export_animation_mp4(
+        self,
+        payload: _MembraneAnimationViewPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the selected animation through the shared MP4 infrastructure."""
+        default_path = get_output_dir() / f"{generate_output_basename(prefix='membrane')}.mp4"
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_animation_figure(payload), filepath, duration_seconds=duration_seconds
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _build_space_time_tab(self, parent: ttk.Frame) -> None:
         ny, _nx = self._result.displacement.shape[1:]

@@ -5,7 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from complex_problems.common import compile_scalar_expression
-from complex_problems.membrane_2d.model import acceleration_field, build_initial_displacement
+from complex_problems.membrane_2d.model import (
+    acceleration_field,
+    build_initial_displacement,
+    compute_fft_power_2d,
+)
 from complex_problems.membrane_2d.solver import solve_membrane_2d
 
 
@@ -34,6 +38,10 @@ def test_membrane_verlet_linear_keeps_energy_drift_small() -> None:
     assert result.displacement.shape == (len(result.t), 24, 24)
     assert result.velocity.shape == (len(result.t), 24, 24)
     assert result.spectrum_power.shape == (24, 24)
+    assert result.spectrum_power_history is not None
+    assert result.spectrum_power_history.shape == result.displacement.shape
+    _kx, _ky, expected_final_spectrum = compute_fft_power_2d(result.displacement[-1])
+    np.testing.assert_allclose(result.spectrum_power_history[-1], expected_final_spectrum)
     assert abs(result.magnitudes["energy_drift_rel"]) < 5e-2
 
 

@@ -13,6 +13,7 @@ from complex_problems.membrane_2d.model import (
     apply_fixed_boundary,
     compute_energy_terms,
     compute_fft_power_2d,
+    compute_fft_power_history_2d,
 )
 from utils import SolverFailedError, get_logger
 
@@ -34,6 +35,7 @@ class Membrane2DResult:
     spectrum_power: np.ndarray
     metadata: dict[str, Any] = field(default_factory=dict)
     magnitudes: dict[str, float] = field(default_factory=dict)
+    spectrum_power_history: np.ndarray | None = None
 
 
 def _build_time_grid(t_min: float, t_max: float, dt: float) -> np.ndarray:
@@ -305,6 +307,7 @@ def solve_membrane_2d(
     )
 
     kx, ky, power = compute_fft_power_2d(u_hist[-1])
+    _spectrum_kx, _spectrum_ky, spectrum_power_history = compute_fft_power_history_2d(u_hist)
     e0 = abs(total[0]) + 1e-12
     magnitudes = {
         "energy_drift_rel": float((total[-1] - total[0]) / e0),
@@ -340,4 +343,5 @@ def solve_membrane_2d(
         spectrum_power=power,
         metadata=metadata,
         magnitudes=magnitudes,
+        spectrum_power_history=spectrum_power_history,
     )

@@ -198,3 +198,22 @@ def compute_fft_power_2d(u: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndar
     kx = np.fft.fftshift(np.fft.fftfreq(nx))
     ky = np.fft.fftshift(np.fft.fftfreq(ny))
     return kx, ky, power
+
+
+def compute_fft_power_history_2d(fields: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute the shifted 2D power spectrum for every field in a time history.
+
+    The history uses ``float32`` storage because it is visualization data, while
+    each FFT is still evaluated from the solver's full-precision displacement.
+    """
+    field_history = np.asarray(fields)
+    if field_history.ndim != 3:
+        raise ValueError("fields must have shape (n_t, ny, nx).")
+
+    n_frames, ny, nx = field_history.shape
+    power_history = np.empty((n_frames, ny, nx), dtype=np.float32)
+    kx = np.fft.fftshift(np.fft.fftfreq(nx))
+    ky = np.fft.fftshift(np.fft.fftfreq(ny))
+    for index, field in enumerate(field_history):
+        power_history[index] = np.abs(np.fft.fftshift(np.fft.fft2(field))) ** 2
+    return kx, ky, power_history

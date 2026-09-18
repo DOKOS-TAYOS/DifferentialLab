@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added selectable 2D field, 3D surface, and 2D FFT power-spectrum animations to the
+  nonlinear membrane results dialog, with matching MP4 export for every selected view.
+
 ### Changed
 
 - Made coupled-oscillator animation labels readable for large mode counts and added

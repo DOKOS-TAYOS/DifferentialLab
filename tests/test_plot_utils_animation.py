@@ -12,7 +12,13 @@ matplotlib.use("Agg")
 import matplotlib.animation as animation_module  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
-from plotting import create_vector_animation_plot, export_animation_to_mp4
+from plotting import (
+    create_image_animation_plot,
+    create_surface_animation_plot,
+    create_vector_animation_plot,
+    export_animated_figure_to_mp4,
+    export_animation_to_mp4,
+)
 
 
 def _animation_data(n_components: int) -> tuple[np.ndarray, np.ndarray]:
@@ -93,3 +99,59 @@ def test_mp4_export_uses_same_component_tick_policy_and_custom_labels(
     assert captured["labels"][0] == "Mode 1"
     assert captured["labels"][-1] == "Mode 32"
     assert len(captured["labels"]) == 10
+
+
+def test_image_and_surface_animation_helpers_render_small_frame_histories() -> None:
+    t = np.array([0.0, 0.5, 1.0])
+    frames = np.arange(3 * 3 * 4, dtype=float).reshape(3, 3, 4)
+
+    image_figure = create_image_animation_plot(
+        t,
+        frames,
+        title="Synthetic spectrum",
+        xlabel="kx",
+        ylabel="ky",
+    )
+    surface_figure = create_surface_animation_plot(
+        t,
+        np.arange(4),
+        np.arange(3),
+        frames,
+        title="Synthetic membrane",
+    )
+    try:
+        image_figure._animation_update(2)  # type: ignore[attr-defined]
+        surface_figure._animation_update(2)  # type: ignore[attr-defined]
+        assert image_figure.axes[0].get_title().endswith("t=1)")
+        assert surface_figure.axes[0].get_title().endswith("t=1)")
+        assert surface_figure.axes[0].get_zlabel() == "u"
+    finally:
+        plt.close(image_figure)
+        plt.close(surface_figure)
+
+
+def test_figure_animation_export_uses_attached_animation_payload(tmp_path: Path) -> None:
+    figure = create_image_animation_plot(
+        np.array([0.0, 1.0]),
+        np.arange(8, dtype=float).reshape(2, 2, 2),
+        title="Synthetic spectrum",
+        xlabel="kx",
+        ylabel="ky",
+    )
+    captured: dict[str, str] = {}
+
+    class _FakeAnimation:
+        def __init__(self, _figure: object, callback: object, **_kwargs: object) -> None:
+            callback(1)  # type: ignore[operator]
+
+        def save(self, _path: str, **_kwargs: object) -> None:
+            captured["title"] = figure.axes[0].get_title()
+
+    with (
+        patch.object(animation_module, "FuncAnimation", _FakeAnimation),
+        patch.object(animation_module.writers, "is_available", return_value=True),
+    ):
+        output = export_animated_figure_to_mp4(figure, tmp_path / "animated.mp4")
+
+    assert output == tmp_path / "animated.mp4"
+    assert captured["title"].endswith("t=1)")
