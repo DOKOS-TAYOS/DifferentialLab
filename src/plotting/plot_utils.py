@@ -18,6 +18,7 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _MAX_ELEMENTS_PLOT = 50
+_MAX_COMPONENT_TICKS = 10
 _SUB_DIGS = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
 
 
@@ -145,6 +146,27 @@ def _finalize_3d_plot(
 def _component_labels(n: int) -> list[str]:
     """Generate f₀, f₁, ... labels for component indices."""
     return [f"f{_SUB_DIGS[i]}" if i < len(_SUB_DIGS) else f"f_{i}" for i in range(n)]
+
+
+def _set_component_ticks(
+    ax: "Axes",
+    vector_components: int,
+    component_labels: list[str] | None = None,
+) -> None:
+    """Apply readable, range-preserving ticks for a component animation."""
+    labels = (
+        component_labels if component_labels is not None else _component_labels(vector_components)
+    )
+    if vector_components <= _MAX_COMPONENT_TICKS:
+        tick_indices = list(range(vector_components))
+    else:
+        tick_indices = [
+            round(index * (vector_components - 1) / (_MAX_COMPONENT_TICKS - 1))
+            for index in range(_MAX_COMPONENT_TICKS)
+        ]
+
+    ax.set_xticks(tick_indices)
+    ax.set_xticklabels([labels[index] for index in tick_indices])
 
 
 def create_solution_plot(
@@ -726,10 +748,7 @@ def create_vector_animation_plot(
     vlines_coll = ax_main.vlines(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
-    ax_main.set_xticks(indices)
-    ax_main.set_xticklabels(
-        component_labels if component_labels is not None else _component_labels(vector_components)
-    )
+    _set_component_ticks(ax_main, vector_components, component_labels)
     j_vals = indices  # Reuse for segment construction in update
 
     def update(idx: int) -> None:
@@ -819,6 +838,7 @@ def export_animation_to_mp4(
     title: str = "f_i(x) vs component",
     duration_seconds: float = 10.0,
     deriv_offset: int = 0,
+    component_labels: list[str] | None = None,
 ) -> Path:
     """Export vector animation as MP4 video.
 
@@ -833,6 +853,7 @@ def export_animation_to_mp4(
         filepath: Output path for the MP4 file.
         title: Plot title.
         duration_seconds: Desired video duration in seconds. FPS is computed.
+        component_labels: Optional labels for the displayed components.
 
     Returns:
         The path that was written.
@@ -894,8 +915,7 @@ def export_animation_to_mp4(
     vlines_coll = ax.vlines(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
-    ax.set_xticks(indices)
-    ax.set_xticklabels(_component_labels(vector_components))
+    _set_component_ticks(ax, vector_components, component_labels)
     j_vals = indices
 
     def _frame(idx: int) -> tuple[Any, Any]:

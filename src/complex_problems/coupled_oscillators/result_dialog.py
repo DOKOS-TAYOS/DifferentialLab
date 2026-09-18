@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -16,7 +18,7 @@ from complex_problems.common.result_dialog_ui import (
     reset_embedded_animation,
 )
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
-from config import get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.window_utils import center_window, make_modal
@@ -26,6 +28,7 @@ from plotting import (
     create_energy_per_mode_plot,
     create_surface_plot,
     create_vector_animation_plot,
+    export_animation_to_mp4,
 )
 from utils import get_logger
 
@@ -106,6 +109,17 @@ def _state_to_vector_ode_format(y: np.ndarray, n: int) -> np.ndarray:
         new_y[2 * i] = y[i]  # position
         new_y[2 * i + 1] = y[n + i]  # velocity
     return new_y
+
+
+@dataclass(frozen=True)
+class _AnimationViewPayload:
+    """Data and display metadata shared by an animation and its MP4 export."""
+
+    x: np.ndarray
+    y: np.ndarray
+    vector_components: int
+    title: str
+    component_labels: list[str] | None
 
 
 class CoupledOscillatorsResultDialog:
@@ -308,60 +322,110 @@ class CoupledOscillatorsResultDialog:
         reset_embedded_animation(self._anim_plot_frame, self._anim_canvas)
         self._anim_canvas = None
 
+        payload = self._get_animation_view_payload()
+
+        fig = create_vector_animation_plot(
+            payload.x,
+            payload.y,
+            order=2,
+            vector_components=payload.vector_components,
+            title=payload.title,
+            deriv_offset=0,
+            component_labels=payload.component_labels,
+        )
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_plot_frame,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
+        )
+
+    def _get_animation_view_payload(self) -> _AnimationViewPayload:
+        """Build the exact component representation currently shown in the animation."""
         r = self._result
         n = r.n_oscillators
-        x = r.x
-        y = r.y
-        boundary = r.metadata.get("boundary", "fixed")
-
         view = self._anim_view_var.get()
-        component_labels = None
+
         if view == "Modes" and r.has_modes:
-            # Transform to mode space: q = M_modes.T @ M @ x
-            # For orthonormal modes (A^T M A = I): q = A^T M x
+            # Transform to mode space: q = M_modes.T @ M @ x.
             M_diag = np.diag(r.masses)
-            positions = y[:n]  # (n, n_points)
-            q = r.M_modes.T @ M_diag @ positions  # (n, n_points)
-            # Build format for animation: [q0, dq0, q1, dq1, ...]
-            dq = r.M_modes.T @ np.diag(r.masses) @ y[n:]
-            n_points = y.shape[1]
-            mode_y = np.zeros((2 * n, n_points))
+            positions = r.y[:n]
+            q = r.M_modes.T @ M_diag @ positions
+            dq = r.M_modes.T @ M_diag @ r.y[n:]
+            mode_y = np.zeros((2 * n, r.y.shape[1]))
             for i in range(n):
                 mode_y[2 * i] = q[i]
                 mode_y[2 * i + 1] = dq[i]
-            plot_y = mode_y
-            title = "Coupled Oscillators — Mode amplitudes"
-            n_components = n
-            # Physics convention: Mode 1 = fundamental
-            component_labels = [f"Mode {i + 1}" for i in range(n)]
-        else:
-            plot_y = _state_to_vector_ode_format(y, n)
-            title = "Coupled Oscillators — Oscillator positions"
-            if boundary == "fixed":
-                # Prepend x_{-1}=0, v_{-1}=0 and append x_N=0, v_N=0
-                n_points = plot_y.shape[1]
-                extended = np.zeros((2 * (n + 2), n_points))
-                extended[0] = 0.0
-                extended[1] = 0.0
-                extended[2 : 2 * (n + 1)] = plot_y
-                extended[-2] = 0.0
-                extended[-1] = 0.0
-                plot_y = extended
-                n_components = n + 2
-                component_labels = [str(i) for i in range(-1, n + 1)]
-            else:
-                n_components = n
+            return _AnimationViewPayload(
+                x=r.x,
+                y=mode_y,
+                vector_components=n,
+                title="Coupled Oscillators — Mode amplitudes",
+                component_labels=[f"Mode {i + 1}" for i in range(n)],
+            )
 
-        fig = create_vector_animation_plot(
-            x,
-            plot_y,
-            order=2,
+        plot_y = _state_to_vector_ode_format(r.y, n)
+        component_labels = None
+        n_components = n
+        if r.metadata.get("boundary", "fixed") == "fixed":
+            # Prepend x_{-1}=0, v_{-1}=0 and append x_N=0, v_N=0.
+            extended = np.zeros((2 * (n + 2), plot_y.shape[1]))
+            extended[2 : 2 * (n + 1)] = plot_y
+            plot_y = extended
+            n_components = n + 2
+            component_labels = [str(i) for i in range(-1, n + 1)]
+
+        return _AnimationViewPayload(
+            x=r.x,
+            y=plot_y,
             vector_components=n_components,
-            title=title,
-            deriv_offset=0,
+            title="Coupled Oscillators — Oscillator positions",
             component_labels=component_labels,
         )
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_plot_frame)
+
+    def _on_export_animation_mp4(
+        self,
+        payload: _AnimationViewPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the currently displayed animation representation as MP4."""
+        default_path = get_output_dir() / f"{generate_output_basename(prefix='animation')}.mp4"
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animation_to_mp4(
+                payload.x,
+                payload.y,
+                order=2,
+                vector_components=payload.vector_components,
+                filepath=filepath,
+                title=payload.title,
+                duration_seconds=duration_seconds,
+                component_labels=payload.component_labels,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _replace_plot(
         self,
