@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added selectable 2D field, 3D surface, and 2D FFT power-spectrum animations to the
   nonlinear membrane results dialog, with matching MP4 export for every selected view.
 
+### Fixed
+
+- Restored Antenna Radiation result plots by keeping Matplotlib axis type casts runtime-safe.
+
 ### Changed
 
 - Deferred animated spectrum-tab construction until first selection and bounded spectrum

@@ -26,7 +26,7 @@ def _create_polar_cut_figure(theta_deg: np.ndarray, cut_db: np.ndarray, *, title
 
     theta_rad = np.deg2rad(theta_deg)
     fig = plt.figure()
-    polar_ax = cast(PolarAxes, fig.add_subplot(111, projection="polar"))
+    polar_ax = cast("PolarAxes", fig.add_subplot(111, projection="polar"))
     polar_ax.plot(theta_rad, cut_db, linewidth=2.0)
     polar_ax.set_title(title)
     polar_ax.set_theta_zero_location("N")
@@ -55,7 +55,7 @@ def _create_3d_pattern_figure(
     z = r * np.cos(TH)
 
     fig = plt.figure()
-    axes_3d = cast(Axes3D, fig.add_subplot(111, projection="3d"))
+    axes_3d = cast("Axes3D", fig.add_subplot(111, projection="3d"))
     axes_3d.plot_surface(x, y, z, cmap="viridis", linewidth=0.0, antialiased=True, alpha=0.95)
     axes_3d.set_title("Normalized 3D radiation pattern")
     axes_3d.set_xlabel("x")
