@@ -29,6 +29,7 @@ from utils import get_logger
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
+    from matplotlib.patches import FancyArrowPatch
     from matplotlib.streamplot import StreamplotSet
 
 logger = get_logger(__name__)
@@ -93,6 +94,7 @@ def _create_streamplot_figure(payload: _StreamlineAnimationPayload) -> Figure:
     """Build a streamline animation while keeping the obstacle contour static."""
     import matplotlib.pyplot as plt
     from matplotlib.colors import Normalize
+    from matplotlib.patches import FancyArrowPatch
 
     speed_min = 0.0
     speed_max = float(np.max(payload.speed))
@@ -110,12 +112,13 @@ def _create_streamplot_figure(payload: _StreamlineAnimationPayload) -> Figure:
         linewidths=1.5,
     )
 
-    def _draw_streamlines(index: int) -> StreamplotSet:
+    def _draw_streamlines(index: int) -> tuple[StreamplotSet, tuple[FancyArrowPatch, ...]]:
         u_frame = np.array(payload.u[index], copy=True)
         v_frame = np.array(payload.v[index], copy=True)
         u_frame[payload.obstacle_mask] = np.nan
         v_frame[payload.obstacle_mask] = np.nan
-        return ax.streamplot(
+        existing_patch_ids = {id(patch) for patch in ax.patches}
+        stream = ax.streamplot(
             payload.x,
             payload.y,
             u_frame,
@@ -126,8 +129,14 @@ def _create_streamplot_figure(payload: _StreamlineAnimationPayload) -> Figure:
             density=1.4,
             linewidth=1.0,
         )
+        arrow_patches = tuple(
+            patch
+            for patch in ax.patches
+            if id(patch) not in existing_patch_ids and isinstance(patch, FancyArrowPatch)
+        )
+        return stream, arrow_patches
 
-    stream = _draw_streamlines(0)
+    stream, arrow_patches = _draw_streamlines(0)
     fig.colorbar(stream.lines, ax=ax, shrink=0.8, label="speed")
     ax.set_title(f"Streamlines and obstacle (t={payload.t[0]:.3g})")
     ax.set_xlabel("x")
@@ -136,13 +145,12 @@ def _create_streamplot_figure(payload: _StreamlineAnimationPayload) -> Figure:
     fig.tight_layout()
 
     def _update(index: int) -> None:
-        nonlocal stream
+        nonlocal arrow_patches, stream
         i = max(0, min(index, len(payload.t) - 1))
         stream.lines.remove()
-        # Matplotlib's PatchCollection used for arrows has no remove hook;
-        # hide it before creating the replacement streamplot artists.
-        stream.arrows.set_visible(False)
-        stream = _draw_streamlines(i)
+        for arrow_patch in arrow_patches:
+            arrow_patch.remove()
+        stream, arrow_patches = _draw_streamlines(i)
         ax.set_title(f"Streamlines and obstacle (t={payload.t[i]:.3g})")
         fig.canvas.draw_idle()
 

@@ -11,6 +11,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.patches import FancyArrowPatch
 
 import complex_problems.aerodynamics_2d.result_dialog as result_dialog
 
@@ -93,6 +94,48 @@ def test_streamlines_update_without_mutating_result_and_keep_global_normalizatio
         assert len(axis.collections) >= 2  # obstacle contour plus current streamlines
         np.testing.assert_array_equal(result.u, original_u)
         np.testing.assert_array_equal(result.v, original_v)
+    finally:
+        plt.close(figure)
+
+
+def test_streamlines_remove_previous_arrow_patches_on_every_update() -> None:
+    result = _make_result()
+    payload = result_dialog._create_streamline_payload(result)
+    figure = result_dialog._create_animation_figure(payload)
+    try:
+        axis = figure.axes[0]
+
+        def streamline_arrows() -> tuple[FancyArrowPatch, ...]:
+            return tuple(patch for patch in axis.patches if isinstance(patch, FancyArrowPatch))
+
+        previous_arrows = streamline_arrows()
+        assert previous_arrows
+        initial_arrow_count = len(previous_arrows)
+
+        figure._animation_update(1)  # type: ignore[attr-defined]
+        replacement_arrows = streamline_arrows()
+        assert replacement_arrows
+        assert all(arrow not in axis.patches for arrow in previous_arrows)
+        assert len(replacement_arrows) != 0
+
+        update_sequence = [2, 0, 2, 1, 0]
+        expected_counts = [len(replacement_arrows)]
+        for index in update_sequence:
+            previous_arrows = replacement_arrows
+            figure._animation_update(index)  # type: ignore[attr-defined]
+            replacement_arrows = streamline_arrows()
+            assert all(arrow not in axis.patches for arrow in previous_arrows)
+            expected_counts.append(len(replacement_arrows))
+
+        for _ in range(20):
+            for expected_count, index in zip(expected_counts, [1, *update_sequence], strict=True):
+                previous_arrows = replacement_arrows
+                figure._animation_update(index)  # type: ignore[attr-defined]
+                replacement_arrows = streamline_arrows()
+                assert all(arrow not in axis.patches for arrow in previous_arrows)
+                assert len(replacement_arrows) == expected_count
+
+        assert len(replacement_arrows) == initial_arrow_count
     finally:
         plt.close(figure)
 
