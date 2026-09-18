@@ -38,6 +38,9 @@ class NonlinearWavesResult:
     _phase_supported: bool = dataclass_field(default=True, repr=False)
     _magnitude_cache: np.ndarray | None = dataclass_field(default=None, init=False, repr=False)
     _phase_cache: np.ndarray | None = dataclass_field(default=None, init=False, repr=False)
+    _spectrum_power_history_cache: np.ndarray | None = dataclass_field(
+        default=None, init=False, repr=False
+    )
 
     @property
     def magnitude(self) -> np.ndarray:
@@ -56,6 +59,14 @@ class NonlinearWavesResult:
         if self._phase_cache is None:
             self._phase_cache = np.angle(self.field)
         return self._phase_cache
+
+    @property
+    def spectrum_power_history(self) -> np.ndarray:
+        """Return the lazily materialized shifted FFT-power history."""
+        if self._spectrum_power_history_cache is None:
+            spectrum = np.fft.fftshift(np.fft.fft(self.field, axis=-1), axes=-1)
+            self._spectrum_power_history_cache = np.asarray(np.abs(spectrum) ** 2, dtype=np.float32)
+        return self._spectrum_power_history_cache
 
 
 def _build_time_grid(t_min: float, t_max: float, dt: float) -> np.ndarray:

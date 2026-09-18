@@ -113,6 +113,37 @@ def test_nlse_result_materializes_lazy_caches_on_demand() -> None:
     np.testing.assert_allclose(phase, np.angle(result.field))
 
 
+@pytest.mark.parametrize("model_type", ["nlse", "kdv"])
+def test_spectrum_power_history_is_lazy_cached_for_both_models(model_type: str) -> None:
+    kwargs = {
+        "model_type": model_type,
+        "x_min": -10.0,
+        "x_max": 10.0,
+        "nx": 64,
+        "t_min": 0.0,
+        "t_max": 0.05,
+        "dt": 0.01,
+        "profile": "sech",
+        "amplitude": 1.0 if model_type == "nlse" else 0.4,
+        "sigma": 1.0,
+        "center": 0.0,
+        "beta2": 1.0,
+        "gamma": 1.0,
+        "initial_phase_k": 0.0,
+        "c": 0.0,
+        "alpha": 4.0,
+        "beta_disp": 1.0,
+    }
+    result = solve_nonlinear_waves(**kwargs)
+
+    assert result._spectrum_power_history_cache is None
+    spectrum_history = result.spectrum_power_history
+    assert spectrum_history.shape == (len(result.t), len(result.k))
+    assert spectrum_history.dtype == np.float32
+    assert result.spectrum_power_history is spectrum_history
+    np.testing.assert_allclose(spectrum_history[-1], result.spectrum_power, rtol=2e-6, atol=1e-5)
+
+
 def test_nlse_store_every_keeps_aligned_history_and_final_frame() -> None:
     kwargs = {
         "model_type": "nlse",

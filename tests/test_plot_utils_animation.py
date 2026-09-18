@@ -165,6 +165,35 @@ def test_surface_animation_uses_full_history_amplitude_before_downsampling() -> 
         plt.close(figure)
 
 
+def test_surface_animation_supports_positive_ranges_and_custom_labels() -> None:
+    frames = np.zeros((2, 5, 5), dtype=float)
+    frames[1, 1, 1] = 0.2
+
+    figure = create_surface_animation_plot(
+        np.array([0.0, 1.0]),
+        np.arange(5),
+        np.arange(5),
+        frames,
+        title="Density",
+        max_render_resolution=2,
+        xlabel="x",
+        ylabel="y",
+        zlabel="|ψ|²",
+        colorbar_label="|ψ|²",
+        symmetric_z_range=False,
+    )
+    try:
+        axis = figure.axes[0]
+        assert axis.get_zlim() == (0.0, 0.2)
+        assert axis.collections[0].get_clim() == (0.0, 0.2)
+        assert axis.get_xlabel() == "x"
+        assert axis.get_ylabel() == "y"
+        assert axis.get_zlabel() == "|ψ|²"
+        assert figure.axes[1].get_ylabel() == "|ψ|²"
+    finally:
+        plt.close(figure)
+
+
 def test_animation_helpers_use_valid_range_for_all_zero_history() -> None:
     t = np.array([0.0, 1.0])
     frames = np.zeros((2, 2, 3), dtype=float)

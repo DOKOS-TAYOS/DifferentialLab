@@ -902,6 +902,11 @@ def create_surface_animation_plot(
     title: str,
     cmap: str = "viridis",
     max_render_resolution: int = 80,
+    xlabel: str = "x index",
+    ylabel: str = "y index",
+    zlabel: str = "u",
+    colorbar_label: str = "Displacement u",
+    symmetric_z_range: bool = True,
 ) -> Figure:
     """Create an animated 3D surface with stable axes and colors across time.
 
@@ -928,9 +933,16 @@ def create_surface_animation_plot(
     render_y = y_values[::y_step]
     render_frames = frame_data[:, ::y_step, ::x_step]
     x_grid, y_grid = np.meshgrid(render_x, render_y)
-    z_bound = float(np.max(np.abs(frame_data)))
-    if z_bound == 0.0:
-        z_bound = 1.0
+    if symmetric_z_range:
+        z_bound = float(np.max(np.abs(frame_data)))
+        if z_bound == 0.0:
+            z_bound = 1.0
+        z_min, z_max = -z_bound, z_bound
+    else:
+        z_min = float(np.min(frame_data))
+        z_max = float(np.max(frame_data))
+        if z_min == z_max:
+            z_max = z_min + 1.0
 
     fig, ax = _new_3d_figure()
     surface = ax.plot_surface(
@@ -938,15 +950,15 @@ def create_surface_animation_plot(
         y_grid,
         render_frames[0],
         cmap=cmap,
-        vmin=-z_bound,
-        vmax=z_bound,
+        vmin=z_min,
+        vmax=z_max,
         edgecolor="none",
     )
-    color_map = plt.cm.ScalarMappable(norm=Normalize(-z_bound, z_bound), cmap=cmap)
+    color_map = plt.cm.ScalarMappable(norm=Normalize(z_min, z_max), cmap=cmap)
     color_map.set_array([])
-    fig.colorbar(color_map, ax=ax, shrink=0.7, label="Displacement u")
-    ax.set_zlim(-z_bound, z_bound)
-    _finalize_3d_plot(ax, f"{title} (t={t[0]:.3g})", "x index", "y index", "u")
+    fig.colorbar(color_map, ax=ax, shrink=0.7, label=colorbar_label)
+    ax.set_zlim(z_min, z_max)
+    _finalize_3d_plot(ax, f"{title} (t={t[0]:.3g})", xlabel, ylabel, zlabel)
     fig.tight_layout()
 
     def update(index: int) -> None:
@@ -959,8 +971,8 @@ def create_surface_animation_plot(
             y_grid,
             render_frames[idx],
             cmap=cmap,
-            vmin=-z_bound,
-            vmax=z_bound,
+            vmin=z_min,
+            vmax=z_max,
             edgecolor="none",
         )
         ax.set_title(f"{title} (t={t[idx]:.3g})")

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added time-evolving 2D k-space and density-surface animations to the Schrodinger TD
+  results, plus NLSE/KdV spectrum animations with matching MP4 export.
 - Added selectable 2D field, 3D surface, and 2D FFT power-spectrum animations to the
   nonlinear membrane results dialog, with matching MP4 export for every selected view.
 

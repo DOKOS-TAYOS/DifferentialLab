@@ -65,6 +65,12 @@ def test_schrodinger_2d_runs_and_observables_are_finite() -> None:
     assert result.ky is not None
     assert result.psi.shape == (len(result.t), len(result.y), len(result.x))
     assert result.spectrum_power.shape == (len(result.y), len(result.x))
+    assert result._spectrum_power_history_cache is None
+    spectrum_history = result.spectrum_power_history
+    assert spectrum_history.shape == (len(result.t), len(result.y), len(result.x))
+    assert spectrum_history.dtype == np.float32
+    assert result.spectrum_power_history is spectrum_history
+    np.testing.assert_allclose(spectrum_history[-1], result.spectrum_power, rtol=2e-6, atol=1e-5)
     assert np.all(np.isfinite(result.magnitude))
     assert np.all(np.isfinite(result.invariants["energy"]))
     assert abs(result.magnitudes["norm_drift_rel"]) < 2e-2
