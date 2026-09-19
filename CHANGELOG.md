@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
+  including the default two-soliton overtaking setup and reproducibility metadata.
+
 - Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat
   source, anisotropic diffusion, and screened Poisson.
 - Added catalog boundary defaults for rectangular PDE controls and a nontrivial Laplace

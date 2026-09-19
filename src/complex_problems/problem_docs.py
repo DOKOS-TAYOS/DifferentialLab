@@ -78,7 +78,10 @@ _DOCS: dict[str, ProblemDoc] = {
         ),
         config_options_summary=(
             "Choose model (NLSE or KdV), spatial domain, Nₓ, and time stepping.",
-            "Pick initial profile type (sech, gaussian, pulse, custom u₀(x)).",
+            "For KdV choose an exact one-soliton profile, a separated one-soliton train, "
+            "or free-width sech, Gaussian, pulse, and custom u₀(x).",
+            "A one-soliton profile has κ = sqrt(αA/(12β)) and speed c + αA/3; "
+            "the train is only separated initial data, not an exact N-soliton solution.",
             "Tune model-specific coefficients: β₂/γ/phase slope for NLSE, c/α/β for KdV.",
         ),
         visualizations_summary=(

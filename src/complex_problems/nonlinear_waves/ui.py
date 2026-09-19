@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tkinter as tk
 from tkinter import ttk
 from typing import cast
@@ -28,7 +29,35 @@ from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import fit_and_center, make_modal
 
 _MODELS = ("nlse", "kdv")
-_PROFILES = ("sech", "gaussian", "pulse", "custom")
+_NLSE_PROFILES = ("Sech", "Gaussian", "Pulse", "Custom")
+_KDV_PROFILES = (
+    "Single soliton",
+    "Separated soliton train",
+    "Free-width sech",
+    "Gaussian",
+    "Pulse",
+    "Custom",
+)
+_PROFILE_KEYS = {
+    "Sech": "sech",
+    "Gaussian": "gaussian",
+    "Pulse": "pulse",
+    "Custom": "custom",
+    "Single soliton": "kdv_soliton",
+    "Separated soliton train": "kdv_soliton_train",
+    "Free-width sech": "sech",
+}
+
+
+def _parse_csv_floats(value: str, *, name: str) -> list[float]:
+    """Parse a comma-separated finite float list for the train controls."""
+    try:
+        values = [float(item.strip()) for item in value.split(",") if item.strip()]
+    except ValueError as exc:
+        raise ValueError(f"{name} must contain comma-separated numbers.") from exc
+    if not values or not all(math.isfinite(item) for item in values):
+        raise ValueError(f"{name} must contain finite comma-separated numbers.")
+    return values
 
 
 class NonlinearWavesDialog:
@@ -76,6 +105,7 @@ class NonlinearWavesDialog:
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._model_var = tk.StringVar(value="nlse")
+        self._last_model = "nlse"
         model_combo = make_labeled_combo(row, "Model", self._model_var, _MODELS, width=10)
         model_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_model_visibility())
         ToolTip(model_combo, "NLSE: split-step Fourier. KdV: pseudo-spectral ETDRK4.")
@@ -103,11 +133,13 @@ class NonlinearWavesDialog:
 
         self._profile_row = ttk.Frame(body)
         self._profile_row.pack(fill=tk.X, pady=pad // 2)
-        self._profile_var = tk.StringVar(value="sech")
-        profile_combo = make_labeled_combo(
-            self._profile_row, "Profile", self._profile_var, _PROFILES, width=12
+        self._profile_var = tk.StringVar(value="Sech")
+        self._profile_combo = make_labeled_combo(
+            self._profile_row, "Profile", self._profile_var, _NLSE_PROFILES, width=24
         )
-        profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_profile_visibility())
+        self._profile_combo.bind(
+            "<<ComboboxSelected>>", lambda _e: self._update_profile_visibility()
+        )
 
         self._profile_params_row = ttk.Frame(body)
         self._profile_params_row.pack(fill=tk.X, pady=pad // 2)
@@ -115,8 +147,23 @@ class NonlinearWavesDialog:
         self._sigma_var = tk.StringVar(value="1.0")
         self._center_var = tk.StringVar(value="0.0")
         make_labeled_entry(self._profile_params_row, "Amplitude", self._amp_var, width=8)
-        make_labeled_entry(self._profile_params_row, "σ", self._sigma_var, width=8)
+        self._sigma_frame = ttk.Frame(self._profile_params_row)
+        self._sigma_frame.pack(side=tk.LEFT)
+        make_labeled_entry(self._sigma_frame, "σ", self._sigma_var, width=8)
         make_labeled_entry(self._profile_params_row, "Center x₀", self._center_var, width=9)
+
+        self._train_row = ttk.Frame(body)
+        self._train_n_var = tk.StringVar(value="2")
+        self._train_amplitudes_var = tk.StringVar(value="1.2, 0.5")
+        self._train_centers_var = tk.StringVar(value="-8.0, -2.0")
+        make_labeled_spinbox(self._train_row, "N", self._train_n_var, from_=2, to=20, width=6)
+        make_labeled_entry(self._train_row, "Amplitudes", self._train_amplitudes_var, width=20)
+        make_labeled_entry(self._train_row, "Centers", self._train_centers_var, width=20)
+        ToolTip(
+            self._train_row,
+            "Separated soliton train: sum of separated one-soliton profiles as initial data, "
+            "not an exact N-soliton solution. Different amplitudes have different speeds.",
+        )
 
         self._custom_row = ttk.Frame(body)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
@@ -169,18 +216,45 @@ class NonlinearWavesDialog:
         scroll.bind_new_children()
 
     def _update_profile_visibility(self) -> None:
-        if self._profile_var.get() == "custom":
+        profile = self._profile_var.get()
+        if profile == "Custom":
             self._custom_row.pack(fill=tk.X, pady=4, before=self._btn_row)
         else:
             self._custom_row.pack_forget()
+        if profile == "Separated soliton train":
+            self._profile_params_row.pack_forget()
+            self._train_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+        else:
+            self._train_row.pack_forget()
+            self._profile_params_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+        if profile == "Single soliton":
+            self._sigma_frame.pack_forget()
+            ToolTip(
+                self._profile_params_row,
+                "Exact KdV traveling-wave profile when alpha*amplitude/beta > 0; "
+                "width is derived from amplitude, alpha, and beta.",
+            )
+        else:
+            self._sigma_frame.pack(side=tk.LEFT)
 
     def _update_model_visibility(self) -> None:
+        model = self._model_var.get()
+        current_profile = self._profile_var.get()
+        if model == "kdv" and self._last_model == "nlse" and current_profile == "Sech":
+            current_profile = "Separated soliton train"
+        elif model == "nlse" and current_profile in {"Single soliton", "Separated soliton train"}:
+            current_profile = "Sech"
+        profiles = _NLSE_PROFILES if model == "nlse" else _KDV_PROFILES
+        self._profile_combo.configure(values=profiles)
+        self._profile_var.set(current_profile if current_profile in profiles else "Sech")
         if self._model_var.get() == "nlse":
             self._nlse_row.pack(fill=tk.X, pady=4, before=self._btn_row)
             self._kdv_row.pack_forget()
         else:
             self._kdv_row.pack(fill=tk.X, pady=4, before=self._btn_row)
             self._nlse_row.pack_forget()
+        self._last_model = model
+        self._update_profile_visibility()
 
     def _collect_inputs(self) -> dict[str, object]:
         model = self._model_var.get()
@@ -192,10 +266,16 @@ class NonlinearWavesDialog:
         t_max = parse_float(self._t_max_var.get(), name="tₘₐₓ")
         dt = parse_positive_float(self._dt_var.get(), name="Δt")
 
-        profile = self._profile_var.get()
-        amplitude = parse_float(self._amp_var.get(), name="Amplitude")
-        sigma = parse_positive_float(self._sigma_var.get(), name="σ")
-        center = parse_float(self._center_var.get(), name="Center x₀")
+        profile_label = self._profile_var.get()
+        profile = _PROFILE_KEYS[profile_label]
+        amplitude = 1.0
+        sigma = 1.0
+        center = 0.0
+        if profile != "kdv_soliton_train":
+            amplitude = parse_float(self._amp_var.get(), name="Amplitude")
+            center = parse_float(self._center_var.get(), name="Center x₀")
+        if profile in {"sech", "gaussian", "pulse"}:
+            sigma = parse_positive_float(self._sigma_var.get(), name="σ")
 
         custom_fn = None
         if profile == "custom":
@@ -227,6 +307,14 @@ class NonlinearWavesDialog:
             params["c"] = parse_float(self._c_var.get(), name="c")
             params["alpha"] = parse_float(self._alpha_var.get(), name="α")
             params["beta_disp"] = parse_float(self._beta_disp_var.get(), name="β")
+            if profile == "kdv_soliton_train":
+                n_solitons = parse_positive_int(self._train_n_var.get(), name="N", min_value=2)
+                amplitudes = _parse_csv_floats(self._train_amplitudes_var.get(), name="Amplitudes")
+                centers = _parse_csv_floats(self._train_centers_var.get(), name="Centers")
+                if len(amplitudes) != n_solitons or len(centers) != n_solitons:
+                    raise ValueError("The number of amplitudes and centers must equal N.")
+                params["soliton_amplitudes"] = amplitudes
+                params["soliton_centers"] = centers
 
         return params
 

@@ -7,11 +7,48 @@ from unittest.mock import MagicMock, patch
 
 import matplotlib
 import numpy as np
+import pytest
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import complex_problems.nonlinear_waves.result_dialog as result_dialog
+import complex_problems.nonlinear_waves.ui as nonlinear_ui
+
+
+class _StubVar:
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def get(self) -> str:
+        return self._value
+
+
+def _make_input_dialog(profile: str, **values: str) -> nonlinear_ui.NonlinearWavesDialog:
+    defaults = {
+        "model": "kdv",
+        "x_min": "-20.0",
+        "x_max": "20.0",
+        "nx": "128",
+        "t_min": "0.0",
+        "t_max": "1.0",
+        "dt": "0.01",
+        "amp": "1.0",
+        "sigma": "1.0",
+        "center": "0.0",
+        "train_n": "2",
+        "train_amplitudes": "1.2, 0.5",
+        "train_centers": "-8.0, -2.0",
+        "c": "0.0",
+        "alpha": "6.0",
+        "beta_disp": "1.0",
+    }
+    defaults.update(values)
+    dialog: nonlinear_ui.NonlinearWavesDialog = object.__new__(nonlinear_ui.NonlinearWavesDialog)
+    for name, value in defaults.items():
+        setattr(dialog, f"_{name}_var", _StubVar(value))
+    dialog._profile_var = _StubVar(profile)
+    return dialog
 
 
 def _make_dialog(model_type: str = "nlse") -> result_dialog.NonlinearWavesResultDialog:
@@ -140,3 +177,49 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
 
     assert "ffmpeg" in show_error.call_args.args[1].lower()
     plt.close("all")
+
+
+def test_kdv_train_csv_parser_rejects_non_finite_and_keeps_count_check_local() -> None:
+    assert nonlinear_ui._parse_csv_floats("1.2, 0.5", name="Amplitudes") == [1.2, 0.5]
+    with pytest.raises(ValueError, match="finite"):
+        nonlinear_ui._parse_csv_floats("1.2, nan", name="Amplitudes")
+
+
+def test_collect_inputs_kdv_train_ignores_hidden_scalar_fields() -> None:
+    dialog = _make_input_dialog(
+        "Separated soliton train",
+        amp="not-a-number",
+        sigma="not-a-number",
+        center="not-a-number",
+    )
+
+    params = dialog._collect_inputs()
+
+    assert params["profile"] == "kdv_soliton_train"
+    assert params["soliton_amplitudes"] == [1.2, 0.5]
+    assert params["soliton_centers"] == [-8.0, -2.0]
+    assert params["c"] == 0.0
+    assert params["alpha"] == 6.0
+    assert params["beta_disp"] == 1.0
+
+
+def test_collect_inputs_kdv_train_rejects_n_list_mismatch() -> None:
+    dialog = _make_input_dialog("Separated soliton train", train_n="3")
+
+    with pytest.raises(ValueError, match="equal N"):
+        dialog._collect_inputs()
+
+
+def test_collect_inputs_kdv_single_soliton_maps_scalar_controls() -> None:
+    dialog = _make_input_dialog(
+        "Single soliton",
+        amp="1.25",
+        center="-3.5",
+        sigma="not-a-number",
+    )
+
+    params = dialog._collect_inputs()
+
+    assert params["profile"] == "kdv_soliton"
+    assert params["amplitude"] == 1.25
+    assert params["center"] == -3.5

@@ -2,9 +2,102 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 import numpy as np
+
+
+@dataclass(frozen=True)
+class KdvSolitonCharacteristics:
+    """Physical parameters of one KdV soliton."""
+
+    amplitude: float
+    center: float
+    inverse_width: float
+    speed: float
+
+
+def kdv_soliton_characteristics(
+    *, amplitude: float, center: float, c: float, alpha: float, beta_disp: float
+) -> KdvSolitonCharacteristics:
+    """Return the inverse width and nominal speed of a real KdV soliton.
+
+    A real soliton requires ``alpha * amplitude / beta_disp > 0``.  The
+    inverse width is ``sqrt(alpha * amplitude / (12 * beta_disp))`` and the
+    nominal speed is ``c + alpha * amplitude / 3``.
+    """
+    values = (amplitude, center, c, alpha, beta_disp)
+    if not all(np.isfinite(value) for value in values):
+        raise ValueError("KdV soliton parameters must be finite.")
+    ratio = alpha * amplitude / beta_disp if beta_disp != 0.0 else 0.0
+    if alpha == 0.0 or beta_disp == 0.0 or ratio <= 0.0:
+        raise ValueError("A real KdV soliton requires alpha * amplitude / beta_disp > 0.")
+    return KdvSolitonCharacteristics(
+        amplitude=float(amplitude),
+        center=float(center),
+        inverse_width=float(np.sqrt(ratio / 12.0)),
+        speed=float(c + alpha * amplitude / 3.0),
+    )
+
+
+def build_kdv_soliton_profile(
+    x: np.ndarray,
+    *,
+    amplitude: float,
+    center: float,
+    c: float,
+    alpha: float,
+    beta_disp: float,
+) -> tuple[np.ndarray, KdvSolitonCharacteristics]:
+    """Build the exact one-soliton traveling-wave profile at ``t=0``."""
+    characteristics = kdv_soliton_characteristics(
+        amplitude=amplitude,
+        center=center,
+        c=c,
+        alpha=alpha,
+        beta_disp=beta_disp,
+    )
+    profile = characteristics.amplitude * np.square(
+        1.0 / np.cosh(characteristics.inverse_width * (x - characteristics.center))
+    )
+    return profile, characteristics
+
+
+def build_kdv_soliton_train(
+    x: np.ndarray,
+    *,
+    amplitudes: Sequence[float],
+    centers: Sequence[float],
+    c: float,
+    alpha: float,
+    beta_disp: float,
+) -> tuple[np.ndarray, list[KdvSolitonCharacteristics]]:
+    """Build separated one-soliton profiles used as initial data.
+
+    This is a superposition of separated one-soliton profiles, not the exact
+    KdV multi-soliton tau-function solution.
+    """
+    if len(amplitudes) != len(centers):
+        raise ValueError("KdV soliton amplitudes and centers must have equal length.")
+    if not amplitudes:
+        raise ValueError("At least one KdV soliton is required.")
+    characteristics = [
+        kdv_soliton_characteristics(
+            amplitude=float(amplitude),
+            center=float(center),
+            c=c,
+            alpha=alpha,
+            beta_disp=beta_disp,
+        )
+        for amplitude, center in zip(amplitudes, centers, strict=True)
+    ]
+    profile = np.zeros_like(x, dtype=float)
+    for soliton in characteristics:
+        profile += soliton.amplitude * np.square(
+            1.0 / np.cosh(soliton.inverse_width * (x - soliton.center))
+        )
+    return profile, characteristics
 
 
 def build_periodic_grid(
@@ -72,10 +165,15 @@ def compute_kdv_invariants(
     *,
     dx: float,
     k: np.ndarray,
+    c: float = 0.0,
+    alpha: float = 6.0,
+    beta_disp: float = 1.0,
 ) -> tuple[float, float, float]:
-    """Compute KdV invariants: mass, L2, and approximate Hamiltonian."""
+    """Compute KdV invariants for the configured equation."""
     mass = float(np.sum(u) * dx)
     l2 = float(np.sum(u**2) * dx)
     ux = np.fft.ifft(1j * k * np.fft.fft(u)).real
-    hamiltonian = float(np.sum(0.5 * ux**2 - (u**3) / 6.0) * dx)
+    hamiltonian = float(
+        np.sum(0.5 * beta_disp * ux**2 - (alpha / 6.0) * u**3 - 0.5 * c * u**2) * dx
+    )
     return mass, l2, hamiltonian

@@ -29,7 +29,7 @@ Plugins are registered lazily in `src/complex_problems/problem_registry.py`.
 |---|---|---|---|
 | `coupled_oscillators` | Coupled Harmonic Oscillators | One-dimensional oscillator chains with configurable masses, coupling constants, boundaries, nonlinear terms, and forcing | energy evolution, modal energy, oscillator/mode animation, heatmaps |
 | `membrane_2d` | 2D Nonlinear Membrane | Discrete 2D membrane lattice with optional nonlinear terms and spectral diagnostics | displacement/velocity animation, energy drift, 3D surface, 2D FFT |
-| `nonlinear_waves` | Nonlinear Waves (NLSE + KdV) | Periodic pseudo-spectral propagation for NLSE and KdV | profile animation, space-time maps, phase/spectrum, invariant curves |
+| `nonlinear_waves` | Nonlinear Waves (NLSE + KdV) | Periodic pseudo-spectral propagation for NLSE and KdV, including coefficient-derived one-soliton and separated-train KdV initial states | profile animation, space-time maps, phase/spectrum, invariant curves |
 | `schrodinger_td` | Schrodinger TD (1D/2D) | Split-operator spectral time-dependent Schrodinger solver with configurable potentials and packet states | density/phase animation, momentum spectrum, expectations, invariant curves |
 | `antenna_radiation` | Antenna Radiation | Far-field patterns for dipole, loop, patch-like aperture, and uniform linear array models | gain/directivity maps, polar cuts, 3D pattern, field metrics |
 | `aerodynamics_2d` | Aerodynamics 2D | 2D incompressible flow around obstacles using projection/Stokes-style approximations | speed/vorticity/pressure views, drag/lift curves, streamlines |
