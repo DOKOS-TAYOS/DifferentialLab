@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Any, cast
 
 from config import APP_NAME, APP_VERSION, get_env_from_schema
@@ -14,6 +16,19 @@ from frontend.window_utils import bind_wraplength, fit_and_center
 from utils import get_logger
 
 logger = get_logger(__name__)
+
+
+def _build_restart_command() -> list[str]:
+    """Build the command used to restart the application."""
+    if Path(sys.argv[0]).suffix.casefold() == ".py":
+        return [sys.executable, sys.argv[0], *sys.argv[1:]]
+
+    return [sys.argv[0], *sys.argv[1:]]
+
+
+def _restart_application() -> None:
+    """Start a fresh DifferentialLab process."""
+    subprocess.Popen(_build_restart_command(), shell=False)
 
 
 class MainMenu:
@@ -222,12 +237,19 @@ class MainMenu:
         self.root.wait_window(dlg.win)
 
         if dlg.accepted:
-            import os
-            import sys
-
             logger.info("Settings saved - restarting application")
+            try:
+                _restart_application()
+            except OSError as exc:
+                logger.exception("Failed to restart application")
+                messagebox.showerror(
+                    "Restart failed",
+                    f"The settings were saved, but DifferentialLab could not restart:\n{exc}",
+                    parent=self.root,
+                )
+                return
+
             self.root.destroy()
-            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _on_info(self) -> None:
         """Open the information / help dialog."""
