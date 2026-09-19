@@ -7,11 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import matplotlib
 import numpy as np
+import pytest
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import complex_problems.nonlinear_waves.result_dialog as result_dialog
+import complex_problems.nonlinear_waves.ui as nonlinear_ui
 
 
 def _make_dialog(model_type: str = "nlse") -> result_dialog.NonlinearWavesResultDialog:
@@ -140,3 +142,9 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
 
     assert "ffmpeg" in show_error.call_args.args[1].lower()
     plt.close("all")
+
+
+def test_kdv_train_csv_parser_rejects_non_finite_and_keeps_count_check_local() -> None:
+    assert nonlinear_ui._parse_csv_floats("1.2, 0.5", name="Amplitudes") == [1.2, 0.5]
+    with pytest.raises(ValueError, match="finite"):
+        nonlinear_ui._parse_csv_floats("1.2, nan", name="Amplitudes")

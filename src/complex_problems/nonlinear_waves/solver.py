@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Any
@@ -11,6 +11,8 @@ import numpy as np
 
 from complex_problems.nonlinear_waves.model import (
     build_initial_profile,
+    build_kdv_soliton_profile,
+    build_kdv_soliton_train,
     build_periodic_grid,
     compute_kdv_invariants,
     compute_nlse_invariants,
@@ -191,7 +193,9 @@ def _simulate_kdv(
     mass = np.zeros(n_stored)
     l2 = np.zeros(n_stored)
     hamiltonian = np.zeros(n_stored)
-    mass[0], l2[0], hamiltonian[0] = compute_kdv_invariants(u, dx=dx, k=k)
+    mass[0], l2[0], hamiltonian[0] = compute_kdv_invariants(
+        u, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta_disp
+    )
     max_amplitude = float(np.max(np.abs(u)))
     store_pos = 1
 
@@ -220,7 +224,7 @@ def _simulate_kdv(
         if store_pos < n_stored and step == int(stored_steps[store_pos]):
             u_hist[store_pos] = u
             mass[store_pos], l2[store_pos], hamiltonian[store_pos] = compute_kdv_invariants(
-                u, dx=dx, k=k
+                u, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta_disp
             )
             store_pos += 1
 
@@ -250,6 +254,8 @@ def solve_nonlinear_waves(
     c: float = 0.0,
     alpha: float = 6.0,
     beta_disp: float = 1.0,
+    soliton_amplitudes: Sequence[float] | None = None,
+    soliton_centers: Sequence[float] | None = None,
     store_every: int = 1,
 ) -> NonlinearWavesResult:
     """Solve nonlinear wave propagation for NLSE or KdV."""
@@ -264,14 +270,48 @@ def solve_nonlinear_waves(
     stored_steps = _stored_step_indices(n_steps, store_every)
     t_stored = t[stored_steps]
 
-    base_profile = build_initial_profile(
-        x,
-        profile=profile,
-        amplitude=amplitude,
-        sigma=sigma,
-        center=center,
-        custom_fn=custom_profile_fn,
-    )
+    if mtype == "nlse" and profile in {"kdv_soliton", "kdv_soliton_train"}:
+        raise ValueError(f"Profile '{profile}' is only supported for the KdV model.")
+    soliton_metadata: dict[str, object] = {}
+    if mtype == "kdv" and profile == "kdv_soliton":
+        base_profile, soliton = build_kdv_soliton_profile(
+            x,
+            amplitude=amplitude,
+            center=center,
+            c=c,
+            alpha=alpha,
+            beta_disp=beta_disp,
+        )
+        solitons = [soliton]
+    elif mtype == "kdv" and profile == "kdv_soliton_train":
+        if soliton_amplitudes is None or soliton_centers is None:
+            raise ValueError("KdV soliton train requires amplitudes and centers.")
+        base_profile, solitons = build_kdv_soliton_train(
+            x,
+            amplitudes=soliton_amplitudes,
+            centers=soliton_centers,
+            c=c,
+            alpha=alpha,
+            beta_disp=beta_disp,
+        )
+    else:
+        base_profile = build_initial_profile(
+            x,
+            profile=profile,
+            amplitude=amplitude,
+            sigma=sigma,
+            center=center,
+            custom_fn=custom_profile_fn,
+        )
+        solitons = []
+    if mtype == "kdv" and solitons:
+        soliton_metadata = {
+            "soliton_count": len(solitons),
+            "soliton_amplitudes": [float(item.amplitude) for item in solitons],
+            "soliton_centers": [float(item.center) for item in solitons],
+            "soliton_inverse_widths": [float(item.inverse_width) for item in solitons],
+            "soliton_speeds": [float(item.speed) for item in solitons],
+        }
 
     logger.info(
         "Solving nonlinear waves: model=%s nx=%d t=[%g,%g] dt=%g",
@@ -336,6 +376,7 @@ def solve_nonlinear_waves(
             "beta_disp": float(beta_disp),
             "profile": profile,
         }
+        metadata.update(soliton_metadata)
         phase_supported = False
 
     metadata.update(

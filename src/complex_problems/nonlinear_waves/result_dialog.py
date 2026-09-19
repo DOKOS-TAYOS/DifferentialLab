@@ -137,6 +137,15 @@ class NonlinearWavesResultDialog:
 
         drift_text = ", ".join(f"{k}: {v:+.3e}" for k, v in self._result.magnitudes.items())
         ttk.Label(top, text=drift_text, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
+        if self._result.model_type == "kdv" and "soliton_count" in self._result.metadata:
+            metadata = self._result.metadata
+            summary = (
+                f"Solitons: N={metadata['soliton_count']} | "
+                f"A={metadata['soliton_amplitudes']} | "
+                f"x0={metadata['soliton_centers']} | "
+                f"v={metadata['soliton_speeds']}"
+            )
+            ttk.Label(top, text=summary, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
 
         nb = ttk.Notebook(top)
         nb.pack(fill=tk.BOTH, expand=True)

@@ -5,7 +5,124 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from complex_problems.nonlinear_waves.model import (
+    build_kdv_soliton_profile,
+    build_kdv_soliton_train,
+    compute_kdv_invariants,
+)
 from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
+
+
+def test_kdv_soliton_characteristics_and_peak() -> None:
+    x = np.linspace(-10.0, 10.0, 1001)
+    profile, characteristics = build_kdv_soliton_profile(
+        x, amplitude=1.0, center=1.25, c=0.0, alpha=6.0, beta_disp=1.0
+    )
+    assert characteristics.inverse_width == pytest.approx(np.sqrt(0.5))
+    assert characteristics.speed == pytest.approx(2.0)
+    assert profile[np.argmin(abs(x - 1.25))] == pytest.approx(1.0, abs=1e-4)
+
+
+def test_kdv_soliton_train_is_sum_of_profiles() -> None:
+    x = np.linspace(-20.0, 20.0, 512, endpoint=False)
+    train, characteristics = build_kdv_soliton_train(
+        x, amplitudes=[1.2, 0.5], centers=[-8.0, -2.0], c=0.0, alpha=6.0, beta_disp=1.0
+    )
+    expected = sum(
+        build_kdv_soliton_profile(
+            x,
+            amplitude=item.amplitude,
+            center=item.center,
+            c=0.0,
+            alpha=6.0,
+            beta_disp=1.0,
+        )[0]
+        for item in characteristics
+    )
+    np.testing.assert_allclose(train, expected)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"beta_disp": 0.0, "alpha": 6.0, "amplitude": 1.0},
+        {"beta_disp": 1.0, "alpha": 0.0, "amplitude": 1.0},
+        {"beta_disp": 1.0, "alpha": 6.0, "amplitude": -1.0},
+    ],
+)
+def test_kdv_soliton_rejects_non_real_parameters(kwargs: dict[str, float]) -> None:
+    with pytest.raises(ValueError, match="alpha \\* amplitude / beta_disp > 0"):
+        build_kdv_soliton_profile(np.array([0.0]), center=0.0, c=0.0, **kwargs)
+
+
+def test_kdv_soliton_train_rejects_mismatched_lists() -> None:
+    with pytest.raises(ValueError, match="equal length"):
+        build_kdv_soliton_train(
+            np.array([0.0]),
+            amplitudes=[1.0, 0.5],
+            centers=[0.0],
+            c=0.0,
+            alpha=6.0,
+            beta_disp=1.0,
+        )
+
+
+def test_kdv_soliton_propagates_with_expected_shape_and_direction() -> None:
+    result = solve_nonlinear_waves(
+        model_type="kdv",
+        x_min=-20.0,
+        x_max=20.0,
+        nx=512,
+        t_max=1.0,
+        dt=0.002,
+        profile="kdv_soliton",
+        amplitude=1.0,
+        center=-5.0,
+        c=0.0,
+        alpha=6.0,
+        beta_disp=1.0,
+    )
+    expected = build_kdv_soliton_profile(
+        result.x, amplitude=1.0, center=-3.0, c=0.0, alpha=6.0, beta_disp=1.0
+    )[0]
+    relative_l2 = np.linalg.norm(result.field[-1] - expected) / np.linalg.norm(expected)
+    assert relative_l2 < 2e-2
+    assert result.x[np.argmax(result.field[-1])] > result.x[np.argmax(result.field[0])]
+    assert result.metadata["soliton_count"] == 1
+
+
+def test_kdv_train_solver_exposes_reproducibility_metadata() -> None:
+    result = solve_nonlinear_waves(
+        model_type="kdv",
+        x_min=-20.0,
+        x_max=20.0,
+        nx=128,
+        t_max=0.1,
+        dt=0.01,
+        profile="kdv_soliton_train",
+        soliton_amplitudes=[1.2, 0.5],
+        soliton_centers=[-8.0, -2.0],
+        c=0.0,
+        alpha=6.0,
+        beta_disp=1.0,
+    )
+    assert np.all(np.isfinite(result.field))
+    assert result.metadata["soliton_count"] == 2
+    assert result.metadata["soliton_speeds"] == pytest.approx([2.4, 1.0])
+    assert np.max(abs(result.field[0])) > 0.1
+
+
+def test_kdv_hamiltonian_uses_configured_coefficients() -> None:
+    nx = 128
+    x = np.linspace(0.0, 2.0 * np.pi, nx, endpoint=False)
+    dx = float(x[1] - x[0])
+    k = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
+    u = 0.4 * np.sin(x) + 0.1 * np.cos(2.0 * x)
+    c, alpha, beta = 1.3, 2.5, 0.7
+    ux = np.fft.ifft(1j * k * np.fft.fft(u)).real
+    expected = float(np.sum(beta * ux**2 / 2.0 - alpha * u**3 / 6.0 - c * u**2 / 2.0) * dx)
+    actual = compute_kdv_invariants(u, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta)[2]
+    assert actual == pytest.approx(expected)
 
 
 def test_nlse_split_step_preserves_norm_reasonably() -> None:
@@ -67,10 +184,9 @@ def test_kdv_ui_defaults_stay_finite_for_long_horizon() -> None:
         t_min=0.0,
         t_max=8.0,
         dt=0.002,
-        profile="sech",
-        amplitude=1.0,
-        sigma=1.0,
-        center=0.0,
+        profile="kdv_soliton_train",
+        soliton_amplitudes=[1.2, 0.5],
+        soliton_centers=[-8.0, -2.0],
         c=0.0,
         alpha=6.0,
         beta_disp=1.0,
