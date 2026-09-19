@@ -828,6 +828,68 @@ def create_vector_animation_3d(
 _MAX_MP4_FRAMES = 500
 
 
+def create_line_animation_plot(
+    frame_coordinates: np.ndarray,
+    x: np.ndarray,
+    frames: np.ndarray,
+    *,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    frame_label: str = "t",
+    symmetric_y_range: bool = False,
+) -> Figure:
+    """Create a stable-scale animation of one-dimensional frames."""
+    import numpy as np
+
+    coordinates = np.asarray(frame_coordinates, dtype=float)
+    x_values = np.asarray(x, dtype=float)
+    frame_data = np.asarray(frames, dtype=float)
+    if coordinates.ndim != 1 or x_values.ndim != 1:
+        raise ValueError("frame_coordinates and x must be one-dimensional")
+    if frame_data.shape != (len(coordinates), len(x_values)):
+        raise ValueError("frames must have shape (len(frame_coordinates), len(x))")
+    if len(coordinates) == 0:
+        raise ValueError("frame_coordinates must not be empty")
+
+    finite_values = frame_data[np.isfinite(frame_data)]
+    if finite_values.size == 0:
+        data_min = data_max = 0.0
+    else:
+        data_min = float(np.min(finite_values))
+        data_max = float(np.max(finite_values))
+    if symmetric_y_range:
+        bound = max(abs(data_min), abs(data_max), 1.0 if data_min == data_max == 0.0 else 0.0)
+        y_min, y_max = -bound, bound
+    elif data_min == data_max:
+        margin = max(abs(data_min) * 0.05, 1.0)
+        y_min, y_max = data_min - margin, data_max + margin
+    else:
+        y_min, y_max = data_min, data_max
+
+    fig, ax = _new_figure()
+    (line,) = ax.plot(x_values, frame_data[0])
+    ax.set_ylim(y_min, y_max)
+    _finalize_plot(ax, f"{title} ({frame_label}={coordinates[0]:.3g})", xlabel, ylabel)
+    fig.tight_layout()
+
+    def update(index: int) -> None:
+        """Draw one bounded animation frame."""
+        idx = max(0, min(index, len(coordinates) - 1))
+        line.set_ydata(frame_data[idx])
+        ax.set_title(f"{title} ({frame_label}={coordinates[idx]:.3g})")
+        fig.canvas.draw_idle()
+
+    return attach_animation_metadata(
+        fig,
+        update=update,
+        n_points=len(coordinates),
+        frame_label=frame_label,
+        frame_coordinates=coordinates,
+        extras={"_animation_x": x_values, "_animation_frames": frame_data},
+    )
+
+
 def create_image_animation_plot(
     t: np.ndarray,
     frames: np.ndarray,
@@ -839,6 +901,7 @@ def create_image_animation_plot(
     x_coordinates: np.ndarray | None = None,
     y_coordinates: np.ndarray | None = None,
     symmetric_color_range: bool = False,
+    frame_label: str = "t",
 ) -> Figure:
     """Create a stable-scale animated 2D image sequence.
 
@@ -879,7 +942,7 @@ def create_image_animation_plot(
         vmax=vmax,
         extent=(x_values[0], x_values[-1], y_values[0], y_values[-1]),
     )
-    _finalize_plot(ax, f"{title} (t={t[0]:.3g})", xlabel, ylabel)
+    _finalize_plot(ax, f"{title} ({frame_label}={t[0]:.3g})", xlabel, ylabel)
     fig.colorbar(image, ax=ax, shrink=0.8)
     fig.tight_layout()
 
@@ -887,10 +950,16 @@ def create_image_animation_plot(
         """Draw one bounded animation frame."""
         idx = max(0, min(index, len(t) - 1))
         image.set_data(frame_data[idx])
-        ax.set_title(f"{title} (t={t[idx]:.3g})")
+        ax.set_title(f"{title} ({frame_label}={t[idx]:.3g})")
         fig.canvas.draw_idle()
 
-    return attach_animation_metadata(fig, update=update, n_points=len(t))
+    return attach_animation_metadata(
+        fig,
+        update=update,
+        n_points=len(t),
+        frame_label=frame_label,
+        frame_coordinates=t,
+    )
 
 
 def create_surface_animation_plot(
@@ -907,6 +976,7 @@ def create_surface_animation_plot(
     zlabel: str = "u",
     colorbar_label: str = "Displacement u",
     symmetric_z_range: bool = True,
+    frame_label: str = "t",
 ) -> Figure:
     """Create an animated 3D surface with stable axes and colors across time.
 
@@ -958,7 +1028,7 @@ def create_surface_animation_plot(
     color_map.set_array([])
     fig.colorbar(color_map, ax=ax, shrink=0.7, label=colorbar_label)
     ax.set_zlim(z_min, z_max)
-    _finalize_3d_plot(ax, f"{title} (t={t[0]:.3g})", xlabel, ylabel, zlabel)
+    _finalize_3d_plot(ax, f"{title} ({frame_label}={t[0]:.3g})", xlabel, ylabel, zlabel)
     fig.tight_layout()
 
     def update(index: int) -> None:
@@ -975,10 +1045,16 @@ def create_surface_animation_plot(
             vmax=z_max,
             edgecolor="none",
         )
-        ax.set_title(f"{title} (t={t[idx]:.3g})")
+        ax.set_title(f"{title} ({frame_label}={t[idx]:.3g})")
         fig.canvas.draw_idle()
 
-    return attach_animation_metadata(fig, update=update, n_points=len(t))
+    return attach_animation_metadata(
+        fig,
+        update=update,
+        n_points=len(t),
+        frame_label=frame_label,
+        frame_coordinates=t,
+    )
 
 
 def export_animated_figure_to_mp4(

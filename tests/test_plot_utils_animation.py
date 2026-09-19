@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from plotting import (
     create_image_animation_plot,
+    create_line_animation_plot,
     create_surface_animation_plot,
     create_vector_animation_plot,
     export_animated_figure_to_mp4,
@@ -125,6 +126,72 @@ def test_image_and_surface_animation_helpers_render_small_frame_histories() -> N
         assert image_figure.axes[0].get_title().endswith("t=1)")
         assert surface_figure.axes[0].get_title().endswith("t=1)")
         assert surface_figure.axes[0].get_zlabel() == "u"
+    finally:
+        plt.close(image_figure)
+        plt.close(surface_figure)
+
+
+def test_line_animation_uses_stable_ranges_and_frame_metadata() -> None:
+    coordinates = np.array([0.0, 1.0])
+    x = np.array([0.0, 1.0, 2.0])
+    frames = np.array([[1.0, -2.0, 0.0], [3.0, 4.0, -1.0]])
+    figure = create_line_animation_plot(
+        coordinates,
+        x,
+        frames,
+        title="Profile",
+        xlabel="x",
+        ylabel="u",
+        frame_label="y",
+    )
+    try:
+        axis = figure.axes[0]
+        np.testing.assert_array_equal(axis.lines[0].get_ydata(), frames[0])
+        assert figure._animation_n_points == 2  # type: ignore[attr-defined]
+        assert figure._animation_frame_label == "y"  # type: ignore[attr-defined]
+        np.testing.assert_array_equal(figure._animation_frame_coordinates, coordinates)  # type: ignore[attr-defined]
+        assert axis.get_title().endswith("y=0)")
+        assert axis.get_ylim() == (-2.0, 4.0)
+        figure._animation_update(1)  # type: ignore[attr-defined]
+        np.testing.assert_array_equal(axis.lines[0].get_ydata(), frames[1])
+        assert axis.get_title().endswith("y=1)")
+    finally:
+        plt.close(figure)
+
+
+def test_line_animation_symmetric_range_is_non_degenerate() -> None:
+    figure = create_line_animation_plot(
+        np.array([0.0, 1.0]),
+        np.array([0.0, 1.0]),
+        np.array([[0.0, 2.0], [-3.0, 1.0]]),
+        title="Profile",
+        xlabel="x",
+        ylabel="u",
+        symmetric_y_range=True,
+    )
+    try:
+        assert figure.axes[0].get_ylim() == (-3.0, 3.0)
+    finally:
+        plt.close(figure)
+
+
+def test_image_and_surface_animation_frame_labels_are_customizable() -> None:
+    frames = np.arange(8, dtype=float).reshape(2, 2, 2)
+    image_figure = create_image_animation_plot(
+        np.array([0.0, 1.0]), frames, title="Image", xlabel="x", ylabel="y", frame_label="z"
+    )
+    surface_figure = create_surface_animation_plot(
+        np.array([0.0, 1.0]), np.arange(2), np.arange(2), frames, title="Surface", frame_label="z"
+    )
+    try:
+        assert image_figure.axes[0].get_title().endswith("z=0)")
+        assert surface_figure.axes[0].get_title().endswith("z=0)")
+        assert image_figure._animation_frame_label == "z"  # type: ignore[attr-defined]
+        assert surface_figure._animation_frame_label == "z"  # type: ignore[attr-defined]
+        image_figure._animation_update(1)  # type: ignore[attr-defined]
+        surface_figure._animation_update(1)  # type: ignore[attr-defined]
+        assert image_figure.axes[0].get_title().endswith("z=1)")
+        assert surface_figure.axes[0].get_title().endswith("z=1)")
     finally:
         plt.close(image_figure)
         plt.close(surface_figure)

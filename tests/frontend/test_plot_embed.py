@@ -140,6 +140,15 @@ class _FakeParent:
         return self
 
 
+class _FakeControl:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.args = args
+        self.kwargs = kwargs
+
+    def pack(self, **kwargs: object) -> None:
+        pass
+
+
 def test_bind_resize_handler_debounces_and_rebinds() -> None:
     widget = _FakeWidget()
     canvas = _FakeCanvas(widget, Figure())
@@ -207,6 +216,69 @@ def test_embed_animation_plot_in_tk_accepts_runtime_figure() -> None:
     assert canvas.draw_calls == 1
     assert callable(getattr(canvas, "_stop_animation"))
     bind_resize_handler.assert_called_once_with(canvas, figure)
+
+
+def test_embed_animation_plot_uses_frame_label_with_legacy_fallback() -> None:
+    figure = Figure()
+    figure._animation_update = lambda _index: None  # type: ignore[attr-defined]
+    figure._animation_n_points = 2  # type: ignore[attr-defined]
+    figure._animation_frame_label = "z"  # type: ignore[attr-defined]
+    parent = _FakeParent()
+    labels: list[str] = []
+
+    class _Label(_FakeControl):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args, **kwargs)
+            labels.append(str(kwargs.get("text", "")))
+
+    with (
+        patch(
+            "matplotlib.backends.backend_tkagg.FigureCanvasTkAgg",
+            _FakeEmbeddedCanvas,
+        ),
+        patch(
+            "matplotlib.backends._backend_tk.NavigationToolbar2Tk",
+            _FakeNavigationToolbar,
+        ),
+        patch.object(plot_embed.ttk, "Frame", _FakeFrame),
+        patch.object(plot_embed.ttk, "Label", _Label),
+        patch.object(plot_embed.ttk, "Scale", _FakeControl),
+        patch.object(plot_embed.ttk, "Entry", _FakeControl),
+        patch.object(plot_embed.ttk, "Button", _FakeControl),
+        patch.object(plot_embed.tk, "IntVar", _FakeVariable),
+        patch.object(plot_embed.tk, "StringVar", _FakeVariable),
+        patch.object(plot_embed, "_bind_resize_handler"),
+    ):
+        embed_animation_plot_in_tk = plot_embed.embed_animation_plot_in_tk
+        embed_animation_plot_in_tk(figure, parent)
+
+    assert "z:" in labels
+
+    fallback = Figure()
+    fallback._animation_update = lambda _index: None  # type: ignore[attr-defined]
+    fallback._animation_n_points = 1  # type: ignore[attr-defined]
+    labels.clear()
+    with (
+        patch(
+            "matplotlib.backends.backend_tkagg.FigureCanvasTkAgg",
+            _FakeEmbeddedCanvas,
+        ),
+        patch(
+            "matplotlib.backends._backend_tk.NavigationToolbar2Tk",
+            _FakeNavigationToolbar,
+        ),
+        patch.object(plot_embed.ttk, "Frame", _FakeFrame),
+        patch.object(plot_embed.ttk, "Label", _Label),
+        patch.object(plot_embed.ttk, "Scale", _FakeControl),
+        patch.object(plot_embed.ttk, "Entry", _FakeControl),
+        patch.object(plot_embed.ttk, "Button", _FakeControl),
+        patch.object(plot_embed.tk, "IntVar", _FakeVariable),
+        patch.object(plot_embed.tk, "StringVar", _FakeVariable),
+        patch.object(plot_embed, "_bind_resize_handler"),
+    ):
+        embed_animation_plot_in_tk(fallback, parent)
+
+    assert "x:" in labels
 
 
 def test_replace_plot_in_tk_reuses_existing_canvas() -> None:
