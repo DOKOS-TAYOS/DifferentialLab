@@ -13,7 +13,14 @@ from utils import get_logger
 logger = get_logger(__name__)
 
 _EQUATIONS_DIR = Path(__file__).resolve().parent.parent / "config" / "equations"
-_EQUATION_FILES = ["ode.yaml", "vector_ode.yaml", "difference.yaml", "pde.yaml", "vector_pde.yaml"]
+_EQUATION_FILES = [
+    "ode.yaml",
+    "vector_ode.yaml",
+    "difference.yaml",
+    "pde.yaml",
+    "pde_3d.yaml",
+    "vector_pde.yaml",
+]
 _cache: dict[str, PredefinedEquation] | None = None
 
 

@@ -6,11 +6,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 
 from frontend.ui_dialogs.equation_dialog import EquationDialog
 from frontend.ui_dialogs.result_dialog import ResultDialog
 from pipeline import SolverResult, run_solver_pipeline
 from solver.equation_parser import parse_pde_3d_residual_expression
+from solver.predefined import load_predefined_equations
 
 
 class _FakeVar:
@@ -117,6 +119,57 @@ def test_custom_pde_3d_ui_routes_to_standard_parameters_dialog() -> None:
     assert kwargs["variables"] == ["x", "y", "z"]
     assert kwargs["default_domain"] == [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
     assert kwargs["expression"] == "-fxx - fyy - fzz"
+
+
+def test_predefined_pde_3d_ui_uses_standard_parameters_dialog() -> None:
+    """A catalog 3D residual follows the same generic predefined route."""
+    equation = load_predefined_equations()["poisson_sine_3d"]
+    dialog = EquationDialog.__new__(EquationDialog)
+    dialog.equations = {equation.key: equation}
+    dialog._selected_key = equation.key
+    dialog.win = _FakeWindow()
+    dialog.parent = object()
+
+    with patch("frontend.ui_dialogs.parameters_dialog.ParametersDialog") as parameters_dialog:
+        dialog._on_next_predefined()
+
+    assert dialog.win.destroyed is True
+    kwargs = parameters_dialog.call_args.kwargs
+    assert kwargs["equation_type"] == "pde_3d"
+    assert kwargs["variables"] == ["x", "y", "z"]
+    assert kwargs["expression"] == equation.expression
+    assert kwargs["default_domain"] == [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
+
+
+def test_catalog_poisson_sine_3d_solves_with_default_boundaries() -> None:
+    """The manufactured catalog case is finite and accurate on a small grid."""
+    equation = load_predefined_equations()["poisson_sine_3d"]
+    result = run_solver_pipeline(
+        expression=equation.expression,
+        function_name=equation.function_name,
+        order=equation.order,
+        parameters={},
+        equation_name=equation.name,
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        z_min=0.0,
+        z_max=1.0,
+        y0=equation.default_initial_conditions,
+        n_points=9,
+        n_points_y=9,
+        n_points_z=9,
+        method="fdm",
+        selected_stats={"mean"},
+        equation_type=equation.equation_type,
+        variables=equation.variables,
+    )
+
+    assert result.y.shape == (9, 9, 9)
+    assert np.isfinite(result.y).all()
+    assert not np.allclose(result.y, 0.0)
+    assert result.y[4, 4, 4] == pytest.approx(1.0, abs=0.06)
 
 
 def test_result_dialog_selects_scalar_pde_3d_orthogonal_slice_without_display() -> None:
