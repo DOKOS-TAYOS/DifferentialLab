@@ -430,9 +430,10 @@ class NonlinearWavesResultDialog:
             residual_checkbox.pack(side=tk.LEFT)
             ToolTip(
                 self._anim_selection,
-                "Dashed curves are fixed-shape soliton profiles whose centers are fitted to the "
-                "numerical solution. During strong overlap, individual identities are approximate. "
-                "Residual = numerical u - sum of tracked profiles.",
+                "Dashed curves use centers tracked from numerical peaks when pulses are "
+                "distinguishable. During strong overlap, ambiguous identities bridge reliable "
+                "pre/post-interaction observations. Residual = numerical u - sum of tracked "
+                "profiles.",
             )
             self._anim_selection.bind("<<ListboxSelect>>", lambda _e: self._update_anim())
         else:

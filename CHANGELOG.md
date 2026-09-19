@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
   including the default two-soliton overtaking setup and reproducibility metadata.
 
-- Added compact selectable tracked KdV soliton-fit overlays and the diagnostic residual
+- Added compact selectable KdV soliton overlays, peak-tracked where distinguishable and
+  smoothly bridged through ambiguous overlaps, plus the diagnostic residual
   `u - Σ(tracked soliton profiles)` to supported soliton profile animations.
 
 - Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat

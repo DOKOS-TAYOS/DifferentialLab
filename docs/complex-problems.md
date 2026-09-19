@@ -72,9 +72,11 @@ Use those diagnostics before trusting conclusions from aggressive settings.
 
 For KdV one-soliton and separated-train results, the profile animation always shows
 the numerical solution `u`. Optional dashed overlays are fixed-amplitude,
-fixed-width soliton fits whose centers are tracked from the numerical history, making
-interaction-induced phase displacement visible. Individual identities are approximate
-during strong overlap. The optional diagnostic residual is
+fixed-width soliton profiles whose centers are tracked from numerical peaks whenever
+individual pulses are distinguishable. During strong overlap, identities are ambiguous,
+so their displayed trajectories bridge reliable pre- and post-interaction observations;
+this makes interaction-induced phase displacement visible without claiming a unique
+instantaneous decomposition. The optional diagnostic residual is
 `u - Σ(tracked soliton profiles)`; it is not a unique nonlinear decomposition.
 
 ## Performance Guidelines
