@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-19
+
 ### Added
 
 - Added `Axis Sweep` result views for stationary scalar 2D and Vector PDE results,
@@ -14,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coordinates rather than physical time and support matching MP4 export.
 
 - Added reusable stationary-PDE axis-sweep preparation and frame-labelled animation
-  infrastructure for future result views.
+  infrastructure for result views.
 
 - Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
   including the default two-soliton overtaking setup and reproducibility metadata.

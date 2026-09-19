@@ -44,12 +44,14 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   structured Dirichlet/Neumann/Robin boundaries, non-duplicated periodic axes,
   component-aware ellipticity validation, and algebraic diagnostics
 - Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
-  component-aware boundaries, sparse block assembly, component/magnitude views, and
+  component-aware boundaries, sparse block assembly, component/magnitude views,
+  component/magnitude spatial axis sweeps, and
   Cartesian quiver, stream, and radial/tangential visualizations for exactly
   two-component systems
 - Scalar linear elliptic PDEs on rectangular 3D grids with all six second-order
   coefficients, Dirichlet/Neumann/Robin faces, periodic axes, sparse diagnostics,
-  pre-run memory advice, and selectable coordinate-labelled orthogonal result slices
+  pre-run memory advice, selectable coordinate-labelled orthogonal result slices, and
+  selectable spatial axis sweeps
 - Cartesian scalar PDE views plus polar re-sampling for visualization; coordinate transforms
   are display-only and never alter the solved equation
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
