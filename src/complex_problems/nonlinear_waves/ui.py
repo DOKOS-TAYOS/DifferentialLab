@@ -135,7 +135,7 @@ class NonlinearWavesDialog:
         self._profile_row.pack(fill=tk.X, pady=pad // 2)
         self._profile_var = tk.StringVar(value="Sech")
         self._profile_combo = make_labeled_combo(
-            self._profile_row, "Profile", self._profile_var, _NLSE_PROFILES, width=12
+            self._profile_row, "Profile", self._profile_var, _NLSE_PROFILES, width=24
         )
         self._profile_combo.bind(
             "<<ComboboxSelected>>", lambda _e: self._update_profile_visibility()
@@ -268,11 +268,14 @@ class NonlinearWavesDialog:
 
         profile_label = self._profile_var.get()
         profile = _PROFILE_KEYS[profile_label]
-        amplitude = parse_float(self._amp_var.get(), name="Amplitude")
+        amplitude = 1.0
         sigma = 1.0
+        center = 0.0
+        if profile != "kdv_soliton_train":
+            amplitude = parse_float(self._amp_var.get(), name="Amplitude")
+            center = parse_float(self._center_var.get(), name="Center x₀")
         if profile in {"sech", "gaussian", "pulse"}:
             sigma = parse_positive_float(self._sigma_var.get(), name="σ")
-        center = parse_float(self._center_var.get(), name="Center x₀")
 
         custom_fn = None
         if profile == "custom":
@@ -305,9 +308,7 @@ class NonlinearWavesDialog:
             params["alpha"] = parse_float(self._alpha_var.get(), name="α")
             params["beta_disp"] = parse_float(self._beta_disp_var.get(), name="β")
             if profile == "kdv_soliton_train":
-                n_solitons = int(self._train_n_var.get())
-                if n_solitons < 2:
-                    raise ValueError("N must be at least 2 for a separated soliton train.")
+                n_solitons = parse_positive_int(self._train_n_var.get(), name="N", min_value=2)
                 amplitudes = _parse_csv_floats(self._train_amplitudes_var.get(), name="Amplitudes")
                 centers = _parse_csv_floats(self._train_centers_var.get(), name="Centers")
                 if len(amplitudes) != n_solitons or len(centers) != n_solitons:
