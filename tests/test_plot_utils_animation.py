@@ -12,6 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.animation as animation_module  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
+from config import get_env_from_schema as configured_env  # noqa: E402
 from plotting import (
     create_image_animation_plot,
     create_line_animation_plot,
@@ -171,6 +172,58 @@ def test_line_animation_symmetric_range_is_non_degenerate() -> None:
     )
     try:
         assert figure.axes[0].get_ylim() == (-3.0, 3.0)
+    finally:
+        plt.close(figure)
+
+
+def test_line_animation_hides_title_on_initial_and_updated_frames() -> None:
+    def get_plot_config(key: str) -> object:
+        if key == "PLOT_SHOW_TITLE":
+            return False
+        return configured_env(key)
+
+    with patch("plotting.plot_utils.get_env_from_schema", side_effect=get_plot_config):
+        figure = create_line_animation_plot(
+            np.array([0.0, 1.0]),
+            np.array([0.0, 1.0]),
+            np.array([[1.0, 2.0], [3.0, 4.0]]),
+            title="Hidden profile",
+            xlabel="x",
+            ylabel="u",
+        )
+        try:
+            axis = figure.axes[0]
+            assert axis.get_title() == ""
+            figure._animation_update(1)  # type: ignore[attr-defined]
+            assert axis.get_title() == ""
+        finally:
+            plt.close(figure)
+
+
+def test_line_animation_uses_configured_line_style() -> None:
+    configured_style = {
+        "PLOT_LINE_COLOR": "darkgreen",
+        "PLOT_LINE_WIDTH": 2.75,
+        "PLOT_LINE_STYLE": "--",
+    }
+
+    def get_plot_config(key: str) -> object:
+        return configured_style.get(key, configured_env(key))
+
+    with patch("plotting.plot_utils.get_env_from_schema", side_effect=get_plot_config):
+        figure = create_line_animation_plot(
+            np.array([0.0]),
+            np.array([0.0, 1.0]),
+            np.array([[1.0, 2.0]]),
+            title="Styled profile",
+            xlabel="x",
+            ylabel="u",
+        )
+    try:
+        line = figure.axes[0].lines[0]
+        assert line.get_color() == "darkgreen"
+        assert line.get_linewidth() == 2.75
+        assert line.get_linestyle() == "--"
     finally:
         plt.close(figure)
 

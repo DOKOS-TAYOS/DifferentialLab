@@ -868,7 +868,16 @@ def create_line_animation_plot(
         y_min, y_max = data_min, data_max
 
     fig, ax = _new_figure()
-    (line,) = ax.plot(x_values, frame_data[0])
+    line_color: str = get_env_from_schema("PLOT_LINE_COLOR")
+    line_width: float = get_env_from_schema("PLOT_LINE_WIDTH")
+    line_style: str = get_env_from_schema("PLOT_LINE_STYLE")
+    (line,) = ax.plot(
+        x_values,
+        frame_data[0],
+        color=line_color,
+        linewidth=line_width,
+        linestyle=line_style,
+    )
     ax.set_ylim(y_min, y_max)
     _finalize_plot(ax, f"{title} ({frame_label}={coordinates[0]:.3g})", xlabel, ylabel)
     fig.tight_layout()
@@ -877,7 +886,8 @@ def create_line_animation_plot(
         """Draw one bounded animation frame."""
         idx = max(0, min(index, len(coordinates) - 1))
         line.set_ydata(frame_data[idx])
-        ax.set_title(f"{title} ({frame_label}={coordinates[idx]:.3g})")
+        if get_env_from_schema("PLOT_SHOW_TITLE"):
+            ax.set_title(f"{title} ({frame_label}={coordinates[idx]:.3g})")
         fig.canvas.draw_idle()
 
     return attach_animation_metadata(
