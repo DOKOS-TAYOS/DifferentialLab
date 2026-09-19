@@ -50,6 +50,17 @@ class _SpectrumAnimationViewPayload:
 
 
 @dataclass(frozen=True)
+class _ProfileAnimationViewPayload:
+    """Prepared profile data shared by the embedded view and MP4 export."""
+
+    x: np.ndarray
+    t: np.ndarray
+    frames: np.ndarray
+    title: str
+    ylabel: str
+
+
+@dataclass(frozen=True)
 class _KdvReferenceAnimationPayload:
     """Inputs for the selectable KdV numerical/reference animation."""
 
@@ -274,6 +285,21 @@ def _create_line_animation_figure(
     return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
+def _create_profile_animation_figure(
+    payload: _ProfileAnimationViewPayload | _KdvReferenceAnimationPayload,
+) -> Figure:
+    """Build a profile figure from the exact prepared display payload."""
+    if isinstance(payload, _KdvReferenceAnimationPayload):
+        return _create_kdv_reference_animation_figure(payload)
+    return _create_line_animation_figure(
+        payload.x,
+        payload.t,
+        payload.frames,
+        title=payload.title,
+        ylabel=payload.ylabel,
+    )
+
+
 class NonlinearWavesResultDialog:
     """Result window for nonlinear waves."""
 
@@ -494,14 +520,19 @@ class NonlinearWavesResultDialog:
             title = f"NLSE profile - {view}"
 
         if not self._kdv_reference_mode:
-            fig = _create_line_animation_figure(
-                self._result.x,
-                self._result.t,
-                y,
+            payload = _ProfileAnimationViewPayload(
+                x=self._result.x,
+                t=self._result.t,
+                frames=y,
                 title=title,
                 ylabel=ylabel,
             )
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_frame)
+            fig = _create_profile_animation_figure(payload)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_frame,
+            on_export_mp4=lambda duration: self._on_export_profile_mp4(payload, duration),
+        )
 
     def _build_spacetime_tab(self, parent: ttk.Frame) -> None:
         ylabel = "t"
@@ -568,6 +599,48 @@ class NonlinearWavesResultDialog:
         try:
             export_animated_figure_to_mp4(
                 _create_spectrum_animation_figure(payload),
+                filepath,
+                duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
+
+    def _on_export_profile_mp4(
+        self,
+        payload: _ProfileAnimationViewPayload | _KdvReferenceAnimationPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the currently displayed profile, including KdV overlays."""
+        default_path = get_output_dir() / (
+            f"{generate_output_basename(prefix='nonlinear_waves')}.mp4"
+        )
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_profile_animation_figure(payload),
                 filepath,
                 duration_seconds=duration_seconds,
             )

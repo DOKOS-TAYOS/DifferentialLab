@@ -63,7 +63,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 - Safe expression parsing with AST validation
 - Unified `f[...]` notation (`f[0]`, `f[1]`, `f[i,k]`)
 - Interactive result dialogs with derivative/component selection and dynamic redraw
-- CSV, JSON, static figure, and MP4 animation exports where supported
+- CSV, JSON, and static figure exports, plus MP4 export for every interactive animation result view
 - Environment-backed configuration through `.env` and the in-app `Settings` dialog
 - Rotating application logs with optional console output
 

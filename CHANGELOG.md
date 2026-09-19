@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added MP4 export to every interactive animated result view, including the main
+  Schrodinger TD, nonlinear-waves profile, and transient Pipe Flow animations.
+
 - Added `Axis Sweep` result views for stationary scalar 2D and Vector PDE results,
   plus selectable x/y/z plane sweeps for scalar PDE 3D results. Sweeps use spatial
   coordinates rather than physical time and support matching MP4 export.

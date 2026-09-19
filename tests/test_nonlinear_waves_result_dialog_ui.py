@@ -141,6 +141,62 @@ def test_spectrum_tab_initializes_only_on_first_selection() -> None:
     build_tab.assert_called_once_with(spectrum_tab)
 
 
+def test_profile_animation_wires_export_for_nlse_and_plain_kdv() -> None:
+    for model_type in ("nlse", "kdv"):
+        dialog = _make_dialog(model_type)
+        dialog._result.x = np.linspace(-2.0, 2.0, 5)
+        dialog._result.field = np.ones((3, 5), dtype=complex)
+        dialog._result.magnitude = np.abs(dialog._result.field) ** 2
+        dialog._anim_frame = object()
+        dialog._anim_canvas = None
+        dialog._anim_view_var = _StubVar("Intensity" if model_type == "nlse" else "Field")
+        dialog._kdv_reference_mode = False
+        captured: dict[str, object] = {}
+
+        def embed_figure(_figure: object, _parent: object, **kwargs: object) -> object:
+            captured.update(kwargs)
+            return object()
+
+        with (
+            patch.object(result_dialog, "embed_animation_plot_in_tk", side_effect=embed_figure),
+            patch.object(result_dialog, "reset_embedded_animation"),
+        ):
+            dialog._update_anim()
+
+        assert callable(captured["on_export_mp4"])
+
+
+def test_kdv_profile_export_reuses_selected_overlays_and_cached_centers() -> None:
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    x = np.linspace(-10.0, 10.0, 32, endpoint=False)
+    dialog._result = _make_kdv_reference_result(numerical=np.zeros((2, len(x))))
+    dialog._result.x = x
+    dialog._kdv_reference_mode = True
+    dialog._anim_frame = object()
+    dialog._anim_canvas = None
+    dialog._selected_animation_labels = MagicMock(return_value=("Soliton 1",))
+    dialog._show_interaction_residual = _StubVar("True")
+    dialog._show_interaction_residual.get = lambda: True  # type: ignore[method-assign]
+    tracked = SimpleNamespace(centers=np.array([[-8.0, -2.0], [-7.5, -1.5]]))
+    dialog._get_tracked_soliton_centers = MagicMock(return_value=tracked)
+    captured: dict[str, object] = {}
+
+    def embed_figure(_figure: object, _parent: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    with (
+        patch.object(result_dialog, "embed_animation_plot_in_tk", side_effect=embed_figure),
+        patch.object(result_dialog, "reset_embedded_animation"),
+        patch.object(result_dialog, "track_kdv_soliton_centers") as tracker,
+    ):
+        dialog._update_anim()
+
+    assert callable(captured["on_export_mp4"])
+    dialog._get_tracked_soliton_centers.assert_called_once()
+    tracker.assert_not_called()
+
+
 def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
     dialog = _make_dialog()
     payload = dialog._get_spectrum_animation_payload()
@@ -490,7 +546,9 @@ def test_kdv_selection_passes_multiple_labels_without_solving() -> None:
         create_payload.call_args.kwargs["tracked_centers"], np.zeros((2, 2))
     )
     tracked.assert_called_once()
-    embed.assert_called_once_with(fake_figure, dialog._anim_frame)
+    embed.assert_called_once()
+    assert embed.call_args.args == (fake_figure, dialog._anim_frame)
+    assert callable(embed.call_args.kwargs["on_export_mp4"])
     assert dialog._anim_canvas == "new-canvas"
     solve.assert_not_called()
 
