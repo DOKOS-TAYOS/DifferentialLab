@@ -251,7 +251,7 @@ def _make_kdv_reference_result(
     )
 
 
-def test_kdv_reference_profiles_wrap_and_follow_stored_speeds() -> None:
+def test_kdv_tracked_profiles_wrap_from_unwrapped_centers() -> None:
     x = np.linspace(-20.0, 20.0, 2048, endpoint=False)
     payload = result_dialog._KdvReferenceAnimationPayload(
         x=x,
@@ -263,10 +263,12 @@ def test_kdv_reference_profiles_wrap_and_follow_stored_speeds() -> None:
         speeds=(2.0,),
         x_min=-20.0,
         x_max=20.0,
-        selected=("Reference soliton 1",),
+        selected=("Soliton 1",),
+        show_residual=False,
+        tracked_centers=np.array([[19.0], [21.0]]),
     )
-    initial = result_dialog._reference_profiles_at_time(payload, 0.0)[0]
-    wrapped = result_dialog._reference_profiles_at_time(payload, 1.0)[0]
+    initial = result_dialog._tracked_profiles_at_frame(payload, 0)[0]
+    wrapped = result_dialog._tracked_profiles_at_frame(payload, 1)[0]
     assert x[np.argmax(initial)] == pytest.approx(19.0, abs=0.05)
     assert x[np.argmax(wrapped)] == pytest.approx(-19.0, abs=0.05)
 
@@ -283,18 +285,24 @@ def test_kdv_reference_residual_is_zero_then_reproduces_perturbation() -> None:
         speeds=(2.4, 1.0),
         x_min=-20.0,
         x_max=20.0,
-        selected=("Interaction residual",),
+        selected=(),
+        show_residual=True,
+        tracked_centers=np.array([[-8.0, -2.0], [-5.6, -1.0]]),
     )
     references = np.array(
         [
-            np.sum(result_dialog._reference_profiles_at_time(base, float(time)), axis=0)
-            for time in base.t
+            np.sum(result_dialog._tracked_profiles_at_frame(base, index), axis=0)
+            for index in range(len(base.t))
         ]
     )
     exact = base.__class__(**{**base.__dict__, "numerical": references})
     figure = result_dialog._create_kdv_reference_animation_figure(exact)
     try:
-        residual = figure.axes[0].lines[0].get_ydata()
+        residual = next(
+            line.get_ydata()
+            for line in figure.axes[0].lines
+            if line.get_label() == "Interaction residual"
+        )
         np.testing.assert_allclose(residual, 0.0, atol=1e-12)
     finally:
         plt.close(figure)
@@ -302,8 +310,13 @@ def test_kdv_reference_residual_is_zero_then_reproduces_perturbation() -> None:
     perturbed = base.__class__(**{**base.__dict__, "numerical": references + perturbation})
     figure = result_dialog._create_kdv_reference_animation_figure(perturbed)
     try:
-        np.testing.assert_allclose(figure.axes[0].lines[0].get_ydata(), perturbation[0])
-        assert figure.axes[0].get_ylim() == pytest.approx((-0.1375, 0.1375))
+        residual = next(
+            line.get_ydata()
+            for line in figure.axes[0].lines
+            if line.get_label() == "Interaction residual"
+        )
+        np.testing.assert_allclose(residual, perturbation[0])
+        assert figure.axes[0].get_ylim()[1] > 1.2
     finally:
         plt.close(figure)
 
@@ -312,13 +325,13 @@ def test_kdv_reference_y_limit_uses_only_selected_reference_amplitudes() -> None
     x = np.linspace(-20.0, 20.0, 256, endpoint=False)
     result = _make_kdv_reference_result(numerical=np.zeros((2, len(x))))
     payload = result_dialog._create_kdv_reference_animation_payload(
-        result, ("Reference soliton 2",)
+        result, ("Soliton 2",), tracked_centers=np.array([[-8.0, -2.0], [-5.6, -1.0]])
     )
     figure = result_dialog._create_kdv_reference_animation_figure(payload)
     try:
         lower, upper = figure.axes[0].get_ylim()
-        assert upper == pytest.approx(0.55)
-        assert lower == pytest.approx(-0.55)
+        assert upper == pytest.approx(0.55, abs=0.001)
+        assert lower == pytest.approx(-0.55, abs=0.001)
     finally:
         plt.close(figure)
 
@@ -328,15 +341,17 @@ def test_kdv_reference_figure_styles_labels_and_animation() -> None:
     result = _make_kdv_reference_result(numerical=np.zeros((2, len(x))))
     payload = result_dialog._create_kdv_reference_animation_payload(
         result,
-        ("Numerical u", "Reference soliton 1", "Reference soliton 2", "Interaction residual"),
+        ("Soliton 1", "Soliton 2"),
+        show_residual=True,
+        tracked_centers=np.array([[-8.0, -2.0], [-5.6, -1.0]]),
     )
     figure = result_dialog._create_kdv_reference_animation_figure(payload)
     try:
         lines = figure.axes[0].lines
         assert [line.get_label() for line in lines] == [
             "Numerical u",
-            "Reference soliton 1",
-            "Reference soliton 2",
+            "Soliton 1",
+            "Soliton 2",
             "Interaction residual",
         ]
         assert lines[0].get_linestyle() == "-"
@@ -369,19 +384,19 @@ def test_kdv_reference_mode_only_supports_kdv_soliton_profiles(
     assert dialog._is_kdv_soliton_result() is expected
 
 
-def test_kdv_selector_contract_and_default_selection() -> None:
+def test_kdv_selector_contract_defaults_to_no_optional_overlays() -> None:
     dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
     selection = MagicMock()
-    selection.curselection.return_value = (0, 2)
-    selection.get.side_effect = lambda index: ("Numerical u", "Reference soliton 2")[index // 2]
+    selection.curselection.return_value = (0, 1)
+    selection.get.side_effect = lambda index: ("Soliton 1", "Soliton 2")[index]
     dialog._anim_selection = selection
-    assert dialog._selected_animation_labels() == ("Numerical u", "Reference soliton 2")
+    assert dialog._selected_animation_labels() == ("Soliton 1", "Soliton 2")
 
     selection.curselection.return_value = ()
-    assert dialog._selected_animation_labels() == ("Numerical u",)
+    assert dialog._selected_animation_labels() == ()
 
 
-def test_kdv_selector_uses_extended_mode_and_preserves_default_selection() -> None:
+def test_kdv_selector_uses_extended_mode_and_compact_unselected_list() -> None:
     created: dict[str, object] = {}
 
     class _Listbox:
@@ -391,35 +406,43 @@ def test_kdv_selector_uses_extended_mode_and_preserves_default_selection() -> No
         def insert(self, _index: object, _label: str) -> None:
             pass
 
-        def selection_set(self, index: int) -> None:
-            created["selected"] = index
-
         def pack(self, **_kwargs: object) -> None:
             pass
 
         def bind(self, *_args: object) -> None:
             pass
 
+        def configure(self, **_kwargs: object) -> None:
+            pass
+
+        def yview(self, *_args: object) -> None:
+            pass
+
     dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
     dialog.win = object()
     dialog._result = SimpleNamespace(
         model_type="kdv",
-        metadata={"profile": "kdv_soliton_train", "soliton_count": 2},
+        metadata={"profile": "kdv_soliton_train", "soliton_count": 4},
     )
     dialog._update_anim = MagicMock()
+    dialog._tracked_soliton_centers = None
     with (
         patch.object(result_dialog.tk, "Listbox", _Listbox),
+        patch.object(result_dialog.tk, "BooleanVar", return_value=MagicMock(get=lambda: False)),
+        patch.object(result_dialog.ttk, "Checkbutton", return_value=MagicMock(pack=MagicMock())),
+        patch.object(result_dialog.ttk, "Scrollbar", return_value=MagicMock(pack=MagicMock())),
+        patch.object(result_dialog, "ToolTip"),
         patch.object(result_dialog, "get_font", return_value=None),
     ):
         dialog._build_anim_tab(MagicMock())
 
     assert created["selectmode"] == result_dialog.tk.EXTENDED
-    assert created["selected"] == 0
+    assert created["height"] <= 3
     assert dialog._anim_selection_labels == [
-        "Numerical u",
-        "Reference soliton 1",
-        "Reference soliton 2",
-        "Interaction residual",
+        "Soliton 1",
+        "Soliton 2",
+        "Soliton 3",
+        "Soliton 4",
     ]
 
 
@@ -429,9 +452,9 @@ def test_kdv_selection_passes_multiple_labels_without_solving() -> None:
     dialog._kdv_reference_mode = True
     dialog._anim_frame = object()
     dialog._anim_canvas = object()
-    dialog._selected_animation_labels = MagicMock(
-        return_value=("Numerical u", "Reference soliton 2")
-    )
+    dialog._selected_animation_labels = MagicMock(return_value=("Soliton 2",))
+    dialog._show_interaction_residual = _StubVar("False")
+    dialog._show_interaction_residual.get = lambda: False  # type: ignore[method-assign]
     created_payload = MagicMock()
     fake_figure = object()
     reset = MagicMock()
@@ -449,16 +472,38 @@ def test_kdv_selection_passes_multiple_labels_without_solving() -> None:
             "_create_kdv_reference_animation_figure",
             return_value=fake_figure,
         ),
+        patch.object(
+            dialog,
+            "_get_tracked_soliton_centers",
+            return_value=SimpleNamespace(centers=np.zeros((2, 2))),
+        ) as tracked,
         patch.object(result_dialog, "embed_animation_plot_in_tk", embed),
         patch.object(nonlinear_solver, "solve_nonlinear_waves") as solve,
     ):
         dialog._update_anim()
 
     reset.assert_called_once_with(dialog._anim_frame, previous_canvas)
-    create_payload.assert_called_once_with(dialog._result, ("Numerical u", "Reference soliton 2"))
+    create_payload.assert_called_once()
+    assert create_payload.call_args.args == (dialog._result, ("Soliton 2",))
+    assert create_payload.call_args.kwargs["show_residual"] is False
+    np.testing.assert_array_equal(
+        create_payload.call_args.kwargs["tracked_centers"], np.zeros((2, 2))
+    )
+    tracked.assert_called_once()
     embed.assert_called_once_with(fake_figure, dialog._anim_frame)
     assert dialog._anim_canvas == "new-canvas"
     solve.assert_not_called()
+
+
+def test_kdv_tracked_centers_are_cached_without_rerunning_the_solver() -> None:
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    dialog._result = _make_kdv_reference_result(numerical=np.zeros((2, 64)))
+    dialog._tracked_soliton_centers = None
+    fitted = SimpleNamespace(centers=np.zeros((2, 2)))
+    with patch.object(result_dialog, "track_kdv_soliton_centers", return_value=fitted) as tracker:
+        assert dialog._get_tracked_soliton_centers() is fitted
+        assert dialog._get_tracked_soliton_centers() is fitted
+    tracker.assert_called_once()
 
 
 def test_kdv_reference_initialization_matches_production_train_definition() -> None:
@@ -485,9 +530,11 @@ def test_kdv_reference_initialization_matches_production_train_definition() -> N
         beta_disp=result.metadata["beta_disp"],
     )
     assert len(characteristics) == result.metadata["soliton_count"]
-    payload = result_dialog._create_kdv_reference_animation_payload(result, ("Numerical u",))
-    references = np.sum(
-        result_dialog._reference_profiles_at_time(payload, float(result.t[0])), axis=0
+    payload = result_dialog._create_kdv_reference_animation_payload(
+        result,
+        (),
+        tracked_centers=np.asarray(result.metadata["soliton_centers"], dtype=float)[None, :],
     )
+    references = np.sum(result_dialog._tracked_profiles_at_frame(payload, 0), axis=0)
     np.testing.assert_allclose(references, expected, rtol=1e-10, atol=2e-12)
     np.testing.assert_allclose(result.field[0].real, expected, rtol=1e-12, atol=1e-12)
