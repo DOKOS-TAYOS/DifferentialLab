@@ -23,11 +23,12 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 - Python: `>=3.12`
 - Package name: `differential-lab`
 - GUI: Tkinter/ttk with embedded Matplotlib figures
-- Predefined catalog: 121 equations loaded from YAML
+- Predefined catalog: 125 equations loaded from YAML
   - 48 ODEs
   - 50 vector ODE systems
   - 10 difference equations
   - 12 2D PDE examples
+  - 4 scalar 3D PDE examples
   - 1 coupled Vector PDE example
 - Advanced Problems: 7 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration

@@ -107,6 +107,7 @@ The catalog is loaded from:
 - `src/config/equations/vector_ode.yaml`
 - `src/config/equations/difference.yaml`
 - `src/config/equations/pde.yaml`
+- `src/config/equations/pde_3d.yaml`
 - `src/config/equations/vector_pde.yaml`
 
 Current catalog size:
@@ -117,6 +118,7 @@ Current catalog size:
 | Vector ODE | 50 |
 | Difference equation | 10 |
 | PDE | 12 |
+| PDE 3D | 4 |
 | Vector PDE | 1 |
 
 `solver.predefined.load_predefined_equations()` caches the parsed catalog after

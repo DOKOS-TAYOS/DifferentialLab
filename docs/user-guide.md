@@ -28,7 +28,7 @@ The standard solver path currently supports:
 - Vector PDE
 
 You can use the predefined YAML catalog or write custom expressions.
-The current catalog has 121 entries:
+The current catalog has 125 entries:
 
 | Type | Entries |
 |---|---:|
@@ -36,6 +36,7 @@ The current catalog has 121 entries:
 | Vector ODE | 50 |
 | Difference equation | 10 |
 | PDE | 12 |
+| PDE 3D | 4 |
 | Vector PDE | 1 |
 
 The catalog files live in `src/config/equations/`.
@@ -181,8 +182,9 @@ discrete L2/L-infinity residual, relative L2 residual, sparse matrix shape and
 nonzero count. A condition estimate is included only for small systems; large
 sparse systems are never converted to dense form solely for diagnostics.
 
-Scalar `PDE 3D` is also available in the standard `Solve Equation` workflow.
-Its custom expression is the complete residual equal to zero, for example
+Scalar `PDE 3D` is available in the standard `Solve Equation` workflow through
+the built-in catalog or a custom expression. Its expression is the complete residual
+equal to zero, for example
 `-fxx - fyy - fzz - 3*pi**2*sin(pi*x)*sin(pi*y)*sin(pi*z)`. The current
 release intentionally supports rectangular grids only; arbitrary 3D masks,
 vector-valued 3D systems, and a generic N-dimensional solver are not included.

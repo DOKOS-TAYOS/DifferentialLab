@@ -46,7 +46,7 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         has_defn = eq.expression or eq.function_name or (vec_exprs and len(vec_exprs) > 0)
         assert has_defn
         eq_type = getattr(eq, "equation_type", "ode")
-        is_pde = eq_type in ("pde", "vector_pde")
+        is_pde = eq_type in ("pde", "pde_3d", "vector_pde")
         is_vector = (vec_exprs is not None and len(vec_exprs) > 0) or eq_type in (
             "vector_ode",
             "vector_pde",
@@ -56,6 +56,8 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
             expected_ic_len = eq.order * vec_comp if is_vector else eq.order
             assert len(eq.default_initial_conditions) == expected_ic_len
             assert len(eq.default_domain) >= 2
+        elif eq_type == "pde_3d":
+            assert len(eq.default_domain) >= 6
         else:
             assert len(eq.default_domain) >= 4  # x_min, x_max, y_min, y_max
 
@@ -66,6 +68,29 @@ def test_load_predefined_equations_known_keys() -> None:
     assert "harmonic_oscillator" in equations
     assert "exponential_growth" in equations or "damped_oscillator" in equations
     assert "coupled_elliptic_system_2d" in equations
+    assert {
+        "poisson_sine_3d",
+        "localized_heat_source_3d",
+        "anisotropic_diffusion_3d",
+        "screened_poisson_3d",
+    } <= equations.keys()
+
+
+def test_predefined_pde_3d_entries_have_required_metadata() -> None:
+    equations = load_predefined_equations()
+    keys = (
+        "poisson_sine_3d",
+        "localized_heat_source_3d",
+        "anisotropic_diffusion_3d",
+        "screened_poisson_3d",
+    )
+
+    for key in keys:
+        equation = equations[key]
+        assert equation.equation_type == "pde_3d"
+        assert equation.variables == ["x", "y", "z"]
+        assert equation.default_initial_conditions == []
+        assert len(equation.default_domain) == 6
 
 
 def test_load_predefined_equations_cached() -> None:

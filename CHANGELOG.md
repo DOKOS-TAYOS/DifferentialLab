@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat
+  source, anisotropic diffusion, and screened Poisson.
+
 ## [0.6.0] - 2026-09-19
 
 ### Added
