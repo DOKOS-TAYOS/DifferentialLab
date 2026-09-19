@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preset, corrected the simple-pendulum and Allee-effect defaults, and made the built-in
   Vector PDE a manufactured nontrivial problem with a documented exact solution.
 
+### Fixed
+
+- Corrected KdV ETDRK4 coefficients to retain complex full-contour means and cleanly reject
+  non-finite numerical evolution instead of returning corrupted results.
+
 ## [0.6.0] - 2026-09-19
 
 ### Added

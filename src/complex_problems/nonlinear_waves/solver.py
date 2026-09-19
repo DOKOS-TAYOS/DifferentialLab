@@ -143,26 +143,25 @@ def _kdv_etdrk4_coefficients(
     linear_op: np.ndarray,
     *,
     dt: float,
-    contour_samples: int = 16,
+    contour_samples: int = 64,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Build ETDRK4 coefficients for the semi-linear KdV Fourier system."""
     e = np.exp(dt * linear_op)
     e_half = np.exp(0.5 * dt * linear_op)
-    roots = np.exp(1j * np.pi * ((np.arange(1, contour_samples + 1) - 0.5) / contour_samples))
+    roots = np.exp(2j * np.pi * ((np.arange(1, contour_samples + 1) - 0.5) / contour_samples))
     lr = dt * linear_op[:, None] + roots[None, :]
-    q = dt * np.real(np.mean((np.exp(0.5 * lr) - 1.0) / lr, axis=1))
-    f1 = dt * np.real(
-        np.mean(
-            (-4.0 - lr + np.exp(lr) * (4.0 - 3.0 * lr + lr**2)) / (lr**3),
-            axis=1,
-        )
+    q = dt * np.mean((np.exp(0.5 * lr) - 1.0) / lr, axis=1)
+    f1 = dt * np.mean(
+        (-4.0 - lr + np.exp(lr) * (4.0 - 3.0 * lr + lr**2)) / (lr**3),
+        axis=1,
     )
-    f2 = dt * np.real(np.mean((2.0 + lr + np.exp(lr) * (-2.0 + lr)) / (lr**3), axis=1))
-    f3 = dt * np.real(
-        np.mean(
-            (-4.0 - 3.0 * lr - lr**2 + np.exp(lr) * (4.0 - lr)) / (lr**3),
-            axis=1,
-        )
+    f2 = dt * np.mean(
+        (4.0 + 2.0 * lr + np.exp(lr) * (-4.0 + 2.0 * lr)) / (lr**3),
+        axis=1,
+    )
+    f3 = dt * np.mean(
+        (-4.0 - 3.0 * lr - lr**2 + np.exp(lr) * (4.0 - lr)) / (lr**3),
+        axis=1,
     )
     return e, e_half, q, f1, f2, f3
 
@@ -190,24 +189,51 @@ def _simulate_kdv(
     dealias_mask = np.abs(k) <= (2.0 / 3.0) * k_max + 1e-12
     linear_op = 1j * (beta_disp * (k**3) - c * k)
 
+    def _require_finite(values: np.ndarray, *, time: float) -> None:
+        if not np.all(np.isfinite(values)):
+            raise RuntimeError(f"KdV integration became numerically unstable near t={time:g}.")
+
+    def _compute_invariants(state: np.ndarray, *, time: float) -> tuple[float, float, float]:
+        with np.errstate(over="ignore", invalid="ignore"):
+            values = compute_kdv_invariants(
+                state, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta_disp
+            )
+        invariant_values = np.asarray(values, dtype=float)
+        _require_finite(invariant_values, time=time)
+        return values
+
+    _require_finite(u, time=float(t[0]))
+
     mass = np.zeros(n_stored)
     l2 = np.zeros(n_stored)
     hamiltonian = np.zeros(n_stored)
-    mass[0], l2[0], hamiltonian[0] = compute_kdv_invariants(
-        u, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta_disp
-    )
+    mass[0], l2[0], hamiltonian[0] = _compute_invariants(u, time=float(t[0]))
     max_amplitude = float(np.max(np.abs(u)))
     store_pos = 1
 
     e, e_half, q, f1, f2, f3 = _kdv_etdrk4_coefficients(linear_op, dt=dt)
-    v = np.fft.fft(u)
+    with np.errstate(over="ignore", invalid="ignore"):
+        v = np.fft.fft(u)
+    _require_finite(v, time=float(t[0]))
     v[~dealias_mask] = 0.0
 
     def _nonlinear(v_hat: np.ndarray) -> np.ndarray:
-        u_state = np.real(np.fft.ifft(v_hat))
-        u_sq_hat = np.fft.fft(u_state * u_state)
+        current_time = float(t[step])
+        _require_finite(v_hat, time=current_time)
+        with np.errstate(over="ignore", invalid="ignore"):
+            u_state = np.real(np.fft.ifft(v_hat))
+        _require_finite(u_state, time=current_time)
+        with np.errstate(over="ignore", invalid="ignore"):
+            u_squared = u_state * u_state
+        _require_finite(u_squared, time=current_time)
+        with np.errstate(over="ignore", invalid="ignore"):
+            u_sq_hat = np.fft.fft(u_squared)
+        _require_finite(u_sq_hat, time=current_time)
         u_sq_hat[~dealias_mask] = 0.0
-        return -0.5j * alpha * k * u_sq_hat
+        with np.errstate(over="ignore", invalid="ignore"):
+            nonlinear = -0.5j * alpha * k * u_sq_hat
+        _require_finite(nonlinear, time=current_time)
+        return nonlinear
 
     for step in range(1, n_steps + 1):
         n_v = _nonlinear(v)
@@ -217,14 +243,18 @@ def _simulate_kdv(
         n_b = _nonlinear(b)
         c_stage = e_half * a + q * (2.0 * n_b - n_v)
         n_c = _nonlinear(c_stage)
-        v = e * v + f1 * n_v + 2.0 * f2 * (n_a + n_b) + f3 * n_c
+        with np.errstate(over="ignore", invalid="ignore"):
+            v = e * v + f1 * n_v + f2 * (n_a + n_b) + f3 * n_c
+        _require_finite(v, time=float(t[step]))
         v[~dealias_mask] = 0.0
-        u = np.real(np.fft.ifft(v))
+        with np.errstate(over="ignore", invalid="ignore"):
+            u = np.real(np.fft.ifft(v))
+        _require_finite(u, time=float(t[step]))
         max_amplitude = max(max_amplitude, float(np.max(np.abs(u))))
         if store_pos < n_stored and step == int(stored_steps[store_pos]):
             u_hist[store_pos] = u
-            mass[store_pos], l2[store_pos], hamiltonian[store_pos] = compute_kdv_invariants(
-                u, dx=dx, k=k, c=c, alpha=alpha, beta_disp=beta_disp
+            mass[store_pos], l2[store_pos], hamiltonian[store_pos] = _compute_invariants(
+                u, time=float(t[step])
             )
             store_pos += 1
 
@@ -362,13 +392,22 @@ def solve_nonlinear_waves(
             alpha=alpha,
             beta_disp=beta_disp,
         )
-        final_spectrum = np.abs(np.fft.fftshift(np.fft.fft(final_field))) ** 2
+        if not np.all(np.isfinite(field)) or not all(
+            np.all(np.isfinite(values)) for values in invariants.values()
+        ):
+            raise RuntimeError("KdV integration returned non-finite numerical data.")
+        with np.errstate(over="ignore", invalid="ignore"):
+            final_spectrum = np.abs(np.fft.fftshift(np.fft.fft(final_field))) ** 2
+        if not np.all(np.isfinite(final_spectrum)):
+            raise RuntimeError("KdV integration returned non-finite numerical data.")
         k_shift = np.fft.fftshift(k)
         ref = abs(invariants["mass"][0]) + 1e-12
         magnitudes = {
             "mass_drift_rel": float((invariants["mass"][-1] - invariants["mass"][0]) / ref),
             "max_amplitude": max_amplitude,
         }
+        if not all(np.isfinite(value) for value in magnitudes.values()):
+            raise RuntimeError("KdV integration returned non-finite numerical data.")
         metadata = {
             "model_type": "kdv",
             "c": float(c),
