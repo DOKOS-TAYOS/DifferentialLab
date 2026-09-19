@@ -30,7 +30,14 @@ from frontend.window_utils import fit_and_center, make_modal
 
 
 def parse_n_body_state_text(
-    masses_text: str, positions_text: str, velocities_text: str, *, n_bodies: int, dimension: int
+    masses_text: str,
+    positions_text: str,
+    velocities_text: str,
+    *,
+    n_bodies: int,
+    dimension: int,
+    gravitational_constant: float,
+    epsilon: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Parse exact comma/line state text without padding or truncating user data."""
     try:
@@ -63,7 +70,14 @@ def parse_n_body_state_text(
         parse_rows(positions_text, "Positions"),
         parse_rows(velocities_text, "Velocities"),
     )
-    return validate_n_body_state(masses, positions, velocities, dimension=dimension)[:3]
+    return validate_n_body_state(
+        masses,
+        positions,
+        velocities,
+        dimension=dimension,
+        gravitational_constant=gravitational_constant,
+        epsilon=epsilon,
+    )[:3]
 
 
 def assess_n_body_request(*, n_bodies: int, n_points: int) -> PerformanceAdvisory | None:
@@ -342,20 +356,24 @@ class GravitationalNBodyDialog:
     def _collect_inputs(self) -> dict[str, object]:
         dimension = 2 if self._dimension_var.get() == "2D" else 3
         n_bodies = 3 if self._mode_var.get() == "Three-body" else int(self._n_var.get())
+        gravitational_constant = float(self._g_var.get())
+        epsilon = float(self._epsilon_var.get())
         masses, positions, velocities = parse_n_body_state_text(
             self._masses_var.get(),
             self._positions_text.get("1.0", tk.END),
             self._velocities_text.get("1.0", tk.END),
             n_bodies=n_bodies,
             dimension=dimension,
+            gravitational_constant=gravitational_constant,
+            epsilon=epsilon,
         )
         return {
             "masses": masses,
             "positions": positions,
             "velocities": velocities,
             "dimension": dimension,
-            "gravitational_constant": float(self._g_var.get()),
-            "epsilon": float(self._epsilon_var.get()),
+            "gravitational_constant": gravitational_constant,
+            "epsilon": epsilon,
             "t_min": float(self._t_min_var.get()),
             "t_max": float(self._t_max_var.get()),
             "n_points": int(self._n_points_var.get()),

@@ -34,6 +34,7 @@ class OrbitAnimationPayload:
 
     t: np.ndarray
     positions: np.ndarray
+    center_of_mass: np.ndarray
     masses: np.ndarray
     dimension: int
     reference_frame: _ReferenceFrame
@@ -44,10 +45,12 @@ def orbit_animation_payload(
 ) -> OrbitAnimationPayload:
     """Prepare current reference-frame data without rerunning the solver."""
     positions = result.positions.copy()
+    center_of_mass = result.center_of_mass.copy()
     if reference_frame == "Center of mass":
-        positions -= result.center_of_mass[:, np.newaxis, :]
+        positions -= center_of_mass[:, np.newaxis, :]
+        center_of_mass = np.zeros_like(center_of_mass)
     return OrbitAnimationPayload(
-        result.t, positions, result.masses, result.dimension, reference_frame
+        result.t, positions, center_of_mass, result.masses, result.dimension, reference_frame
     )
 
 
@@ -87,7 +90,16 @@ def create_orbit_animation_figure(payload: OrbitAnimationPayload) -> Figure:
         points: Any = axis.scatter(
             initial[:, 0], initial[:, 1], initial[:, 2], s=_marker_sizes(payload.masses), c=colors
         )
-        com_marker = axis.scatter([0.0], [0.0], [0.0], marker="+", s=100, c="black", label="COM")
+        initial_com = payload.center_of_mass[0]
+        com_marker = axis.scatter(
+            [initial_com[0]],
+            [initial_com[1]],
+            [initial_com[2]],
+            marker="+",
+            s=100,
+            c="black",
+            label="COM",
+        )
 
         def update(index: int) -> None:
             current = payload.positions[index]
@@ -97,6 +109,12 @@ def create_orbit_animation_figure(payload: OrbitAnimationPayload) -> Figure:
                 )
                 trail.set_3d_properties(payload.positions[: index + 1, body, 2])
             points._offsets3d = (current[:, 0], current[:, 1], current[:, 2])
+            current_com = payload.center_of_mass[index]
+            com_marker._offsets3d = (
+                np.asarray([current_com[0]]),
+                np.asarray([current_com[1]]),
+                np.asarray([current_com[2]]),
+            )
             axis.set_title(f"Gravitational N-body orbit — t={payload.t[index]:.4g}")
             fig.canvas.draw_idle()
 
@@ -115,7 +133,10 @@ def create_orbit_animation_figure(payload: OrbitAnimationPayload) -> Figure:
         points: Any = axis.scatter(
             initial[:, 0], initial[:, 1], s=_marker_sizes(payload.masses), c=colors
         )
-        com_marker = axis.scatter([0.0], [0.0], marker="+", s=100, c="black", label="COM")
+        initial_com = payload.center_of_mass[0]
+        com_marker = axis.scatter(
+            [initial_com[0]], [initial_com[1]], marker="+", s=100, c="black", label="COM"
+        )
 
         def update(index: int) -> None:
             current = payload.positions[index]
@@ -124,6 +145,7 @@ def create_orbit_animation_figure(payload: OrbitAnimationPayload) -> Figure:
                     payload.positions[: index + 1, body, 0], payload.positions[: index + 1, body, 1]
                 )
             points.set_offsets(current[:, :2])
+            com_marker.set_offsets(payload.center_of_mass[index, :2])
             axis.set_title(f"Gravitational N-body orbit — t={payload.t[index]:.4g}")
             fig.canvas.draw_idle()
 

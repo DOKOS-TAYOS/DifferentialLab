@@ -21,6 +21,7 @@ from complex_problems.gravitational_n_body.result_dialog import (
     selected_pair_distance,
 )
 from complex_problems.gravitational_n_body.solver import solve_n_body
+from complex_problems.gravitational_n_body.ui import parse_n_body_state_text
 
 
 def test_two_body_force_is_equal_and_opposite_and_translation_invariant() -> None:
@@ -156,3 +157,78 @@ def test_orbit_animation_uses_current_reference_frame_data() -> None:
     assert callable(getattr(figure, "_animation_update", None))
     figure._animation_update(3)  # type: ignore[attr-defined]
     assert selected_pair_distance(result, 0, 1).shape == result.t.shape
+
+
+def test_orbit_animation_tracks_nonzero_moving_com_in_2d_and_com_frame() -> None:
+    result = solve_n_body(
+        masses=[1.0, 2.0],
+        positions=[[1.0, 0.0], [2.0, 0.0]],
+        velocities=[[0.0, 1.0], [0.0, 2.0]],
+        t_max=0.2,
+        n_points=8,
+    )
+    inertial_payload = orbit_animation_payload(result, "Inertial")
+    assert np.allclose(inertial_payload.center_of_mass, result.center_of_mass)
+    assert not np.allclose(inertial_payload.center_of_mass, 0.0)
+    inertial_figure = create_orbit_animation_figure(inertial_payload)
+    try:
+        inertial_figure._animation_update(4)  # type: ignore[attr-defined]
+        marker = inertial_figure.axes[0].collections[-1]
+        np.testing.assert_allclose(marker.get_offsets()[0], result.center_of_mass[4])
+    finally:
+        import matplotlib.pyplot as plt
+
+        plt.close(inertial_figure)
+
+    com_payload = orbit_animation_payload(result, "Center of mass")
+    assert np.allclose(
+        np.average(com_payload.positions, axis=1, weights=result.masses), 0.0, atol=1e-8
+    )
+    assert np.allclose(com_payload.center_of_mass, 0.0)
+    com_figure = create_orbit_animation_figure(com_payload)
+    try:
+        com_figure._animation_update(4)  # type: ignore[attr-defined]
+        np.testing.assert_allclose(com_figure.axes[0].collections[-1].get_offsets()[0], [0.0, 0.0])
+    finally:
+        plt.close(com_figure)
+
+
+def test_orbit_animation_tracks_com_marker_in_3d() -> None:
+    result = solve_n_body(
+        masses=[1.0, 2.0],
+        positions=[[1.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+        velocities=[[0.0, 1.0, 0.5], [0.0, 2.0, 1.0]],
+        t_max=0.1,
+        n_points=5,
+    )
+    figure = create_orbit_animation_figure(orbit_animation_payload(result))
+    try:
+        figure._animation_update(3)  # type: ignore[attr-defined]
+        marker = figure.axes[0].collections[-1]
+        offsets = marker._offsets3d  # type: ignore[attr-defined]
+        np.testing.assert_allclose([values[0] for values in offsets], result.center_of_mass[3])
+    finally:
+        import matplotlib.pyplot as plt
+
+        plt.close(figure)
+
+
+def test_custom_state_parser_uses_configured_gravity_and_softening() -> None:
+    common = ("1, 1", "0, 0\n0, 0", "0, 0\n0, 0")
+    with pytest.raises(ValueError, match="Coincident"):
+        parse_n_body_state_text(
+            *common, n_bodies=2, dimension=2, gravitational_constant=2.5, epsilon=0.0
+        )
+    masses, positions, velocities = parse_n_body_state_text(
+        *common, n_bodies=2, dimension=2, gravitational_constant=2.5, epsilon=0.25
+    )
+    assert masses.tolist() == [1.0, 1.0]
+    assert positions.shape == velocities.shape == (2, 2)
+    with pytest.raises(ValueError, match="positive"):
+        parse_n_body_state_text(
+            *common, n_bodies=2, dimension=2, gravitational_constant=0.0, epsilon=0.25
+        )
+    with pytest.raises(ValueError, match="non-negative"):
+        parse_n_body_state_text(
+            *common, n_bodies=2, dimension=2, gravitational_constant=2.5, epsilon=-0.1
+        )
