@@ -49,6 +49,61 @@ class ScalarSlice3D:
     fixed_coordinate: float
 
 
+@dataclass(frozen=True)
+class ScalarAxisSweep:
+    """Display-independent frames obtained by sweeping one spatial axis."""
+
+    sweep_axis: Literal["x", "y", "z"]
+    sweep_coordinates: NDArray[np.float64]
+    axis_1: NDArray[np.float64]
+    axis_2: NDArray[np.float64] | None
+    frames: NDArray[np.float64]
+
+
+def prepare_scalar_axis_sweep_2d(
+    x: ArrayLike,
+    y: ArrayLike,
+    values: ArrayLike,
+    sweep_axis: Literal["x", "y"],
+) -> ScalarAxisSweep:
+    """Prepare 1D scalar profiles by sweeping one coordinate of a 2D field."""
+    x_arr = np.asarray(x, dtype=float)
+    y_arr = np.asarray(y, dtype=float)
+    field = np.asarray(values, dtype=float)
+    if x_arr.ndim != 1 or y_arr.ndim != 1:
+        raise ValueError("x and y must be one-dimensional")
+    if field.shape != (len(y_arr), len(x_arr)):
+        raise ValueError("values must have shape (len(y), len(x))")
+    if sweep_axis == "x":
+        return ScalarAxisSweep("x", x_arr, y_arr, None, field.T)
+    if sweep_axis == "y":
+        return ScalarAxisSweep("y", y_arr, x_arr, None, field)
+    raise ValueError("sweep_axis must be 'x' or 'y'")
+
+
+def prepare_scalar_axis_sweep_3d(
+    x: ArrayLike,
+    y: ArrayLike,
+    z: ArrayLike,
+    values: ArrayLike,
+    sweep_axis: Literal["x", "y", "z"],
+) -> ScalarAxisSweep:
+    """Prepare orthogonal 2D scalar frames from ``(z, y, x)`` field data."""
+    x_arr, y_arr, z_arr = (np.asarray(axis, dtype=float) for axis in (x, y, z))
+    field = np.asarray(values, dtype=float)
+    if any(axis.ndim != 1 for axis in (x_arr, y_arr, z_arr)):
+        raise ValueError("x, y, and z must be one-dimensional")
+    if field.shape != (len(z_arr), len(y_arr), len(x_arr)):
+        raise ValueError("values must have shape (len(z), len(y), len(x))")
+    if sweep_axis == "x":
+        return ScalarAxisSweep("x", x_arr, y_arr, z_arr, np.moveaxis(field, 2, 0))
+    if sweep_axis == "y":
+        return ScalarAxisSweep("y", y_arr, x_arr, z_arr, np.moveaxis(field, 1, 0))
+    if sweep_axis == "z":
+        return ScalarAxisSweep("z", z_arr, x_arr, y_arr, field)
+    raise ValueError("sweep_axis must be 'x', 'y', or 'z'")
+
+
 def _arrays(*values: ArrayLike) -> tuple[NDArray[np.float64], ...]:
     """Convert and broadcast numeric coordinate inputs without mutating them."""
     return tuple(np.broadcast_arrays(*(np.asarray(value, dtype=float) for value in values)))

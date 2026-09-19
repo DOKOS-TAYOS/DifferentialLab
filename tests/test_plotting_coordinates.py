@@ -18,6 +18,8 @@ from plotting.coordinates import (
     extract_scalar_3d_slice,
     polar_to_cartesian,
     polar_vector_to_cartesian,
+    prepare_scalar_axis_sweep_2d,
+    prepare_scalar_axis_sweep_3d,
     resample_scalar_to_polar,
     spherical_to_cartesian,
     spherical_vector_to_cartesian,
@@ -140,3 +142,74 @@ def test_extract_scalar_3d_slice_uses_documented_public_axis_order() -> None:
     extracted = extract_scalar_3d_slice([0, 1, 2, 3], [0, 1, 2], [0, 1], values, "XZ", 1)
     np.testing.assert_array_equal(extracted.values, values[:, 1, :])
     assert extracted.fixed_coordinate == 1.0
+
+
+def test_scalar_axis_sweep_2d_preserves_both_profile_orientations() -> None:
+    """2D sweeps use the spatial axis as frames without changing field order."""
+    x = np.array([10.0, 20.0, 30.0, 40.0])
+    y = np.array([1.0, 2.0, 3.0])
+    values = np.arange(12.0).reshape(3, 4)
+
+    x_sweep = prepare_scalar_axis_sweep_2d(x, y, values, "x")
+    assert x_sweep.sweep_axis == "x"
+    np.testing.assert_array_equal(x_sweep.sweep_coordinates, x)
+    np.testing.assert_array_equal(x_sweep.axis_1, y)
+    assert x_sweep.axis_2 is None
+    np.testing.assert_array_equal(x_sweep.frames, values.T)
+
+    y_sweep = prepare_scalar_axis_sweep_2d(x, y, values, "y")
+    assert y_sweep.sweep_axis == "y"
+    np.testing.assert_array_equal(y_sweep.sweep_coordinates, y)
+    np.testing.assert_array_equal(y_sweep.axis_1, x)
+    assert y_sweep.axis_2 is None
+    np.testing.assert_array_equal(y_sweep.frames, values)
+
+
+def test_scalar_axis_sweep_3d_matches_public_slice_order() -> None:
+    """3D sweep frames retain the public ``(z, y, x)`` storage convention."""
+    x = np.arange(4.0)
+    y = np.arange(3.0)
+    z = np.arange(2.0)
+    values = np.arange(24.0).reshape(2, 3, 4)
+
+    x_sweep = prepare_scalar_axis_sweep_3d(x, y, z, values, "x")
+    np.testing.assert_array_equal(x_sweep.frames, np.moveaxis(values, 2, 0))
+    np.testing.assert_array_equal(x_sweep.axis_1, y)
+    np.testing.assert_array_equal(x_sweep.axis_2, z)
+    assert x_sweep.frames.shape == (4, 2, 3)
+
+    y_sweep = prepare_scalar_axis_sweep_3d(x, y, z, values, "y")
+    np.testing.assert_array_equal(y_sweep.frames, np.moveaxis(values, 1, 0))
+    np.testing.assert_array_equal(y_sweep.axis_1, x)
+    np.testing.assert_array_equal(y_sweep.axis_2, z)
+    assert y_sweep.frames.shape == (3, 2, 4)
+
+    z_sweep = prepare_scalar_axis_sweep_3d(x, y, z, values, "z")
+    np.testing.assert_array_equal(z_sweep.frames, values)
+    np.testing.assert_array_equal(z_sweep.axis_1, x)
+    np.testing.assert_array_equal(z_sweep.axis_2, y)
+    assert z_sweep.frames.shape == (2, 3, 4)
+
+
+@pytest.mark.parametrize(
+    ("helper", "arguments"),
+    [
+        (prepare_scalar_axis_sweep_2d, ([0.0, 1.0], [0.0], np.zeros((2, 2)), "x")),
+        (
+            prepare_scalar_axis_sweep_3d,
+            ([0.0], [0.0], [0.0], np.zeros((2, 1, 1)), "z"),
+        ),
+    ],
+)
+def test_scalar_axis_sweeps_reject_invalid_shapes(
+    helper: object, arguments: tuple[object, ...]
+) -> None:
+    with pytest.raises(ValueError, match="shape"):
+        helper(*arguments)  # type: ignore[operator]
+
+
+def test_scalar_axis_sweeps_reject_invalid_axes() -> None:
+    with pytest.raises(ValueError, match="sweep_axis"):
+        prepare_scalar_axis_sweep_2d([0.0], [0.0], [[1.0]], "z")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="sweep_axis"):
+        prepare_scalar_axis_sweep_3d([0.0], [0.0], [0.0], [[[1.0]]], "q")  # type: ignore[arg-type]

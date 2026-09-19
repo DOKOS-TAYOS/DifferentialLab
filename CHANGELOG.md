@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added reusable stationary-PDE axis-sweep preparation and frame-labelled animation
+  infrastructure for future result views.
+
 - Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
   including the default two-soliton overtaking setup and reproducibility metadata.
 
