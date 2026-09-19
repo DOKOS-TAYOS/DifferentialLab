@@ -70,6 +70,12 @@ Most modules expose model-specific diagnostics in results:
 
 Use those diagnostics before trusting conclusions from aggressive settings.
 
+For KdV one-soliton and separated-train results, the profile animation can show the
+numerical solution together with each isolated reference soliton propagated at its
+stored theoretical speed. It can also show the diagnostic residual
+`u - Σ(reference solitons)`. These references are non-interacting theoretical
+trajectories; the residual is not a unique decomposition of the nonlinear solution.
+
 ## Performance Guidelines
 
 - Start with defaults and validate a low-cost run first.

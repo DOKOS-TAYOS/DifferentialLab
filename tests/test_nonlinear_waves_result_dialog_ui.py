@@ -223,3 +223,111 @@ def test_collect_inputs_kdv_single_soliton_maps_scalar_controls() -> None:
     assert params["profile"] == "kdv_soliton"
     assert params["amplitude"] == 1.25
     assert params["center"] == -3.5
+
+
+def _make_kdv_reference_result(
+    *, numerical: np.ndarray, t: np.ndarray | None = None
+) -> SimpleNamespace:
+    times = np.array([0.0, 1.0]) if t is None else t
+    x = np.linspace(-20.0, 20.0, numerical.shape[1], endpoint=False)
+    return SimpleNamespace(
+        model_type="kdv",
+        x=x,
+        t=times,
+        field=numerical,
+        metadata={
+            "profile": "kdv_soliton_train",
+            "soliton_count": 2,
+            "soliton_amplitudes": [1.2, 0.5],
+            "soliton_centers": [-8.0, -2.0],
+            "soliton_inverse_widths": [1.0, 0.5],
+            "soliton_speeds": [2.4, 1.0],
+            "x_min": -20.0,
+            "x_max": 20.0,
+        },
+    )
+
+
+def test_kdv_reference_profiles_wrap_and_follow_stored_speeds() -> None:
+    x = np.linspace(-20.0, 20.0, 2048, endpoint=False)
+    payload = result_dialog._KdvReferenceAnimationPayload(
+        x=x,
+        t=np.array([0.0, 1.0]),
+        numerical=np.zeros((2, len(x))),
+        amplitudes=(1.0,),
+        centers=(19.0,),
+        inverse_widths=(1.0,),
+        speeds=(2.0,),
+        x_min=-20.0,
+        x_max=20.0,
+        selected=("Reference soliton 1",),
+    )
+    initial = result_dialog._reference_profiles_at_time(payload, 0.0)[0]
+    wrapped = result_dialog._reference_profiles_at_time(payload, 1.0)[0]
+    assert x[np.argmax(initial)] == pytest.approx(19.0, abs=0.05)
+    assert x[np.argmax(wrapped)] == pytest.approx(-19.0, abs=0.05)
+
+
+def test_kdv_reference_residual_is_zero_then_reproduces_perturbation() -> None:
+    x = np.linspace(-20.0, 20.0, 256, endpoint=False)
+    base = result_dialog._KdvReferenceAnimationPayload(
+        x=x,
+        t=np.array([0.0, 1.0]),
+        numerical=np.zeros((2, len(x))),
+        amplitudes=(1.2, 0.5),
+        centers=(-8.0, -2.0),
+        inverse_widths=(1.0, 0.5),
+        speeds=(2.4, 1.0),
+        x_min=-20.0,
+        x_max=20.0,
+        selected=("Interaction residual",),
+    )
+    references = np.array(
+        [
+            np.sum(result_dialog._reference_profiles_at_time(base, float(time)), axis=0)
+            for time in base.t
+        ]
+    )
+    exact = base.__class__(**{**base.__dict__, "numerical": references})
+    figure = result_dialog._create_kdv_reference_animation_figure(exact)
+    try:
+        residual = figure.axes[0].lines[0].get_ydata()
+        np.testing.assert_allclose(residual, 0.0, atol=1e-12)
+    finally:
+        plt.close(figure)
+    perturbation = np.full_like(references, 0.125)
+    perturbed = base.__class__(**{**base.__dict__, "numerical": references + perturbation})
+    figure = result_dialog._create_kdv_reference_animation_figure(perturbed)
+    try:
+        np.testing.assert_allclose(figure.axes[0].lines[0].get_ydata(), perturbation[0])
+    finally:
+        plt.close(figure)
+
+
+def test_kdv_reference_figure_styles_labels_and_animation() -> None:
+    x = np.linspace(-20.0, 20.0, 128, endpoint=False)
+    result = _make_kdv_reference_result(numerical=np.zeros((2, len(x))))
+    payload = result_dialog._create_kdv_reference_animation_payload(
+        result,
+        ("Numerical u", "Reference soliton 1", "Reference soliton 2", "Interaction residual"),
+    )
+    figure = result_dialog._create_kdv_reference_animation_figure(payload)
+    try:
+        lines = figure.axes[0].lines
+        assert [line.get_label() for line in lines] == [
+            "Numerical u",
+            "Reference soliton 1",
+            "Reference soliton 2",
+            "Interaction residual",
+        ]
+        assert lines[0].get_linestyle() == "-"
+        assert lines[1].get_linestyle() == "--"
+        assert lines[2].get_linestyle() == "--"
+        assert lines[3].get_linestyle() == ":"
+        assert lines[1].get_color() != lines[2].get_color()
+        assert figure._animation_n_points == 2  # type: ignore[attr-defined]
+        figure._animation_update(1)  # type: ignore[attr-defined]
+        assert figure.axes[0].get_title().endswith("t=1)")
+        assert np.max(lines[1].get_ydata()) > 0.0
+    finally:
+        plt.close(figure)

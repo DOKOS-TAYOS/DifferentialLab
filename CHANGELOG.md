@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
   including the default two-soliton overtaking setup and reproducibility metadata.
 
+- Added selectable KdV soliton-profile references and the diagnostic residual
+  `u - Σ(reference solitons)` to the profile animation for supported soliton results.
+
 - Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat
   source, anisotropic diffusion, and screened Poisson.
 - Added catalog boundary defaults for rectangular PDE controls and a nontrivial Laplace
