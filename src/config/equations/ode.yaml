@@ -107,7 +107,7 @@ simple_pendulum:
   order: 2
   parameters:
     g:
-      default: -9.81
+      default: 9.81
       description: Gravitational acceleration (m/s²)
     L:
       default: 1.0
@@ -490,7 +490,7 @@ allee_effect:
   formula: f' = rf(1 - f/K)(f/K - m)
   description: "f' = rf(1 - f/K)(f/K - m)
 
-    Population with critical threshold."
+    Population with critical threshold; the default starts below the threshold and declines."
   order: 1
   parameters:
     r:
@@ -504,7 +504,7 @@ allee_effect:
       description: Allee threshold (0 < m < 1)
   function_name: allee_effect
   default_initial_conditions:
-  - 2.0
+  - 1.0
   default_domain:
   - 0.0
   - 20.0

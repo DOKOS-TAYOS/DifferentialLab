@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat
   source, anisotropic diffusion, and screened Poisson.
+- Added catalog boundary defaults for rectangular PDE controls and a nontrivial Laplace
+  preset, corrected the simple-pendulum and Allee-effect defaults, and made the built-in
+  Vector PDE a manufactured nontrivial problem with a documented exact solution.
 
 ## [0.6.0] - 2026-09-19
 

@@ -141,6 +141,26 @@ def test_predefined_pde_3d_ui_uses_standard_parameters_dialog() -> None:
     assert kwargs["default_domain"] == [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
 
 
+def test_predefined_laplace_ui_forwards_boundary_preset() -> None:
+    """The standard predefined route passes editable catalog BC defaults onward."""
+    equation = load_predefined_equations()["laplace_2d"]
+    dialog = EquationDialog.__new__(EquationDialog)
+    dialog.equations = {equation.key: equation}
+    dialog._selected_key = equation.key
+    dialog.win = _FakeWindow()
+    dialog.parent = object()
+
+    with patch("frontend.ui_dialogs.parameters_dialog.ParametersDialog") as parameters_dialog:
+        dialog._on_next_predefined()
+
+    assert parameters_dialog.call_args.kwargs["default_boundary_conditions"] == {
+        "bottom": {"type": "Dirichlet", "expression": "x"},
+        "top": {"type": "Dirichlet", "expression": "x"},
+        "left": {"type": "Dirichlet", "expression": "0"},
+        "right": {"type": "Dirichlet", "expression": "1"},
+    }
+
+
 def test_catalog_poisson_sine_3d_solves_with_default_boundaries() -> None:
     """The manufactured catalog case is finite and accurate on a small grid."""
     equation = load_predefined_equations()["poisson_sine_3d"]

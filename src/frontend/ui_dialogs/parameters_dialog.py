@@ -132,6 +132,7 @@ class ParametersDialog:
         vector_components: int = 1,
         pde_operator: str = "neg_laplacian",
         component_orders: tuple[int, ...] | None = None,
+        default_boundary_conditions: dict[str, dict[str, str]] | None = None,
     ) -> None:
         self.parent = parent
         self.expression = expression
@@ -159,6 +160,7 @@ class ParametersDialog:
         self.pde_operator = pde_operator
         self.is_pde = equation_type in ("pde", "pde_3d", "vector_pde") or len(self.variables) > 1
         self.component_orders = component_orders
+        self.default_boundary_conditions = default_boundary_conditions or {}
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Solve - {equation_name}")
@@ -546,6 +548,7 @@ class ParametersDialog:
                     (f"{idx0} = {idx0}\u2098\u1d62\u2099 (x min)", "x, y, z"),
                     (f"{idx0} = {idx0}\u2098\u2090\u2093 (x max)", "x, y, z"),
                 ]
+                boundary_faces = ["z_min", "z_max", "y_min", "y_max", "x_min", "x_max"]
             else:
                 boundaries = [
                     (f"{idx1} = {idx1}\u2098\u1d62\u2099 (bottom)", idx0),
@@ -553,11 +556,13 @@ class ParametersDialog:
                     (f"{idx0} = {idx0}\u2098\u1d62\u2099 (left)", idx1),
                     (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
                 ]
-            for label_text, free_var in boundaries:
+                boundary_faces = ["bottom", "top", "left", "right"]
+            for (label_text, free_var), face in zip(boundaries, boundary_faces, strict=True):
                 row = ttk.Frame(self._rect_bc_frame)
                 row.pack(fill=tk.X, pady=1)
                 ttk.Label(row, text=f"{label_text}:", width=24).pack(side=tk.LEFT)
-                bc_type_var = tk.StringVar(value="Dirichlet")
+                preset = self.default_boundary_conditions.get(face, {})
+                bc_type_var = tk.StringVar(value=preset.get("type", "Dirichlet"))
                 bc_type_combo = ttk.Combobox(
                     row,
                     textvariable=bc_type_var,
@@ -568,7 +573,7 @@ class ParametersDialog:
                 )
                 bc_type_combo.pack(side=tk.LEFT, padx=(pad, 2))
                 self._bc_type_vars.append(bc_type_var)
-                bc_var = tk.StringVar(value="0")
+                bc_var = tk.StringVar(value=preset.get("expression", "0"))
                 bc_entry = ttk.Entry(
                     row,
                     textvariable=bc_var,

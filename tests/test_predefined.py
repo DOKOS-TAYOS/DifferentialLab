@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,6 +28,7 @@ def test_predefined_equation_dataclass() -> None:
     assert eq.key == "test"
     assert eq.order == 1
     assert eq.default_domain == [0.0, 10.0]
+    assert eq.default_boundary_conditions == {}
 
 
 def test_load_predefined_equations_returns_dict() -> None:
@@ -74,6 +76,37 @@ def test_load_predefined_equations_known_keys() -> None:
         "anisotropic_diffusion_3d",
         "screened_poisson_3d",
     } <= equations.keys()
+
+
+def test_catalog_boundary_defaults_are_valid_and_laplace_is_nontrivial() -> None:
+    equations = load_predefined_equations()
+    laplace = equations["laplace_2d"]
+    assert laplace.default_boundary_conditions == {
+        "bottom": {"type": "Dirichlet", "expression": "x"},
+        "top": {"type": "Dirichlet", "expression": "x"},
+        "left": {"type": "Dirichlet", "expression": "0"},
+        "right": {"type": "Dirichlet", "expression": "1"},
+    }
+
+    valid_faces = {
+        "pde": {"bottom", "top", "left", "right"},
+        "vector_pde": {"bottom", "top", "left", "right"},
+        "pde_3d": {"z_min", "z_max", "y_min", "y_max", "x_min", "x_max"},
+    }
+    for equation in equations.values():
+        assert all(isfinite(float(value)) for value in equation.default_domain)
+        assert all(isfinite(float(value)) for value in equation.default_initial_conditions)
+        assert all(
+            isfinite(float(info.get("default", 0.0))) for info in equation.parameters.values()
+        )
+        assert all(
+            equation.default_domain[index] < equation.default_domain[index + 1]
+            for index in range(0, len(equation.default_domain), 2)
+        )
+        for face, condition in equation.default_boundary_conditions.items():
+            assert face in valid_faces[equation.equation_type]
+            assert condition["type"] in {"Dirichlet", "Neumann"}
+            assert isinstance(condition["expression"], str)
 
 
 def test_predefined_pde_3d_entries_have_required_metadata() -> None:

@@ -41,6 +41,11 @@ The current catalog has 125 entries:
 
 The catalog files live in `src/config/equations/`.
 
+Predefined PDEs may seed the standard rectangular boundary controls with catalog
+defaults. These are initial editable values only; unspecified faces remain
+Dirichlet zero. The `laplace_2d` default preset uses `x` on the bottom and top,
+`0` on the left, and `1` on the right, producing the harmonic field `f(x,y)=x`.
+
 ### 2. Define the equation
 
 For custom expressions:

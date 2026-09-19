@@ -58,6 +58,7 @@ class PredefinedEquation:
             If absent or ``["x"]``, treated as 1D ODE.
         partial_derivatives: For PDEs, maps derivative keys (e.g. ``"f_xx"``, ``"f_xy"``)
             to expression strings. Only needed for PDE type.
+        default_boundary_conditions: Optional initial values for rectangular PDE faces.
     """
 
     key: str
@@ -76,6 +77,7 @@ class PredefinedEquation:
     category: str = "Oscillators"
     variables: list[str] = field(default_factory=lambda: ["x"])
     partial_derivatives: dict[str, str] | None = None
+    default_boundary_conditions: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 def load_predefined_equations() -> dict[str, PredefinedEquation]:
@@ -138,6 +140,13 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
 
         partial_derivatives = data.get("partial_derivatives")
         partial_derivatives = dict(partial_derivatives) if partial_derivatives else None
+        default_boundary_conditions = {
+            str(face): {
+                "type": str(condition.get("type", "Dirichlet")),
+                "expression": str(condition.get("expression", "0")),
+            }
+            for face, condition in (data.get("default_boundary_conditions") or {}).items()
+        }
 
         eq = PredefinedEquation(
             key=key,
@@ -156,6 +165,7 @@ def load_predefined_equations() -> dict[str, PredefinedEquation]:
             category=str(data.get("category", "Oscillators")),
             variables=list(data.get("variables", ["x"])),
             partial_derivatives=partial_derivatives,
+            default_boundary_conditions=default_boundary_conditions,
         )
         equations[key] = eq
         logger.debug("Loaded predefined equation: %s", key)
