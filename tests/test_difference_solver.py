@@ -25,6 +25,7 @@ def test_geometric_growth() -> None:
 
 def test_fibonacci() -> None:
     """Fibonacci y_{n+2} = y_{n+1} + y_n with y_0=0, y_1=1."""
+
     def recur(n: int, y: np.ndarray) -> float:
         return y[0] + y[1]
 
@@ -39,6 +40,7 @@ def test_fibonacci() -> None:
 
 def test_n_min_ge_n_max_returns_failure() -> None:
     """n_min >= n_max should return success=False."""
+
     def recur(n: int, y: np.ndarray) -> float:
         return y[0]
 
@@ -54,6 +56,7 @@ def test_n_min_ge_n_max_returns_failure() -> None:
 
 def test_exception_in_recur_func_propagates() -> None:
     """Exception in recur_func should set success=False and propagate message."""
+
     def recur_failing(n: int, y: np.ndarray) -> float:
         raise ValueError("custom error")
 
@@ -61,3 +64,39 @@ def test_exception_in_recur_func_propagates() -> None:
     assert result.success is False
     assert "custom error" in result.message
     assert len(result.n) >= 1  # Partial result up to failure point
+
+
+def test_callback_receives_ordered_distinct_states_without_back_mutation() -> None:
+    """Callbacks may retain and mutate their state without altering saved output."""
+    received: list[np.ndarray] = []
+
+    def recur(_n: int, state: np.ndarray) -> float:
+        received.append(state)
+        state[0] += 10.0
+        return float(state.sum())
+
+    result = solve_difference(recur, n_min=0, n_max=2, y0=[1.0, 2.0], order=2)
+
+    assert result.success is True
+    assert len({id(state) for state in received}) == 2
+    np.testing.assert_allclose(received[0], [11.0, 2.0])
+    np.testing.assert_allclose(received[1], [12.0, 13.0])
+    np.testing.assert_allclose(result.y, [[1.0, 2.0, 13.0], [2.0, 13.0, 25.0]])
+
+
+def test_failure_truncation_includes_the_current_unwritten_column() -> None:
+    """A failure preserves the established current-index truncation contract."""
+    calls = 0
+
+    def recur(_n: int, state: np.ndarray) -> float:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("stop after first recurrence")
+        return float(state[0] + state[1])
+
+    result = solve_difference(recur, n_min=3, n_max=6, y0=[1.0, 1.0], order=2)
+
+    assert result.success is False
+    np.testing.assert_array_equal(result.n, [3.0, 4.0, 5.0])
+    np.testing.assert_allclose(result.y, [[1.0, 1.0, 0.0], [1.0, 2.0, 0.0]])

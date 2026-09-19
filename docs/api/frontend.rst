@@ -21,6 +21,12 @@ frontend.plot_embed
 .. automodule:: frontend.plot_embed
    :members:
 
+frontend.performance_guard
+--------------------------
+
+.. automodule:: frontend.performance_guard
+   :members:
+
 frontend.ui_main_menu
 ---------------------
 
@@ -60,6 +66,12 @@ frontend.ui_dialogs.loading_dialog
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: frontend.ui_dialogs.loading_dialog
+   :members:
+
+frontend.ui_dialogs.background_task
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: frontend.ui_dialogs.background_task
    :members:
 
 frontend.ui_dialogs.help_dialog

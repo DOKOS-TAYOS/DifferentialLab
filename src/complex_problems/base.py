@@ -25,4 +25,3 @@ class ComplexProblem(Protocol):
 
     def open_dialog(self, parent: "Tk | Toplevel") -> None:
         """Open the problem-specific configuration dialog."""
-

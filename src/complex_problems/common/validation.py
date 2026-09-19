@@ -34,4 +34,3 @@ def parse_positive_float(value: str, *, name: str, min_value: float = 0.0) -> fl
         relation = ">" if min_value == 0 else f"> {min_value}"
         raise ValueError(f"{name} must be {relation}.")
     return out
-

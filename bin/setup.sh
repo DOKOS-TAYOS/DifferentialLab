@@ -8,6 +8,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
+MODE="${1:---prod}"
+INSTALL_TARGET="."
+INSTALL_MODE_LABEL="production"
+
+case "$MODE" in
+    --dev|-d)
+        INSTALL_TARGET=".[dev]"
+        INSTALL_MODE_LABEL="development"
+        ;;
+    --prod|-p)
+        ;;
+    *)
+        echo "Usage: bin/setup.sh [--prod|-p|--dev|-d]"
+        exit 1
+        ;;
+esac
+
 is_linux_with_pkg_manager() {
     [ "$(uname -s)" = "Linux" ] || return 1
     command -v apt-get &> /dev/null || command -v dnf &> /dev/null || \
@@ -66,6 +83,7 @@ echo ""
 echo "===================================="
 echo " DifferentialLab Setup (Unix/Mac)"
 echo "===================================="
+echo " Mode: $INSTALL_MODE_LABEL"
 echo ""
 
 if ! command -v python3 &> /dev/null; then
@@ -122,7 +140,7 @@ python -m pip install --upgrade pip
 
 echo ""
 echo "[6/7] Installing dependencies..."
-pip install -r requirements.txt
+python -m pip install -e "$INSTALL_TARGET"
 
 echo ""
 echo "[7/7] Setting up environment file..."

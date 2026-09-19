@@ -1,0 +1,22 @@
+coupled_elliptic_system_2d:
+  equation_type: vector_pde
+  category: Coupled elliptic systems
+  name: Coupled Elliptic System (2D)
+  formula: "Δf₀ + 0.2Δf₁ + f₁ = 0; 0.2Δf₀ + Δf₁ + f₀ = 0"
+  description: "A two-component strongly elliptic system with off-diagonal second-order
+    and zero-order coupling. It uses homogeneous shared Dirichlet boundaries."
+  variables:
+  - x
+  - y
+  order: 2
+  parameters: {}
+  vector_expressions:
+  - "fxx[0] + fyy[0] + 0.2*fxx[1] + 0.2*fyy[1] + f[1]"
+  - "0.2*fxx[0] + 0.2*fyy[0] + fxx[1] + fyy[1] + f[0]"
+  vector_components: 2
+  default_initial_conditions: []
+  default_domain:
+  - 0.0
+  - 1.0
+  - 0.0
+  - 1.0

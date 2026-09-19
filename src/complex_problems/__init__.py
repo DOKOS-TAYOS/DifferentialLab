@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from complex_problems.base import ProblemDescriptor
 from complex_problems.problem_registry import (
     PROBLEM_REGISTRY,
     get_problem_descriptors,
     open_problem_dialog,
 )
+
+if TYPE_CHECKING:
+    from complex_problems.complex_problems_dialog import ComplexProblemsDialog
 
 __all__ = [
     "ComplexProblemsDialog",
@@ -18,11 +23,10 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy-load ComplexProblemsDialog on first access."""
     if name == "ComplexProblemsDialog":
         from complex_problems.complex_problems_dialog import ComplexProblemsDialog
 
         return ComplexProblemsDialog
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

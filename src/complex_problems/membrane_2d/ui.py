@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
+from typing import cast
 
 import numpy as np
 
@@ -14,11 +15,17 @@ from complex_problems.common import (
     parse_int,
     parse_positive_float,
     parse_positive_int,
-    run_solver_with_loading,
+)
+from complex_problems.common.dialog_ui import (
+    make_labeled_combo,
+    make_labeled_entry,
+    make_labeled_spinbox,
+    run_solver_dialog,
 )
 from complex_problems.membrane_2d.model import build_initial_displacement
 from complex_problems.membrane_2d.solver import solve_membrane_2d
 from config import get_env_from_schema
+from frontend.performance_guard import assess_membrane_request, confirm_performance_advisory
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
@@ -84,8 +91,8 @@ class Membrane2DDialog:
         ttk.Label(
             body,
             text=(
-                "Discrete membrane lattice with fixed or periodic boundaries.\n"
-                "The linear Laplacian term is always active; optional nonlinear terms can be added."
+                "Simulate a rectangular membrane lattice with fixed or periodic boundaries.\n"
+                "Start from the linear Laplacian model, then add nonlinear terms as needed."
             ),
             style="Small.TLabel",
             justify=tk.LEFT,
@@ -103,18 +110,16 @@ class Membrane2DDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._nx_var = tk.StringVar(value="32")
         self._ny_var = tk.StringVar(value="32")
-        self._make_spinbox(row, "Nₓ", self._nx_var, from_=8, to=2048, width=7)
-        self._make_spinbox(row, "Nᵧ", self._ny_var, from_=8, to=2048, width=7)
+        make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=8, to=2048, width=7)
+        make_labeled_spinbox(row, "Nᵧ", self._ny_var, from_=8, to=2048, width=7)
         ToolTip(row, "Grid size along x and y (integers).")
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._boundary_var = tk.StringVar(value="fixed")
         self._integrator_var = tk.StringVar(value="verlet")
-        self._make_combo(row, "Boundary", self._boundary_var, _BOUNDARY_OPTIONS, width=10)
-        self._make_combo(
-            row, "Integrator", self._integrator_var, _INTEGRATOR_OPTIONS, width=10
-        )
+        make_labeled_combo(row, "Boundary", self._boundary_var, _BOUNDARY_OPTIONS, width=10)
+        make_labeled_combo(row, "Integrator", self._integrator_var, _INTEGRATOR_OPTIONS, width=10)
         ToolTip(
             row,
             "Verlet is faster and more energy-stable for Hamiltonian-like dynamics. "
@@ -125,8 +130,8 @@ class Membrane2DDialog:
         row.pack(fill=tk.X, pady=pad // 2)
         self._mass_var = tk.StringVar(value="1.0")
         self._k_var = tk.StringVar(value="1.0")
-        self._make_entry(row, "Mass m", self._mass_var, width=10)
-        self._make_entry(row, "Linear k", self._k_var, width=10)
+        make_labeled_entry(row, "Mass m", self._mass_var, width=10)
+        make_labeled_entry(row, "Linear k", self._k_var, width=10)
 
         btn_bg = get_env_from_schema("UI_BUTTON_BG")
         fg = get_env_from_schema("UI_FOREGROUND")
@@ -165,12 +170,12 @@ class Membrane2DDialog:
         self._high_power_var = tk.StringVar(value="5")
 
         self._alpha_frame = ttk.Frame(body)
-        self._make_entry(self._alpha_frame, "α coefficient", self._alpha_var, width=10)
+        make_labeled_entry(self._alpha_frame, "α coefficient", self._alpha_var, width=10)
         self._beta_frame = ttk.Frame(body)
-        self._make_entry(self._beta_frame, "β coefficient", self._beta_var, width=10)
+        make_labeled_entry(self._beta_frame, "β coefficient", self._beta_var, width=10)
         self._high_frame = ttk.Frame(body)
-        self._make_entry(self._high_frame, "cₚ coefficient", self._high_coeff_var, width=10)
-        self._make_entry(self._high_frame, "Power p", self._high_power_var, width=8)
+        make_labeled_entry(self._high_frame, "cₚ coefficient", self._high_coeff_var, width=10)
+        make_labeled_entry(self._high_frame, "Power p", self._high_power_var, width=8)
         ToolTip(
             self._high_frame,
             "Higher-order contribution uses cₚ·sign(Δu)·|Δu|ᵖ with integer p ≥ 2.",
@@ -180,31 +185,29 @@ class Membrane2DDialog:
         self._t_min_var = tk.StringVar(value="0.0")
         self._t_max_var = tk.StringVar(value="20.0")
         self._dt_var = tk.StringVar(value="0.02")
-        self._make_entry(row, "tₘᵢₙ", self._t_min_var, width=8)
-        self._make_entry(row, "tₘₐₓ", self._t_max_var, width=8)
-        self._make_entry(row, "Δt", self._dt_var, width=8)
+        make_labeled_entry(row, "tₘᵢₙ", self._t_min_var, width=8)
+        make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
+        make_labeled_entry(row, "Δt", self._dt_var, width=8)
 
         ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial condition", style="Small.TLabel").pack(anchor=tk.W)
+        ttk.Label(body, text="Initial state", style="Small.TLabel").pack(anchor=tk.W)
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._ic_shape_var = tk.StringVar(value="gaussian")
-        shape_combo = self._make_combo(
-            row, "Shape", self._ic_shape_var, _IC_SHAPES, width=12
-        )
+        shape_combo = make_labeled_combo(row, "Shape", self._ic_shape_var, _IC_SHAPES, width=12)
         shape_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_ic_visibility())
         self._amp_var = tk.StringVar(value="1.0")
         self._sigma_var = tk.StringVar(value="0.12")
-        self._make_entry(row, "Amplitude", self._amp_var, width=8)
-        self._make_entry(row, "σ", self._sigma_var, width=8)
+        make_labeled_entry(row, "Amplitude", self._amp_var, width=8)
+        make_labeled_entry(row, "σ", self._sigma_var, width=8)
 
         self._mode_row = ttk.Frame(body)
         self._mode_row.pack(fill=tk.X, pady=pad // 2)
         self._mode_x_var = tk.StringVar(value="1")
         self._mode_y_var = tk.StringVar(value="1")
-        self._make_entry(self._mode_row, "Mode nₓ", self._mode_x_var, width=6)
-        self._make_entry(self._mode_row, "Mode nᵧ", self._mode_y_var, width=6)
+        make_labeled_entry(self._mode_row, "Mode nₓ", self._mode_x_var, width=6)
+        make_labeled_entry(self._mode_row, "Mode nᵧ", self._mode_y_var, width=6)
 
         self._custom_row = ttk.Frame(body)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
@@ -217,16 +220,16 @@ class Membrane2DDialog:
             font=get_font(),
         )
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ToolTip(self._custom_entry, "Custom expression using x and y in [0,1].")
+        ToolTip(self._custom_entry, "Custom displacement expression using x and y in [0,1].")
 
         row = ttk.Frame(body)
         row.pack(fill=tk.X, pady=pad // 2)
         self._center_x_var = tk.StringVar(value="0.5")
         self._center_y_var = tk.StringVar(value="0.5")
         self._seed_var = tk.StringVar(value="0")
-        self._make_entry(row, "Center x₀", self._center_x_var, width=8)
-        self._make_entry(row, "Center y₀", self._center_y_var, width=8)
-        self._make_entry(row, "Random seed", self._seed_var, width=8)
+        make_labeled_entry(row, "Center x₀", self._center_x_var, width=8)
+        make_labeled_entry(row, "Center y₀", self._center_y_var, width=8)
+        make_labeled_entry(row, "Random seed", self._seed_var, width=8)
 
         self._btn_row = ttk.Frame(body)
         self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
@@ -238,75 +241,16 @@ class Membrane2DDialog:
             text="Close",
             style="Cancel.TButton",
             command=self.win.destroy,
-        ).pack(
-            side=tk.LEFT
-        )
+        ).pack(side=tk.LEFT)
 
         self._update_optional_terms_visibility()
         self._update_ic_visibility()
 
         scroll.bind_new_children()
 
-    def _make_entry(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        *,
-        width: int = 10,
-    ) -> ttk.Entry:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        entry = ttk.Entry(parent, textvariable=var, width=width, font=get_font())
-        entry.pack(side=tk.LEFT, padx=(0, 12))
-        return entry
-
-    def _make_spinbox(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        *,
-        from_: int,
-        to: int,
-        width: int = 8,
-    ) -> ttk.Spinbox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        spin = ttk.Spinbox(
-            parent,
-            textvariable=var,
-            from_=from_,
-            to=to,
-            width=width,
-            font=get_font(),
-        )
-        spin.pack(side=tk.LEFT, padx=(0, 12))
-        return spin
-
-    def _make_combo(
-        self,
-        parent: ttk.Frame,
-        label: str,
-        var: tk.StringVar,
-        values: tuple[str, ...],
-        *,
-        width: int = 12,
-    ) -> ttk.Combobox:
-        ttk.Label(parent, text=f"{label}:").pack(side=tk.LEFT, padx=(0, 4))
-        combo = ttk.Combobox(
-            parent,
-            textvariable=var,
-            values=list(values),
-            state="readonly",
-            width=width,
-            font=get_font(),
-        )
-        combo.pack(side=tk.LEFT, padx=(0, 12))
-        return combo
-
     def _update_optional_terms_visibility(self) -> None:
         selected = {
-            self._optional_terms_listbox.get(i)
-            for i in self._optional_terms_listbox.curselection()
+            self._optional_terms_listbox.get(i) for i in self._optional_terms_listbox.curselection()
         }
         if _TERM_ALPHA in selected:
             self._alpha_frame.pack(fill=tk.X, pady=4, before=self._btn_row)
@@ -352,8 +296,7 @@ class Membrane2DDialog:
             raise ValueError("tₘₐₓ must be greater than tₘᵢₙ.")
 
         selected_terms = {
-            self._optional_terms_listbox.get(i)
-            for i in self._optional_terms_listbox.curselection()
+            self._optional_terms_listbox.get(i) for i in self._optional_terms_listbox.curselection()
         }
         alpha, beta, high_coeff, high_power = resolve_optional_membrane_terms(
             selected_terms,
@@ -410,26 +353,31 @@ class Membrane2DDialog:
             "high_order_power": high_power,
         }
 
+    def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:
+        """Warn before launching unusually large membrane histories."""
+        u0 = cast(np.ndarray, params["u0"])
+        t_min = cast(float, params["t_min"])
+        t_max = cast(float, params["t_max"])
+        dt = cast(float, params["dt"])
+        advisory = assess_membrane_request(
+            nx=int(u0.shape[1]),
+            ny=int(u0.shape[0]),
+            t_min=t_min,
+            t_max=t_max,
+            dt=dt,
+        )
+        return confirm_performance_advisory(window, advisory)
+
     def _on_solve(self) -> None:
-        try:
-            params = self._collect_inputs()
-        except ValueError as exc:
-            messagebox.showerror("Invalid input", str(exc), parent=self.win)
-            return
+        from complex_problems.membrane_2d.result_dialog import Membrane2DResultDialog
 
-        self.win.destroy()
-
-        def _task():
-            return solve_membrane_2d(**params)
-
-        def _on_success(result) -> None:
-            from complex_problems.membrane_2d.result_dialog import Membrane2DResultDialog
-
-            Membrane2DResultDialog(self.parent, result=result)
-
-        run_solver_with_loading(
+        run_solver_dialog(
             parent=self.parent,
+            window=self.win,
+            collect_inputs=self._collect_inputs,
+            solver=solve_membrane_2d,
             message="Solving 2D nonlinear membrane...",
-            task=_task,
-            on_success=_on_success,
+            result_parent=self.parent,
+            result_dialog_factory=Membrane2DResultDialog,
+            confirm_run=self._confirm_heavy_request,
         )

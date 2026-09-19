@@ -3,6 +3,12 @@ complex_problems -- Specialized Plugin Workflows
 
 .. automodule:: complex_problems
 
+Base protocol
+-------------
+
+.. automodule:: complex_problems.base
+   :members:
+
 Registry and dialog
 -------------------
 
@@ -21,10 +27,16 @@ Common helpers
 .. automodule:: complex_problems.common.background
    :members:
 
+.. automodule:: complex_problems.common.dialog_ui
+   :members:
+
 .. automodule:: complex_problems.common.expression
    :members:
 
 .. automodule:: complex_problems.common.problem_doc_ui
+   :members:
+
+.. automodule:: complex_problems.common.result_dialog_ui
    :members:
 
 .. automodule:: complex_problems.common.validation
@@ -40,6 +52,9 @@ coupled_oscillators
 -------------------
 
 .. automodule:: complex_problems.coupled_oscillators
+
+.. automodule:: complex_problems.coupled_oscillators.problem
+   :members:
 
 .. automodule:: complex_problems.coupled_oscillators.model
    :members:
@@ -58,6 +73,9 @@ membrane_2d
 
 .. automodule:: complex_problems.membrane_2d
 
+.. automodule:: complex_problems.membrane_2d.problem
+   :members:
+
 .. automodule:: complex_problems.membrane_2d.model
    :members:
 
@@ -74,6 +92,9 @@ nonlinear_waves
 ---------------
 
 .. automodule:: complex_problems.nonlinear_waves
+
+.. automodule:: complex_problems.nonlinear_waves.problem
+   :members:
 
 .. automodule:: complex_problems.nonlinear_waves.model
    :members:
@@ -92,6 +113,9 @@ schrodinger_td
 
 .. automodule:: complex_problems.schrodinger_td
 
+.. automodule:: complex_problems.schrodinger_td.problem
+   :members:
+
 .. automodule:: complex_problems.schrodinger_td.model
    :members:
 
@@ -108,6 +132,9 @@ antenna_radiation
 -----------------
 
 .. automodule:: complex_problems.antenna_radiation
+
+.. automodule:: complex_problems.antenna_radiation.problem
+   :members:
 
 .. automodule:: complex_problems.antenna_radiation.model
    :members:
@@ -126,6 +153,9 @@ aerodynamics_2d
 
 .. automodule:: complex_problems.aerodynamics_2d
 
+.. automodule:: complex_problems.aerodynamics_2d.problem
+   :members:
+
 .. automodule:: complex_problems.aerodynamics_2d.model
    :members:
 
@@ -142,6 +172,9 @@ pipe_flow
 ---------
 
 .. automodule:: complex_problems.pipe_flow
+
+.. automodule:: complex_problems.pipe_flow.problem
+   :members:
 
 .. automodule:: complex_problems.pipe_flow.model
    :members:

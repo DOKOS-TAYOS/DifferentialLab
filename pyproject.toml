@@ -1,24 +1,23 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "differential-lab"
-version = "0.4.1"
-description = "DifferentialLab — Numerical ODE solver with Tkinter GUI, predefined equations, and professional visualizations"
+version = "0.5.0"
+description = "Scientific numerical workflows for ODEs, boundary-value problems, difference equations, and scalar/vector PDEs, with a GUI."
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Alejandro Mata Ali", email = "alejandro.mata.ali@gmail.com"}
 ]
-keywords = ["ode", "differential-equations", "scientific", "numerical-methods", "solver"]
+keywords = ["ode", "bvp", "pde", "difference-equations", "scientific-computing", "numerical-methods", "gui"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Physics",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
@@ -36,7 +35,8 @@ dev = [
     "pytest>=8.0,<10.0",
     "pytest-cov>=6.0,<8.0",
     "ruff>=0.9,<1.0",
-    "mypy>=2.0,<3.0",
+    "pyright>=1.1,<2.0",
+    "pip-audit>=2.7,<3.0",
 ]
 docs = [
     "sphinx>=8.0.0",
@@ -48,21 +48,32 @@ docs = [
 [project.scripts]
 differential-lab = "main_program:main"
 
+[tool.setuptools]
+py-modules = ["main_program", "pipeline"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+config = ["equations/*.yaml"]
+
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --basetemp=.pytest-temp"
 
 [tool.coverage.run]
-source = ["src"]
+source = [
+    "src/solver",
+    "src/utils",
+]
 omit = ["tests/*"]
 
 [tool.coverage.report]
+fail_under = 70
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -75,13 +86,36 @@ exclude_lines = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = [
+    ".venv",
+    ".worktrees",
+    ".pytest_cache",
+    ".pytest-temp",
+    ".tmp",
+    "pytest_temp*",
+    "pytest-cache-files-*",
+    "output",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 
-[tool.mypy]
-python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
+[tool.pyright]
+include = ["src"]
+exclude = [
+    ".venv",
+    ".worktrees",
+    ".pytest_cache",
+    ".pytest-temp",
+    ".tmp",
+    "pytest_temp*",
+    "pytest-cache-files-*",
+    "output",
+    "tests",
+]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src"]
+pythonVersion = "3.12"
+pythonPlatform = "Windows"
+typeCheckingMode = "basic"

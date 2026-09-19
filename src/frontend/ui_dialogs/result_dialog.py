@@ -5,12 +5,12 @@ from __future__ import annotations
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 
 from config import generate_output_basename, get_env_from_schema, get_output_dir
-from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from pipeline import SolverResult
 
 logger = get_logger(__name__)
+_EXTRAPOLATE_FILL: Any = "extrapolate"
 
 _MAGNITUDE_KEYS = {
     "mean",
@@ -74,9 +75,79 @@ class ResultDialog:
 
         # Canvas references for cleanup
         self._canvases: list[FigureCanvasTkAgg] = []
+        self._closed = False
+        self._initial_plot_callbacks: list[Callable[[], None]] = []
+        self.win.protocol("WM_DELETE_WINDOW", self._close)
 
+        # Allocate the final window geometry before creating Matplotlib canvases,
+        # then materialize every plot frame before the first canvas is embedded.
+        self._set_window_geometry()
         self._build_ui()
+        self._build_plot_tabs()
+        self.win.update_idletasks()
+        self._render_initial_plots()
+        make_modal(self.win, parent)
+        logger.info("Result dialog displayed")
 
+    def _close(self) -> None:
+        """Release owned plot resources and close the result window."""
+        if self._closed:
+            return
+        self._closed = True
+        self._cleanup_plots()
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _dispose_canvas(canvas: FigureCanvasTkAgg | None) -> None:
+        """Stop a canvas animation and close its Matplotlib figure."""
+        if canvas is None:
+            return
+
+        try:
+            stop_animation = getattr(canvas, "_stop_animation", None)
+        except Exception:
+            stop_animation = None
+        if callable(stop_animation):
+            try:
+                stop_animation()
+            except Exception:
+                logger.debug("Could not stop a result-dialog animation", exc_info=True)
+
+        try:
+            figure = getattr(canvas, "figure", None)
+        except Exception:
+            return
+        if figure is None:
+            return
+
+        import matplotlib.pyplot as plt
+
+        try:
+            plt.close(figure)
+        except Exception:
+            logger.debug("Could not close a result-dialog figure", exc_info=True)
+
+    def _cleanup_plots(self) -> None:
+        """Close every Matplotlib canvas currently owned by the dialog."""
+        canvases = tuple(self._canvases)
+        self._canvases.clear()
+        for canvas in canvases:
+            self._dispose_canvas(canvas)
+
+    def _register_canvas(self, canvas: FigureCanvasTkAgg) -> None:
+        """Track a canvas once so its figure is closed with the dialog."""
+        if not any(existing is canvas for existing in self._canvases):
+            self._canvases.append(canvas)
+
+    def _unregister_canvas(self, canvas: FigureCanvasTkAgg) -> None:
+        """Stop tracking a canvas that has already been disposed."""
+        self._canvases[:] = [existing for existing in self._canvases if existing is not canvas]
+
+    def _set_window_geometry(self) -> None:
+        """Set the dialog geometry before the initial plot canvas is embedded."""
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
         win_w = int(screen_w * 0.94)
@@ -84,8 +155,6 @@ class ResultDialog:
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
         self.win.minsize(_LEFT_MIN_WIDTH + 500, 500)
-        make_modal(self.win, parent)
-        logger.info("Result dialog displayed")
 
     # ------------------------------------------------------------------
     # UI construction
@@ -103,7 +172,7 @@ class ResultDialog:
             btn_frame,
             text="Close",
             style="Cancel.TButton",
-            command=self.win.destroy,
+            command=self._close,
         )
         btn_close.pack()
         setup_arrow_enter_navigation([[btn_close]])
@@ -138,8 +207,6 @@ class ResultDialog:
         self._notebook = ttk.Notebook(right_frame)
         self._notebook.pack(fill=tk.BOTH, expand=True)
 
-        self._build_plot_tabs()
-
     def _build_left_panel(
         self,
         inner: ttk.Frame,
@@ -163,7 +230,7 @@ class ResultDialog:
                 self._render_stat_entry(stat_section.content, key, val, pad)
 
         # Solver info
-        info_section = CollapsibleSection(inner, scroll, "Solver Info", expanded=True, pad=pad)
+        info_section = CollapsibleSection(inner, scroll, "Solver Summary", expanded=True, pad=pad)
         info_items: list[tuple[str, Any]] = [
             ("Method", metadata.get("method", "?")),
             ("Success", "Yes" if metadata.get("solver_success") else "No"),
@@ -182,6 +249,27 @@ class ResultDialog:
             info_items.append(("Residual RMS", f"{metadata['residual_rms']:.2e}"))
         if metadata.get("n_jacobian_evals") is not None:
             info_items.append(("Jacobian evals", metadata["n_jacobian_evals"]))
+        if metadata.get("n_lu_decompositions") is not None:
+            info_items.append(("LU decompositions", metadata["n_lu_decompositions"]))
+        if metadata.get("solver_status") is not None:
+            info_items.append(("Solver status", metadata["solver_status"]))
+        if metadata.get("event_times"):
+            event_count = sum(len(times) for times in metadata["event_times"])
+            info_items.append(("Detected events", event_count))
+        if metadata.get("relative_residual_l2") is not None:
+            info_items.append(("Relative residual", f"{metadata['relative_residual_l2']:.2e}"))
+        if metadata.get("component_relative_residual_l2") is not None:
+            component_values = metadata["component_relative_residual_l2"]
+            info_items.append(
+                (
+                    "Component residuals",
+                    ", ".join(f"{float(value):.2e}" for value in component_values),
+                )
+            )
+        if metadata.get("matrix_shape") is not None:
+            info_items.append(("Sparse system", metadata["matrix_shape"]))
+        if metadata.get("nnz") is not None:
+            info_items.append(("Sparse nnz", metadata["nnz"]))
         for label, value in info_items:
             row = ttk.Frame(info_section.content)
             row.pack(fill=tk.X, pady=1)
@@ -189,13 +277,13 @@ class ResultDialog:
             ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
 
         # Export
-        export_section = CollapsibleSection(inner, scroll, "Export Data", expanded=True, pad=pad)
+        export_section = CollapsibleSection(inner, scroll, "Export Results", expanded=True, pad=pad)
         btn_row = ttk.Frame(export_section.content)
         btn_row.pack(fill=tk.X, pady=2)
-        ttk.Button(btn_row, text="Save CSV...", command=self._on_save_csv).pack(
+        ttk.Button(btn_row, text="Export CSV...", command=self._on_save_csv).pack(
             side=tk.LEFT, padx=(0, pad)
         )
-        ttk.Button(btn_row, text="Save JSON...", command=self._on_save_json).pack(side=tk.LEFT)
+        ttk.Button(btn_row, text="Export JSON...", command=self._on_save_json).pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Transform controls helper
@@ -218,8 +306,13 @@ class ResultDialog:
         sep = ttk.Separator(parent, orient=tk.VERTICAL)
         sep.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
 
-        label_kw = {"style": label_style} if label_style else {}
-        ttk.Label(parent, text="Transform:", **label_kw).pack(side=tk.LEFT, padx=(0, 4))
+        if label_style:
+            ttk.Label(parent, text="Transform:", style=label_style).pack(
+                side=tk.LEFT,
+                padx=(0, 4),
+            )
+        else:
+            ttk.Label(parent, text="Transform:").pack(side=tk.LEFT, padx=(0, 4))
         var = tk.StringVar(value=TransformKind.ORIGINAL.value)
         setattr(self, f"_transform_{prefix}_var", var)
 
@@ -276,9 +369,12 @@ class ResultDialog:
         r = self._result
         eq_type = r.equation_type
 
-        is_2d_pde = eq_type == "pde" and r.y_grid is not None
+        is_2d_pde = eq_type in ("pde", "vector_pde") and r.y_grid is not None
+        is_3d_pde = eq_type == "pde_3d" and r.y_grid is not None and r.z_grid is not None
 
-        if is_2d_pde:
+        if is_3d_pde:
+            self._build_pde_3d_slice_tabs()
+        elif is_2d_pde:
             self._build_pde_tabs()
         elif eq_type == "vector_ode" or (r.is_vector and r.vector_components > 1):
             self._build_vector_ode_tabs()
@@ -286,6 +382,17 @@ class ResultDialog:
             self._build_ode_scalar_tabs()  # same layout: solution + (no phase for 1st-order)
         else:
             self._build_ode_scalar_tabs()
+
+    def _queue_initial_plot(self, callback: Callable[[], None]) -> None:
+        """Defer an initial plot until all tab frames have been laid out."""
+        self._initial_plot_callbacks.append(callback)
+
+    def _render_initial_plots(self) -> None:
+        """Render each initial plot after Tk has materialized its parent frame."""
+        callbacks = self._initial_plot_callbacks
+        self._initial_plot_callbacks = []
+        for callback in callbacks:
+            callback()
 
     # ── ODE scalar / difference ──────────────────────────────────────
 
@@ -314,7 +421,7 @@ class ResultDialog:
         self._sol_plot_frame = ttk.Frame(sol_tab)
         self._sol_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._sol_canvas: FigureCanvasTkAgg | None = None
-        self._update_solution_plot()
+        self._queue_initial_plot(self._update_solution_plot)
 
         # --- Tab 2: Phase Space ---
         order = r.vector_order
@@ -370,7 +477,7 @@ class ResultDialog:
             self._phase_plot_frame = ttk.Frame(phase_tab)
             self._phase_plot_frame.pack(fill=tk.BOTH, expand=True)
             self._phase_canvas: FigureCanvasTkAgg | None = None
-            self._update_phase_plot()
+            self._queue_initial_plot(self._update_phase_plot)
 
     def _apply_transform_multi(
         self,
@@ -396,7 +503,7 @@ class ResultDialog:
         for idx in selected:
             if idx >= y_2d.shape[0]:
                 continue
-            func = interp1d(x, y_2d[idx], kind="cubic", fill_value="extrapolate")
+            func = interp1d(x, y_2d[idx], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
             tx, ty, txlabel, tylabel = apply_transform(
                 lambda arr, f=func: f(arr),
                 kind,
@@ -434,6 +541,13 @@ class ResultDialog:
             return TransformKind(var.get())
         except ValueError:
             return TransformKind.ORIGINAL
+
+    def _require_pde_y_grid(self) -> np.ndarray:
+        """Return the PDE y-grid or raise if this dialog is misused."""
+        y_grid = self._result.y_grid
+        if y_grid is None:
+            raise ValueError("2D PDE result is missing its y-grid")
+        return y_grid
 
     def _update_solution_plot(self) -> None:
         """Regenerate the solution f(x) plot with currently selected derivatives."""
@@ -627,7 +741,7 @@ class ResultDialog:
         self._vec_sol_plot_frame = ttk.Frame(sol_tab)
         self._vec_sol_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_sol_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_solution_plot()
+        self._queue_initial_plot(self._update_vec_solution_plot)
 
         # --- Tab 2: Phase Space 2D ---
         phase_tab = ttk.Frame(nb)
@@ -683,7 +797,7 @@ class ResultDialog:
         self._vec_phase_plot_frame = ttk.Frame(phase_tab)
         self._vec_phase_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_phase_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_phase_plot()
+        self._queue_initial_plot(self._update_vec_phase_plot)
 
         # --- Tab 3: Phase Space 3D ---
         phase3d_tab = ttk.Frame(nb)
@@ -755,7 +869,7 @@ class ResultDialog:
         self._vec_phase3d_plot_frame = ttk.Frame(phase3d_tab)
         self._vec_phase3d_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._vec_phase3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_vec_phase_3d()
+        self._queue_initial_plot(self._update_vec_phase_3d)
 
         # --- Tab 4: Animation ---
         anim_tab = ttk.Frame(nb)
@@ -781,7 +895,8 @@ class ResultDialog:
 
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
-        self._update_animation()
+        self._anim_canvas: FigureCanvasTkAgg | None = None
+        self._queue_initial_plot(self._update_animation)
 
         # --- Tab 5: 3D Surface ---
         tab_3d = ttk.Frame(nb)
@@ -807,7 +922,7 @@ class ResultDialog:
         self._3d_plot_frame = ttk.Frame(tab_3d)
         self._3d_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_3d_plot()
+        self._queue_initial_plot(self._update_3d_plot)
 
     def _update_vec_solution_plot(self) -> None:
         """Regenerate vector ODE solution plot."""
@@ -1059,6 +1174,11 @@ class ResultDialog:
                 deriv_offset=deriv_k,
             )
 
+        old_canvas = getattr(self, "_anim_canvas", None)
+        if old_canvas is not None:
+            self._dispose_canvas(old_canvas)
+            self._unregister_canvas(old_canvas)
+
         # Clear existing widgets
         for w in self._anim_plot_frame.winfo_children():
             w.destroy()
@@ -1066,7 +1186,12 @@ class ResultDialog:
         def _export_cb(dur: float) -> None:
             self._on_export_animation_mp4(dur, deriv_k)
 
-        embed_animation_plot_in_tk(fig, self._anim_plot_frame, on_export_mp4=_export_cb)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_plot_frame,
+            on_export_mp4=_export_cb,
+        )
+        self._register_canvas(self._anim_canvas)
 
     def _update_3d_plot(self) -> None:
         """Regenerate the 3D surface tab."""
@@ -1112,6 +1237,105 @@ class ResultDialog:
 
     # ── PDE ──────────────────────────────────────────────────────────
 
+    def _build_pde_3d_slice_tabs(self) -> None:
+        """Build component-free orthogonal slice access for scalar PDE 3D."""
+        tab = ttk.Frame(self._notebook)
+        self._notebook.add(tab, text="  Orthogonal Slice  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(controls, text="Plane:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_slice_plane_var = tk.StringVar(value="XY")
+        plane_combo = ttk.Combobox(
+            controls,
+            textvariable=self._pde_3d_slice_plane_var,
+            values=["XY", "XZ", "YZ"],
+            state="readonly",
+            width=4,
+            font=get_font(),
+        )
+        plane_combo.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(controls, text="Fixed-axis index:").pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_slice_index_var = tk.StringVar(value="0")
+        self._pde_3d_slice_index_combo = ttk.Combobox(
+            controls,
+            textvariable=self._pde_3d_slice_index_var,
+            state="readonly",
+            width=7,
+            font=get_font(),
+        )
+        self._pde_3d_slice_index_combo.pack(side=tk.LEFT, padx=(0, 4))
+
+        def refresh_indices(*, render: bool = True) -> None:
+            """Refresh valid fixed-axis indexes and redraw the selected slice."""
+            result = self._result
+            plane = self._pde_3d_slice_plane_var.get()
+            size = (
+                len(result.z_grid)
+                if plane == "XY" and result.z_grid is not None
+                else len(result.y_grid)
+                if plane == "XZ" and result.y_grid is not None
+                else len(result.x)
+            )
+            values = [str(index) for index in range(size)]
+            self._pde_3d_slice_index_combo.configure(values=values)
+            self._pde_3d_slice_index_var.set(str(size // 2))
+            if render:
+                self._update_pde_3d_slice()
+
+        plane_combo.bind("<<ComboboxSelected>>", lambda _event: refresh_indices())
+        self._pde_3d_slice_index_combo.bind(
+            "<<ComboboxSelected>>", lambda _event: self._update_pde_3d_slice()
+        )
+        self._pde_3d_slice_frame = ttk.Frame(tab)
+        self._pde_3d_slice_frame.pack(fill=tk.BOTH, expand=True)
+        self._pde_3d_slice_canvas: FigureCanvasTkAgg | None = None
+        refresh_indices(render=False)
+        self._queue_initial_plot(self._update_pde_3d_slice)
+
+    def _update_pde_3d_slice(self) -> None:
+        """Render the selected XY, XZ, or YZ scalar slice."""
+        from plotting import create_contour_plot
+        from plotting.coordinates import extract_scalar_3d_slice
+
+        result = self._result
+        if result.y_grid is None or result.z_grid is None:
+            raise ValueError("PDE 3D result is missing its y/z grids")
+        variables = result.metadata.get("variables", ["x", "y", "z"])
+        labels = [
+            variables[index] if len(variables) > index else "xyz"[index] for index in range(3)
+        ]
+        selected_plane = self._pde_3d_slice_plane_var.get()
+        plane: Literal["XY", "XZ", "YZ"] = (
+            cast(Literal["XY", "XZ", "YZ"], selected_plane)
+            if selected_plane in {"XY", "XZ", "YZ"}
+            else "XY"
+        )
+        try:
+            requested_index = int(self._pde_3d_slice_index_var.get())
+        except ValueError:
+            requested_index = 0
+        slice_data = extract_scalar_3d_slice(
+            result.x,
+            result.y_grid,
+            result.z_grid,
+            result.y,
+            plane,
+            requested_index,
+        )
+        label_indexes = {"XY": (0, 1, 2), "XZ": (0, 2, 1), "YZ": (1, 2, 0)}[plane]
+        axis_1_label, axis_2_label, fixed_axis_label = (labels[index] for index in label_indexes)
+        fixed_label = f"{fixed_axis_label}={slice_data.fixed_coordinate:.4g}"
+        equation_name = result.metadata.get("equation_name", "PDE 3D")
+        figure = create_contour_plot(
+            slice_data.axis_1,
+            slice_data.axis_2,
+            slice_data.values,
+            title=f"{equation_name} — {plane} slice at {fixed_label}",
+            xlabel=axis_1_label,
+            ylabel=axis_2_label,
+        )
+        self._replace_plot(self._pde_3d_slice_frame, figure, "_pde_3d_slice_canvas")
+
     def _build_pde_tabs(self) -> None:
         """Solution 3D (surface) + Solution 2D (contour) + Phase Space slice."""
         nb = self._notebook
@@ -1136,11 +1360,12 @@ class ResultDialog:
         ).pack(side=tk.LEFT, padx=(0, 4))
 
         self._build_transform_controls(surf_ctrl, self._update_pde_3d, "pde_3d")
+        self._add_vector_pde_field_selector(surf_ctrl, "_pde_3d_field_var", self._update_pde_3d)
 
         self._pde_3d_frame = ttk.Frame(surf_tab)
         self._pde_3d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_3d()
+        self._queue_initial_plot(self._update_pde_3d)
 
         # --- Tab 2: 2D Contour ---
         contour_tab = ttk.Frame(nb)
@@ -1161,11 +1386,40 @@ class ResultDialog:
         ).pack(side=tk.LEFT, padx=(0, 4))
 
         self._build_transform_controls(contour_ctrl, self._update_pde_2d, "pde_2d")
+        self._add_vector_pde_field_selector(
+            contour_ctrl,
+            "_pde_2d_field_var",
+            self._update_pde_2d,
+        )
 
         self._pde_2d_frame = ttk.Frame(contour_tab)
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_2d_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_2d()
+        self._queue_initial_plot(self._update_pde_2d)
+
+        if self._result.equation_type == "pde":
+            polar_tab = ttk.Frame(nb)
+            nb.add(polar_tab, text="  Polar View  ")
+            polar_ctrl = ttk.Frame(polar_tab)
+            polar_ctrl.pack(fill=tk.X, padx=4, pady=4)
+            ttk.Label(polar_ctrl, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+            self._pde_polar_origin_x_var = tk.StringVar(value="0")
+            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_x_var, width=7).pack(
+                side=tk.LEFT, padx=(0, 6)
+            )
+            ttk.Label(polar_ctrl, text="y:").pack(side=tk.LEFT, padx=(0, 3))
+            self._pde_polar_origin_y_var = tk.StringVar(value="0")
+            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_y_var, width=7).pack(
+                side=tk.LEFT, padx=(0, 6)
+            )
+            ttk.Button(polar_ctrl, text="Update", command=self._update_pde_polar).pack(side=tk.LEFT)
+            self._pde_polar_frame = ttk.Frame(polar_tab)
+            self._pde_polar_frame.pack(fill=tk.BOTH, expand=True)
+            self._pde_polar_canvas: FigureCanvasTkAgg | None = None
+            self._queue_initial_plot(self._update_pde_polar)
+
+        if self._result.equation_type == "vector_pde":
+            self._build_vector_pde_field_tab()
 
         # --- Tab 3: Transform (1D slice) ---
         trans_tab = ttk.Frame(nb)
@@ -1189,12 +1443,8 @@ class ResultDialog:
             font=get_font(),
         ).pack(side=tk.LEFT, padx=(0, 2))
 
-        r = self._result
-        y_mid = (
-            float((r.y_grid[0] + r.y_grid[-1]) / 2)
-            if r.y_grid is not None and len(r.y_grid) > 0
-            else 0.5
-        )
+        y_grid = self._require_pde_y_grid()
+        y_mid = float((y_grid[0] + y_grid[-1]) / 2) if len(y_grid) > 0 else 0.5
 
         ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(
             side=tk.LEFT, padx=(0, 4)
@@ -1213,6 +1463,11 @@ class ResultDialog:
             "pde",
             label_style="Small.TLabel",
         )
+        self._add_vector_pde_field_selector(
+            trans_ctrl,
+            "_pde_slice_field_var",
+            self._update_pde_transform,
+        )
 
         ttk.Button(
             trans_ctrl,
@@ -1223,7 +1478,48 @@ class ResultDialog:
         self._pde_trans_frame = ttk.Frame(trans_tab)
         self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_trans_canvas: FigureCanvasTkAgg | None = None
-        self._update_pde_transform()
+        self._queue_initial_plot(self._update_pde_transform)
+
+    def _add_vector_pde_field_selector(
+        self,
+        parent: ttk.Frame,
+        variable_name: str,
+        callback: Callable[[], None],
+    ) -> None:
+        """Add a component/magnitude selector only for Vector PDE results."""
+        if self._result.equation_type != "vector_pde":
+            return
+        labels = [f"Component {index}" for index in range(self._result.vector_components)]
+        labels.append("Magnitude")
+        ttk.Label(parent, text="Field:").pack(side=tk.LEFT, padx=(8, 4))
+        variable = tk.StringVar(value=labels[0])
+        setattr(self, variable_name, variable)
+        combo = ttk.Combobox(
+            parent,
+            textvariable=variable,
+            values=labels,
+            state="readonly",
+            width=13,
+            font=get_font(),
+        )
+        combo.pack(side=tk.LEFT, padx=(0, 4))
+        combo.bind("<<ComboboxSelected>>", lambda _event: callback())
+
+    def _selected_pde_field(self, variable_name: str) -> tuple[np.ndarray, str]:
+        """Return the selected scalar field and its display label."""
+        result = self._result
+        if result.equation_type != "vector_pde":
+            return np.asarray(result.y), "f"
+        variable = getattr(self, variable_name, None)
+        label = variable.get() if variable is not None else "Component 0"
+        if label == "Magnitude":
+            return np.linalg.norm(result.y, axis=0), "|f|"
+        try:
+            component = int(label.rsplit(" ", 1)[1])
+        except (IndexError, ValueError):
+            component = 0
+        component = max(0, min(result.vector_components - 1, component))
+        return np.asarray(result.y[component]), f"f[{component}]"
 
     def _pde_axis_labels(self) -> tuple[str, str]:
         """Return (xlabel, ylabel) from metadata variable names."""
@@ -1260,7 +1556,7 @@ class ResultDialog:
             raw: list[tuple[np.ndarray, np.ndarray]] = []
             txlabel = ""
             for i in range(z.shape[0]):
-                func = interp1d(x, z[i, :], kind="cubic", fill_value="extrapolate")
+                func = interp1d(x, z[i, :], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
                 tx, ty, txlabel, _tylabel = apply_transform(
                     lambda arr, f=func: f(arr),
                     kind,
@@ -1286,7 +1582,7 @@ class ResultDialog:
             raw_c: list[tuple[np.ndarray, np.ndarray]] = []
             tylabel = ""
             for j in range(z.shape[1]):
-                func = interp1d(y_grid, z[:, j], kind="cubic", fill_value="extrapolate")
+                func = interp1d(y_grid, z[:, j], kind="cubic", fill_value=_EXTRAPOLATE_FILL)
                 ty, tz, tylabel, _tzlabel = apply_transform(
                     lambda arr, f=func: f(arr),
                     kind,
@@ -1313,16 +1609,18 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        field, field_label = self._selected_pde_field("_pde_3d_field_var")
 
         kind = self._get_transform_kind("pde_3d")
         if kind != TransformKind.ORIGINAL:
             axis_var = self._pde_3d_axis_var.get()
             result = self._transform_pde_along_axis(
                 r.x,
-                r.y_grid,
-                r.y,
+                y_grid,
+                field,
                 axis_var,
                 kind,
             )
@@ -1335,19 +1633,19 @@ class ResultDialog:
                     title=f"{eq_name} — {kind.value}",
                     xlabel=pxl,
                     ylabel=pyl,
-                    zlabel="|F|",
+                    zlabel=field_label,
                 )
                 self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
                 return
 
         fig = create_surface_plot(
             r.x,
-            r.y_grid,
-            r.y,
-            title=eq_name,
+            y_grid,
+            field,
+            title=f"{eq_name} — {field_label}" if r.equation_type == "vector_pde" else eq_name,
             xlabel=xlabel,
             ylabel=ylabel,
-            zlabel="f",
+            zlabel=field_label,
         )
         self._replace_plot(self._pde_3d_frame, fig, "_pde_3d_canvas")
 
@@ -1357,16 +1655,18 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         xlabel, ylabel = self._pde_axis_labels()
         eq_name = r.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        field, field_label = self._selected_pde_field("_pde_2d_field_var")
 
         kind = self._get_transform_kind("pde_2d")
         if kind != TransformKind.ORIGINAL:
             axis_var = self._pde_2d_axis_var.get()
             result = self._transform_pde_along_axis(
                 r.x,
-                r.y_grid,
-                r.y,
+                y_grid,
+                field,
                 axis_var,
                 kind,
             )
@@ -1385,13 +1685,113 @@ class ResultDialog:
 
         fig = create_contour_plot(
             r.x,
-            r.y_grid,
-            r.y,
-            title=eq_name,
+            y_grid,
+            field,
+            title=f"{eq_name} — {field_label}" if r.equation_type == "vector_pde" else eq_name,
             xlabel=xlabel,
             ylabel=ylabel,
         )
         self._replace_plot(self._pde_2d_frame, fig, "_pde_2d_canvas")
+
+    def _update_pde_polar(self) -> None:
+        """Render a scalar PDE field resampled for a polar display."""
+        from plotting import create_polar_contour_plot
+
+        try:
+            origin = (
+                float(self._pde_polar_origin_x_var.get()),
+                float(self._pde_polar_origin_y_var.get()),
+            )
+        except ValueError:
+            origin = (0.0, 0.0)
+        y_grid = self._require_pde_y_grid()
+        xlabel, ylabel = self._pde_axis_labels()
+        eq_name = self._result.metadata.get("equation_name", f"f({xlabel},{ylabel})")
+        figure = create_polar_contour_plot(
+            self._result.x,
+            y_grid,
+            np.asarray(self._result.y),
+            title=f"{eq_name} — polar view about ({origin[0]:.4g}, {origin[1]:.4g})",
+            origin=origin,
+        )
+        self._replace_plot(self._pde_polar_frame, figure, "_pde_polar_canvas")
+
+    def _build_vector_pde_field_tab(self) -> None:
+        """Build field-specific views without duplicating the plot canvas lifecycle."""
+        tab = ttk.Frame(self._notebook)
+        self._notebook.add(tab, text="  Vector Field  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(controls, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        self._vector_pde_view_var = tk.StringVar(value="Magnitude")
+        views = self._vector_pde_view_labels()
+        selector = ttk.Combobox(
+            controls,
+            textvariable=self._vector_pde_view_var,
+            values=views,
+            state="readonly",
+            width=19,
+            font=get_font(),
+        )
+        selector.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(controls, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+        self._vector_pde_origin_x_var = tk.StringVar(value="0")
+        ttk.Entry(controls, textvariable=self._vector_pde_origin_x_var, width=7).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        ttk.Label(controls, text="y:").pack(side=tk.LEFT, padx=(0, 3))
+        self._vector_pde_origin_y_var = tk.StringVar(value="0")
+        ttk.Entry(controls, textvariable=self._vector_pde_origin_y_var, width=7).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._update_vector_pde_field())
+        ttk.Button(controls, text="Update", command=self._update_vector_pde_field).pack(
+            side=tk.LEFT
+        )
+        self._vector_pde_field_frame = ttk.Frame(tab)
+        self._vector_pde_field_frame.pack(fill=tk.BOTH, expand=True)
+        self._vector_pde_field_canvas: FigureCanvasTkAgg | None = None
+        self._queue_initial_plot(self._update_vector_pde_field)
+
+    def _vector_pde_view_labels(self) -> list[str]:
+        """Return views compatible with the Vector PDE component count."""
+        views = ["Components", "Magnitude"]
+        if self._result.vector_components == 2:
+            views.extend(["Quiver", "Streamlines", "Radial/Tangential"])
+        return views
+
+    def _update_vector_pde_field(self) -> None:
+        """Render the selected vector PDE field view."""
+        from plotting import create_vector_field_plot
+
+        view_map = {
+            "Components": "components",
+            "Magnitude": "magnitude",
+            "Quiver": "quiver",
+            "Streamlines": "stream",
+            "Radial/Tangential": "radial_tangential",
+        }
+        selected = self._vector_pde_view_var.get()
+        try:
+            origin = (
+                float(self._vector_pde_origin_x_var.get()),
+                float(self._vector_pde_origin_y_var.get()),
+            )
+        except ValueError:
+            origin = (0.0, 0.0)
+        figure = create_vector_field_plot(
+            self._result.x,
+            self._require_pde_y_grid(),
+            np.asarray(self._result.y),
+            view=view_map.get(selected, "magnitude"),
+            origin=origin,
+            title=f"{self._result.metadata.get('equation_name', 'Vector PDE')} — {selected}",
+        )
+        self._replace_plot(
+            self._vector_pde_field_frame,
+            figure,
+            "_vector_pde_field_canvas",
+        )
 
     def _update_pde_transform(self) -> None:
         """Render a 1D transform of a slice through the PDE solution."""
@@ -1399,8 +1799,10 @@ class ResultDialog:
         from transforms import TransformKind, apply_transform
 
         r = self._result
+        y_grid = self._require_pde_y_grid()
         kind = self._get_transform_kind("pde")
         xlabel, ylabel = self._pde_axis_labels()
+        field, field_label = self._selected_pde_field("_pde_slice_field_var")
 
         slice_var = self._pde_slice_var.get()
         try:
@@ -1410,16 +1812,16 @@ class ResultDialog:
 
         if slice_var == xlabel:
             # Slice along x[0] at a fixed x[1] value
-            y_idx = int(np.argmin(np.abs(r.y_grid - slice_val)))
-            data_1d = r.y[y_idx, :]
+            y_idx = int(np.argmin(np.abs(y_grid - slice_val)))
+            data_1d = field[y_idx, :]
             x_1d = r.x
             slice_label = f"{ylabel}={slice_val:.3g}"
             axis_label = xlabel
         else:
             # Slice along x[1] at a fixed x[0] value
             x_idx = int(np.argmin(np.abs(r.x - slice_val)))
-            data_1d = r.y[:, x_idx]
-            x_1d = r.y_grid
+            data_1d = field[:, x_idx]
+            x_1d = y_grid
             slice_label = f"{xlabel}={slice_val:.3g}"
             axis_label = ylabel
 
@@ -1431,14 +1833,14 @@ class ResultDialog:
                 np.atleast_2d(data_1d),
                 title=f"{eq_name} \u2014 slice at {slice_label}",
                 xlabel=axis_label,
-                ylabel="f",
+                ylabel=field_label,
                 selected_derivatives=[0],
-                labels=["f"],
+                labels=[field_label],
             )
         else:
             from scipy.interpolate import interp1d
 
-            func = interp1d(x_1d, data_1d, kind="cubic", fill_value="extrapolate")
+            func = interp1d(x_1d, data_1d, kind="cubic", fill_value=_EXTRAPOLATE_FILL)
             x_min_t, x_max_t = float(x_1d[0]), float(x_1d[-1])
             tx, ty, txlabel, tylabel = apply_transform(
                 lambda arr: func(arr),
@@ -1468,20 +1870,14 @@ class ResultDialog:
         fig: Figure,
         canvas_attr: str,
     ) -> None:
-        """Destroy the old canvas in *frame* and embed *fig* in its place."""
-        import matplotlib.pyplot as plt
-
+        """Reuse the existing canvas when replacing a matplotlib figure."""
         old_canvas: FigureCanvasTkAgg | None = getattr(self, canvas_attr, None)
-        if old_canvas is not None:
-            old_fig = old_canvas.figure
-            old_canvas.get_tk_widget().destroy()
-            plt.close(old_fig)
-
-        for w in frame.winfo_children():
-            w.destroy()
-
-        canvas = embed_plot_in_tk(fig, frame)
+        canvas = replace_plot_in_tk(fig, frame, current_canvas=old_canvas)
+        if old_canvas is not None and canvas is not old_canvas:
+            self._dispose_canvas(old_canvas)
+            self._unregister_canvas(old_canvas)
         setattr(self, canvas_attr, canvas)
+        self._register_canvas(canvas)
 
     # ------------------------------------------------------------------
     # Stat rendering
@@ -1514,7 +1910,7 @@ class ResultDialog:
 
     def _save_export_file(
         self,
-        export_fn,
+        export_fn: Callable[[Path], None],
         ext: str,
         filetypes: list[tuple[str, str]],
         prefix_log: str = "",
@@ -1533,19 +1929,19 @@ class ResultDialog:
         try:
             export_fn(path)
             messagebox.showinfo(
-                "Export Complete",
-                f"{prefix_log} saved to:\n{path}",
+                "Export saved",
+                f"{prefix_log} was saved to:\n{path}",
                 parent=self.win,
             )
         except Exception as exc:
             logger.error(f"{prefix_log} export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+            messagebox.showerror("Export was not saved", str(exc), parent=self.win)
 
     def _on_save_csv(self) -> None:
         r = self._result
 
-        def export_fn(path: str) -> None:
-            export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid)
+        def export_fn(path: Path) -> None:
+            export_csv_to_path(r.x, r.y, path, y_grid=r.y_grid, z_grid=r.z_grid)
 
         self._save_export_file(
             export_fn,
@@ -1557,7 +1953,7 @@ class ResultDialog:
     def _on_save_json(self) -> None:
         r = self._result
 
-        def export_fn(path: str) -> None:
+        def export_fn(path: Path) -> None:
             export_json_to_path(r.statistics, r.metadata, path)
 
         self._save_export_file(
@@ -1593,20 +1989,20 @@ class ResultDialog:
                 duration_seconds=duration_seconds,
             )
             messagebox.showinfo(
-                "Export Complete",
-                f"Animation saved to:\n{filepath}",
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
                 parent=self.win,
             )
         except RuntimeError as exc:
             logger.warning("MP4 export failed (ffmpeg): %s", exc)
             messagebox.showerror(
-                "Export Failed",
+                "Animation export was not saved",
                 str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
                 parent=self.win,
             )
         except Exception as exc:
             logger.error("MP4 export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Export Failed", str(exc), parent=self.win)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     @staticmethod
     def _format_stat(value: Any) -> str:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 
@@ -18,23 +18,25 @@ _EPS_SIGN = 1e-12
 def _resolve_mass(masses_spec: Any, i: int, n: int) -> float:
     """Resolve mass for oscillator i."""
     if callable(masses_spec):
-        return float(masses_spec(i))
+        return float(cast(float | int, masses_spec(i)))
     if isinstance(masses_spec, (list, tuple, np.ndarray)):
-        if len(masses_spec) == 0:
+        values = np.asarray(masses_spec, dtype=float).ravel()
+        if values.size == 0:
             raise ValueError("Mass specification list cannot be empty.")
-        return float(masses_spec[i] if i < len(masses_spec) else masses_spec[-1])
+        return float(values[i] if i < values.size else values[-1])
     return float(masses_spec)
 
 
 def _resolve_k(k_spec: Any, i: int, n: int) -> float:
     """Resolve coupling constant at spring index i."""
     if callable(k_spec):
-        return float(k_spec(i))
+        return float(cast(float | int, k_spec(i)))
     if isinstance(k_spec, (list, tuple, np.ndarray)):
-        if len(k_spec) == 0:
+        values = np.asarray(k_spec, dtype=float).ravel()
+        if values.size == 0:
             raise ValueError("Coupling specification list cannot be empty.")
-        idx = min(i, len(k_spec) - 1)
-        return float(k_spec[idx])
+        idx = min(i, values.size - 1)
+        return float(values[idx])
     return float(k_spec)
 
 
@@ -42,7 +44,15 @@ def _resolve_mass_array(
     masses_spec: float | list[float] | Callable[[int], float],
     n: int,
 ) -> np.ndarray:
-    masses = np.array([_resolve_mass(masses_spec, i, n) for i in range(n)], dtype=float)
+    if callable(masses_spec):
+        masses = np.fromiter((float(masses_spec(i)) for i in range(n)), dtype=float, count=n)
+    elif isinstance(masses_spec, (list, tuple, np.ndarray)):
+        values = np.asarray(masses_spec, dtype=float).ravel()
+        if values.size == 0:
+            raise ValueError("Mass specification list cannot be empty.")
+        masses = np.pad(values[:n], (0, max(0, n - values.size)), mode="edge")
+    else:
+        masses = np.full(n, float(masses_spec), dtype=float)
     if np.any(masses <= 0):
         raise ValueError("All masses must be positive.")
     return masses
@@ -55,7 +65,17 @@ def _resolve_k_array(
 ) -> np.ndarray:
     if n_springs <= 0:
         return np.zeros(0, dtype=float)
-    k_arr = np.array([_resolve_k(k_spec, i, n) for i in range(n_springs)], dtype=float)
+    if callable(k_spec):
+        k_arr = np.fromiter(
+            (float(k_spec(i)) for i in range(n_springs)), dtype=float, count=n_springs
+        )
+    elif isinstance(k_spec, (list, tuple, np.ndarray)):
+        values = np.asarray(k_spec, dtype=float).ravel()
+        if values.size == 0:
+            raise ValueError("Coupling specification list cannot be empty.")
+        k_arr = np.pad(values[:n_springs], (0, max(0, n_springs - values.size)), mode="edge")
+    else:
+        k_arr = np.full(n_springs, float(k_spec), dtype=float)
     if np.any(k_arr < 0):
         raise ValueError("Coupling constants must be non-negative.")
     return k_arr
@@ -181,22 +201,6 @@ def build_ode_function(
     return ode_func
 
 
-def _is_uniform(
-    masses: float | list[float] | Callable[[int], float],
-    k_coupling: float | list[float] | Callable[[int], float],
-    n: int,
-) -> bool:
-    """True when masses and nearest-neighbor couplings are uniform."""
-    if callable(masses) or callable(k_coupling):
-        return False
-    masses_arr = _resolve_mass_array(masses, n)
-    k_arr = _resolve_k_array(k_coupling, n - 1, n)
-    return (
-        np.allclose(masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
-        and np.allclose(k_arr, k_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
-    )
-
-
 def _build_stiffness_matrix(
     n: int,
     boundary: str,
@@ -261,12 +265,8 @@ def compute_normal_modes(
     long_range = [(2, float(k_2nn)), (3, float(k_3nn)), (4, float(k_4nn))]
     long_range = [(dist, kval) for dist, kval in long_range if kval != 0.0]
 
-    uniform_mass = np.allclose(
-        masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL
-    )
-    uniform_k = np.allclose(
-        k_nearest, k_nearest[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL
-    )
+    uniform_mass = np.allclose(masses_arr, masses_arr[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
+    uniform_k = np.allclose(k_nearest, k_nearest[0], rtol=_UNIFORM_RTOL, atol=_UNIFORM_ATOL)
     if boundary == "fixed" and uniform_mass and uniform_k and not long_range:
         m0 = float(masses_arr[0])
         k0 = float(k_nearest[0])
@@ -302,4 +302,3 @@ def compute_normal_modes(
     except Exception:  # pragma: no cover - fallback path
         logger.warning("Could not compute normal modes; returning identity basis")
         return np.eye(n), np.ones(n)
-

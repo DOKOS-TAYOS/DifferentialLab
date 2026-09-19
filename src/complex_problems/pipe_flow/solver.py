@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -209,7 +210,7 @@ def _solve_transient(
         p = p + (dt / 6.0) * (k1_p + 2.0 * k2_p + 2.0 * k3_p + k4_p)
         apply_bc(u, p, step * dt)
 
-        if step in sample_indices:
+        if sample_pos < n_samples and step == sample_indices[sample_pos]:
             sample(sample_pos, step * dt)
             sample_pos += 1
 
@@ -227,7 +228,7 @@ def solve_pipe_flow(
     d0: float = 0.06,
     profile_amplitude: float = 0.20,
     profile_waves: float = 2.0,
-    custom_diameter_fn=None,
+    custom_diameter_fn: Callable[[float], float] | None = None,
     rho: float = 1000.0,
     mu: float = 1.0e-3,
     roughness: float = 1.0e-5,
@@ -242,7 +243,7 @@ def solve_pipe_flow(
     wave_speed: float = 200.0,
     damping: float = 0.2,
     t_max: float = 1.0,
-    dt: float = 5.0e-4,
+    dt: float = 2.0e-4,
     sample_every: int = 10,
 ) -> PipeFlowResult:
     """Solve steady or transient 1D pipe flow."""

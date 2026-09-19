@@ -8,9 +8,63 @@ import pytest
 from solver.equation_parser import (
     _parse_expression,
     _validate_expression,
+    build_pde_3d_coefficient_provider,
+    build_vector_pde_coefficient_provider,
     normalize_unicode_escapes,
+    parse_ode_event_expression,
+    parse_vector_pde_residual_expressions,
 )
 from utils import EquationParseError
+
+
+def test_explicit_affine_3d_expression_builds_direct_coefficients() -> None:
+    """A structurally explicit affine 3D expression needs no residual probing."""
+    provider = build_pde_3d_coefficient_provider(
+        "-fxx - y*fyy - 2*fzz + fxy + x*fx - f + sin(x) + y*z",
+        ["x", "y", "z"],
+    )
+
+    assert provider is not None
+    np.testing.assert_allclose(
+        provider(0.2, 0.3, 0.4, {}),
+        (-1.0, -0.3, -2.0, 1.0, 0.0, 0.0, 0.2, 0.0, 0.0, -1.0, np.sin(0.2) + 0.12),
+    )
+
+
+def test_nonstructural_3d_expression_keeps_affinity_probe_path() -> None:
+    """Division by a solution term is not a safe direct-coefficient form."""
+    assert build_pde_3d_coefficient_provider("fxx / (1 + f)", ["x", "y", "z"]) is None
+
+
+def test_explicit_affine_vector_expression_builds_coupled_direct_matrices() -> None:
+    """Literal component accesses retain all matrix rows and columns in the fast path."""
+    provider = build_vector_pde_coefficient_provider(
+        [
+            "-fxx[0] + 0.25*fxx[1] - fyy[0] + f[1] - x",
+            "0.5*fxx[0] - fyy[1] + y*f[0] - y",
+        ],
+        2,
+        ["x", "y"],
+    )
+
+    assert provider is not None
+    coefficients = provider(0.2, 0.3, {})
+    np.testing.assert_allclose(coefficients.fxx, ((-1.0, 0.25), (0.5, 0.0)))
+    np.testing.assert_allclose(coefficients.fyy, ((-1.0, 0.0), (0.0, -1.0)))
+    np.testing.assert_allclose(coefficients.f, ((0.0, 1.0), (0.3, 0.0)))
+    np.testing.assert_allclose(coefficients.constant, (-0.2, -0.3))
+
+
+def test_nonlinear_vector_expression_keeps_complete_affinity_probe_path() -> None:
+    """A product of two state entries is deliberately not recognized as affine."""
+    assert (
+        build_vector_pde_coefficient_provider(
+            ["fxx[0] + f[0] * f[1]", "fxx[1]"],
+            2,
+            ["x", "y"],
+        )
+        is None
+    )
 
 
 class TestNormalizeUnicodeEscapes:
@@ -47,6 +101,19 @@ class TestValidateExpression:
     def test_valid_expression_returns_no_errors(self) -> None:
         errors = _validate_expression("y[0] * 2 + x")
         assert errors == []
+
+    def test_safe_math_calls_and_subscripts_remain_allowed(self) -> None:
+        ode_func = _parse_expression("sin(x) + heaviside(y[0], 0.0)", order=1)
+
+        result = ode_func(np.pi / 2, np.array([1.0]))
+
+        np.testing.assert_allclose(result, [2.0])
+
+    def test_dunder_attribute_escape_is_rejected(self) -> None:
+        errors = _validate_expression("().__class__.__mro__[1].__subclasses__()")
+
+        assert errors
+        assert "disallowed" in errors[0].lower() or "unsafe" in errors[0].lower()
 
     def test_syntax_error_reported(self) -> None:
         errors = _validate_expression("y[0] + (")
@@ -107,3 +174,93 @@ class TestParseExpression:
         x, y = 0.0, np.array([3.0])
         dydx = ode_func(x, y)
         np.testing.assert_allclose(dydx, [3.0])
+
+    def test_parameter_name_with_dunder_is_rejected(self) -> None:
+        with pytest.raises(EquationParseError, match="Unsafe parameter name"):
+            _parse_expression("k * y[0]", order=1, parameters={"__class__": 1.0})
+
+
+class TestParseODEEventExpression:
+    def test_scalar_finite_event_is_valid(self) -> None:
+        event = parse_ode_event_expression(
+            "sin(x) + f[0] - threshold", state_size=2, parameters={"threshold": 0.5}
+        )
+
+        result = event(np.pi / 2, np.array([0.25, 0.0]))
+
+        np.testing.assert_allclose(result, 0.75)
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "y",
+            "[y[0], y[1]]",
+            "(y[0],)",
+            "1j",
+            "1e309",
+            "True",
+        ],
+    )
+    def test_non_scalar_or_non_real_finite_event_is_rejected_during_parse(
+        self,
+        expression: str,
+    ) -> None:
+        with pytest.raises(EquationParseError, match="exactly one finite real scalar"):
+            parse_ode_event_expression(expression, state_size=2)
+
+
+class TestVectorPDEResidualParser:
+    def test_exact_component_notation_returns_vector(self) -> None:
+        residual = parse_vector_pde_residual_expressions(
+            [
+                "fxx[0] + fyy[0] + 0.5*f[1] + x",
+                "fxy[0] + fxx[1] + fyy[1] - 0.25*fy[0] + y",
+            ],
+            2,
+            ["x", "y"],
+        )
+        zeros = np.zeros(2)
+        result = residual(
+            0.2,
+            0.3,
+            np.array([1.0, 2.0]),
+            zeros,
+            np.array([4.0, 0.0]),
+            np.array([3.0, 5.0]),
+            np.array([7.0, 0.0]),
+            np.array([11.0, 13.0]),
+        )
+
+        np.testing.assert_allclose(result, [15.2, 24.3])
+
+    @pytest.mark.parametrize(
+        ("expression", "message"),
+        [
+            ("f[2]", "outside"),
+            ("fx[-1]", "integer literals"),
+            ("f[0, 1]", "integer literals"),
+            ("f[i]", "integer literals"),
+            ("f", "explicit component index"),
+            ("weights[0]", "subscripts only"),
+            ("f[0].real", "Disallowed construct"),
+        ],
+    )
+    def test_invalid_or_unsafe_component_access_is_rejected(
+        self,
+        expression: str,
+        message: str,
+    ) -> None:
+        with pytest.raises(EquationParseError, match=message):
+            parse_vector_pde_residual_expressions(
+                [expression, "fxx[1] + fyy[1]"],
+                2,
+                ["x", "y"],
+            )
+
+    def test_expression_count_must_match_system_length(self) -> None:
+        with pytest.raises(EquationParseError, match="exactly 2.*got 1"):
+            parse_vector_pde_residual_expressions(
+                ["fxx[0] + fyy[0]"],
+                2,
+                ["x", "y"],
+            )

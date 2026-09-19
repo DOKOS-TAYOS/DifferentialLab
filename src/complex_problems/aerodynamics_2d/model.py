@@ -71,12 +71,17 @@ def _mask_naca0012(
     x = xp + 0.5 * chord
     xc = x / chord
     t = thickness_ratio
-    yt = 5.0 * t * chord * (
-        0.2969 * np.sqrt(np.clip(xc, 0.0, None))
-        - 0.1260 * xc
-        - 0.3516 * xc**2
-        + 0.2843 * xc**3
-        - 0.1015 * xc**4
+    yt = (
+        5.0
+        * t
+        * chord
+        * (
+            0.2969 * np.sqrt(np.clip(xc, 0.0, None))
+            - 0.1260 * xc
+            - 0.3516 * xc**2
+            + 0.2843 * xc**3
+            - 0.1015 * xc**4
+        )
     )
     return (x >= 0.0) & (x <= chord) & (np.abs(yp) <= yt)
 
@@ -133,20 +138,34 @@ def build_obstacle_mask(
 
 def ddx_periodic(f: np.ndarray, dx: float) -> np.ndarray:
     """Periodic x-derivative."""
-    return (np.roll(f, -1, axis=1) - np.roll(f, 1, axis=1)) / (2.0 * dx)
+    out = np.empty_like(f, dtype=float)
+    out[:, 1:-1] = (f[:, 2:] - f[:, :-2]) / (2.0 * dx)
+    out[:, 0] = (f[:, 1] - f[:, -1]) / (2.0 * dx)
+    out[:, -1] = (f[:, 0] - f[:, -2]) / (2.0 * dx)
+    return out
 
 
 def ddy_periodic(f: np.ndarray, dy: float) -> np.ndarray:
     """Periodic y-derivative."""
-    return (np.roll(f, -1, axis=0) - np.roll(f, 1, axis=0)) / (2.0 * dy)
+    out = np.empty_like(f, dtype=float)
+    out[1:-1, :] = (f[2:, :] - f[:-2, :]) / (2.0 * dy)
+    out[0, :] = (f[1, :] - f[-1, :]) / (2.0 * dy)
+    out[-1, :] = (f[0, :] - f[-2, :]) / (2.0 * dy)
+    return out
 
 
 def laplacian_periodic(f: np.ndarray, dx: float, dy: float) -> np.ndarray:
     """Periodic 2D Laplacian."""
-    return (
-        (np.roll(f, -1, axis=1) - 2.0 * f + np.roll(f, 1, axis=1)) / (dx * dx)
-        + (np.roll(f, -1, axis=0) - 2.0 * f + np.roll(f, 1, axis=0)) / (dy * dy)
-    )
+    out = np.empty_like(f, dtype=float)
+    dx2 = dx * dx
+    dy2 = dy * dy
+    out[:, 1:-1] = (f[:, 2:] - 2.0 * f[:, 1:-1] + f[:, :-2]) / dx2
+    out[:, 0] = (f[:, 1] - 2.0 * f[:, 0] + f[:, -1]) / dx2
+    out[:, -1] = (f[:, 0] - 2.0 * f[:, -1] + f[:, -2]) / dx2
+    out[1:-1, :] += (f[2:, :] - 2.0 * f[1:-1, :] + f[:-2, :]) / dy2
+    out[0, :] += (f[1, :] - 2.0 * f[0, :] + f[-1, :]) / dy2
+    out[-1, :] += (f[0, :] - 2.0 * f[-1, :] + f[-2, :]) / dy2
+    return out
 
 
 def divergence_periodic(u: np.ndarray, v: np.ndarray, dx: float, dy: float) -> np.ndarray:

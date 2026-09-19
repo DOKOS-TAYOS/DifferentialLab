@@ -47,6 +47,7 @@ class TestLightenColor:
         # When theme fallback also fails to parse, use final fallback
         def mock_get_env(key: str) -> str:
             return "notacolor"  # Invalid, so _color_to_rgb returns None
+
         monkeypatch.setattr("frontend.theme.get_env_from_schema", mock_get_env)
         assert _lighten_color("notacolor", factor=0.2) == "#ffffff"
 
@@ -73,6 +74,7 @@ class TestDarkenColor:
         # When theme fallback also fails to parse, use final fallback
         def mock_get_env(key: str) -> str:
             return "notacolor"  # Invalid, so _color_to_rgb returns None
+
         monkeypatch.setattr("frontend.theme.get_env_from_schema", mock_get_env)
         result = _darken_color("notacolor", factor=0.25)
         assert result == "#1e1e1e"

@@ -12,6 +12,7 @@ from frontend.theme import get_font
 from utils import get_logger
 
 logger = get_logger(__name__)
+_RESIZE_DEBOUNCE_MS = 75
 
 if TYPE_CHECKING:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -34,7 +35,8 @@ def _bind_resize_handler(
         fig: The Matplotlib figure.
     """
 
-    def _on_resize(_event: object, _fig: object = fig, _canvas: object = canvas) -> None:
+    def _redraw(_fig: object = fig, _canvas: object = canvas) -> None:
+        setattr(canvas, "_resize_after_id", None)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
@@ -43,7 +45,78 @@ def _bind_resize_handler(
         except Exception as exc:
             logger.debug("Plot resize handler failed: %s", exc)
 
-    canvas.mpl_connect("resize_event", _on_resize)
+    previous_after_id = getattr(canvas, "_resize_after_id", None)
+    if previous_after_id is not None:
+        try:
+            canvas.get_tk_widget().after_cancel(previous_after_id)
+        except tk.TclError:
+            pass
+        setattr(canvas, "_resize_after_id", None)
+
+    previous_handler_id = getattr(canvas, "_resize_handler_id", None)
+    if previous_handler_id is not None:
+        try:
+            canvas.mpl_disconnect(previous_handler_id)
+        except Exception:
+            logger.debug("Could not disconnect previous resize handler", exc_info=True)
+
+    def _on_resize(
+        _event: object,
+        _fig: object = fig,
+        _canvas: object = canvas,
+    ) -> None:
+        after_id = getattr(_canvas, "_resize_after_id", None)
+        if after_id is not None:
+            try:
+                _canvas.get_tk_widget().after_cancel(after_id)  # type: ignore[union-attr]
+            except tk.TclError:
+                pass
+        try:
+            next_after_id = _canvas.get_tk_widget().after(  # type: ignore[union-attr]
+                _RESIZE_DEBOUNCE_MS,
+                lambda: _redraw(_fig, _canvas),
+            )
+        except tk.TclError:
+            return
+        setattr(_canvas, "_resize_after_id", next_after_id)
+
+    handler_id = canvas.mpl_connect("resize_event", _on_resize)
+    setattr(canvas, "_resize_handler_id", handler_id)
+
+
+def _get_canvas_size_in_pixels(
+    canvas: FigureCanvasTkAgg,
+    fallback_figure: Figure,
+) -> tuple[int, int] | None:
+    """Return the current drawable canvas size, when it is available."""
+    widget = canvas.get_tk_widget()
+    try:
+        width_px = int(widget.winfo_width())
+        height_px = int(widget.winfo_height())
+    except (AttributeError, tk.TclError, TypeError, ValueError):
+        width_px = height_px = 0
+
+    if width_px > 1 and height_px > 1:
+        return width_px, height_px
+
+    try:
+        width_px, height_px = canvas.get_width_height(physical=True)
+    except (AttributeError, TypeError, ValueError):
+        width_px = height_px = 0
+
+    if width_px > 1 and height_px > 1:
+        return int(width_px), int(height_px)
+
+    try:
+        width_inches, height_inches = fallback_figure.get_size_inches()
+        width_px = round(float(width_inches) * float(fallback_figure.dpi))
+        height_px = round(float(height_inches) * float(fallback_figure.dpi))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    if width_px > 1 and height_px > 1:
+        return width_px, height_px
+    return None
 
 
 def embed_animation_plot_in_tk(
@@ -65,16 +138,18 @@ def embed_animation_plot_in_tk(
     Returns:
         The canvas object.
     """
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+    from matplotlib.backends._backend_tk import NavigationToolbar2Tk
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-    update_fn = getattr(fig, "_animation_update", None)
-    n_points = getattr(fig, "_animation_n_points", 0)
-    initial_idx = getattr(fig, "_animation_initial_index", 0)
+    figure = fig
+    update_fn = getattr(figure, "_animation_update", None)
+    n_points = getattr(figure, "_animation_n_points", 0)
+    initial_idx = getattr(figure, "_animation_initial_index", 0)
 
     top_frame = ttk.Frame(parent)
     top_frame.pack(fill=tk.BOTH, expand=True)
 
-    canvas = FigureCanvasTkAgg(fig, master=top_frame)
+    canvas = FigureCanvasTkAgg(figure, master=top_frame)
     tb = NavigationToolbar2Tk(canvas, top_frame)
     tb.update()
     tb.pack(side=tk.BOTTOM, fill=tk.X)
@@ -83,7 +158,7 @@ def embed_animation_plot_in_tk(
     widget.config(width=1, height=1)
     widget.pack(fill=tk.BOTH, expand=True)
 
-    _bind_resize_handler(canvas, fig)
+    _bind_resize_handler(canvas, figure)
     canvas.draw()
 
     ctrl_frame = ttk.Frame(parent)
@@ -150,6 +225,11 @@ def embed_animation_plot_in_tk(
                 pass
             _play_job = None
 
+    # Result dialogs can replace or close an animation while a playback callback
+    # is pending on the toplevel.  Expose its cancellation through the canvas so
+    # the shared cleanup path owns the complete animation lifecycle.
+    setattr(canvas, "_stop_animation", _on_stop)
+
     if update_fn is not None and n_points > 0:
         scale = ttk.Scale(
             ctrl_frame,
@@ -208,9 +288,11 @@ def embed_plot_in_tk(
     Returns:
         The canvas object.
     """
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+    from matplotlib.backends._backend_tk import NavigationToolbar2Tk
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-    canvas = FigureCanvasTkAgg(fig, master=parent)
+    figure = fig
+    canvas = FigureCanvasTkAgg(figure, master=parent)
 
     if toolbar:
         tb = NavigationToolbar2Tk(canvas, parent)
@@ -223,7 +305,53 @@ def embed_plot_in_tk(
     widget.config(width=1, height=1)
     widget.pack(fill=tk.BOTH, expand=True)
 
-    _bind_resize_handler(canvas, fig)
+    _bind_resize_handler(canvas, figure)
     canvas.draw()
 
     return canvas
+
+
+def replace_plot_in_tk(
+    fig: Figure,
+    parent: tk.Widget,
+    *,
+    current_canvas: FigureCanvasTkAgg | None,
+    toolbar: bool = True,
+) -> FigureCanvasTkAgg:
+    """Reuse an existing Tk canvas when swapping figures for the same frame."""
+    import matplotlib.pyplot as plt
+
+    if current_canvas is None:
+        return embed_plot_in_tk(fig, parent, toolbar=toolbar)
+
+    try:
+        if not current_canvas.get_tk_widget().winfo_exists():
+            return embed_plot_in_tk(fig, parent, toolbar=toolbar)
+    except tk.TclError:
+        return embed_plot_in_tk(fig, parent, toolbar=toolbar)
+
+    old_fig = current_canvas.figure
+    if old_fig is fig:
+        _bind_resize_handler(current_canvas, fig)
+        current_canvas.draw()
+        return current_canvas
+
+    canvas_size = _get_canvas_size_in_pixels(current_canvas, old_fig)
+    if canvas_size is not None:
+        width_px, height_px = canvas_size
+        fig.set_size_inches(
+            width_px / fig.dpi,
+            height_px / fig.dpi,
+            forward=False,
+        )
+
+    current_canvas.figure = fig
+    fig.set_canvas(current_canvas)
+    toolbar_widget = getattr(current_canvas, "toolbar", None)
+    if toolbar_widget is not None:
+        toolbar_widget.canvas = current_canvas
+        toolbar_widget.update()
+    _bind_resize_handler(current_canvas, fig)
+    current_canvas.draw()
+    plt.close(old_fig)
+    return current_canvas

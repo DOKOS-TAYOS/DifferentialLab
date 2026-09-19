@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
+
 import numpy as np
 import pytest
 
+from complex_problems.pipe_flow import solver as pipe_solver
+from complex_problems.pipe_flow.model import friction_factor
 from complex_problems.pipe_flow.solver import solve_pipe_flow
 
 
@@ -62,6 +66,32 @@ def test_transient_pipe_flow_runs_with_finite_fields() -> None:
     assert result.magnitudes["cfl"] < 0.95
 
 
+def test_transient_pipe_flow_keeps_expected_samples_without_linear_membership_check() -> None:
+    result = solve_pipe_flow(
+        model_type="transient",
+        length=20.0,
+        nx=120,
+        profile="constant",
+        d0=0.06,
+        rho=1000.0,
+        mu=1.0e-3,
+        roughness=1.0e-5,
+        friction_model="auto",
+        p_out=1.9e5,
+        p_base=2.0e5,
+        p_amp=1.5e3,
+        p_freq_hz=1.0,
+        wave_speed=150.0,
+        damping=0.2,
+        t_max=0.0055,
+        dt=0.001,
+        sample_every=4,
+    )
+
+    np.testing.assert_allclose(result.t, [0.0, 0.004, 0.006])
+    assert "step in sample_indices" not in inspect.getsource(pipe_solver._solve_transient)
+
+
 def test_transient_pipe_flow_rejects_unstable_cfl() -> None:
     with pytest.raises(ValueError):
         solve_pipe_flow(
@@ -79,3 +109,28 @@ def test_transient_pipe_flow_rejects_unstable_cfl() -> None:
             t_max=0.05,
             dt=0.01,
         )
+
+
+def test_default_transient_pipe_flow_configuration_is_cfl_stable() -> None:
+    result = solve_pipe_flow(model_type="transient")
+
+    assert result.magnitudes["cfl"] < 0.95
+    assert np.all(np.isfinite(result.pressure))
+    assert np.all(np.isfinite(result.velocity))
+
+
+def test_laminar_friction_does_not_evaluate_turbulent_formula(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    re = np.array([100.0, 200.0, 500.0])
+    diameter = np.array([0.05, 0.05, 0.05])
+
+    def fail_log10(values: np.ndarray) -> np.ndarray:
+        raise AssertionError("laminar friction should not evaluate Swamee-Jain")
+
+    monkeypatch.setattr(np, "log10", fail_log10)
+
+    np.testing.assert_allclose(
+        friction_factor(re, roughness=1e-5, diameter=diameter, model="laminar"),
+        64.0 / re,
+    )

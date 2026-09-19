@@ -17,8 +17,8 @@ class AntennaRadiationProblem:
         id="antenna_radiation",
         name="Antenna Radiation",
         description=(
-            "Far-field radiation patterns and field magnitudes for dipoles, "
-            "loops, patch-like apertures, and uniform linear arrays."
+            "Far-field gain, directivity, and electric-field estimates for dipoles, "
+            "loops, patch-like apertures, and linear arrays."
         ),
     )
 

@@ -1,36 +1,168 @@
-"""ODE, difference, and PDE solving engine."""
+"""ODE, difference, and PDE solving engine.
 
-from solver.difference_solver import solve_difference
-from solver.equation_parser import (
-    get_difference_function,
-    get_ode_function,
-    get_vector_ode_function,
-    parse_pde_rhs_expression,
-)
-from solver.error_metrics import compute_ode_residual_error
-from solver.notation import FNotation, generate_derivative_labels
-from solver.ode_solver import ODESolution, solve_multipoint, solve_ode
-from solver.pde_solver import solve_pde_2d
-from solver.predefined import is_multivariate, load_predefined_equations
-from solver.statistics import compute_statistics, compute_statistics_2d
-from solver.validators import validate_all_inputs
+Public symbols are loaded lazily so importing :mod:`solver` does not pull in
+SciPy-heavy solver modules until a caller asks for them.
+"""
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "solve_difference": ("solver.difference_solver", "solve_difference"),
+    "get_difference_function": ("solver.equation_parser", "get_difference_function"),
+    "get_ode_function": ("solver.equation_parser", "get_ode_function"),
+    "get_vector_ode_function": ("solver.equation_parser", "get_vector_ode_function"),
+    "parse_ode_event_expression": (
+        "solver.equation_parser",
+        "parse_ode_event_expression",
+    ),
+    "parse_pde_rhs_expression": ("solver.equation_parser", "parse_pde_rhs_expression"),
+    "parse_pde_3d_residual_expression": (
+        "solver.equation_parser",
+        "parse_pde_3d_residual_expression",
+    ),
+    "parse_vector_pde_residual_expressions": (
+        "solver.equation_parser",
+        "parse_vector_pde_residual_expressions",
+    ),
+    "compute_ode_residual_error": ("solver.error_metrics", "compute_ode_residual_error"),
+    "FNotation": ("solver.notation", "FNotation"),
+    "generate_derivative_labels": ("solver.notation", "generate_derivative_labels"),
+    "ODESolution": ("solver.ode_solver", "ODESolution"),
+    "IVPOptions": ("solver.ode_solver", "IVPOptions"),
+    "BVPOptions": ("solver.ode_solver", "BVPOptions"),
+    "BVPSolution": ("solver.ode_solver", "BVPSolution"),
+    "solve_bvp": ("solver.ode_solver", "solve_bvp"),
+    "solve_multipoint": ("solver.ode_solver", "solve_multipoint"),
+    "solve_ode": ("solver.ode_solver", "solve_ode"),
+    "PDEDiagnostics": ("solver.pde_solver", "PDEDiagnostics"),
+    "PDESolution": ("solver.pde_solver", "PDESolution"),
+    "PDEBoundaryCondition": ("solver.pde_types", "PDEBoundaryCondition"),
+    "PDEBoundaryConditions": ("solver.pde_types", "PDEBoundaryConditions"),
+    "PDECoefficientProvider": ("solver.pde_types", "PDECoefficientProvider"),
+    "PDECoefficients": ("solver.pde_types", "PDECoefficients"),
+    "solve_pde_2d": ("solver.pde_solver", "solve_pde_2d"),
+    "PDEBoundaryCondition3D": ("solver.pde_types", "PDEBoundaryCondition3D"),
+    "PDEBoundaryConditions3D": ("solver.pde_types", "PDEBoundaryConditions3D"),
+    "PDECoefficientProvider3D": ("solver.pde_types", "PDECoefficientProvider3D"),
+    "PDECoefficients3D": ("solver.pde_types", "PDECoefficients3D"),
+    "PDESolution3D": ("solver.pde_types", "PDESolution3D"),
+    "solve_pde_3d": ("solver.pde_3d_solver", "solve_pde_3d"),
+    "VectorPDEBoundaryConditions": ("solver.pde_types", "VectorPDEBoundaryConditions"),
+    "VectorPDECoefficientProvider": ("solver.pde_types", "VectorPDECoefficientProvider"),
+    "VectorPDECoefficients": ("solver.pde_types", "VectorPDECoefficients"),
+    "VectorPDEDiagnostics": ("solver.pde_types", "VectorPDEDiagnostics"),
+    "VectorPDEResidual": ("solver.pde_types", "VectorPDEResidual"),
+    "VectorPDESolution": ("solver.pde_types", "VectorPDESolution"),
+    "solve_vector_pde_2d": ("solver.pde_system_solver", "solve_vector_pde_2d"),
+    "is_multivariate": ("solver.predefined", "is_multivariate"),
+    "load_predefined_equations": ("solver.predefined", "load_predefined_equations"),
+    "compute_statistics": ("solver.statistics", "compute_statistics"),
+    "compute_statistics_2d": ("solver.statistics", "compute_statistics_2d"),
+    "validate_all_inputs": ("solver.validators", "validate_all_inputs"),
+}
 
 __all__ = [
     "solve_difference",
     "get_difference_function",
     "get_ode_function",
     "get_vector_ode_function",
+    "parse_ode_event_expression",
     "parse_pde_rhs_expression",
+    "parse_pde_3d_residual_expression",
+    "parse_vector_pde_residual_expressions",
     "compute_ode_residual_error",
     "FNotation",
     "generate_derivative_labels",
     "ODESolution",
+    "IVPOptions",
+    "BVPOptions",
+    "BVPSolution",
+    "solve_bvp",
     "solve_multipoint",
     "solve_ode",
+    "PDEDiagnostics",
+    "PDESolution",
+    "PDEBoundaryCondition",
+    "PDEBoundaryConditions",
+    "PDECoefficientProvider",
+    "PDECoefficients",
     "solve_pde_2d",
+    "PDEBoundaryCondition3D",
+    "PDEBoundaryConditions3D",
+    "PDECoefficientProvider3D",
+    "PDECoefficients3D",
+    "PDESolution3D",
+    "solve_pde_3d",
+    "VectorPDEBoundaryConditions",
+    "VectorPDECoefficientProvider",
+    "VectorPDECoefficients",
+    "VectorPDEDiagnostics",
+    "VectorPDEResidual",
+    "VectorPDESolution",
+    "solve_vector_pde_2d",
     "is_multivariate",
     "load_predefined_equations",
     "compute_statistics",
     "compute_statistics_2d",
     "validate_all_inputs",
 ]
+
+if TYPE_CHECKING:
+    from solver.difference_solver import solve_difference
+    from solver.equation_parser import (
+        get_difference_function,
+        get_ode_function,
+        get_vector_ode_function,
+        parse_ode_event_expression,
+        parse_pde_3d_residual_expression,
+        parse_pde_rhs_expression,
+        parse_vector_pde_residual_expressions,
+    )
+    from solver.error_metrics import compute_ode_residual_error
+    from solver.notation import FNotation, generate_derivative_labels
+    from solver.ode_solver import (
+        BVPOptions,
+        BVPSolution,
+        IVPOptions,
+        ODESolution,
+        solve_bvp,
+        solve_multipoint,
+        solve_ode,
+    )
+    from solver.pde_3d_solver import solve_pde_3d
+    from solver.pde_solver import PDEDiagnostics, PDESolution, solve_pde_2d
+    from solver.pde_system_solver import solve_vector_pde_2d
+    from solver.pde_types import (
+        PDEBoundaryCondition,
+        PDEBoundaryCondition3D,
+        PDEBoundaryConditions,
+        PDEBoundaryConditions3D,
+        PDECoefficientProvider,
+        PDECoefficientProvider3D,
+        PDECoefficients,
+        PDECoefficients3D,
+        PDESolution3D,
+        VectorPDEBoundaryConditions,
+        VectorPDECoefficientProvider,
+        VectorPDECoefficients,
+        VectorPDEDiagnostics,
+        VectorPDEResidual,
+        VectorPDESolution,
+    )
+    from solver.predefined import is_multivariate, load_predefined_equations
+    from solver.statistics import compute_statistics, compute_statistics_2d
+    from solver.validators import validate_all_inputs
+
+
+def __getattr__(name: str) -> Any:
+    """Load a public solver symbol on first access."""
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value

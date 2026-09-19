@@ -9,8 +9,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from complex_problems.coupled_oscillators.model import (
-    _resolve_k,
-    _resolve_mass,
+    _resolve_k_array,
+    _resolve_mass_array,
     build_ode_function,
     compute_normal_modes,
 )
@@ -41,15 +41,8 @@ def _resolve_state_arrays(
     masses: float | list[float] | Callable[[int], float],
     k_coupling: float | list[float] | Callable[[int], float],
 ) -> tuple[np.ndarray, np.ndarray]:
-    masses_arr = np.array([_resolve_mass(masses, i, n) for i in range(n)], dtype=float)
-    if np.any(masses_arr <= 0):
-        raise ValueError("All masses must be positive.")
-
     n_springs = n if boundary == "periodic" else n - 1
-    k_arr = np.array([_resolve_k(k_coupling, i, n) for i in range(n_springs)], dtype=float)
-    if np.any(k_arr < 0):
-        raise ValueError("All coupling constants must be non-negative.")
-    return masses_arr, k_arr
+    return _resolve_mass_array(masses, n), _resolve_k_array(k_coupling, n_springs, n)
 
 
 def solve_coupled_oscillators(
@@ -96,9 +89,7 @@ def solve_coupled_oscillators(
         y0[0] = 1.0
     y0_arr = np.asarray(y0, dtype=float)
     if y0_arr.shape != (2 * n,):
-        raise ValueError(
-            f"Initial state must have exactly {2 * n} values, got {y0_arr.size}."
-        )
+        raise ValueError(f"Initial state must have exactly {2 * n} values, got {y0_arr.size}.")
 
     masses_arr, k_arr = _resolve_state_arrays(n, boundary, masses, k_coupling)
 
@@ -194,4 +185,3 @@ def solve_coupled_oscillators(
         has_modes=has_modes,
         metadata=metadata,
     )
-

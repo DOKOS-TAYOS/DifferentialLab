@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
 from utils.update_checker import (
+    _fetch_latest_version,
     _parse_version,
+    perform_git_pull,
     record_check_done,
     should_run_check,
 )
@@ -30,6 +33,14 @@ class TestParseVersion:
         assert _parse_version("") == (0,)
 
 
+class TestFetchLatestVersion:
+    def test_rejects_non_https_update_url(self) -> None:
+        with patch("utils.update_checker.urlopen") as urlopen_mock:
+            assert _fetch_latest_version("file:///C:/Users/example/pyproject.toml") is None
+
+        urlopen_mock.assert_not_called()
+
+
 class TestShouldRunCheck:
     def test_disabled_returns_false(self) -> None:
         with patch("utils.update_checker.get_env_from_schema") as mock:
@@ -42,6 +53,7 @@ class TestShouldRunCheck:
 
     def test_force_returns_true(self) -> None:
         with patch("utils.update_checker.get_env_from_schema") as mock:
+
             def env_effect(k: str) -> object:
                 if k == "CHECK_UPDATES":
                     return "true"
@@ -50,6 +62,7 @@ class TestShouldRunCheck:
                 if k == "UPDATE_CHECK_INTERVAL_DAYS":
                     return 7
                 return None
+
             mock.side_effect = env_effect
             assert should_run_check() is True
 
@@ -73,8 +86,94 @@ class TestShouldRunCheck:
 
 
 class TestRecordCheckDone:
-    def test_touches_file(self, tmp_path: Path) -> None:
-        with patch("utils.update_checker.get_project_root", return_value=tmp_path):
+    def test_touches_file(self) -> None:
+        check_file = Path("C:/repo/.last_update_check")
+        with (
+            patch("utils.update_checker._get_last_check_path", return_value=check_file),
+            patch("pathlib.Path.touch") as touch_mock,
+        ):
             record_check_done()
-            check_file = tmp_path / ".last_update_check"
-            assert check_file.exists()
+        touch_mock.assert_called_once_with()
+
+
+class TestPerformGitPull:
+    def test_blocks_when_non_protected_paths_are_dirty(self) -> None:
+        root = Path("C:/repo")
+        status_result = subprocess.CompletedProcess(
+            args=["git", "status"],
+            returncode=0,
+            stdout=" M src/main_program.py\n?? input/new_case.txt\n",
+            stderr="",
+        )
+
+        with (
+            patch("utils.update_checker.get_project_root", return_value=root),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_dir", return_value=True),
+            patch("utils.update_checker.subprocess.run", return_value=status_result) as run_mock,
+        ):
+            success, msg = perform_git_pull()
+
+        assert success is False
+        assert "outside input/ and output/" in msg
+        assert "src/main_program.py" in msg
+        assert run_mock.call_count == 1
+
+    def test_reports_conflicts_when_stash_pop_fails(self) -> None:
+        root = Path("C:/repo")
+        responses = [
+            subprocess.CompletedProcess(
+                args=["git", "status"],
+                returncode=0,
+                stdout="?? input/new_case.txt\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "rev-parse", "--verify", "-q", "refs/stash"],
+                returncode=1,
+                stdout="",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "stash", "push"],
+                returncode=0,
+                stdout="Saved working directory and index state WIP on main: abc123 test\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "rev-parse", "--verify", "-q", "refs/stash"],
+                returncode=0,
+                stdout="0123456789abcdef\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "pull"],
+                returncode=0,
+                stdout="Already up to date.\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "stash", "pop"],
+                returncode=1,
+                stdout="CONFLICT (content): Merge conflict in input/new_case.txt\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=["git", "diff"],
+                returncode=0,
+                stdout="input/new_case.txt\n",
+                stderr="",
+            ),
+        ]
+
+        with (
+            patch("utils.update_checker.get_project_root", return_value=root),
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_dir", return_value=True),
+            patch("utils.update_checker.subprocess.run", side_effect=responses),
+        ):
+            success, msg = perform_git_pull()
+
+        assert success is False
+        assert "caused merge conflicts" in msg
+        assert "input/new_case.txt" in msg

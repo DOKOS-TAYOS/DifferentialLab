@@ -5,11 +5,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from complex_problems.coupled_oscillators import model as coupled_oscillators_model
 from complex_problems.coupled_oscillators.model import (
     build_ode_function,
     compute_normal_modes,
 )
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
+
+
+def test_private_uniform_helper_removed_from_module_namespace() -> None:
+    assert not hasattr(coupled_oscillators_model, "_is_uniform")
 
 
 def test_build_ode_linear_nonuniform_fixed_matches_spring_balance() -> None:
@@ -58,10 +63,7 @@ def test_build_ode_linear_nonuniform_periodic_matches_spring_balance() -> None:
 
     expected = np.zeros(n)
     for i in range(n):
-        expected[i] = (
-            k[i] * (x[(i + 1) % n] - x[i])
-            - k[(i - 1) % n] * (x[i] - x[(i - 1) % n])
-        )
+        expected[i] = k[i] * (x[(i + 1) % n] - x[i]) - k[(i - 1) % n] * (x[i] - x[(i - 1) % n])
     np.testing.assert_allclose(acc, expected, rtol=1e-12, atol=1e-12)
 
 
@@ -118,3 +120,41 @@ def test_solver_rejects_non_positive_mass() -> None:
             n_points=20,
         )
 
+
+def test_spec_normalization_preserves_padding_and_array_inputs() -> None:
+    result = solve_coupled_oscillators(
+        n_oscillators=4,
+        masses=np.array([1.0, 2.0]),
+        k_coupling=(0.2, 0.4),
+        boundary="fixed",
+        t_max=0.1,
+        n_points=3,
+    )
+    np.testing.assert_array_equal(result.masses, [1.0, 2.0, 2.0, 2.0])
+    np.testing.assert_array_equal(result.k_coupling, [0.2, 0.4, 0.4])
+
+
+def test_spec_normalization_preserves_callable_contract() -> None:
+    def masses(i: int) -> float:
+        return 1.0 + i * 0.1
+
+    def coupling(i: int) -> float:
+        return 0.2 + i * 0.05
+
+    result = solve_coupled_oscillators(
+        n_oscillators=3,
+        masses=masses,
+        k_coupling=coupling,
+        boundary="periodic",
+        t_max=0.1,
+        n_points=3,
+    )
+    np.testing.assert_allclose(result.masses, [1.0, 1.1, 1.2])
+    np.testing.assert_allclose(result.k_coupling, [0.2, 0.25, 0.3])
+
+
+def test_empty_array_specs_still_raise() -> None:
+    with pytest.raises(ValueError, match="Mass specification list cannot be empty"):
+        coupled_oscillators_model._resolve_mass_array([], 3)
+    with pytest.raises(ValueError, match="Coupling specification list cannot be empty"):
+        coupled_oscillators_model._resolve_k_array([], 2, 3)

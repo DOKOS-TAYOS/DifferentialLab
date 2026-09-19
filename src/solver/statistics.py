@@ -75,17 +75,22 @@ def compute_statistics(
     if "dominant_frequency" in all_stats:
         results["dominant_frequency"] = _estimate_dominant_frequency(x, y_primary)
 
+    exponential_rate = (
+        _estimate_exponential_rate(x, y_primary)
+        if all_stats & {"exponential_rate", "half_life", "time_constant", "doubling_time"}
+        else None
+    )
     if "exponential_rate" in all_stats:
-        results["exponential_rate"] = _estimate_exponential_rate(x, y_primary)
+        results["exponential_rate"] = exponential_rate
 
     if "half_life" in all_stats:
-        results["half_life"] = _compute_half_life(x, y_primary)
+        results["half_life"] = _compute_half_life_from_rate(exponential_rate)
 
     if "time_constant" in all_stats:
-        results["time_constant"] = _compute_time_constant(x, y_primary)
+        results["time_constant"] = _compute_time_constant_from_rate(exponential_rate)
 
     if "doubling_time" in all_stats:
-        results["doubling_time"] = _compute_doubling_time(x, y_primary)
+        results["doubling_time"] = _compute_doubling_time_from_rate(exponential_rate)
 
     if "angular_frequency" in all_stats:
         results["angular_frequency"] = _compute_angular_frequency(x, y_primary)
@@ -253,6 +258,11 @@ def _compute_half_life(x: np.ndarray, y: np.ndarray) -> float | None:
         Half-life, or None if not exponential decay.
     """
     lam = _estimate_exponential_rate(x, y)
+    return _compute_half_life_from_rate(lam)
+
+
+def _compute_half_life_from_rate(lam: float | None) -> float | None:
+    """Compute half-life from a precomputed exponential rate."""
     if lam is None or lam >= 0:
         return None
     return float(np.log(2) / abs(lam))
@@ -269,6 +279,11 @@ def _compute_time_constant(x: np.ndarray, y: np.ndarray) -> float | None:
         Time constant, or None if not exponential decay.
     """
     lam = _estimate_exponential_rate(x, y)
+    return _compute_time_constant_from_rate(lam)
+
+
+def _compute_time_constant_from_rate(lam: float | None) -> float | None:
+    """Compute time constant from a precomputed exponential rate."""
     if lam is None or lam >= 0:
         return None
     return float(1.0 / abs(lam))
@@ -285,6 +300,11 @@ def _compute_doubling_time(x: np.ndarray, y: np.ndarray) -> float | None:
         Doubling time, or None if not exponential growth.
     """
     lam = _estimate_exponential_rate(x, y)
+    return _compute_doubling_time_from_rate(lam)
+
+
+def _compute_doubling_time_from_rate(lam: float | None) -> float | None:
+    """Compute doubling time from a precomputed exponential rate."""
     if lam is None or lam <= 0:
         return None
     return float(np.log(2) / lam)

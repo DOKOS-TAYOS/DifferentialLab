@@ -5,6 +5,145 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added time-evolving speed-field, streamline, and centerline-profile animations to
+  the 2D aerodynamics results, with matching MP4 export for every animated view.
+- Added time-evolving 2D k-space and density-surface animations to the Schrodinger TD
+  results, plus NLSE/KdV spectrum animations with matching MP4 export.
+- Added selectable 2D field, 3D surface, and 2D FFT power-spectrum animations to the
+  nonlinear membrane results dialog, with matching MP4 export for every selected view.
+
+### Fixed
+
+- Restored Antenna Radiation result plots by keeping Matplotlib axis type casts runtime-safe.
+
+### Changed
+
+- Improved Pipe Flow result visualizations with unit-aware pressure, separated geometry
+  and steady-flow profiles, spatial steady diagnostics, and scale-separated transient diagnostics.
+- Deferred animated spectrum-tab construction until first selection and bounded spectrum
+  history FFT temporaries to one stored frame for Schrodinger TD and nonlinear waves.
+- Corrected low-amplitude membrane animation scaling and included cached float32
+  spectrum history in the membrane memory advisory.
+- Made coupled-oscillator animation labels readable for large mode counts and added
+  MP4 export that matches the currently selected oscillator or mode view.
+- Set the standard Vector PDE interactive grid default to 100 × 100 while keeping
+  larger user-selected grids behind the existing performance advisory.
+- Kept Tk-backed parameter state out of solver workers and deferred cyclic garbage collection
+  until their Tk-thread completion callbacks, preventing 3D PDE solves from leaving the loading
+  dialog open after Tk finalizer thread errors.
+- Deferred PDE backend imports until a PDE route is selected, reducing the standard ODE cold start.
+- Sized and materialized ResultDialog before embedding its initial Matplotlib canvas.
+- Synchronized replacement Matplotlib figures with the existing Tk canvas dimensions to prevent stale plot regions.
+- Closed Matplotlib figures owned by ResultDialog during animation replacement and dialog shutdown.
+- Consolidated release, dependency, logo, and documentation metadata around their canonical sources.
+- Vectorized safe custom membrane initial-displacement expressions while retaining scalar callable
+  fallback, removed a redundant fixed-boundary acceleration copy, and normalized coupled-oscillator
+  mass/coupling specifications once per solve.
+- Added conservative direct-coefficient fast paths for structurally explicit scalar 3D and
+  vector PDE expressions, and compacted internal scalar 3D boundary workspaces.
+- Preserved dense interpolants for public IVP calls while skipping their allocation in the
+  sampled application pipeline, where only sampled results and event diagnostics are used.
+
+## [0.5.0] - 2026-09-16
+
+### Added
+
+- Added parameterized Advanced Problems contract smoke coverage for all seven registered
+  plugins, including lazy descriptors, callable dialog entry points, and finite
+  representative numerical solves.
+- Added display-only Cartesian/polar, cylindrical, and spherical coordinate utilities with
+  deterministic singular-origin vector bases; scalar 2D polar re-sampling, Vector PDE
+  component/magnitude/quiver/stream/radial-tangential views, and shared 3D slice extraction.
+- Added structured scalar PDE diagnostics for discrete residual norms, sparse matrix size,
+  nonzero count, and a bounded small-system condition estimate.
+- Added structured scalar-2D Dirichlet, Neumann, and Robin boundary objects plus
+  mathematically wrapped one-axis/two-axis periodic grids with non-duplicated endpoints.
+- Added linear strongly elliptic Vector PDE systems in 2D with six matrix-valued
+  operator coefficients, full coupled residual-affinity probing, sampled principal-symbol
+  validation, explicit shared/component boundary rules, component-major sparse assembly,
+  global/per-component diagnostics, and one coupled catalog example.
+- Integrated `Vector PDE` into the standard equation, parameter, result, and export flow
+  with safe indexed residual notation and component/magnitude field views.
+- Added a dedicated scalar linear elliptic PDE 3D solver with affine residual and direct
+  coefficient paths, strict 3x3 principal-matrix validation, mixed-derivative sparse
+  stencils, six-face Dirichlet/Neumann/Robin data, periodic axes, algebraic diagnostics,
+  standard-workflow dispatch, pre-run sparse-memory advice, and orthogonal slice access.
+- Added typed IVP options for events, analytic Jacobians, vectorized evaluation, and
+  first-step control; structured ODE work/status/event diagnostics; and safe terminal or
+  directional event expressions in the standard ODE dialog.
+- Added a typed SciPy BVP wrapper plus automatic, forced-shooting, and forced-BVP
+  multipoint strategies with deterministic bounded initial meshes and explicit
+  incompatible-condition failures.
+
+### Security
+
+- Added Dependabot configuration for Python dependencies and GitHub Actions.
+- Documented GitHub CodeQL default setup and added a weekly/manual `pip-audit`
+  dependency audit workflow.
+- Added a repository security policy for private vulnerability reporting.
+- Hardened expression parameter handling so unsafe parameter names are rejected and
+  user parameters cannot shadow approved math functions during expression evaluation.
+- Restricted the update checker to HTTPS version URLs.
+
+### Changed
+
+- Hardened package distribution contents, clean-install smoke verification, and cross-platform CI;
+  CI now enforces at least 70% coverage for the tested runtime core.
+- Stabilized Advanced Problems cleanup by cancelling pending Tk animation playback when
+  a result view is replaced or its dialog closes.
+- Restricted planar Vector PDE views (quiver, stream, and radial/tangential) to
+  exactly two components, preserving component and magnitude views for larger systems.
+- Corrected cylindrical vector-component transforms so every returned component uses
+  the common broadcast shape of its vector and coordinate inputs.
+- Preserved zero-valued ODE solver options through explicit `None` resolution, including
+  the `max_step=0` infinity sentinel when callers supply their own evaluation grid.
+- Corrected automatic multipoint routing so every compatible endpoint-only condition set
+  after the all-at-start IVP shortcut uses BVP, including conditions entirely at `x_max`.
+- Reject ODE event expressions during parsing unless their test evaluation produces
+  exactly one finite real scalar.
+
+- Hardened the scalar 2D PDE solver with strict domain, grid, mask, boundary-data,
+  coefficient, affine-residual, ellipticity, sparse-solve, and finiteness validation.
+- Corrected nonzero outward-normal Neumann signs on all rectangular edges, made
+  mixed-derivative boundary elimination geometry-aware, and rejected spatially
+  inconsistent positive/negative ellipticity orientation.
+- Split scalar-2D PDE validation, boundary substitution, sparse assembly, and public
+  types into focused modules while preserving the `solve_pde_2d()` legacy signature.
+- Made corner behavior explicit, removed the zero-valued Neumann reconstruction fallback,
+  and validate ellipticity orientation independently in each connected mask component.
+- Detect a constant-field numerical nullspace before sparse PDE solves, including large
+  periodic Laplacian systems whose zero right-hand side can otherwise hide singularity.
+
+- Expanded CI to run on `main` and `dev` for Python 3.12 and 3.13, with ruff linting,
+  ruff format checks, pytest, and pyright.
+- Configured pytest to use the repo-local ignored `.pytest-temp` directory for
+  temporary files, avoiding Windows temp-permission issues.
+- Refreshed repository documentation to match the current 0.4.1 codebase, including
+  setup/run modes, solver coverage, complex-problem plugins, configuration defaults,
+  logging behavior, API docs, and the pytest/ruff/pyright workflow.
+- Aligned `.env.example` with the current `ENV_SCHEMA` defaults, including log
+  rotation settings.
+- Ignored the local `.tmp/` scratch directory used by sandboxed test runs.
+- Improved the logging setup with rotating log files, safer handler reconfiguration, nested log-path support, and graceful console fallback when file logging cannot start.
+- Removed the unused internal `_is_uniform` helper from the coupled oscillators model.
+- Extracted shared internal complex-problem dialog helpers to reduce UI duplication across simpler solver dialogs.
+- Extracted shared internal result-dialog helpers to centralize embedded figure cleanup and animation reset logic.
+- Refactored coupled oscillators and standard parameter dialogs to use typed input-collection helpers before solver dispatch.
+- Added explicit function annotations across internal source modules.
+- Reused a shared background-task helper for solver dialogs and split the standard parameters dialog UI into focused private builders.
+- Reduced high-resolution PDE overhead by switching masked-domain classification and sparse assembly to compact integer grids with preallocated buffers.
+- Reduced ODE residual/PDE/aerodynamics/pipe-flow overhead by reusing precomputed RHS values, adding a direct PDE coefficient fast path for coordinate-only right-hand sides, avoiding extra periodic derivative temporaries, and stabilizing transient pipe-flow defaults.
+- Deferred large Schrödinger and nonlinear-wave `magnitude`/`phase` arrays until first access, and added pre-run performance advisories for expensive solver configurations.
+- Hardened expression validation against unsafe attribute access and added opt-in solver controls for lower-memory Schrödinger histories and skipped ODE RHS post-processing.
+- Reduced transform import overhead, reused exponential-rate statistics work, and added opt-in lower-memory nonlinear-wave histories.
+- Reused result-plot canvases on view changes, debounced resize redraws, and collapsed membrane history summaries into a single energy/extrema pass.
+- Added a repo-local `pyright` configuration, tightened Tk/matplotlib typing in shared UI helpers, and cleaned transform/solver typing hotspots until `pyright` reports zero errors.
+- Refreshed user-facing dialog copy across the main UI, equation setup, transforms, results, settings, performance warnings, and advanced-problem workflows.
+
 ## [0.3.2] - 2026-03-05
 
 ### Added

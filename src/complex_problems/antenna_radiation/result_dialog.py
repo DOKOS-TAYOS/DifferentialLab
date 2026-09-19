@@ -4,28 +4,35 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
 from complex_problems.antenna_radiation.solver import AntennaRadiationResult
+from complex_problems.common.result_dialog_ui import close_embedded_figures
 from config import get_env_from_schema
 from frontend.plot_embed import embed_plot_in_tk
 from frontend.window_utils import center_window, make_modal
 from plotting import create_contour_plot, create_solution_plot
 
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+    from matplotlib.projections.polar import PolarAxes
+    from mpl_toolkits.mplot3d.axes3d import Axes3D
 
-def _create_polar_cut_figure(theta_deg: np.ndarray, cut_db: np.ndarray, *, title: str) -> "object":
+
+def _create_polar_cut_figure(theta_deg: np.ndarray, cut_db: np.ndarray, *, title: str) -> Figure:
     import matplotlib.pyplot as plt
 
     theta_rad = np.deg2rad(theta_deg)
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection="polar")
-    ax.plot(theta_rad, cut_db, linewidth=2.0)
-    ax.set_title(title)
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-    ax.set_rlabel_position(135)
-    ax.grid(True, alpha=0.35)
+    polar_ax = cast("PolarAxes", fig.add_subplot(111, projection="polar"))
+    polar_ax.plot(theta_rad, cut_db, linewidth=2.0)
+    polar_ax.set_title(title)
+    polar_ax.set_theta_zero_location("N")
+    polar_ax.set_theta_direction(-1)
+    polar_ax.set_rlabel_position(135)
+    polar_ax.grid(True, alpha=0.35)
     fig.tight_layout()
     return fig
 
@@ -34,7 +41,7 @@ def _create_3d_pattern_figure(
     theta_deg: np.ndarray,
     phi_deg: np.ndarray,
     gain_db: np.ndarray,
-) -> "object":
+) -> Figure:
     import matplotlib.pyplot as plt
 
     theta = np.deg2rad(theta_deg)
@@ -48,12 +55,12 @@ def _create_3d_pattern_figure(
     z = r * np.cos(TH)
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.plot_surface(x, y, z, cmap="viridis", linewidth=0.0, antialiased=True, alpha=0.95)
-    ax.set_title("Normalized 3D radiation pattern")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("z")
+    axes_3d = cast("Axes3D", fig.add_subplot(111, projection="3d"))
+    axes_3d.plot_surface(x, y, z, cmap="viridis", linewidth=0.0, antialiased=True, alpha=0.95)
+    axes_3d.set_title("Normalized 3D radiation pattern")
+    axes_3d.set_xlabel("x")
+    axes_3d.set_ylabel("y")
+    axes_3d.set_zlabel("z")
     fig.tight_layout()
     return fig
 
@@ -65,7 +72,7 @@ class AntennaRadiationResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Antenna Radiation")
+        self.win.title("Antenna Radiation Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._map_canvas = None
@@ -81,21 +88,16 @@ class AntennaRadiationResultDialog:
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
-        import matplotlib.pyplot as plt
-
-        for attr in (
-            "_map_canvas",
-            "_cut_canvas",
-            "_phi_canvas",
-            "_surface_canvas",
-            "_field_canvas",
-        ):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            (
+                "_map_canvas",
+                "_cut_canvas",
+                "_phi_canvas",
+                "_surface_canvas",
+                "_field_canvas",
+            ),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -122,7 +124,7 @@ class AntennaRadiationResultDialog:
         nb.pack(fill=tk.BOTH, expand=True)
 
         tab_map = ttk.Frame(nb)
-        nb.add(tab_map, text="  Angular Map  ")
+        nb.add(tab_map, text="  Angular Gain Map  ")
         self._build_map_tab(tab_map)
 
         tab_cut = ttk.Frame(nb)
@@ -138,7 +140,7 @@ class AntennaRadiationResultDialog:
         self._build_3d_tab(tab_3d)
 
         tab_field = ttk.Frame(nb)
-        nb.add(tab_field, text="  Field Map  ")
+        nb.add(tab_field, text="  Field Strength  ")
         self._build_field_tab(tab_field)
 
         btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))

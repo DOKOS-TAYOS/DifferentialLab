@@ -3,16 +3,70 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
+from complex_problems.common.result_dialog_ui import (
+    close_embedded_figures,
+    reset_embedded_animation,
+)
 from complex_problems.nonlinear_waves.solver import NonlinearWavesResult
-from config import get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
-from plotting import create_contour_plot, create_solution_plot
+from plotting import (
+    create_contour_plot,
+    create_solution_plot,
+    export_animated_figure_to_mp4,
+)
+from plotting.animation_metadata import attach_animation_metadata
+from utils import get_logger
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class _SpectrumAnimationViewPayload:
+    """Prepared spectrum data shared by the embedded view and MP4 export."""
+
+    t: np.ndarray
+    k: np.ndarray
+    frames: np.ndarray
+    title: str
+
+
+def _create_spectrum_animation_figure(payload: _SpectrumAnimationViewPayload) -> Figure:
+    """Build the spectrum figure used by Tk and by MP4 export."""
+    import matplotlib.pyplot as plt
+
+    y_max = float(np.max(payload.frames))
+    y_lim = 1.1 * (y_max if y_max > 0.0 else 1.0)
+    fig, ax = plt.subplots()
+    (line,) = ax.plot(payload.k, payload.frames[0], linewidth=2.0)
+    ax.set_xlim(float(payload.k[0]), float(payload.k[-1]))
+    ax.set_ylim(0.0, y_lim)
+    ax.set_xlabel("k")
+    ax.set_ylabel("Power")
+    ax.set_title(f"{payload.title} (t={payload.t[0]:.3g})")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    def _update(index: int) -> None:
+        """Draw one bounded spectrum frame."""
+        idx = max(0, min(index, len(payload.t) - 1))
+        line.set_ydata(payload.frames[idx])
+        ax.set_title(f"{payload.title} (t={payload.t[idx]:.3g})")
+        fig.canvas.draw_idle()
+
+    return attach_animation_metadata(fig, update=_update, n_points=len(payload.t))
 
 
 def _create_line_animation_figure(
@@ -22,7 +76,7 @@ def _create_line_animation_figure(
     *,
     title: str,
     ylabel: str,
-) -> "object":
+) -> Figure:
     """Create a line animation figure compatible with embed_animation_plot_in_tk."""
     import matplotlib.pyplot as plt
 
@@ -44,10 +98,7 @@ def _create_line_animation_figure(
         ax.set_title(f"{title} (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 class NonlinearWavesResultDialog:
@@ -57,7 +108,7 @@ class NonlinearWavesResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Nonlinear Waves")
+        self.win.title("Nonlinear Waves Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
@@ -73,15 +124,10 @@ class NonlinearWavesResultDialog:
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
-        import matplotlib.pyplot as plt
-
-        for attr in ("_anim_canvas", "_st_canvas", "_phase_canvas", "_spec_canvas", "_inv_canvas"):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            ("_anim_canvas", "_st_canvas", "_phase_canvas", "_spec_canvas", "_inv_canvas"),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -100,7 +146,7 @@ class NonlinearWavesResultDialog:
         self._build_anim_tab(tab_anim)
 
         tab_st = ttk.Frame(nb)
-        nb.add(tab_st, text="  Space-Time  ")
+        nb.add(tab_st, text="  Space-Time Map  ")
         self._build_spacetime_tab(tab_st)
 
         if self._result.phase is not None:
@@ -110,7 +156,9 @@ class NonlinearWavesResultDialog:
 
         tab_spec = ttk.Frame(nb)
         nb.add(tab_spec, text="  Spectrum  ")
-        self._build_spectrum_tab(tab_spec)
+        self._spectrum_tab = tab_spec
+        self._spectrum_tab_initialized = False
+        nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
         tab_inv = ttk.Frame(nb)
         nb.add(tab_inv, text="  Invariants  ")
@@ -122,13 +170,23 @@ class NonlinearWavesResultDialog:
             side=tk.RIGHT
         )
 
+    def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
+        """Initialize the deferred Spectrum tab on its first selection."""
+        if self._spectrum_tab_initialized:
+            return
+        notebook = cast(ttk.Notebook, event.widget)
+        selected_tab = notebook.nametowidget(notebook.select())
+        if selected_tab is self._spectrum_tab:
+            self._build_spectrum_tab(self._spectrum_tab)
+            self._spectrum_tab_initialized = True
+
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
 
         options = ["Field"] if self._result.model_type == "kdv" else ["Intensity", "Real", "Imag"]
         self._anim_view_var = tk.StringVar(value=options[0])
-        ttk.Label(ctrl, text="View:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             ctrl,
             textvariable=self._anim_view_var,
@@ -145,27 +203,19 @@ class NonlinearWavesResultDialog:
         self._update_anim()
 
     def _update_anim(self) -> None:
-        import matplotlib.pyplot as plt
-
-        if self._anim_canvas is not None and hasattr(self._anim_canvas, "figure"):
-            try:
-                plt.close(self._anim_canvas.figure)
-            except Exception:
-                pass
-        for w in self._anim_frame.winfo_children():
-            w.destroy()
+        reset_embedded_animation(self._anim_frame, self._anim_canvas)
 
         if self._result.model_type == "kdv":
-            y = self._result.field.real
+            y = np.real(self._result.field)
             title = "KdV profile"
             ylabel = "u"
         else:
             view = self._anim_view_var.get()
             if view == "Real":
-                y = self._result.field.real
+                y = np.real(self._result.field)
                 ylabel = "Re(ψ)"
             elif view == "Imag":
-                y = self._result.field.imag
+                y = np.imag(self._result.field)
                 ylabel = "Im(ψ)"
             else:
                 y = self._result.magnitude
@@ -207,16 +257,63 @@ class NonlinearWavesResultDialog:
         self._phase_canvas = embed_plot_in_tk(fig, parent)
 
     def _build_spectrum_tab(self, parent: ttk.Frame) -> None:
-        fig = create_solution_plot(
-            self._result.k,
-            np.atleast_2d(self._result.spectrum_power),
-            title="Final spectrum",
-            xlabel="k",
-            ylabel="Power",
-            selected_derivatives=[0],
-            labels=["|F(k)|^2"],
+        payload = self._get_spectrum_animation_payload()
+        self._spec_canvas = embed_animation_plot_in_tk(
+            _create_spectrum_animation_figure(payload),
+            parent,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
         )
-        self._spec_canvas = embed_plot_in_tk(fig, parent)
+
+    def _get_spectrum_animation_payload(self) -> _SpectrumAnimationViewPayload:
+        """Return the prepared spectrum history for display or export."""
+        return _SpectrumAnimationViewPayload(
+            t=self._result.t,
+            k=self._result.k,
+            frames=self._result.spectrum_power_history,
+            title=f"{self._result.model_type.upper()} spectrum evolution",
+        )
+
+    def _on_export_animation_mp4(
+        self,
+        payload: _SpectrumAnimationViewPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the spectrum animation through the shared MP4 path."""
+        default_path = get_output_dir() / (
+            f"{generate_output_basename(prefix='nonlinear_waves')}.mp4"
+        )
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_spectrum_animation_figure(payload),
+                filepath,
+                duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _build_invariants_tab(self, parent: ttk.Frame) -> None:
         keys = list(self._result.invariants.keys())

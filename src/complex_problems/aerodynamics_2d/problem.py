@@ -17,7 +17,7 @@ class Aerodynamics2DProblem:
         id="aerodynamics_2d",
         name="Aerodynamics 2D",
         description=(
-            "2D incompressible flow around configurable obstacles with "
+            "Incompressible 2D flow around configurable obstacles with "
             "Navier-Stokes projection and Stokes-limit approximations."
         ),
     )

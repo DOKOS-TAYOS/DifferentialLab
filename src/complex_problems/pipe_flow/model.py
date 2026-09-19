@@ -91,17 +91,16 @@ def friction_factor(
         raise ValueError("roughness must be non-negative.")
 
     re_safe = np.maximum(re, 1e-8)
-    eps_rel = roughness / np.maximum(diameter, 1e-8)
-    lam = 64.0 / np.maximum(re_safe, 1.0)
-    blasius = 0.3164 / np.maximum(re_safe, 1.0) ** 0.25
-    swj = 0.25 / (
-        np.log10(np.maximum(eps_rel / 3.7 + 5.74 / np.maximum(re_safe, 1.0) ** 0.9, 1e-10)) ** 2
-    )
+    re_base = np.maximum(re_safe, 1.0)
 
     if m == "laminar":
-        return lam
+        return 64.0 / re_base
     if m == "blasius":
-        return blasius
+        return 0.3164 / re_base**0.25
+
+    eps_rel = roughness / np.maximum(diameter, 1e-8)
+    swj = 0.25 / (np.log10(np.maximum(eps_rel / 3.7 + 5.74 / re_base**0.9, 1e-10)) ** 2)
     if m == "swamee_jain":
         return swj
+    lam = 64.0 / re_base
     return np.where(re_safe < 2300.0, lam, swj)

@@ -58,9 +58,7 @@ class ToolTip:
         pady: int = get_env_from_schema("UI_TOOLTIP_PADY")
         base_font = get_font()
         base_size = (
-            int(base_font[1])
-            if len(base_font) > 1
-            else int(get_env_from_schema("UI_FONT_SIZE"))
+            int(base_font[1]) if len(base_font) > 1 else int(get_env_from_schema("UI_FONT_SIZE"))
         )
         tooltip_font = (base_font[0], max(6, int(round(base_size * 0.5))))
         label = tk.Label(

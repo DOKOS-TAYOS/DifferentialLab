@@ -9,13 +9,16 @@ if TYPE_CHECKING:
     import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from mpl_toolkits.mplot3d.axes3d import Axes3D
 
 from config import get_env_from_schema
+from plotting.animation_metadata import attach_animation_metadata
 from utils import get_logger
 
 logger = get_logger(__name__)
 
 _MAX_ELEMENTS_PLOT = 50
+_MAX_COMPONENT_TICKS = 10
 _SUB_DIGS = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
 
 
@@ -121,7 +124,7 @@ def _new_3d_figure() -> tuple[Any, Any]:
 
 
 def _finalize_3d_plot(
-    ax: Axes,
+    ax: Axes3D,
     title: str,
     xlabel: str,
     ylabel: str,
@@ -143,6 +146,27 @@ def _finalize_3d_plot(
 def _component_labels(n: int) -> list[str]:
     """Generate f₀, f₁, ... labels for component indices."""
     return [f"f{_SUB_DIGS[i]}" if i < len(_SUB_DIGS) else f"f_{i}" for i in range(n)]
+
+
+def _set_component_ticks(
+    ax: "Axes",
+    vector_components: int,
+    component_labels: list[str] | None = None,
+) -> None:
+    """Apply readable, range-preserving ticks for a component animation."""
+    labels = (
+        component_labels if component_labels is not None else _component_labels(vector_components)
+    )
+    if vector_components <= _MAX_COMPONENT_TICKS:
+        tick_indices = list(range(vector_components))
+    else:
+        tick_indices = [
+            round(index * (vector_components - 1) / (_MAX_COMPONENT_TICKS - 1))
+            for index in range(_MAX_COMPONENT_TICKS)
+        ]
+
+    ax.set_xticks(tick_indices)
+    ax.set_xticklabels([labels[index] for index in tick_indices])
 
 
 def create_solution_plot(
@@ -522,6 +546,137 @@ def create_contour_plot(
     return fig
 
 
+def create_polar_contour_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    title: str = "f(r, θ)",
+    *,
+    origin: tuple[float, float] = (0.0, 0.0),
+    radial_points: int = 160,
+    angular_points: int = 180,
+) -> Figure:
+    """Create a polar re-sampled contour plot from Cartesian scalar data."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    from plotting.coordinates import resample_scalar_to_polar
+
+    _apply_plot_style()
+    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
+    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
+    dpi: int = get_env_from_schema("DPI")
+    sampled = resample_scalar_to_polar(
+        x,
+        y,
+        z,
+        origin=origin,
+        radial_points=radial_points,
+        angular_points=angular_points,
+    )
+    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi, subplot_kw={"projection": "polar"})
+    angle_grid, radius_grid = np.meshgrid(sampled.angle, sampled.radius, indexing="ij")
+    mesh = ax.pcolormesh(
+        angle_grid,
+        radius_grid,
+        np.ma.masked_invalid(sampled.values),
+        cmap=get_env_from_schema("PLOT_SURFACE_CMAP"),
+        shading="auto",
+    )
+    fig.colorbar(mesh, ax=ax, shrink=get_env_from_schema("PLOT_COLORBAR_SHRINK"))
+    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
+        ax.set_title(title)
+    ax.set_xlabel("azimuth θ (rad)")
+    ax.set_ylabel("radius r")
+    fig.tight_layout()
+    return fig
+
+
+def create_vector_field_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    components: np.ndarray,
+    *,
+    view: str = "magnitude",
+    origin: tuple[float, float] = (0.0, 0.0),
+    title: str = "Vector field",
+) -> Figure:
+    """Create component, magnitude, quiver, stream, or radial field views.
+
+    Quiver, stream, and radial/tangential views require exactly two components;
+    component and magnitude views support any positive component count.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    from plotting.coordinates import cartesian_vector_to_polar, vector_field_data
+
+    field = np.asarray(components, dtype=float)
+    if field.ndim != 3 or field.shape[1:] != (len(y), len(x)) or field.shape[0] < 1:
+        raise ValueError("components must have shape (components, len(y), len(x))")
+    _apply_plot_style()
+    cmap = get_env_from_schema("PLOT_SURFACE_CMAP")
+    if view == "components":
+        fig, axes = plt.subplots(1, field.shape[0], squeeze=False)
+        for index, axis in enumerate(axes[0]):
+            image = axis.pcolormesh(
+                x, y, np.ma.masked_invalid(field[index]), cmap=cmap, shading="auto"
+            )
+            fig.colorbar(image, ax=axis)
+            _finalize_plot(axis, f"f[{index}]", "x", "y")
+        fig.suptitle(title)
+        fig.tight_layout()
+        return fig
+    if view == "magnitude":
+        magnitude = np.linalg.norm(field, axis=0)
+        fig, ax = _new_figure()
+        image = ax.pcolormesh(x, y, np.ma.masked_invalid(magnitude), cmap=cmap, shading="auto")
+        fig.colorbar(image, ax=ax)
+        _finalize_plot(ax, title, "x", "y")
+        fig.tight_layout()
+        return fig
+
+    if field.shape[0] != 2:
+        raise ValueError(f"{view} view requires exactly two vector components")
+
+    data = vector_field_data(x, y, field)
+    x_grid, y_grid = np.meshgrid(data.x, data.y)
+    fig, ax = _new_figure()
+    if view == "quiver":
+        stride = max(1, int(np.ceil(max(len(x), len(y)) / 25)))
+        ax.quiver(
+            x_grid[::stride, ::stride],
+            y_grid[::stride, ::stride],
+            data.u[::stride, ::stride],
+            data.v[::stride, ::stride],
+            data.magnitude[::stride, ::stride],
+            cmap=cmap,
+        )
+    elif view == "stream":
+        ax.streamplot(data.x, data.y, data.u, data.v, color=data.magnitude, cmap=cmap)
+    elif view == "radial_tangential":
+        radial, tangential = cartesian_vector_to_polar(
+            data.u, data.v, x_grid - origin[0], y_grid - origin[1]
+        )
+        plt.close(fig)
+        fig, axes = plt.subplots(1, 2, squeeze=False)
+        for axis, component, label in zip(axes[0], (radial, tangential), ("radial", "tangential")):
+            image = axis.pcolormesh(
+                x, y, np.ma.masked_invalid(component), cmap=cmap, shading="auto"
+            )
+            fig.colorbar(image, ax=axis, label=f"{label} component")
+            axis.plot(origin[0], origin[1], "ko", markersize=3)
+            _finalize_plot(axis, label.capitalize(), "x", "y")
+        fig.suptitle(title)
+        fig.tight_layout()
+        return fig
+    else:
+        raise ValueError("view must be components, magnitude, quiver, stream, or radial_tangential")
+    _finalize_plot(ax, title, "x", "y")
+    fig.tight_layout()
+    return fig
+
+
 def create_vector_animation_plot(
     x: np.ndarray,
     y: np.ndarray,
@@ -557,7 +712,7 @@ def create_vector_animation_plot(
     dpi: int = get_env_from_schema("DPI")
 
     fig = plt.figure(figsize=(width, height), dpi=dpi)
-    ax_main = fig.add_axes([0.12, 0.15, 0.78, 0.78])
+    ax_main = fig.add_axes((0.12, 0.15, 0.78, 0.78))
 
     y_2d = np.atleast_2d(y)
     if y_2d.shape[1] != len(x):
@@ -593,23 +748,16 @@ def create_vector_animation_plot(
     vlines_coll = ax_main.vlines(
         indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
     )
-    ax_main.set_xticks(indices)
-    ax_main.set_xticklabels(
-        component_labels if component_labels is not None else _component_labels(vector_components)
-    )
+    _set_component_ticks(ax_main, vector_components, component_labels)
     j_vals = indices  # Reuse for segment construction in update
 
     def update(idx: int) -> None:
         i = max(0, min(idx, n_points - 1))
         new_vals = f_values[:, i]
         line_chain.set_ydata(new_vals)
-        segments = np.stack(
-            [
-                np.column_stack([j_vals, np.zeros(vector_components)]),
-                np.column_stack([j_vals, new_vals]),
-            ],
-            axis=1,
-        )
+        segments = [
+            np.array([[float(j), 0.0], [float(j), float(val)]]) for j, val in zip(j_vals, new_vals)
+        ]
         vlines_coll.set_segments(segments)
         fig.canvas.draw_idle()
 
@@ -623,13 +771,17 @@ def create_vector_animation_plot(
         ax_main.grid(True, alpha=grid_alpha)
     fig.subplots_adjust(bottom=0.12, left=0.12, right=0.95, top=0.92)
 
-    fig._animation_update = update
-    fig._animation_n_points = n_points
-    fig._animation_initial_index = time_index
-    fig._animation_x = x
-    fig._animation_f_values = f_values
-    fig._animation_vector_components = vector_components
-    return fig
+    return attach_animation_metadata(
+        fig,
+        update=update,
+        n_points=n_points,
+        initial_index=time_index,
+        extras={
+            "_animation_x": x,
+            "_animation_f_values": f_values,
+            "_animation_vector_components": vector_components,
+        },
+    )
 
 
 def create_vector_animation_3d(
@@ -676,6 +828,210 @@ def create_vector_animation_3d(
 _MAX_MP4_FRAMES = 500
 
 
+def create_image_animation_plot(
+    t: np.ndarray,
+    frames: np.ndarray,
+    *,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    cmap: str = "viridis",
+    x_coordinates: np.ndarray | None = None,
+    y_coordinates: np.ndarray | None = None,
+    symmetric_color_range: bool = False,
+) -> Figure:
+    """Create a stable-scale animated 2D image sequence.
+
+    The returned figure uses the shared animation metadata consumed by the Tk
+    embedding controls and :func:`export_animated_figure_to_mp4`.
+    """
+    import numpy as np
+
+    frame_data = np.asarray(frames)
+    if frame_data.ndim != 3 or frame_data.shape[0] != len(t):
+        raise ValueError("frames must have shape (len(t), ny, nx).")
+
+    ny, nx = frame_data.shape[1:]
+    x_values = np.arange(nx) if x_coordinates is None else np.asarray(x_coordinates)
+    y_values = np.arange(ny) if y_coordinates is None else np.asarray(y_coordinates)
+    if len(x_values) != nx or len(y_values) != ny:
+        raise ValueError("Coordinate lengths must match frame dimensions.")
+
+    data_min = float(np.min(frame_data))
+    data_max = float(np.max(frame_data))
+    if symmetric_color_range:
+        bound = max(abs(data_min), abs(data_max))
+        if bound == 0.0:
+            bound = 1.0
+        vmin, vmax = -bound, bound
+    else:
+        vmin, vmax = data_min, data_max
+        if vmin == vmax:
+            vmax = vmin + 1.0
+
+    fig, ax = _new_figure()
+    image = ax.imshow(
+        frame_data[0],
+        origin="lower",
+        cmap=cmap,
+        aspect="auto",
+        vmin=vmin,
+        vmax=vmax,
+        extent=(x_values[0], x_values[-1], y_values[0], y_values[-1]),
+    )
+    _finalize_plot(ax, f"{title} (t={t[0]:.3g})", xlabel, ylabel)
+    fig.colorbar(image, ax=ax, shrink=0.8)
+    fig.tight_layout()
+
+    def update(index: int) -> None:
+        """Draw one bounded animation frame."""
+        idx = max(0, min(index, len(t) - 1))
+        image.set_data(frame_data[idx])
+        ax.set_title(f"{title} (t={t[idx]:.3g})")
+        fig.canvas.draw_idle()
+
+    return attach_animation_metadata(fig, update=update, n_points=len(t))
+
+
+def create_surface_animation_plot(
+    t: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    frames: np.ndarray,
+    *,
+    title: str,
+    cmap: str = "viridis",
+    max_render_resolution: int = 80,
+    xlabel: str = "x index",
+    ylabel: str = "y index",
+    zlabel: str = "u",
+    colorbar_label: str = "Displacement u",
+    symmetric_z_range: bool = True,
+) -> Figure:
+    """Create an animated 3D surface with stable axes and colors across time.
+
+    Surface rendering is locally downsampled when needed, while the supplied
+    frame history remains unchanged for other result views and exports.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.colors import Normalize
+
+    frame_data = np.asarray(frames)
+    x_values = np.asarray(x)
+    y_values = np.asarray(y)
+    if frame_data.ndim != 3 or frame_data.shape[0] != len(t):
+        raise ValueError("frames must have shape (len(t), ny, nx).")
+    if frame_data.shape[1:] != (len(y_values), len(x_values)):
+        raise ValueError("Coordinate lengths must match frame dimensions.")
+    if max_render_resolution < 2:
+        raise ValueError("max_render_resolution must be at least 2.")
+
+    x_step = max(1, int(np.ceil(len(x_values) / max_render_resolution)))
+    y_step = max(1, int(np.ceil(len(y_values) / max_render_resolution)))
+    render_x = x_values[::x_step]
+    render_y = y_values[::y_step]
+    render_frames = frame_data[:, ::y_step, ::x_step]
+    x_grid, y_grid = np.meshgrid(render_x, render_y)
+    if symmetric_z_range:
+        z_bound = float(np.max(np.abs(frame_data)))
+        if z_bound == 0.0:
+            z_bound = 1.0
+        z_min, z_max = -z_bound, z_bound
+    else:
+        z_min = float(np.min(frame_data))
+        z_max = float(np.max(frame_data))
+        if z_min == z_max:
+            z_max = z_min + 1.0
+
+    fig, ax = _new_3d_figure()
+    surface = ax.plot_surface(
+        x_grid,
+        y_grid,
+        render_frames[0],
+        cmap=cmap,
+        vmin=z_min,
+        vmax=z_max,
+        edgecolor="none",
+    )
+    color_map = plt.cm.ScalarMappable(norm=Normalize(z_min, z_max), cmap=cmap)
+    color_map.set_array([])
+    fig.colorbar(color_map, ax=ax, shrink=0.7, label=colorbar_label)
+    ax.set_zlim(z_min, z_max)
+    _finalize_3d_plot(ax, f"{title} (t={t[0]:.3g})", xlabel, ylabel, zlabel)
+    fig.tight_layout()
+
+    def update(index: int) -> None:
+        """Replace the surface artist with the requested time frame."""
+        nonlocal surface
+        idx = max(0, min(index, len(t) - 1))
+        surface.remove()
+        surface = ax.plot_surface(
+            x_grid,
+            y_grid,
+            render_frames[idx],
+            cmap=cmap,
+            vmin=z_min,
+            vmax=z_max,
+            edgecolor="none",
+        )
+        ax.set_title(f"{title} (t={t[idx]:.3g})")
+        fig.canvas.draw_idle()
+
+    return attach_animation_metadata(fig, update=update, n_points=len(t))
+
+
+def export_animated_figure_to_mp4(
+    fig: Figure,
+    filepath: Path,
+    *,
+    duration_seconds: float = 10.0,
+) -> Path:
+    """Export an animation-metadata figure through the shared MP4 path.
+
+    Callers create the export figure with the same plot factory used for Tk,
+    ensuring that display and video use identical data transformations.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.animation import FuncAnimation, writers
+
+    update = getattr(fig, "_animation_update", None)
+    n_points = int(getattr(fig, "_animation_n_points", 0))
+    if not callable(update) or n_points < 1:
+        plt.close(fig)
+        raise ValueError("Figure does not contain valid animation metadata.")
+
+    frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
+    fps = max(1, int(round(len(frame_indices) / max(0.5, duration_seconds))))
+
+    def animate(frame_number: int) -> None:
+        """Render one sampled export frame."""
+        update(int(frame_indices[frame_number]))
+
+    animation = FuncAnimation(
+        fig,
+        animate,
+        frames=len(frame_indices),
+        interval=int(1000 / fps),
+        blit=False,
+    )
+    if not writers.is_available("ffmpeg"):
+        plt.close(fig)
+        raise RuntimeError("FFMpeg is not available. Install ffmpeg and ensure it is in your PATH.")
+
+    try:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        animation.save(str(filepath), writer="ffmpeg", fps=fps)
+    except Exception as exc:
+        logger.error("MP4 export failed: %s", exc, exc_info=True)
+        raise RuntimeError(f"Failed to export MP4. Is ffmpeg installed? {exc}") from exc
+    finally:
+        plt.close(fig)
+    logger.info("Animation exported: %s (%d frames)", filepath, len(frame_indices))
+    return filepath
+
+
 def export_animation_to_mp4(
     x: np.ndarray,
     y: np.ndarray,
@@ -686,6 +1042,7 @@ def export_animation_to_mp4(
     title: str = "f_i(x) vs component",
     duration_seconds: float = 10.0,
     deriv_offset: int = 0,
+    component_labels: list[str] | None = None,
 ) -> Path:
     """Export vector animation as MP4 video.
 
@@ -700,6 +1057,7 @@ def export_animation_to_mp4(
         filepath: Output path for the MP4 file.
         title: Plot title.
         duration_seconds: Desired video duration in seconds. FPS is computed.
+        component_labels: Optional labels for the displayed components.
 
     Returns:
         The path that was written.
@@ -707,97 +1065,13 @@ def export_animation_to_mp4(
     Raises:
         RuntimeError: If ffmpeg is not available.
     """
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from matplotlib.animation import FuncAnimation
-
-    _apply_plot_style()
-    dpi: int = get_env_from_schema("DPI")
-
-    y_2d = np.atleast_2d(y)
-    if y_2d.shape[1] != len(x):
-        y_2d = y_2d.T if y_2d.shape[0] == len(x) else y_2d
-
-    row_indices = np.arange(vector_components) * order + deriv_offset
-    f_values = y_2d[row_indices]
-    n_points = len(x)
-
-    frame_indices = np.linspace(0, n_points - 1, min(n_points, _MAX_MP4_FRAMES), dtype=int)
-    num_frames = len(frame_indices)
-    fps = max(1, num_frames / max(0.5, duration_seconds))
-
-    color_scheme: str = get_env_from_schema("PLOT_COLOR_SCHEME")
-    colors = _get_colors(color_scheme, vector_components)
-    width: int = get_env_from_schema("PLOT_FIGSIZE_WIDTH")
-    height: int = get_env_from_schema("PLOT_FIGSIZE_HEIGHT")
-    marker_size: int = get_env_from_schema("PLOT_PHASE_MARKER_SIZE")
-    anim_line_width: float = get_env_from_schema("PLOT_ANIMATION_LINE_WIDTH")
-    vlines_line_width: float = get_env_from_schema("PLOT_VLINES_LINE_WIDTH")
-    vlines_alpha: float = get_env_from_schema("PLOT_VLINES_ALPHA")
-    y_margin: float = get_env_from_schema("PLOT_ANIMATION_Y_MARGIN")
-
-    fig, ax = plt.subplots(figsize=(width, height), dpi=dpi)
-    y_min = float(np.min(f_values)) - y_margin
-    y_max = float(np.max(f_values)) + y_margin
-    ax.set_ylim(y_min, y_max)
-    ax.set_xlabel("Component index i")
-    ax.set_ylabel("f_i(x)")
-    if get_env_from_schema("PLOT_SHOW_TITLE") and title:
-        ax.set_title(title)
-    if get_env_from_schema("PLOT_SHOW_GRID"):
-        grid_alpha: float = get_env_from_schema("PLOT_GRID_ALPHA")
-        ax.grid(True, alpha=grid_alpha)
-
-    indices = np.arange(vector_components)
-    vals = f_values[:, frame_indices[0]]
-    (line_chain,) = ax.plot(
-        indices,
-        vals,
-        "o-",
-        color=colors[0],
-        markersize=marker_size,
-        linewidth=anim_line_width,
+    fig = create_vector_animation_plot(
+        x,
+        y,
+        order=order,
+        vector_components=vector_components,
+        title=title,
+        deriv_offset=deriv_offset,
+        component_labels=component_labels,
     )
-    vlines_coll = ax.vlines(
-        indices, 0, vals, colors=colors, linewidth=vlines_line_width, alpha=vlines_alpha
-    )
-    ax.set_xticks(indices)
-    ax.set_xticklabels(_component_labels(vector_components))
-    j_vals = indices
-
-    def _frame(idx: int) -> None:
-        new_vals = f_values[:, idx]
-        line_chain.set_ydata(new_vals)
-        segments = np.stack(
-            [
-                np.column_stack([j_vals, np.zeros(vector_components)]),
-                np.column_stack([j_vals, new_vals]),
-            ],
-            axis=1,
-        )
-        vlines_coll.set_segments(segments)
-
-    anim = FuncAnimation(
-        fig,
-        lambda i: _frame(frame_indices[i]),
-        frames=num_frames,
-        interval=int(1000 / fps),
-        blit=False,
-    )
-
-    from matplotlib.animation import writers
-
-    if not writers.is_available("ffmpeg"):
-        plt.close(fig)
-        raise RuntimeError("FFMpeg is not available. Install ffmpeg and ensure it is in your PATH.")
-
-    try:
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-        anim.save(str(filepath), writer="ffmpeg", fps=fps)
-    except Exception as exc:
-        logger.error("MP4 export failed: %s", exc, exc_info=True)
-        plt.close(fig)
-        raise RuntimeError(f"Failed to export MP4. Is ffmpeg installed? {exc}") from exc
-    plt.close(fig)
-    logger.info("Animation exported: %s (%d frames)", filepath, len(frame_indices))
-    return filepath
+    return export_animated_figure_to_mp4(fig, filepath, duration_seconds=duration_seconds)

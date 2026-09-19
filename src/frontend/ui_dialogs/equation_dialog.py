@@ -15,7 +15,7 @@ from solver import load_predefined_equations
 
 
 class EquationDialog:
-    """Dialog for selecting or entering an ODE.
+    """Dialog for selecting or entering an equation.
 
     Args:
         parent: Parent window.
@@ -24,7 +24,7 @@ class EquationDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.parent = parent
         self.win = tk.Toplevel(parent)
-        self.win.title("Select Equation")
+        self.win.title("Choose an Equation")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -56,7 +56,7 @@ class EquationDialog:
 
         self._btn_next = ttk.Button(
             btn_inner,
-            text="Next \u2192",
+            text="Continue",
             command=self._on_next,
         )
         self._btn_next.pack(side=tk.LEFT, padx=pad)
@@ -74,26 +74,26 @@ class EquationDialog:
         # ── Equation type selector ──
         type_frame = ttk.Frame(self.win)
         type_frame.pack(fill=tk.X, padx=pad, pady=(pad, 0))
-        ttk.Label(type_frame, text="Equation type:", style="Subtitle.TLabel").pack(
+        ttk.Label(type_frame, text="Equation family:", style="Subtitle.TLabel").pack(
             side=tk.LEFT, padx=(0, pad)
         )
         ttk.Radiobutton(
             type_frame,
-            text="Differential (ODE)",
+            text="ODE",
             variable=self._equation_type_var,
             value="ode",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="Difference (recurrence)",
+            text="Recurrence",
             variable=self._equation_type_var,
             value="difference",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="Vector ODE",
+            text="Vector ODE system",
             variable=self._equation_type_var,
             value="vector_ode",
             command=self._on_type_change,
@@ -105,6 +105,20 @@ class EquationDialog:
             value="pde",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
+            text="PDE 3D",
+            variable=self._equation_type_var,
+            value="pde_3d",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
+        ttk.Radiobutton(
+            type_frame,
+            text="Vector PDE",
+            variable=self._equation_type_var,
+            value="vector_pde",
+            command=self._on_type_change,
+        ).pack(side=tk.LEFT, padx=pad)
 
         # ── Notebook ──
         self._notebook = ttk.Notebook(self.win)
@@ -112,7 +126,7 @@ class EquationDialog:
 
         # --- Tab 1: Predefined ---
         predef_frame = ttk.Frame(self._notebook, padding=pad)
-        self._notebook.add(predef_frame, text="  Predefined  ")
+        self._notebook.add(predef_frame, text="  Built-in  ")
 
         btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
         fg: str = get_env_from_schema("UI_FOREGROUND")
@@ -186,7 +200,7 @@ class EquationDialog:
 
         self.eq_listbox.bind("<<ListboxSelect>>", self._on_select_equation)
 
-        desc_frame = ttk.LabelFrame(right_container, text="Information", padding=pad)
+        desc_frame = ttk.LabelFrame(right_container, text="Details", padding=pad)
         desc_frame.grid(row=2, column=0, sticky="nsew", pady=(pad, 0))
         desc_frame.columnconfigure(0, weight=1)
         desc_frame.rowconfigure(0, weight=1)
@@ -295,7 +309,7 @@ class EquationDialog:
 
         # -- Hint --
         if eq_type == "difference":
-            hint_title = "Write f_{n+order} as a Python expression."
+            hint_title = "Write the next recurrence term as a Python expression."
             hint_detail = (
                 "Use n for the index, f[0] for f_n, f[1] for f_{n+1}, etc.\n"
                 "Example (geometric growth):  r * f[0]"
@@ -307,8 +321,21 @@ class EquationDialog:
                 "f[i,0] = component i, f[i,1] = its first derivative, etc.\n"
                 "Example (coupled oscillators):  -\u03c9**2 * f[0,0] + k * (f[1,0] - f[0,0])"
             )
+        elif eq_type == "vector_pde":
+            hint_title = "Write one residual equation for each PDE component."
+            hint_detail = (
+                "Use exactly f[i], fx[i], fy[i], fxx[i], fxy[i], and fyy[i].\n"
+                "Indexes are zero-based and must be within the component count. "
+                "Each expression is a residual equal to zero."
+            )
+        elif eq_type == "pde_3d":
+            hint_title = "Write a scalar linear elliptic residual equal to zero."
+            hint_detail = (
+                "Use x, y, z; f, fx, fy, fz; and fxx, fxy, fxz, fyy, fyz, fzz.\n"
+                "Example: -fxx - fyy - fzz - 3*pi**2*sin(pi*x)*sin(pi*y)*sin(pi*z)"
+            )
         elif eq_type == "pde":
-            hint_title = "Select the LHS operator and write the RHS expression."
+            hint_title = "Select the left-hand operator and write the right-hand expression."
             hint_detail = (
                 "Choose which derivative operator equals the expression.\n"
                 "Spatial: x, y (or x[0], x[1]). Solution: f. Derivatives: "
@@ -334,9 +361,7 @@ class EquationDialog:
         bind_wraplength(ci, self.custom_hint_detail, pad=2 * pad)
 
         # -- Unicode reference --
-        unicode_frame = ttk.LabelFrame(
-            ci, text="Unicode symbols — copy and paste directly", padding=pad
-        )
+        unicode_frame = ttk.LabelFrame(ci, text="Symbols you can copy", padding=pad)
         unicode_frame.pack(fill=tk.X, pady=(0, pad))
         _unicode_hint = (
             "\u03b1 \u03b2 \u03b3 \u03b4 \u03b5 \u03b6 \u03b7"
@@ -361,6 +386,10 @@ class EquationDialog:
         # -- Type-specific controls --
         if eq_type == "vector_ode":
             self._build_custom_vector_ode(ci, pad, _btn_bg, _fg, _font)
+        elif eq_type == "vector_pde":
+            self._build_custom_vector_pde(ci, pad, _btn_bg, _fg, _font)
+        elif eq_type == "pde_3d":
+            self._build_custom_pde_3d(ci, pad, _btn_bg, _fg, _font)
         elif eq_type == "pde":
             self._build_custom_pde(ci, pad, _btn_bg, _fg, _font)
         else:
@@ -428,7 +457,9 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, \u03b3")
@@ -483,7 +514,10 @@ class EquationDialog:
         # Per-component order spinbox variables
         self._vec_order_vars: list[tk.StringVar] = []
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W, pady=(pad, 0))
+        ttk.Label(
+            ci,
+            text="Parameter names to configure later (comma-separated):",
+        ).pack(anchor=tk.W, pady=(pad, 0))
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: \u03c9, k")
@@ -502,7 +536,10 @@ class EquationDialog:
     def _do_vec_n_refresh(self) -> None:
         """Perform the actual refresh (called after debounce delay)."""
         self._vec_n_refresh_id = None
-        self._refresh_vec_boxes()
+        if self._equation_type_var.get() == "vector_pde":
+            self._refresh_vector_pde_boxes()
+        else:
+            self._refresh_vec_boxes()
 
     def _on_vec_mode_change(self) -> None:
         """Switch between per-component and bulk expression modes."""
@@ -644,7 +681,12 @@ class EquationDialog:
 
                 # Bind order spinbox change to update label
                 def _on_order_change(
-                    _var: str, _idx: str, _mode: str, comp=i, ov=order_var, lb=lbl
+                    _var: str,
+                    _idx: str,
+                    _mode: str,
+                    comp: int = i,
+                    ov: tk.StringVar = order_var,
+                    lb: ttk.Label = lbl,
                 ) -> None:
                     try:
                         val = int(ov.get())
@@ -680,7 +722,7 @@ class EquationDialog:
                         canvas.yview_scroll(-1, "units")
                 return "break"
 
-            def _bind_mousewheel(w: tk.Widget) -> None:
+            def _bind_mousewheel(w: tk.Misc) -> None:
                 w.bind("<MouseWheel>", _on_mousewheel)
                 w.bind("<Button-4>", _on_mousewheel)
                 w.bind("<Button-5>", _on_mousewheel)
@@ -743,7 +785,7 @@ class EquationDialog:
 
         ttk.Label(
             ci,
-            text="Right-hand side expression (use x[0], x[1] or x, y for variables):",
+            text="Right-hand side expression (use x[0], x[1], or x, y for variables):",
         ).pack(anchor=tk.W)
         self.custom_expr = tk.Text(
             ci,
@@ -756,10 +798,107 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names (comma-separated):").pack(anchor=tk.W)
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self.custom_params, "E.g.: k, \u03b1")
+
+    def _build_custom_pde_3d(
+        self,
+        ci: ttk.Frame,
+        pad: int,
+        btn_bg: str,
+        fg: str,
+        font: Any,
+    ) -> None:
+        """Build the residual-form custom editor for scalar PDE 3D."""
+        self.custom_order_var = tk.StringVar(value="2")
+        ttk.Label(ci, text="Residual expression (equals zero):").pack(anchor=tk.W)
+        self.custom_expr = tk.Text(
+            ci,
+            height=4,
+            width=60,
+            bg=btn_bg,
+            fg=fg,
+            insertbackground=fg,
+            font=font,
+        )
+        self.custom_expr.pack(fill=tk.X, pady=(4, pad))
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W
+        )
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+
+    def _build_custom_vector_pde(
+        self,
+        ci: ttk.Frame,
+        pad: int,
+        btn_bg: str,
+        fg: str,
+        font: Any,
+    ) -> None:
+        """Build the bounded per-equation editor for a custom Vector PDE."""
+        top_row = ttk.Frame(ci)
+        top_row.pack(fill=tk.X, pady=(pad, pad))
+        ttk.Label(top_row, text="System components:").pack(side=tk.LEFT)
+        self._vec_n_var = tk.StringVar(value="2")
+        component_spin = ttk.Spinbox(
+            top_row,
+            from_=1,
+            to=4,
+            width=5,
+            textvariable=self._vec_n_var,
+            font=font,
+        )
+        component_spin.pack(side=tk.LEFT, padx=(pad, 0))
+        ToolTip(component_spin, "Vector PDE is limited to 4 components in the standard UI")
+        self._vec_n_refresh_id = None
+        self._vec_n_var.trace_add("write", self._on_vec_n_change)
+        self.custom_order_var = tk.StringVar(value="2")
+
+        self._vec_content_frame = ttk.Frame(ci)
+        self._vec_content_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
+            anchor=tk.W,
+            pady=(pad, 0),
+        )
+        self.custom_params = ttk.Entry(ci, width=50, font=font)
+        self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        self._refresh_vector_pde_boxes()
+
+    def _refresh_vector_pde_boxes(self) -> None:
+        """Rebuild the small list of Vector PDE residual expression boxes."""
+        for widget in self._vec_content_frame.winfo_children():
+            widget.destroy()
+        self._vec_expr_widgets = []
+        try:
+            components = int(self._vec_n_var.get())
+        except ValueError:
+            components = 2
+        components = max(1, min(4, components))
+        button_bg: str = get_env_from_schema("UI_BUTTON_BG")
+        foreground: str = get_env_from_schema("UI_FOREGROUND")
+        font = get_font()
+        pad: int = get_env_from_schema("UI_PADDING")
+        for component in range(components):
+            row = ttk.Frame(self._vec_content_frame)
+            row.pack(fill=tk.X, pady=2)
+            ttk.Label(row, text=f"Residual {component} = 0:", width=16).pack(side=tk.LEFT)
+            expression = tk.Text(
+                row,
+                height=2,
+                width=52,
+                bg=button_bg,
+                fg=foreground,
+                insertbackground=foreground,
+                font=font,
+            )
+            expression.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(pad, 0))
+            self._vec_expr_widgets.append(expression)
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
@@ -783,7 +922,11 @@ class EquationDialog:
 
     def _on_next_predefined(self) -> None:
         if self._selected_key is None:
-            messagebox.showwarning("No Selection", "Please select an equation.", parent=self.win)
+            messagebox.showwarning(
+                "Choose an equation",
+                "Select a built-in equation before continuing.",
+                parent=self.win,
+            )
             return
 
         eq = self.equations[self._selected_key]
@@ -846,6 +989,10 @@ class EquationDialog:
         eq_type = self._equation_type_var.get()
         if eq_type == "vector_ode":
             self._on_next_custom_vector()
+        elif eq_type == "vector_pde":
+            self._on_next_custom_vector_pde()
+        elif eq_type == "pde_3d":
+            self._on_next_custom_pde_3d()
         elif eq_type == "pde":
             self._on_next_custom_pde()
         else:
@@ -857,7 +1004,7 @@ class EquationDialog:
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
             messagebox.showwarning(
-                "Empty Expression", "Please enter an expression.", parent=self.win
+                "Add an expression", "Write the expression before continuing.", parent=self.win
             )
             return
 
@@ -865,7 +1012,7 @@ class EquationDialog:
             order = int(self.custom_order_var.get())
         except ValueError:
             messagebox.showerror(
-                "Invalid Order", "Order must be a positive integer.", parent=self.win
+                "Check the order", "Order must be a positive integer.", parent=self.win
             )
             return
 
@@ -899,7 +1046,9 @@ class EquationDialog:
             n_components = int(self._vec_n_var.get())
         except ValueError:
             messagebox.showerror(
-                "Invalid Input", "Number of components must be an integer.", parent=self.win
+                "Check the component count",
+                "Number of components must be an integer.",
+                parent=self.win,
             )
             return
 
@@ -912,7 +1061,7 @@ class EquationDialog:
                 component_orders.append(int(ov.get()))
             except ValueError:
                 messagebox.showerror(
-                    "Invalid Order",
+                    "Check the order",
                     f"Order for component {idx} must be a positive integer.",
                     parent=self.win,
                 )
@@ -926,7 +1075,9 @@ class EquationDialog:
             bulk_expr = normalize_unicode_escapes(self._vec_bulk_expr.get("1.0", tk.END).strip())
             if not bulk_expr:
                 messagebox.showwarning(
-                    "Empty Expression", "Please enter a bulk expression.", parent=self.win
+                    "Add an expression",
+                    "Write the bulk expression before continuing.",
+                    parent=self.win,
                 )
                 return
             # Expand bulk expression for each component index
@@ -937,9 +1088,9 @@ class EquationDialog:
         else:
             if len(self._vec_expr_widgets) != n_components:
                 messagebox.showerror(
-                    "Mismatch",
-                    "Number of expression boxes doesn't match components. "
-                    "Click 'Refresh component boxes'.",
+                    "Component boxes are out of sync",
+                    "The number of expression boxes does not match the component count. "
+                    "Change the component count again to refresh the boxes.",
                     parent=self.win,
                 )
                 return
@@ -948,7 +1099,7 @@ class EquationDialog:
                 expr = normalize_unicode_escapes(widget.get("1.0", tk.END).strip())
                 if not expr:
                     messagebox.showwarning(
-                        "Empty Expression",
+                        "Add an expression",
                         f"Expression for component {idx} is empty.",
                         parent=self.win,
                     )
@@ -989,7 +1140,7 @@ class EquationDialog:
         expr = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
         if not expr:
             messagebox.showwarning(
-                "Empty Expression", "Please enter a PDE expression.", parent=self.win
+                "Add an expression", "Write the PDE expression before continuing.", parent=self.win
             )
             return
 
@@ -1032,4 +1183,96 @@ class EquationDialog:
             equation_type="pde",
             variables=variables,
             pde_operator=pde_operator,
+        )
+
+    def _on_next_custom_pde_3d(self) -> None:
+        """Validate a custom scalar 3D residual and open its grid dialog."""
+        from utils import normalize_unicode_escapes
+
+        expression = normalize_unicode_escapes(self.custom_expr.get("1.0", tk.END).strip())
+        if not expression:
+            messagebox.showwarning(
+                "Add an expression",
+                "Write the PDE 3D residual before continuing.",
+                parent=self.win,
+            )
+            return
+        params = self._parse_custom_params()
+        if params is None:
+            return
+        self.win.destroy()
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            self.parent,
+            expression=expression,
+            function_name=None,
+            order=2,
+            parameters=params,
+            equation_name="Custom PDE 3D",
+            default_y0=[],
+            default_domain=[0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+            equation_type="pde_3d",
+            variables=["x", "y", "z"],
+        )
+
+    def _on_next_custom_vector_pde(self) -> None:
+        """Validate the custom Vector PDE editor and open shared PDE parameters."""
+        from utils import normalize_unicode_escapes
+
+        try:
+            components = int(self._vec_n_var.get())
+        except ValueError:
+            messagebox.showerror(
+                "Check the component count",
+                "Number of components must be an integer.",
+                parent=self.win,
+            )
+            return
+        if not 1 <= components <= 4:
+            messagebox.showerror(
+                "Check the component count",
+                "Vector PDE supports between 1 and 4 components in the standard UI.",
+                parent=self.win,
+            )
+            return
+        if len(self._vec_expr_widgets) != components:
+            messagebox.showerror(
+                "Component boxes are out of sync",
+                "Change the component count again to refresh the residual boxes.",
+                parent=self.win,
+            )
+            return
+
+        residual_expressions: list[str] = []
+        for component, widget in enumerate(self._vec_expr_widgets):
+            expression = normalize_unicode_escapes(widget.get("1.0", tk.END).strip())
+            if not expression:
+                messagebox.showwarning(
+                    "Add an expression",
+                    f"Residual expression for component {component} is empty.",
+                    parent=self.win,
+                )
+                return
+            residual_expressions.append(expression)
+
+        params = self._parse_custom_params()
+        if params is None:
+            return
+        self.win.destroy()
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            self.parent,
+            expression=None,
+            function_name=None,
+            order=2,
+            parameters=params,
+            equation_name="Custom Vector PDE",
+            default_y0=[],
+            default_domain=[0.0, 1.0, 0.0, 1.0],
+            equation_type="vector_pde",
+            variables=["x", "y"],
+            vector_expressions=residual_expressions,
+            vector_components=components,
         )

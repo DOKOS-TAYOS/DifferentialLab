@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -11,9 +13,13 @@ import numpy as np
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
+from complex_problems.common.result_dialog_ui import (
+    close_embedded_figures,
+    reset_embedded_animation,
+)
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
-from config import get_env_from_schema
-from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
+from config import generate_output_basename, get_env_from_schema, get_output_dir
+from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.window_utils import center_window, make_modal
 from plotting import (
@@ -22,6 +28,7 @@ from plotting import (
     create_energy_per_mode_plot,
     create_surface_plot,
     create_vector_animation_plot,
+    export_animation_to_mp4,
 )
 from utils import get_logger
 
@@ -104,6 +111,17 @@ def _state_to_vector_ode_format(y: np.ndarray, n: int) -> np.ndarray:
     return new_y
 
 
+@dataclass(frozen=True)
+class _AnimationViewPayload:
+    """Data and display metadata shared by an animation and its MP4 export."""
+
+    x: np.ndarray
+    y: np.ndarray
+    vector_components: int
+    title: str
+    component_labels: list[str] | None
+
+
 class CoupledOscillatorsResultDialog:
     """Result window for coupled harmonic oscillators.
 
@@ -125,7 +143,7 @@ class CoupledOscillatorsResultDialog:
         self._result = result
 
         self.win = tk.Toplevel(parent)
-        self.win.title("Results — Coupled Harmonic Oscillators")
+        self.win.title("Coupled Harmonic Oscillator Results")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -150,15 +168,10 @@ class CoupledOscillatorsResultDialog:
 
     def _on_close(self) -> None:
         """Close all matplotlib figures and destroy the window."""
-        import matplotlib.pyplot as plt
-
-        for attr in ("_energy_canvas", "_em_canvas", "_anim_canvas", "_hm_canvas", "_surf_canvas"):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            ("_energy_canvas", "_em_canvas", "_anim_canvas", "_hm_canvas", "_surf_canvas"),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -192,10 +205,10 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 2: Energy per mode
         energy_mode_tab = ttk.Frame(nb)
-        nb.add(energy_mode_tab, text="  Energy per mode  ")
+        nb.add(energy_mode_tab, text="  Energy by Mode/Oscillator  ")
         em_ctrl = ttk.Frame(energy_mode_tab)
         em_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(em_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(em_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._em_view_var = tk.StringVar(value="Modes" if self._result.has_modes else "Oscillators")
         em_values = ["Modes", "Oscillators"] if self._result.has_modes else ["Oscillators"]
         em_view_combo = ttk.Combobox(
@@ -207,9 +220,7 @@ class CoupledOscillatorsResultDialog:
             font=get_font(),
         )
         em_view_combo.pack(side=tk.LEFT, padx=(0, 8))
-        em_view_combo.bind(
-            "<<ComboboxSelected>>", lambda _e: self._on_em_view_change()
-        )
+        em_view_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_em_view_change())
         ttk.Label(em_ctrl, text="Select:").pack(side=tk.LEFT, padx=(16, 4))
         n = self._result.n_oscillators
         btn_bg = get_env_from_schema("UI_BUTTON_BG")
@@ -245,7 +256,7 @@ class CoupledOscillatorsResultDialog:
         nb.add(anim_tab, text="  Animation  ")
         anim_ctrl = ttk.Frame(anim_tab)
         anim_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(anim_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(anim_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_view_var = tk.StringVar(value="Oscillators")
         anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         view_combo = ttk.Combobox(
@@ -264,10 +275,10 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 4: Heatmap 2D
         heatmap_tab = ttk.Frame(nb)
-        nb.add(heatmap_tab, text="  Heatmap 2D  ")
+        nb.add(heatmap_tab, text="  Space-Time Heatmap  ")
         hm_ctrl = ttk.Frame(heatmap_tab)
         hm_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(hm_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(hm_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._hm_view_var = tk.StringVar(value="Oscillators")
         hm_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         hm_view_combo = ttk.Combobox(
@@ -289,7 +300,7 @@ class CoupledOscillatorsResultDialog:
         nb.add(surf_tab, text="  Surface 3D  ")
         surf_ctrl = ttk.Frame(surf_tab)
         surf_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(surf_ctrl, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(surf_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._surf_view_var = tk.StringVar(value="Oscillators")
         surf_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         surf_view_combo = ttk.Combobox(
@@ -308,71 +319,113 @@ class CoupledOscillatorsResultDialog:
 
     def _update_animation(self) -> None:
         """Regenerate the animation tab."""
-        import matplotlib.pyplot as plt
+        reset_embedded_animation(self._anim_plot_frame, self._anim_canvas)
+        self._anim_canvas = None
 
-        if self._anim_canvas is not None and hasattr(self._anim_canvas, "figure"):
-            try:
-                plt.close(self._anim_canvas.figure)
-            except Exception:
-                pass
-            self._anim_canvas = None
-        for w in self._anim_plot_frame.winfo_children():
-            w.destroy()
+        payload = self._get_animation_view_payload()
 
+        fig = create_vector_animation_plot(
+            payload.x,
+            payload.y,
+            order=2,
+            vector_components=payload.vector_components,
+            title=payload.title,
+            deriv_offset=0,
+            component_labels=payload.component_labels,
+        )
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_plot_frame,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
+        )
+
+    def _get_animation_view_payload(self) -> _AnimationViewPayload:
+        """Build the exact component representation currently shown in the animation."""
         r = self._result
         n = r.n_oscillators
-        x = r.x
-        y = r.y
-        boundary = r.metadata.get("boundary", "fixed")
-
         view = self._anim_view_var.get()
-        component_labels = None
+
         if view == "Modes" and r.has_modes:
-            # Transform to mode space: q = M_modes.T @ M @ x
-            # For orthonormal modes (A^T M A = I): q = A^T M x
+            # Transform to mode space: q = M_modes.T @ M @ x.
             M_diag = np.diag(r.masses)
-            positions = y[:n]  # (n, n_points)
-            q = r.M_modes.T @ M_diag @ positions  # (n, n_points)
-            # Build format for animation: [q0, dq0, q1, dq1, ...]
-            dq = r.M_modes.T @ np.diag(r.masses) @ y[n:]
-            n_points = y.shape[1]
-            mode_y = np.zeros((2 * n, n_points))
+            positions = r.y[:n]
+            q = r.M_modes.T @ M_diag @ positions
+            dq = r.M_modes.T @ M_diag @ r.y[n:]
+            mode_y = np.zeros((2 * n, r.y.shape[1]))
             for i in range(n):
                 mode_y[2 * i] = q[i]
                 mode_y[2 * i + 1] = dq[i]
-            plot_y = mode_y
-            title = "Coupled Oscillators — Mode amplitudes"
-            n_components = n
-            # Physics convention: Mode 1 = fundamental
-            component_labels = [f"Mode {i + 1}" for i in range(n)]
-        else:
-            plot_y = _state_to_vector_ode_format(y, n)
-            title = "Coupled Oscillators — Oscillator positions"
-            if boundary == "fixed":
-                # Prepend x_{-1}=0, v_{-1}=0 and append x_N=0, v_N=0
-                n_points = plot_y.shape[1]
-                extended = np.zeros((2 * (n + 2), n_points))
-                extended[0] = 0.0
-                extended[1] = 0.0
-                extended[2 : 2 * (n + 1)] = plot_y
-                extended[-2] = 0.0
-                extended[-1] = 0.0
-                plot_y = extended
-                n_components = n + 2
-                component_labels = [str(i) for i in range(-1, n + 1)]
-            else:
-                n_components = n
+            return _AnimationViewPayload(
+                x=r.x,
+                y=mode_y,
+                vector_components=n,
+                title="Coupled Oscillators — Mode amplitudes",
+                component_labels=[f"Mode {i + 1}" for i in range(n)],
+            )
 
-        fig = create_vector_animation_plot(
-            x,
-            plot_y,
-            order=2,
+        plot_y = _state_to_vector_ode_format(r.y, n)
+        component_labels = None
+        n_components = n
+        if r.metadata.get("boundary", "fixed") == "fixed":
+            # Prepend x_{-1}=0, v_{-1}=0 and append x_N=0, v_N=0.
+            extended = np.zeros((2 * (n + 2), plot_y.shape[1]))
+            extended[2 : 2 * (n + 1)] = plot_y
+            plot_y = extended
+            n_components = n + 2
+            component_labels = [str(i) for i in range(-1, n + 1)]
+
+        return _AnimationViewPayload(
+            x=r.x,
+            y=plot_y,
             vector_components=n_components,
-            title=title,
-            deriv_offset=0,
+            title="Coupled Oscillators — Oscillator positions",
             component_labels=component_labels,
         )
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_plot_frame)
+
+    def _on_export_animation_mp4(
+        self,
+        payload: _AnimationViewPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the currently displayed animation representation as MP4."""
+        default_path = get_output_dir() / f"{generate_output_basename(prefix='animation')}.mp4"
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animation_to_mp4(
+                payload.x,
+                payload.y,
+                order=2,
+                vector_components=payload.vector_components,
+                filepath=filepath,
+                title=payload.title,
+                duration_seconds=duration_seconds,
+                component_labels=payload.component_labels,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _replace_plot(
         self,
@@ -380,19 +433,9 @@ class CoupledOscillatorsResultDialog:
         fig: "Figure",
         canvas_attr: str,
     ) -> None:
-        """Destroy the old canvas in frame and embed fig in its place."""
-        from matplotlib.pyplot import close as plt_close
-
+        """Reuse the existing canvas in frame when the figure changes."""
         old_canvas = getattr(self, canvas_attr, None)
-        if old_canvas is not None:
-            old_fig = old_canvas.figure
-            old_canvas.get_tk_widget().destroy()
-            plt_close(old_fig)
-
-        for w in frame.winfo_children():
-            w.destroy()
-
-        canvas = embed_plot_in_tk(fig, frame)
+        canvas = replace_plot_in_tk(fig, frame, current_canvas=old_canvas)
         setattr(self, canvas_attr, canvas)
 
     def _update_energy_plot(self) -> None:
@@ -440,9 +483,7 @@ class CoupledOscillatorsResultDialog:
             k_arr = r.k_coupling
             coupling_types = r.metadata.get("coupling_types", ["linear"])
             nonlinear_coeff = r.metadata.get("nonlinear_coeff", 0.0)
-            has_nonlinear = (
-                "nonlinear" in coupling_types and nonlinear_coeff != 0
-            )
+            has_nonlinear = "nonlinear" in coupling_types and nonlinear_coeff != 0
 
             for i in range(n - 1):
                 delta = x[i + 1] - x[i]

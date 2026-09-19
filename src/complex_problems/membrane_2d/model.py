@@ -6,6 +6,8 @@ from collections.abc import Callable
 
 import numpy as np
 
+from complex_problems.common.expression import CompiledScalarExpression
+
 _SHAPES = {"gaussian", "mode", "random", "custom"}
 
 
@@ -22,13 +24,7 @@ def laplacian_2d(u: np.ndarray, *, boundary: str) -> np.ndarray:
 
     # Fixed boundary with u=0 outside domain.
     p = np.pad(u, pad_width=1, mode="constant", constant_values=0.0)
-    return (
-        p[2:, 1:-1]
-        + p[:-2, 1:-1]
-        + p[1:-1, 2:]
-        + p[1:-1, :-2]
-        - 4.0 * p[1:-1, 1:-1]
-    )
+    return p[2:, 1:-1] + p[:-2, 1:-1] + p[1:-1, 2:] + p[1:-1, :-2] - 4.0 * p[1:-1, 1:-1]
 
 
 def apply_fixed_boundary(u: np.ndarray, v: np.ndarray | None = None) -> None:
@@ -67,7 +63,6 @@ def acceleration_field(
 
     a = force / mass
     if boundary == "fixed":
-        a = a.copy()
         a[0, :] = 0.0
         a[-1, :] = 0.0
         a[:, 0] = 0.0
@@ -94,7 +89,7 @@ def build_initial_displacement(
     mode_y: int = 1,
     center_x: float = 0.5,
     center_y: float = 0.5,
-    custom_fn: Callable[[float, float], float] | None = None,
+    custom_fn: Callable[[float, float], float] | CompiledScalarExpression | None = None,
     random_seed: int = 0,
     boundary: str = "fixed",
 ) -> np.ndarray:
@@ -109,19 +104,17 @@ def build_initial_displacement(
     X, Y = _build_mesh(nx, ny)
 
     if shape == "gaussian":
-        u = amplitude * np.exp(
-            -(((X - center_x) ** 2 + (Y - center_y) ** 2) / (2.0 * sigma**2))
-        )
+        u = amplitude * np.exp(-(((X - center_x) ** 2 + (Y - center_y) ** 2) / (2.0 * sigma**2)))
     elif shape == "mode":
         if boundary == "periodic":
-            u = amplitude * np.cos(2.0 * np.pi * mode_x * X) * np.cos(
-                2.0 * np.pi * mode_y * Y
-            )
+            u = amplitude * np.cos(2.0 * np.pi * mode_x * X) * np.cos(2.0 * np.pi * mode_y * Y)
         else:
             j = np.arange(1, ny + 1)[:, np.newaxis]
             i = np.arange(1, nx + 1)[np.newaxis, :]
-            u = amplitude * np.sin(mode_x * np.pi * i / (nx + 1)) * np.sin(
-                mode_y * np.pi * j / (ny + 1)
+            u = (
+                amplitude
+                * np.sin(mode_x * np.pi * i / (nx + 1))
+                * np.sin(mode_y * np.pi * j / (ny + 1))
             )
     elif shape == "random":
         rng = np.random.default_rng(random_seed)
@@ -129,10 +122,25 @@ def build_initial_displacement(
     else:
         if custom_fn is None:
             raise ValueError("Custom shape selected but no expression provided.")
-        u = np.array(
-            [[custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)] for j in range(ny)],
-            dtype=float,
-        )
+        if isinstance(custom_fn, CompiledScalarExpression):
+            try:
+                evaluated = custom_fn.evaluate_array(X, Y)
+                u = np.broadcast_to(evaluated, X.shape).copy()
+                if u.shape != X.shape:
+                    raise ValueError("Custom expression must produce the grid shape.")
+            except (TypeError, ValueError):
+                u = np.array(
+                    [
+                        [custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)]
+                        for j in range(ny)
+                    ],
+                    dtype=float,
+                )
+        else:
+            u = np.array(
+                [[custom_fn(float(X[j, i]), float(Y[j, i])) for i in range(nx)] for j in range(ny)],
+                dtype=float,
+            )
 
     if boundary == "fixed":
         u = u.copy()
@@ -191,3 +199,21 @@ def compute_fft_power_2d(u: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndar
     ky = np.fft.fftshift(np.fft.fftfreq(ny))
     return kx, ky, power
 
+
+def compute_fft_power_history_2d(fields: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute the shifted 2D power spectrum for every field in a time history.
+
+    The history uses ``float32`` storage because it is visualization data, while
+    each FFT is still evaluated from the solver's full-precision displacement.
+    """
+    field_history = np.asarray(fields)
+    if field_history.ndim != 3:
+        raise ValueError("fields must have shape (n_t, ny, nx).")
+
+    n_frames, ny, nx = field_history.shape
+    power_history = np.empty((n_frames, ny, nx), dtype=np.float32)
+    kx = np.fft.fftshift(np.fft.fftfreq(nx))
+    ky = np.fft.fftshift(np.fft.fftfreq(ny))
+    for index, field in enumerate(field_history):
+        power_history[index] = np.abs(np.fft.fftshift(np.fft.fft2(field))) ** 2
+    return kx, ky, power_history

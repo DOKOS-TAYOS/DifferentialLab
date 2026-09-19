@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 from config.env import (
+    _VALIDATED_CACHE,
+    DEFAULT_LOG_BACKUP_COUNT,
+    DEFAULT_LOG_MAX_BYTES,
     ENV_SCHEMA,
     SCHEMA_BY_KEY,
     _validate_env_value,
@@ -56,6 +59,18 @@ class TestValidateEnvValue:
         assert valid is True
         assert value == "INFO"
 
+    def test_log_max_bytes_invalid_uses_default(self) -> None:
+        schema = SCHEMA_BY_KEY["LOG_MAX_BYTES"]
+        valid, value = _validate_env_value("LOG_MAX_BYTES", 0, schema)
+        assert valid is False
+        assert value == DEFAULT_LOG_MAX_BYTES
+
+    def test_log_backup_count_invalid_uses_default(self) -> None:
+        schema = SCHEMA_BY_KEY["LOG_BACKUP_COUNT"]
+        valid, value = _validate_env_value("LOG_BACKUP_COUNT", -1, schema)
+        assert valid is False
+        assert value == DEFAULT_LOG_BACKUP_COUNT
+
 
 class TestGetCurrentEnvValues:
     def test_returns_dict_of_strings(self) -> None:
@@ -64,6 +79,11 @@ class TestGetCurrentEnvValues:
         for key, val in result.items():
             assert isinstance(key, str)
             assert isinstance(val, str)
+
+    def test_includes_log_rotation_defaults(self) -> None:
+        _VALIDATED_CACHE.clear()
+        assert get_env_from_schema("LOG_MAX_BYTES") == DEFAULT_LOG_MAX_BYTES
+        assert get_env_from_schema("LOG_BACKUP_COUNT") == DEFAULT_LOG_BACKUP_COUNT
 
 
 class TestWriteEnvFile:

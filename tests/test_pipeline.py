@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 
-from pipeline import SolverResult, run_solver_pipeline
-from utils import ValidationError
+from pipeline import SolverResult, _build_mask, run_solver_pipeline
+from solver.ode_solver import solve_ode
+from solver.pde_solver import PDESolution
+from utils import EquationParseError, ValidationError
 
 
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_success(
     mock_ode_env: object,
-    tmp_path: object,
     sample_expression_order1: str,
     sample_y0_order1: list[float],
     sample_domain: tuple[float, float],
@@ -52,9 +57,105 @@ def test_run_solver_pipeline_success(
     assert result.metadata["equation_name"] == "Exponential"
     # Verify numerical solution: y'=0.5*y, y(0)=1 => y(x)=exp(0.5*x)
     np.testing.assert_allclose(result.y[0, 0], 1.0)
-    np.testing.assert_allclose(
-        result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5
+    np.testing.assert_allclose(result.y[0, -1], np.exp(0.5 * sample_domain[1]), rtol=1e-5)
+
+
+@patch("solver.ode_solver.get_env_from_schema")
+def test_run_solver_pipeline_supports_safe_terminal_event_expression(
+    mock_ode_env: object,
+) -> None:
+    mock_ode_env.side_effect = lambda key: {
+        "SOLVER_MAX_STEP": 0.0,
+        "SOLVER_RTOL": 1e-8,
+        "SOLVER_ATOL": 1e-10,
+        "SOLVER_NUM_POINTS": 101,
+    }.get(key, 101)
+
+    result = run_solver_pipeline(
+        expression="1.0",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Linear event",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[0.0],
+        n_points=101,
+        method="RK45",
+        selected_stats=set(),
+        event_expression="f[0] - 0.5",
+        event_terminal=True,
+        event_direction=1,
     )
+
+    assert result.x[-1] <= 0.5
+    assert result.metadata["solver_status"] == 1
+    np.testing.assert_allclose(result.metadata["event_times"][0], [0.5], atol=1e-8)
+
+
+@patch("pipeline.solve_ode", wraps=solve_ode)
+def test_run_solver_pipeline_disables_unused_dense_output(mock_solve_ode: object) -> None:
+    """Sampled pipeline IVPs do not retain an interpolant they never consume."""
+    result = run_solver_pipeline(
+        expression="y[0]",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Dense output opt-out",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[1.0],
+        n_points=20,
+        method="RK45",
+        selected_stats=set(),
+    )
+
+    assert result.x.size == 20
+    assert mock_solve_ode.call_args.kwargs["options"].dense_output is False
+
+
+@patch("pipeline.solve_ode", wraps=solve_ode)
+def test_pipeline_events_preserve_dense_output_opt_out(mock_solve_ode: object) -> None:
+    """Constructing event options cannot restore dense output in the pipeline."""
+    result = run_solver_pipeline(
+        expression="1.0",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Event dense output opt-out",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[0.0],
+        n_points=20,
+        method="RK45",
+        selected_stats=set(),
+        event_expression="f[0] - 0.5",
+        event_terminal=True,
+        event_direction=1,
+    )
+
+    assert result.x[-1] <= 0.5
+    options = mock_solve_ode.call_args.kwargs["options"]
+    assert options.dense_output is False
+    assert len(options.events) == 1
+
+
+def test_run_solver_pipeline_rejects_unsafe_event_expression() -> None:
+    with pytest.raises(EquationParseError, match="Disallowed"):
+        run_solver_pipeline(
+            expression="1.0",
+            function_name=None,
+            order=1,
+            parameters={},
+            equation_name="Unsafe event",
+            x_min=0.0,
+            x_max=1.0,
+            y0=[0.0],
+            n_points=20,
+            method="RK45",
+            selected_stats=set(),
+            event_expression="__import__('os')",
+        )
 
 
 def test_run_solver_pipeline_validation_error() -> None:
@@ -80,7 +181,6 @@ def test_run_solver_pipeline_validation_error() -> None:
 @patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_multipoint(
     mock_ode_env: object,
-    tmp_path: object,
 ) -> None:
     def env_side_effect(key: str) -> object:
         env = {
@@ -139,8 +239,50 @@ def test_run_solver_pipeline_difference_equation() -> None:
 
 
 @patch("solver.ode_solver.get_env_from_schema")
+def test_run_solver_pipeline_can_skip_rhs_recalculation(
+    mock_ode_env: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def env_side_effect(key: str) -> object:
+        env = {
+            "SOLVER_MAX_STEP": 0.0,
+            "SOLVER_RTOL": 1e-8,
+            "SOLVER_ATOL": 1e-10,
+            "SOLVER_NUM_POINTS": 25,
+        }
+        return env.get(key, 25)
+
+    def fail_rhs_values(*args: object, **kwargs: object) -> np.ndarray:
+        raise AssertionError("RHS values should not be recomputed when both flags are disabled")
+
+    mock_ode_env.side_effect = env_side_effect
+    monkeypatch.setattr("pipeline._evaluate_ode_rhs_values", fail_rhs_values)
+
+    result = run_solver_pipeline(
+        expression="-y[0]",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Decay",
+        x_min=0.0,
+        x_max=1.0,
+        y0=[1.0],
+        n_points=25,
+        method="RK45",
+        selected_stats={"mean"},
+        augment_highest_derivative=False,
+        compute_residual_metrics=False,
+    )
+
+    assert result.y.shape == (1, 25)
+    assert result.vector_order == 1
+    assert result.metadata["residual_max"] is None
+
+
+@patch("solver.ode_solver.get_env_from_schema")
 def test_run_solver_pipeline_vector_ode(mock_ode_env: object) -> None:
     """Vector ODE: coupled system f0'=f1, f1'=-f0 (harmonic oscillator)."""
+
     def env_side_effect(key: str) -> object:
         env = {
             "SOLVER_MAX_STEP": 0.0,
@@ -208,3 +350,182 @@ def test_run_solver_pipeline_pde_2d() -> None:
     assert result.y_grid.shape == (11,)
     assert result.y.shape == (11, 11)
     np.testing.assert_allclose(result.y, 0.0, atol=1e-10)
+
+
+def test_run_solver_pipeline_vector_pde_dispatches_without_display() -> None:
+    """Vector PDE is a standard data-only pipeline route, not an Advanced Problem."""
+    result = run_solver_pipeline(
+        expression=None,
+        function_name=None,
+        order=2,
+        parameters={},
+        equation_name="Coupled elliptic system",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=9,
+        n_points_y=7,
+        method="fdm",
+        selected_stats={"mean", "l2_norm"},
+        equation_type="vector_pde",
+        variables=["x", "y"],
+        vector_expressions=[
+            "fxx[0] + fyy[0] + 0.2*fxx[1] + 0.2*fyy[1] + f[1]",
+            "0.2*fxx[0] + 0.2*fyy[0] + fxx[1] + fyy[1] + f[0]",
+        ],
+        vector_components=2,
+    )
+
+    assert result.equation_type == "vector_pde"
+    assert result.is_vector is True
+    assert result.vector_components == 2
+    assert result.y.shape == (2, 7, 9)
+    assert result.y_grid is not None
+    assert result.metadata["matrix_shape"] == (70, 70)
+    assert len(result.metadata["component_residual_l2"]) == 2
+    assert set(result.statistics) == {"magnitude", "component_0", "component_1"}
+    np.testing.assert_allclose(result.y, 0.0)
+
+
+def test_vector_pde_pipeline_rejects_component_index_before_solver() -> None:
+    with pytest.raises(EquationParseError, match=r"outside \[0, 2\)"):
+        run_solver_pipeline(
+            expression=None,
+            function_name=None,
+            order=2,
+            parameters={},
+            equation_name="Invalid Vector PDE",
+            x_min=0.0,
+            x_max=1.0,
+            y_min=0.0,
+            y_max=1.0,
+            y0=[],
+            n_points=5,
+            n_points_y=5,
+            method="fdm",
+            selected_stats=set(),
+            equation_type="vector_pde",
+            variables=["x", "y"],
+            vector_expressions=["fxx[2] + fyy[0]", "fxx[1] + fyy[1]"],
+            vector_components=2,
+        )
+
+
+def test_build_mask_rejects_unsafe_expression() -> None:
+    with pytest.raises(EquationParseError):
+        _build_mask(
+            "().__class__.__mro__[1].__subclasses__()",
+            np.linspace(0.0, 1.0, 5),
+            np.linspace(0.0, 1.0, 5),
+            {},
+        )
+
+
+def test_run_solver_pipeline_pde_uses_fast_coefficients_for_coordinate_rhs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_solve_pde_2d(*args: object, **kwargs: object) -> PDESolution:
+        provider = kwargs.get("coefficient_provider")
+        captured["coefficient_provider"] = provider
+        assert callable(provider)
+        assert provider(0.25, 0.5, {}) == (-1.0, 0.0, -1.0, 0.0, 0.0, 0.0, -0.75)
+        x_grid = np.linspace(0.0, 1.0, 5)
+        y_grid = np.linspace(0.0, 1.0, 5)
+        return PDESolution(
+            grid=(x_grid, y_grid),
+            u=np.zeros((5, 5)),
+            success=True,
+            message="OK",
+        )
+
+    monkeypatch.setattr("pipeline.solve_pde_2d", fake_solve_pde_2d)
+
+    run_solver_pipeline(
+        expression="x + y",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Poisson",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=5,
+        n_points_y=5,
+        method="fdm",
+        selected_stats=set(),
+        equation_type="pde",
+        variables=["x", "y"],
+    )
+
+    assert captured["coefficient_provider"] is not None
+
+
+def test_run_solver_pipeline_pde_keeps_generic_path_for_solution_terms(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_solve_pde_2d(*args: object, **kwargs: object) -> PDESolution:
+        captured["coefficient_provider"] = kwargs.get("coefficient_provider")
+        x_grid = np.linspace(0.0, 1.0, 5)
+        y_grid = np.linspace(0.0, 1.0, 5)
+        return PDESolution(
+            grid=(x_grid, y_grid),
+            u=np.zeros((5, 5)),
+            success=True,
+            message="OK",
+        )
+
+    monkeypatch.setattr("pipeline.solve_pde_2d", fake_solve_pde_2d)
+
+    run_solver_pipeline(
+        expression="f + x",
+        function_name=None,
+        order=1,
+        parameters={},
+        equation_name="Reaction diffusion",
+        x_min=0.0,
+        x_max=1.0,
+        y_min=0.0,
+        y_max=1.0,
+        y0=[],
+        n_points=5,
+        n_points_y=5,
+        method="fdm",
+        selected_stats=set(),
+        equation_type="pde",
+        variables=["x", "y"],
+    )
+
+    assert captured["coefficient_provider"] is None
+
+
+def test_solver_package_import_is_lazy_for_scipy() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "PYTHONPATH": str(project_root / "src")}
+    code = (
+        "import sys\n"
+        "def has_scipy():\n"
+        "    return any(name == 'scipy' or name.startswith('scipy.') for name in sys.modules)\n"
+        "import solver\n"
+        "print(has_scipy())\n"
+        "from solver import solve_ode\n"
+        "print(callable(solve_ode))\n"
+        "print(has_scipy())\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.stdout.splitlines() == ["False", "True", "True"]

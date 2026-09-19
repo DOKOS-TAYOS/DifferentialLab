@@ -1,4 +1,4 @@
-"""Help / Information dialog with collapsible sections."""
+"""Help and about dialog with collapsible sections."""
 
 from __future__ import annotations
 
@@ -24,9 +24,8 @@ YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 # ── Section content (human-readable) ─────────────────────────────────
 
 _ABOUT = (
-    f"Welcome to {APP_NAME} v{APP_VERSION}!\n\n"
-    f"{APP_NAME} is a graphical tool for solving and visualising differential "
-    "equations, recurrence relations, and mathematical transforms. "
+    f"{APP_NAME} v{APP_VERSION} is a graphical workspace for solving and visualizing "
+    "differential equations, recurrence relations, and mathematical transforms. "
     "It supports:\n\n"
     "\u2022 Scalar ODEs — ordinary differential equations of any order\n"
     "\u2022 Vector ODEs — coupled systems (Lorenz attractor, Lotka-Volterra, "
@@ -34,6 +33,7 @@ _ABOUT = (
     "\u2022 Difference equations — recurrence relations (Fibonacci, logistic map, ...)\n"
     "\u2022 PDEs — 2-D elliptic equations solved with finite differences "
     "(Poisson, Laplace, general operator-based)\n"
+    "\u2022 PDE 3D — scalar elliptic equations on rectangular 3-D grids with slice views\n"
     "\u2022 Function transforms — Fourier (FFT), Laplace, Taylor series, "
     "Hilbert, and Z-transform\n\n"
     "Under the hood the application relies on SciPy's solve_ivp integrator "
@@ -42,13 +42,13 @@ _ABOUT = (
 )
 
 _HOW_TO_USE = (
-    "The main menu has five buttons: Solve Differential Equation, "
-    "Function Transform, Information, Configuration, and Quit.\n\n"
+    "The main menu gives direct access to equation solving, function transforms, "
+    "advanced problems, help, settings, and exit.\n\n"
     "Solving an equation step by step:\n"
-    "1.  Click  Solve Differential Equation.\n"
+    "1.  Click  Solve Equation.\n"
     "2.  Pick a predefined equation from the list, or switch to the  Custom  "
     "tab and write your own expression.\n"
-    "3.  Choose the equation type: ODE, Vector ODE, Difference, or PDE.\n"
+    "3.  Choose the equation type: ODE, Vector ODE, Difference, PDE, PDE 3D, or Vector PDE.\n"
     "4.  Click  Next  to open the parameters screen.\n"
     "5.  Set the domain, initial/boundary conditions, evaluation points, "
     "solver method (for ODEs), and statistics to compute.\n"
@@ -82,6 +82,9 @@ _CUSTOM_EXPRESSIONS = (
     "    Spatial: x, y (or x[0], x[1]). Solution: f. Derivatives: f[0]=f_x, "
     "f[1]=f_y, f[0,0]=f_xx, f[0,1]=f_xy, f[1,1]=f_yy.\n"
     "    Select the LHS operator and write the RHS expression.\n\n"
+    "PDE 3D (scalar elliptic):\n"
+    "    Spatial: x, y, z. Write a residual equal to zero using f, fx, fy, fz, "
+    "fxx, fxy, fxz, fyy, fyz, and fzz.\n\n"
     "Available math functions:\n"
     "    sin  cos  tan  exp  log  log10  sqrt  abs\n"
     "    sinh  cosh  tanh  arcsin  arccos  arctan\n"
@@ -120,9 +123,9 @@ _PREDEFINED_EQUATIONS = (
 
 _OUTPUT_FILES = (
     "All files are saved on demand from the Results or Transform dialog.\n\n"
-    "\u2022 Save CSV  \u2014  tabular data (x, f, f\u2032, f\u2080, f\u2032\u2080, \u2026) "
+    "\u2022 Export CSV  \u2014  tabular data (x, f, f\u2032, f\u2080, f\u2032\u2080, \u2026) "
     "ready for spreadsheets or further analysis.\n"
-    "\u2022 Save JSON  \u2014  full metadata, equation definition, and all computed "
+    "\u2022 Export JSON  \u2014  full metadata, equation definition, and all computed "
     "statistics in a structured format.\n"
     "\u2022 Matplotlib toolbar  \u2014  use the floppy-disk icon below any plot to "
     "save it.\n"
@@ -148,11 +151,11 @@ _FUNCTION_TRANSFORMS = (
 )
 
 _CONFIGURATION = (
-    f"Almost every visual and numerical aspect of {APP_NAME} can be customised: "
+    f"Almost every visual and numerical aspect of {APP_NAME} can be customized: "
     "UI colours and fonts, plot styling (colours, line width, markers, DPI), "
     "solver defaults (method, tolerances, step size), output paths, and "
     "logging verbosity.\n\n"
-    "Open  Configuration  from the main menu to edit settings in a graphical "
+    "Open  Settings  from the main menu to edit values in a graphical "
     "form, or edit the  .env  file directly with any text editor.\n\n"
     "After saving, the application restarts automatically so changes take "
     "effect immediately."
@@ -182,20 +185,20 @@ _KEYBOARD_SHORTCUTS = (
 
 _SECTIONS: list[tuple[str, str]] = [
     ("About", _ABOUT),
-    ("How to Use", _HOW_TO_USE),
+    ("Quick Start", _HOW_TO_USE),
     ("Writing Custom Expressions", _CUSTOM_EXPRESSIONS),
     ("Predefined Equations", _PREDEFINED_EQUATIONS),
     ("Function Transforms", _FUNCTION_TRANSFORMS),
     ("Solver Methods", _solver_methods_text()),
     ("Available Statistics", _statistics_text()),
-    ("Output Files", _OUTPUT_FILES),
-    ("Configuration", _CONFIGURATION),
+    ("Exports and Files", _OUTPUT_FILES),
+    ("Settings", _CONFIGURATION),
     ("Keyboard Shortcuts", _KEYBOARD_SHORTCUTS),
 ]
 
 
 class HelpDialog:
-    """Information window with collapsible sections.
+    """Help window with collapsible sections.
 
     Args:
         parent: Parent window.
@@ -203,7 +206,7 @@ class HelpDialog:
 
     def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
         self.win = tk.Toplevel(parent)
-        self.win.title(f"{APP_NAME} — Information")
+        self.win.title(f"{APP_NAME} - Help & About")
 
         bg: str = get_env_from_schema("UI_BACKGROUND")
         self.win.configure(bg=bg)
@@ -224,7 +227,7 @@ class HelpDialog:
 
         btn_youtube = ttk.Button(
             btn_frame,
-            text="Support us on YouTube",
+            text="Open YouTube Channel",
             command=lambda: webbrowser.open(YOUTUBE_CHANNEL_URL),
             padding=(14, 8),
         )
@@ -251,7 +254,7 @@ class HelpDialog:
 
         ttk.Label(
             inner,
-            text=f"{APP_NAME} — Information",
+            text=f"{APP_NAME} - Help & About",
             style="Title.TLabel",
         ).pack(anchor=tk.W, pady=(0, pad))
 

@@ -3,16 +3,83 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 
+from complex_problems.common.result_dialog_ui import (
+    close_embedded_figures,
+    reset_embedded_animation,
+)
 from complex_problems.schrodinger_td.solver import SchrodingerTDResult
-from config import get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
-from plotting import create_contour_plot, create_solution_plot, create_surface_plot
+from plotting import (
+    create_contour_plot,
+    create_image_animation_plot,
+    create_solution_plot,
+    create_surface_animation_plot,
+    export_animated_figure_to_mp4,
+)
+from plotting.animation_metadata import attach_animation_metadata
+from utils import get_logger
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class _SchrodingerAnimationViewPayload:
+    """Prepared data shared by a Schrodinger animation and its MP4 export."""
+
+    kind: Literal["image", "surface"]
+    t: np.ndarray
+    x: np.ndarray
+    y: np.ndarray
+    frames: np.ndarray
+    title: str
+    cmap: str
+    xlabel: str
+    ylabel: str
+    zlabel: str = ""
+    colorbar_label: str = ""
+    symmetric_z_range: bool = True
+
+
+def _create_animation_figure(payload: _SchrodingerAnimationViewPayload) -> Figure:
+    """Build the figure used both by Tk and by MP4 export."""
+    if payload.kind == "surface":
+        return create_surface_animation_plot(
+            payload.t,
+            payload.x,
+            payload.y,
+            payload.frames,
+            title=payload.title,
+            cmap=payload.cmap,
+            xlabel=payload.xlabel,
+            ylabel=payload.ylabel,
+            zlabel=payload.zlabel,
+            colorbar_label=payload.colorbar_label,
+            symmetric_z_range=payload.symmetric_z_range,
+        )
+    return create_image_animation_plot(
+        payload.t,
+        payload.frames,
+        title=payload.title,
+        xlabel=payload.xlabel,
+        ylabel=payload.ylabel,
+        cmap=payload.cmap,
+        x_coordinates=payload.x,
+        y_coordinates=payload.y,
+        symmetric_color_range=payload.symmetric_z_range,
+    )
 
 
 def _create_line_anim_figure(
@@ -22,7 +89,7 @@ def _create_line_anim_figure(
     *,
     title: str,
     ylabel: str,
-) -> "object":
+) -> Figure:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
@@ -43,10 +110,7 @@ def _create_line_anim_figure(
         ax.set_title(f"{title} (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 def _create_image_anim_figure(
@@ -55,7 +119,7 @@ def _create_image_anim_figure(
     *,
     title: str,
     symmetric: bool = False,
-) -> "object":
+) -> Figure:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots()
@@ -83,10 +147,7 @@ def _create_image_anim_figure(
         ax.set_title(f"{title} (t={t[i]:.3g})")
         fig.canvas.draw_idle()
 
-    fig._animation_update = _update
-    fig._animation_n_points = len(t)
-    fig._animation_initial_index = 0
-    return fig
+    return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
 class SchrodingerTDResultDialog:
@@ -96,7 +157,7 @@ class SchrodingerTDResultDialog:
         self.parent = parent
         self._result = result
         self.win = tk.Toplevel(parent)
-        self.win.title("Results - Schrodinger TD")
+        self.win.title("Schrodinger Time Evolution Results")
         self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
@@ -112,15 +173,10 @@ class SchrodingerTDResultDialog:
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
-        import matplotlib.pyplot as plt
-
-        for attr in ("_anim_canvas", "_st_canvas", "_spec_canvas", "_inv_canvas", "_extra_canvas"):
-            canvas = getattr(self, attr, None)
-            if canvas is not None and hasattr(canvas, "figure"):
-                try:
-                    plt.close(canvas.figure)
-                except Exception:
-                    pass
+        close_embedded_figures(
+            self,
+            ("_anim_canvas", "_st_canvas", "_spec_canvas", "_inv_canvas", "_extra_canvas"),
+        )
         self.win.destroy()
 
     def _build_ui(self) -> None:
@@ -139,12 +195,17 @@ class SchrodingerTDResultDialog:
         self._build_animation_tab(tab_anim)
 
         tab_st = ttk.Frame(nb)
-        nb.add(tab_st, text="  Space-Time / Density  ")
+        nb.add(tab_st, text="  Density Maps  ")
         self._build_space_tab(tab_st)
 
         tab_spec = ttk.Frame(nb)
         nb.add(tab_spec, text="  Spectrum  ")
-        self._build_spectrum_tab(tab_spec)
+        if self._result.dimension == 1:
+            self._build_spectrum_tab(tab_spec)
+        else:
+            self._spectrum_tab = tab_spec
+            self._spectrum_tab_initialized = False
+            nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
         tab_inv = ttk.Frame(nb)
         nb.add(tab_inv, text="  Expectations  ")
@@ -160,6 +221,16 @@ class SchrodingerTDResultDialog:
             side=tk.RIGHT
         )
 
+    def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
+        """Initialize the deferred 2D Spectrum tab on its first selection."""
+        if self._spectrum_tab_initialized:
+            return
+        notebook = cast(ttk.Notebook, event.widget)
+        selected_tab = notebook.nametowidget(notebook.select())
+        if selected_tab is self._spectrum_tab:
+            self._build_spectrum_tab(self._spectrum_tab)
+            self._spectrum_tab_initialized = True
+
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
@@ -168,7 +239,7 @@ class SchrodingerTDResultDialog:
         else:
             options = ("Density", "Phase")
         self._anim_view_var = tk.StringVar(value=options[0])
-        ttk.Label(ctrl, text="View:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             ctrl,
             textvariable=self._anim_view_var,
@@ -184,24 +255,16 @@ class SchrodingerTDResultDialog:
         self._update_anim()
 
     def _update_anim(self) -> None:
-        import matplotlib.pyplot as plt
-
-        if self._anim_canvas is not None and hasattr(self._anim_canvas, "figure"):
-            try:
-                plt.close(self._anim_canvas.figure)
-            except Exception:
-                pass
-        for w in self._anim_frame.winfo_children():
-            w.destroy()
+        reset_embedded_animation(self._anim_frame, self._anim_canvas)
 
         view = self._anim_view_var.get()
         r = self._result
         if r.dimension == 1:
             if view == "Real":
-                y = r.psi.real
+                y = np.real(r.psi)
                 ylabel = "Re(ψ)"
             elif view == "Imag":
-                y = r.psi.imag
+                y = np.imag(r.psi)
                 ylabel = "Im(ψ)"
             else:
                 y = r.magnitude
@@ -256,17 +319,14 @@ class SchrodingerTDResultDialog:
                 selected_derivatives=[0],
                 labels=["|ψ(k)|²"],
             )
+            self._spec_canvas = embed_plot_in_tk(fig, parent)
         else:
-            assert r.ky is not None
-            fig = create_contour_plot(
-                r.kx,
-                r.ky,
-                r.spectrum_power,
-                title="Final 2D k-space power",
-                xlabel="kₓ",
-                ylabel="kᵧ",
+            payload = self._get_spectrum_animation_payload()
+            self._spec_canvas = embed_animation_plot_in_tk(
+                _create_animation_figure(payload),
+                parent,
+                on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
             )
-        self._spec_canvas = embed_plot_in_tk(fig, parent)
 
     def _build_invariants_tab(self, parent: ttk.Frame) -> None:
         keys = list(self._result.invariants.keys())
@@ -294,14 +354,89 @@ class SchrodingerTDResultDialog:
                 selected_derivatives=[0],
                 labels=["V"],
             )
+            self._extra_canvas = embed_plot_in_tk(fig, parent)
         else:
-            fig = create_surface_plot(
-                np.arange(r.magnitude.shape[2]),
-                np.arange(r.magnitude.shape[1]),
-                r.magnitude[-1],
-                title="Final density surface",
-                xlabel="x index",
-                ylabel="y index",
-                zlabel="|ψ|²",
+            payload = self._get_density_surface_animation_payload()
+            self._extra_canvas = embed_animation_plot_in_tk(
+                _create_animation_figure(payload),
+                parent,
+                on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
             )
-        self._extra_canvas = embed_plot_in_tk(fig, parent)
+
+    def _get_spectrum_animation_payload(self) -> _SchrodingerAnimationViewPayload:
+        """Return the prepared 2D k-space history for display or export."""
+        result = self._result
+        if result.dimension != 2 or result.ky is None:
+            raise ValueError("2D spectrum animation requires a 2D Schrodinger result.")
+        return _SchrodingerAnimationViewPayload(
+            kind="image",
+            t=result.t,
+            x=result.kx,
+            y=result.ky,
+            frames=result.spectrum_power_history,
+            title="2D k-space power",
+            cmap="magma",
+            xlabel="kₓ",
+            ylabel="kᵧ",
+            symmetric_z_range=False,
+        )
+
+    def _get_density_surface_animation_payload(self) -> _SchrodingerAnimationViewPayload:
+        """Return the prepared 2D density history for display or export."""
+        result = self._result
+        if result.dimension != 2 or result.y is None:
+            raise ValueError("2D density-surface animation requires a 2D Schrodinger result.")
+        return _SchrodingerAnimationViewPayload(
+            kind="surface",
+            t=result.t,
+            x=result.x,
+            y=result.y,
+            frames=result.magnitude,
+            title="2D density surface",
+            cmap="viridis",
+            xlabel="x",
+            ylabel="y",
+            zlabel="|ψ|²",
+            colorbar_label="|ψ|²",
+            symmetric_z_range=False,
+        )
+
+    def _on_export_animation_mp4(
+        self,
+        payload: _SchrodingerAnimationViewPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export a selected 2D animation through the shared MP4 path."""
+        default_path = get_output_dir() / (
+            f"{generate_output_basename(prefix='schrodinger_td')}.mp4"
+        )
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_animation_figure(payload), filepath, duration_seconds=duration_seconds
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)

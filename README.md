@@ -4,12 +4,13 @@
 
 # DifferentialLab
 
-Numerical ODE, difference-equation, and PDE solver with a desktop GUI for science and engineering workflows.
+Desktop numerical lab for ODEs, vector ODEs, difference equations, scalar 2D/3D PDEs,
+vector 2D PDEs, function transforms, and specialized scientific simulation workflows.
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![CI](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml/badge.svg)](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml)
 
 [Documentation](docs/index.md) |
 [Report Bug](https://github.com/DOKOS-TAYOS/DifferentialLab/issues) |
@@ -17,42 +18,81 @@ Numerical ODE, difference-equation, and PDE solver with a desktop GUI for scienc
 
 </div>
 
+## Current State
+
+- Python: `>=3.12`
+- Package name: `differential-lab`
+- GUI: Tkinter/ttk with embedded Matplotlib figures
+- Predefined catalog: 121 equations loaded from YAML
+  - 48 ODEs
+  - 50 vector ODE systems
+  - 10 difference equations
+  - 12 2D PDE examples
+  - 1 coupled Vector PDE example
+- Advanced Problems: 7 registered, lazily loaded plugins
+- Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
+- Documentation: Sphinx + MyST under `docs/`
+
 ## What It Solves
 
-- ODEs with SciPy integrators (`RK45`, `RK23`, `DOP853`, `Radau`, `BDF`, `LSODA`)
-- Difference equations (recurrence systems)
-- PDEs (elliptic 2D solver and operator-based PDE workflows)
-- Vector ODE systems with dedicated visualization modes
-- Function transforms (Fourier, Laplace, Taylor, Hilbert, Z-transform)
+- Scalar ODEs with SciPy IVP integrators, safe terminal/directional events, and a
+  dedicated endpoint-BVP backend with shooting retained for true multipoint conditions
+- Vector ODE systems with component-aware notation and visualizations
+- Difference equations and recurrence systems
+- Scalar linear elliptic 2D PDE workflows with rectangular or masked domains,
+  structured Dirichlet/Neumann/Robin boundaries, non-duplicated periodic axes,
+  component-aware ellipticity validation, and algebraic diagnostics
+- Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
+  component-aware boundaries, sparse block assembly, component/magnitude views, and
+  Cartesian quiver, stream, and radial/tangential visualizations for exactly
+  two-component systems
+- Scalar linear elliptic PDEs on rectangular 3D grids with all six second-order
+  coefficients, Dirichlet/Neumann/Robin faces, periodic axes, sparse diagnostics,
+  pre-run memory advice, and selectable coordinate-labelled orthogonal result slices
+- Cartesian scalar PDE views plus polar re-sampling for visualization; coordinate transforms
+  are display-only and never alter the solved equation
+- Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
+- Advanced Problems subsystem with specialized models, custom UI, solvers, diagnostics, and result dialogs
 
 ## Core Features
 
-- Predefined equation catalog loaded from YAML (`config/equations/*.yaml`)
-- Custom equation parsing with safe AST validation
+- Predefined equation catalog in `src/config/equations/*.yaml`
+- Safe expression parsing with AST validation
 - Unified `f[...]` notation (`f[0]`, `f[1]`, `f[i,k]`)
-- Interactive result dialogs (derivative selection, phase-space selection, dynamic redraw)
-- Export to CSV, JSON, static figures, and MP4 animations
-- Configurable UI/plot/solver behavior via `.env` or in-app configuration dialog
+- Interactive result dialogs with derivative/component selection and dynamic redraw
+- CSV, JSON, static figure, and MP4 animation exports where supported
+- Environment-backed configuration through `.env` and the in-app `Settings` dialog
+- Rotating application logs with optional console output
 
-## Complex Problems (Plugin Mode)
+## Security
 
-`Complex Problems` is a plugin-style subsystem for specialized models with custom UI, solver, and result dialogs.
+- Report security issues privately using [SECURITY.md](SECURITY.md).
+- Local `.env`, generated outputs, update-check state, logs, caches, and virtual environments
+  are ignored by git.
+- GitHub checks include Dependabot, CodeQL default setup, and a weekly Python dependency audit.
+
+## Advanced Problems
+
+`Advanced Problems` is a seven-plugin subsystem. Internally, its Python package
+is named `complex_problems`; each plugin provides its own configuration dialog,
+solver, structured result, and result dialog.
 
 Current modules:
 
-- `coupled_oscillators` (1D coupled oscillators and FPUT variants)
-- `membrane_2d` (2D coupled nonlinear membrane)
-- `nonlinear_waves` (NLSE and KdV)
-- `schrodinger_td` (time-dependent Schrodinger in 1D/2D)
-- `antenna_radiation` (far-field patterns and antenna metrics)
-- `aerodynamics_2d` (2D incompressible obstacle flow approximations)
-- `pipe_flow` (steady and transient 1D pipe-flow models)
+- `coupled_oscillators`: 1D coupled oscillator chains and FPUT-style variants
+- `membrane_2d`: 2D nonlinear membrane lattice
+- `nonlinear_waves`: NLSE and KdV pseudo-spectral propagation
+- `schrodinger_td`: 1D/2D time-dependent Schrodinger solver
+- `antenna_radiation`: far-field patterns and antenna metrics
+- `aerodynamics_2d`: 2D incompressible obstacle-flow approximations
+- `pipe_flow`: steady and transient 1D pipe-flow models
 
 ## Requirements
 
 - Python `>=3.12`
 - Windows 10/11, macOS, or Linux
-- Tkinter available in the Python runtime (GUI requirement)
+- Tkinter available in the Python runtime
+- A virtual environment named `.venv` is the expected local setup
 
 ## Quick Start
 
@@ -88,7 +128,19 @@ chmod +x bin/setup.sh bin/run.sh
 ./bin/run.sh
 ```
 
-Direct run:
+For development dependencies:
+
+```bat
+bin\setup.bat --dev
+```
+
+or on Linux/macOS:
+
+```bash
+./bin/setup.sh --dev
+```
+
+Direct run from an activated environment:
 
 ```bash
 python src/main_program.py
@@ -131,11 +183,17 @@ Install development dependencies:
 pip install -e ".[dev]"
 ```
 
-Run tests:
+Recommended checks before sharing changes:
 
 ```bash
+ruff check . --fix
+ruff format .
 pytest
+pyright
+python -m pip_audit
 ```
+
+Run `pyright` when it is installed in your environment.
 
 Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 

@@ -6,8 +6,8 @@ This document lists the third-party libraries used and their licenses, to facili
 with their terms when redistributing DifferentialLab (as source code, installable package, binary,
 or installer).
 
-> Note: This list is based on the dependencies declared in `pyproject.toml` (and the matching
-> `requirements.txt`). If you add or remove dependencies, update this file.
+> Note: This list is based on the dependencies declared in `pyproject.toml`. If you add or
+> remove dependencies, update this file.
 
 ---
 
@@ -20,7 +20,7 @@ These libraries are used at application runtime.
 | **numpy**         | `>=2.0,<3.0`    | BSD-3-Clause                          |
 | **matplotlib**    | `>=3.10,<4.0`   | Matplotlib License (BSD-style + PSF)  |
 | **scipy**         | `>=1.15,<2.0`   | BSD-3-Clause                          |
-| **python-dotenv** | `>=1.0,<2.0`    | BSD-3-Clause                          |
+| **python-dotenv** | `>=1.2.2,<2.0`  | BSD-3-Clause                          |
 | **PyYAML**        | `>=6.0,<7.0`    | MIT                                   |
 
 ---
@@ -50,7 +50,8 @@ These libraries are used only for development and are not distributed with the a
 | **pytest**    | `>=8.0,<10.0`   | MIT          |
 | **pytest-cov**| `>=6.0,<8.0`    | MIT          |
 | **ruff**      | `>=0.9,<1.0`    | MIT          |
-| **mypy**      | `>=2.0,<3.0`    | MIT          |
+| **pyright**   | `>=1.1,<2.0`    | MIT          |
+| **pip-audit** | `>=2.7,<3.0`    | Apache-2.0   |
 
 ---
 

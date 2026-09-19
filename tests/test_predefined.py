@@ -45,9 +45,12 @@ def test_load_predefined_equations_entries_are_predefined_equation() -> None:
         vec_exprs = getattr(eq, "vector_expressions", None)
         has_defn = eq.expression or eq.function_name or (vec_exprs and len(vec_exprs) > 0)
         assert has_defn
-        is_pde = getattr(eq, "equation_type", "ode") == "pde"
         eq_type = getattr(eq, "equation_type", "ode")
-        is_vector = (vec_exprs is not None and len(vec_exprs) > 0) or eq_type == "vector_ode"
+        is_pde = eq_type in ("pde", "vector_pde")
+        is_vector = (vec_exprs is not None and len(vec_exprs) > 0) or eq_type in (
+            "vector_ode",
+            "vector_pde",
+        )
         if not is_pde:
             vec_comp = getattr(eq, "vector_components", 1)
             expected_ic_len = eq.order * vec_comp if is_vector else eq.order
@@ -62,6 +65,7 @@ def test_load_predefined_equations_known_keys() -> None:
     # From config/equations/*.yaml
     assert "harmonic_oscillator" in equations
     assert "exponential_growth" in equations or "damped_oscillator" in equations
+    assert "coupled_elliptic_system_2d" in equations
 
 
 def test_load_predefined_equations_cached() -> None:
