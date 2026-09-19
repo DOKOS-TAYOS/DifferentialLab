@@ -38,6 +38,19 @@ def _history(
     )
 
 
+def _sampled_model_rms(
+    x: np.ndarray,
+    centers: np.ndarray,
+    numerical: np.ndarray,
+    amplitudes: tuple[float, ...],
+    widths: tuple[float, ...],
+) -> float:
+    """Evaluate a fixed-shape model RMS using the tracker's bounded sample grid."""
+    sample_indices = np.unique(np.linspace(0, len(x) - 1, min(len(x), 256), dtype=int))
+    model = _history(x[sample_indices], centers, amplitudes, widths)
+    return float(np.sqrt(np.mean(np.square(model - numerical[:, sample_indices]))))
+
+
 def test_tracks_one_soliton_with_smooth_phase_displacement() -> None:
     x = np.linspace(-20.0, 20.0, 512, endpoint=False)
     t = np.linspace(0.0, 4.0, 61)
@@ -100,6 +113,99 @@ def test_tracks_two_nonconstant_soliton_trajectories() -> None:
     assert abs(tracked.centers[midpoint, 0] - (-10.0 + 3.0 * t[midpoint])) > 0.1
 
 
+def test_periodic_fit_cannot_accumulate_an_extra_domain_traversal() -> None:
+    x = np.linspace(-20.0, 20.0, 512, endpoint=False)
+    t = np.linspace(0.0, 8.0, 121)
+    free = -14.0 + 3.0 * t
+    expected = free + 0.45 * np.sin(np.pi * t / 8.0)
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        _history(x, expected[:, None], (1.0,), (0.9,)),
+        amplitudes=(1.0,),
+        inverse_widths=(0.9,),
+        initial_centers=(-14.0,),
+        speeds=(3.0,),
+        x_min=-20.0,
+        x_max=20.0,
+    )
+    anchor_centers = tracked.centers[tracked.anchor_indices, 0]
+    anchor_free = free[tracked.anchor_indices]
+    anchor_steps = np.diff(anchor_centers) - 3.0 * np.diff(t[tracked.anchor_indices])
+    local_radius = min(40.0 / 16.0, max(2.0 / 0.9, 4.0 * 40.0 / len(x)))
+    assert np.max(np.abs(tracked.centers[:, 0] - free)) <= 40.0 / 4.0 + 1e-10
+    assert np.max(np.abs(anchor_steps)) <= local_radius + 1e-10
+    expected_phase = 0.45 * np.sin(np.pi * t[tracked.anchor_indices] / 8.0)
+    np.testing.assert_allclose(
+        anchor_centers - anchor_free,
+        expected_phase,
+        atol=0.04,
+    )
+
+
+def test_distractor_pulse_does_not_migrate_the_tracked_identity() -> None:
+    x = np.linspace(-20.0, 20.0, 512, endpoint=False)
+    t = np.linspace(0.0, 2.0, 61)
+    free = -8.0 + 2.0 * t
+    numerical = _history(x, free[:, None], (1.0,), (1.0,))
+    numerical += periodic_soliton_profile(
+        x,
+        center=12.0,
+        amplitude=1.4,
+        inverse_width=1.0,
+        x_min=-20.0,
+        x_max=20.0,
+    )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(1.0,),
+        inverse_widths=(1.0,),
+        initial_centers=(-8.0,),
+        speeds=(2.0,),
+        x_min=-20.0,
+        x_max=20.0,
+    )
+    np.testing.assert_allclose(tracked.centers[:, 0], free, atol=0.03)
+    assert np.max(np.abs(tracked.centers[:, 0] - free)) <= 40.0 / 4.0 + 1e-10
+
+
+def test_tracked_model_improves_on_free_propagation_for_smooth_interaction() -> None:
+    x = np.linspace(-20.0, 20.0, 512, endpoint=False)
+    t = np.linspace(0.0, 4.0, 81)
+    amplitudes = (1.2, 0.6)
+    widths = (0.9, 0.65)
+    initial_centers = (-9.0, 2.0)
+    speeds = (2.4, 0.9)
+    free = np.column_stack((initial_centers[0] + speeds[0] * t, initial_centers[1] + speeds[1] * t))
+    phase = np.column_stack((0.35 * np.sin(np.pi * t / 4.0), -0.24 * np.sin(np.pi * t / 4.0)))
+    numerical = _history(x, free + phase, amplitudes, widths)
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=amplitudes,
+        inverse_widths=widths,
+        initial_centers=initial_centers,
+        speeds=speeds,
+        x_min=-20.0,
+        x_max=20.0,
+    )
+    anchors = tracked.anchor_indices
+    free_rms = _sampled_model_rms(x, free[anchors], numerical[anchors], amplitudes, widths)
+    tracked_rms = _sampled_model_rms(
+        x,
+        tracked.centers[anchors],
+        numerical[anchors],
+        amplitudes,
+        widths,
+    )
+    assert tracked_rms < free_rms
+    assert np.max(np.abs(tracked.centers - free)) <= 40.0 / 4.0 + 1e-10
+    assert np.any(np.abs(tracked.centers - free) > 0.1)
+
+
 def test_invalid_anchor_uses_finite_prediction_fallback() -> None:
     x = np.linspace(-20.0, 20.0, 64, endpoint=False)
     t = np.array([0.0, 1.0])
@@ -151,7 +257,12 @@ def test_representative_kdv_train_has_finite_continuous_phase_displacement() -> 
     free_final = np.asarray(metadata["soliton_centers"]) + np.asarray(
         metadata["soliton_speeds"]
     ) * (result.t[-1] - result.t[0])
+    free_history = (
+        np.asarray(metadata["soliton_centers"])[None, :]
+        + (result.t[:, None] - result.t[0]) * np.asarray(metadata["soliton_speeds"])[None, :]
+    )
     assert len(tracked.anchor_indices) == 240
     assert np.all(np.isfinite(tracked.centers))
     assert np.max(np.abs(np.diff(tracked.centers, axis=0))) < 1.0
+    assert np.max(np.abs(tracked.centers - free_history)) <= 40.0 / 4.0 + 1e-10
     assert np.max(np.abs(tracked.centers[-1] - free_final)) > 0.1
