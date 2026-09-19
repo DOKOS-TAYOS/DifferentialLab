@@ -7,23 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-19
+
 ### Added
+
+- Added MP4 export to every interactive animated result view, including the main
+  Schrodinger TD, nonlinear-waves profile, and transient Pipe Flow animations.
 
 - Added `Axis Sweep` result views for stationary scalar 2D and Vector PDE results,
   plus selectable x/y/z plane sweeps for scalar PDE 3D results. Sweeps use spatial
   coordinates rather than physical time and support matching MP4 export.
 
 - Added reusable stationary-PDE axis-sweep preparation and frame-labelled animation
-  infrastructure for future result views.
+  infrastructure for result views.
 
 - Added coefficient-derived KdV one-soliton and separated-soliton-train controls,
   including the default two-soliton overtaking setup and reproducibility metadata.
+
+- Added compact selectable KdV soliton overlays, peak-tracked where distinguishable and
+  smoothly bridged through ambiguous overlaps, plus the diagnostic residual
+  `u - Σ(tracked soliton profiles)` to supported soliton profile animations.
 
 - Added four built-in scalar 3D PDE examples: manufactured sine Poisson, localized heat
   source, anisotropic diffusion, and screened Poisson.
 - Added catalog boundary defaults for rectangular PDE controls and a nontrivial Laplace
   preset, corrected the simple-pendulum and Allee-effect defaults, and made the built-in
   Vector PDE a manufactured nontrivial problem with a documented exact solution.
+
+### Fixed
+
+- Corrected KdV ETDRK4 coefficients to retain complex full-contour means and cleanly reject
+  non-finite numerical evolution instead of returning corrupted results.
 
 ## [0.6.0] - 2026-09-19
 

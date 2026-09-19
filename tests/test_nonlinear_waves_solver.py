@@ -8,9 +8,10 @@ import pytest
 from complex_problems.nonlinear_waves.model import (
     build_kdv_soliton_profile,
     build_kdv_soliton_train,
+    build_periodic_grid,
     compute_kdv_invariants,
 )
-from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
+from complex_problems.nonlinear_waves.solver import _simulate_kdv, solve_nonlinear_waves
 
 
 def test_kdv_soliton_characteristics_and_peak() -> None:
@@ -195,6 +196,49 @@ def test_kdv_ui_defaults_stay_finite_for_long_horizon() -> None:
     assert np.all(np.isfinite(result.field))
     assert np.all(np.isfinite(result.invariants["mass"]))
     assert abs(result.magnitudes["mass_drift_rel"]) < 1e-6
+
+
+def test_kdv_three_soliton_train_stays_finite_and_bounded() -> None:
+    result = solve_nonlinear_waves(
+        model_type="kdv",
+        x_min=-20.0,
+        x_max=20.0,
+        nx=384,
+        t_max=7.5,
+        dt=0.002,
+        profile="kdv_soliton_train",
+        soliton_amplitudes=[3.0, 1.0, 1.0],
+        soliton_centers=[0.0, 6.0, 12.0],
+        c=0.0,
+        alpha=6.0,
+        beta_disp=1.0,
+        store_every=4,
+    )
+
+    assert np.all(np.isfinite(result.field))
+    assert all(np.all(np.isfinite(values)) for values in result.invariants.values())
+    assert np.all(np.isfinite(result.spectrum_power))
+    assert all(np.isfinite(value) for value in result.magnitudes.values())
+    assert np.max(np.abs(result.field)) < 10.0
+
+
+def test_kdv_rejects_non_finite_internal_state() -> None:
+    x, dx, k = build_periodic_grid(-4.0, 4.0, 32)
+    t = np.array([0.0, 0.01])
+    stored_steps = np.array([0, 1])
+
+    with pytest.raises(RuntimeError, match="KdV integration became numerically unstable"):
+        _simulate_kdv(
+            x=x,
+            t=t,
+            stored_steps=stored_steps,
+            dx=dx,
+            k=k,
+            u0=np.full(len(x), 1e200),
+            c=0.0,
+            alpha=6.0,
+            beta_disp=1.0,
+        )
 
 
 def test_nlse_result_materializes_lazy_caches_on_demand() -> None:

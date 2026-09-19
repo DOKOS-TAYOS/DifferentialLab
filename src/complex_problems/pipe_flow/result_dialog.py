@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -13,16 +14,19 @@ from complex_problems.common.result_dialog_ui import (
     reset_embedded_animation,
 )
 from complex_problems.pipe_flow.solver import PipeFlowResult
-from config import get_env_from_schema
+from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import center_window, make_modal
-from plotting import create_contour_plot
+from plotting import create_contour_plot, export_animated_figure_to_mp4
 from plotting.animation_metadata import attach_animation_metadata
+from utils import get_logger
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+
+logger = get_logger(__name__)
 
 
 def _set_visible_ylim(ax: Axes, values: np.ndarray, references: tuple[float, ...] = ()) -> None:
@@ -331,7 +335,61 @@ class PipeFlowResultDialog:
             title=title,
             ylabel=ylabel,
         )
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_frame)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_frame,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(
+                arr, title, ylabel, duration
+            ),
+        )
+
+    def _on_export_animation_mp4(
+        self,
+        field: np.ndarray,
+        title: str,
+        ylabel: str,
+        duration_seconds: float,
+    ) -> None:
+        """Export the selected transient field through the shared MP4 path."""
+        default_path = get_output_dir() / (f"{generate_output_basename(prefix='pipe_flow')}.mp4")
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_line_animation_figure(
+                    self._result.x,
+                    self._result.t,
+                    field,
+                    title=title,
+                    ylabel=ylabel,
+                ),
+                filepath,
+                duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _build_geometry_tab(self, parent: ttk.Frame) -> None:
         fig = _create_geometry_figure(self._result)
