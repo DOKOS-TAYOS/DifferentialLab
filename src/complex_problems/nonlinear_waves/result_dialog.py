@@ -133,8 +133,9 @@ def _create_kdv_reference_animation_figure(
     global_max = 0.0
     if "Numerical u" in selected:
         global_max = max(global_max, float(np.max(np.abs(payload.numerical))))
-    if needs_references:
-        global_max = max(global_max, max((abs(value) for value in payload.amplitudes), default=0.0))
+    for index, amplitude in enumerate(payload.amplitudes):
+        if f"Reference soliton {index + 1}" in selected:
+            global_max = max(global_max, abs(amplitude))
     if "Interaction residual" in selected:
         for time, numerical in zip(payload.t, payload.numerical, strict=True):
             reference_sum = np.sum(_reference_profiles_at_time(payload, float(time)), axis=0)
@@ -367,7 +368,7 @@ class NonlinearWavesResultDialog:
             ttk.Label(ctrl, text="Show:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
             self._anim_selection = tk.Listbox(
                 ctrl,
-                selectmode=tk.MULTIPLE,
+                selectmode=tk.EXTENDED,
                 exportselection=False,
                 height=min(len(self._anim_selection_labels), 6),
                 width=24,

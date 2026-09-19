@@ -13,7 +13,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import complex_problems.nonlinear_waves.result_dialog as result_dialog
+import complex_problems.nonlinear_waves.solver as nonlinear_solver
 import complex_problems.nonlinear_waves.ui as nonlinear_ui
+from complex_problems.nonlinear_waves.model import build_kdv_soliton_train
+from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
 
 
 class _StubVar:
@@ -300,6 +303,22 @@ def test_kdv_reference_residual_is_zero_then_reproduces_perturbation() -> None:
     figure = result_dialog._create_kdv_reference_animation_figure(perturbed)
     try:
         np.testing.assert_allclose(figure.axes[0].lines[0].get_ydata(), perturbation[0])
+        assert figure.axes[0].get_ylim() == pytest.approx((-0.1375, 0.1375))
+    finally:
+        plt.close(figure)
+
+
+def test_kdv_reference_y_limit_uses_only_selected_reference_amplitudes() -> None:
+    x = np.linspace(-20.0, 20.0, 256, endpoint=False)
+    result = _make_kdv_reference_result(numerical=np.zeros((2, len(x))))
+    payload = result_dialog._create_kdv_reference_animation_payload(
+        result, ("Reference soliton 2",)
+    )
+    figure = result_dialog._create_kdv_reference_animation_figure(payload)
+    try:
+        lower, upper = figure.axes[0].get_ylim()
+        assert upper == pytest.approx(0.55)
+        assert lower == pytest.approx(-0.55)
     finally:
         plt.close(figure)
 
@@ -331,3 +350,144 @@ def test_kdv_reference_figure_styles_labels_and_animation() -> None:
         assert np.max(lines[1].get_ydata()) > 0.0
     finally:
         plt.close(figure)
+
+
+@pytest.mark.parametrize(
+    ("model_type", "profile", "expected"),
+    [
+        ("kdv", "kdv_soliton_train", True),
+        ("kdv", "kdv_soliton", True),
+        ("kdv", "sech", False),
+        ("nlse", "kdv_soliton", False),
+    ],
+)
+def test_kdv_reference_mode_only_supports_kdv_soliton_profiles(
+    model_type: str, profile: str, expected: bool
+) -> None:
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    dialog._result = SimpleNamespace(model_type=model_type, metadata={"profile": profile})
+    assert dialog._is_kdv_soliton_result() is expected
+
+
+def test_kdv_selector_contract_and_default_selection() -> None:
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    selection = MagicMock()
+    selection.curselection.return_value = (0, 2)
+    selection.get.side_effect = lambda index: ("Numerical u", "Reference soliton 2")[index // 2]
+    dialog._anim_selection = selection
+    assert dialog._selected_animation_labels() == ("Numerical u", "Reference soliton 2")
+
+    selection.curselection.return_value = ()
+    assert dialog._selected_animation_labels() == ("Numerical u",)
+
+
+def test_kdv_selector_uses_extended_mode_and_preserves_default_selection() -> None:
+    created: dict[str, object] = {}
+
+    class _Listbox:
+        def __init__(self, _parent: object, **kwargs: object) -> None:
+            created.update(kwargs)
+
+        def insert(self, _index: object, _label: str) -> None:
+            pass
+
+        def selection_set(self, index: int) -> None:
+            created["selected"] = index
+
+        def pack(self, **_kwargs: object) -> None:
+            pass
+
+        def bind(self, *_args: object) -> None:
+            pass
+
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    dialog.win = object()
+    dialog._result = SimpleNamespace(
+        model_type="kdv",
+        metadata={"profile": "kdv_soliton_train", "soliton_count": 2},
+    )
+    dialog._update_anim = MagicMock()
+    with (
+        patch.object(result_dialog.tk, "Listbox", _Listbox),
+        patch.object(result_dialog, "get_font", return_value=None),
+    ):
+        dialog._build_anim_tab(MagicMock())
+
+    assert created["selectmode"] == result_dialog.tk.EXTENDED
+    assert created["selected"] == 0
+    assert dialog._anim_selection_labels == [
+        "Numerical u",
+        "Reference soliton 1",
+        "Reference soliton 2",
+        "Interaction residual",
+    ]
+
+
+def test_kdv_selection_passes_multiple_labels_without_solving() -> None:
+    dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
+    dialog._result = _make_kdv_reference_result(numerical=np.zeros((2, 64)))
+    dialog._kdv_reference_mode = True
+    dialog._anim_frame = object()
+    dialog._anim_canvas = object()
+    dialog._selected_animation_labels = MagicMock(
+        return_value=("Numerical u", "Reference soliton 2")
+    )
+    created_payload = MagicMock()
+    fake_figure = object()
+    reset = MagicMock()
+    embed = MagicMock(return_value="new-canvas")
+    previous_canvas = dialog._anim_canvas
+    with (
+        patch.object(result_dialog, "reset_embedded_animation", reset),
+        patch.object(
+            result_dialog,
+            "_create_kdv_reference_animation_payload",
+            return_value=created_payload,
+        ) as create_payload,
+        patch.object(
+            result_dialog,
+            "_create_kdv_reference_animation_figure",
+            return_value=fake_figure,
+        ),
+        patch.object(result_dialog, "embed_animation_plot_in_tk", embed),
+        patch.object(nonlinear_solver, "solve_nonlinear_waves") as solve,
+    ):
+        dialog._update_anim()
+
+    reset.assert_called_once_with(dialog._anim_frame, previous_canvas)
+    create_payload.assert_called_once_with(dialog._result, ("Numerical u", "Reference soliton 2"))
+    embed.assert_called_once_with(fake_figure, dialog._anim_frame)
+    assert dialog._anim_canvas == "new-canvas"
+    solve.assert_not_called()
+
+
+def test_kdv_reference_initialization_matches_production_train_definition() -> None:
+    result = solve_nonlinear_waves(
+        model_type="kdv",
+        x_min=-40.0,
+        x_max=40.0,
+        nx=512,
+        t_max=0.01,
+        dt=0.01,
+        profile="kdv_soliton_train",
+        soliton_amplitudes=[3.0, 0.5],
+        soliton_centers=[-15.0, 12.0],
+        c=0.0,
+        alpha=6.0,
+        beta_disp=1.0,
+    )
+    expected, characteristics = build_kdv_soliton_train(
+        result.x,
+        amplitudes=result.metadata["soliton_amplitudes"],
+        centers=result.metadata["soliton_centers"],
+        c=result.metadata["c"],
+        alpha=result.metadata["alpha"],
+        beta_disp=result.metadata["beta_disp"],
+    )
+    assert len(characteristics) == result.metadata["soliton_count"]
+    payload = result_dialog._create_kdv_reference_animation_payload(result, ("Numerical u",))
+    references = np.sum(
+        result_dialog._reference_profiles_at_time(payload, float(result.t[0])), axis=0
+    )
+    np.testing.assert_allclose(references, expected, rtol=1e-10, atol=2e-12)
+    np.testing.assert_allclose(result.field[0].real, expected, rtol=1e-12, atol=1e-12)
