@@ -124,6 +124,11 @@ Current catalog size:
 `solver.predefined.load_predefined_equations()` caches the parsed catalog after
 the first successful load.
 
+Predefined PDE entries may also provide an optional `default_boundary_conditions`
+mapping for the standard rectangular boundary controls. It is used only to seed
+the Parameters dialog; unspecified faces retain homogeneous Dirichlet defaults and
+users can edit every value before solving.
+
 ## Complex Problems Architecture
 
 `complex_problems` uses a lazy plugin registry.

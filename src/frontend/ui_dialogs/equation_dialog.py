@@ -956,6 +956,7 @@ class EquationDialog:
             variables=variables,
             vector_expressions=vector_expressions,
             vector_components=vector_components,
+            default_boundary_conditions=eq.default_boundary_conditions,
         )
 
     def _parse_custom_params(self) -> dict[str, float | list[float]] | None:

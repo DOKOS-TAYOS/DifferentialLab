@@ -28,7 +28,7 @@ laplace_2d:
   formula: ∇²f = 0
   description: "fₓₓ + fᵧᵧ = 0
 
-    Harmonic function. Zero Dirichlet BC."
+    Harmonic function. The default boundary data produce f(x,y)=x."
   variables:
   - x
   - y
@@ -41,6 +41,19 @@ laplace_2d:
   - 1.0
   - 0.0
   - 1.0
+  default_boundary_conditions:
+    bottom:
+      type: Dirichlet
+      expression: "x"
+    top:
+      type: Dirichlet
+      expression: "x"
+    left:
+      type: Dirichlet
+      expression: "0"
+    right:
+      type: Dirichlet
+      expression: "1"
 poisson_xy:
   category: Poisson
   name: 'Poisson: -∇²f = x·y'
