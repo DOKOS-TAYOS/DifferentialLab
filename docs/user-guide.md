@@ -224,8 +224,17 @@ solution = solve_pde_3d(
 
 `PDESolution3D.u` has shape `(nz, ny, nx)`. Periodic axes omit the duplicated
 upper endpoint. Diagnostics use the same residual/matrix structure as scalar
-2D results. The initial result UI provides selectable XY, XZ, and YZ slices;
-coordinate-aware visualization is intentionally left to the later visualization work.
+2D results. The result UI provides selectable XY, XZ, and YZ orthogonal slices
+and an `Axis Sweep` animation. The sweep traverses a selected spatial coordinate
+of the stationary solution; it is not physical time evolution.
+
+Stationary scalar 2D PDE results also provide an `Axis Sweep` tab. Its frames are
+profiles along the other coordinate, and the selected coordinate is shown in the
+frame control. Vector PDE results use the same tab and allow selecting any field
+component or the Euclidean magnitude before sweeping. Scalar PDE 3D results can
+sweep x, y, or z to display YZ, XZ, or XY planes respectively. These animations
+can be exported as MP4 and must be interpreted as spatial traversal, not temporal
+dynamics.
 
 Vector PDE is part of the same standard `Solve Equation` workflow. The custom
 editor supports 1–4 components and interprets every expression as a residual

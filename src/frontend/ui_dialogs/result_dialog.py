@@ -1292,6 +1292,28 @@ class ResultDialog:
         refresh_indices(render=False)
         self._queue_initial_plot(self._update_pde_3d_slice)
 
+        sweep_tab = ttk.Frame(self._notebook)
+        self._notebook.add(sweep_tab, text="  Axis Sweep  ")
+        sweep_controls = ttk.Frame(sweep_tab)
+        sweep_controls.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(sweep_controls, text="Sweep coordinate:").pack(side=tk.LEFT, padx=(0, 4))
+        labels = self._pde_coordinate_labels(3)
+        self._pde_3d_sweep_axis_var = tk.StringVar(value=labels[2])
+        sweep_selector = ttk.Combobox(
+            sweep_controls,
+            textvariable=self._pde_3d_sweep_axis_var,
+            values=labels,
+            state="readonly",
+            width=max(5, max(map(len, labels))),
+            font=get_font(),
+        )
+        sweep_selector.pack(side=tk.LEFT, padx=(0, 4))
+        sweep_selector.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_3d_sweep())
+        self._pde_3d_sweep_frame = ttk.Frame(sweep_tab)
+        self._pde_3d_sweep_frame.pack(fill=tk.BOTH, expand=True)
+        self._pde_3d_sweep_canvas: FigureCanvasTkAgg | None = None
+        self._queue_initial_plot(self._update_pde_3d_sweep)
+
     def _update_pde_3d_slice(self) -> None:
         """Render the selected XY, XZ, or YZ scalar slice."""
         from plotting import create_contour_plot
@@ -1421,6 +1443,33 @@ class ResultDialog:
         if self._result.equation_type == "vector_pde":
             self._build_vector_pde_field_tab()
 
+        sweep_tab = ttk.Frame(nb)
+        nb.add(sweep_tab, text="  Axis Sweep  ")
+        sweep_ctrl = ttk.Frame(sweep_tab)
+        sweep_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ttk.Label(sweep_ctrl, text="Sweep coordinate:").pack(side=tk.LEFT, padx=(0, 4))
+        sweep_labels = self._pde_coordinate_labels(2)
+        self._pde_2d_sweep_axis_var = tk.StringVar(value=sweep_labels[1])
+        sweep_selector = ttk.Combobox(
+            sweep_ctrl,
+            textvariable=self._pde_2d_sweep_axis_var,
+            values=sweep_labels,
+            state="readonly",
+            width=max(5, max(map(len, sweep_labels))),
+            font=get_font(),
+        )
+        sweep_selector.pack(side=tk.LEFT, padx=(0, 8))
+        sweep_selector.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_2d_sweep())
+        self._add_vector_pde_field_selector(
+            sweep_ctrl,
+            "_pde_2d_sweep_field_var",
+            self._update_pde_2d_sweep,
+        )
+        self._pde_2d_sweep_frame = ttk.Frame(sweep_tab)
+        self._pde_2d_sweep_frame.pack(fill=tk.BOTH, expand=True)
+        self._pde_2d_sweep_canvas: FigureCanvasTkAgg | None = None
+        self._queue_initial_plot(self._update_pde_2d_sweep)
+
         # --- Tab 3: Transform (1D slice) ---
         trans_tab = ttk.Frame(nb)
         nb.add(trans_tab, text="  Transform  ")
@@ -1527,6 +1576,131 @@ class ResultDialog:
         xlabel = variables[0] if len(variables) > 0 else "x[0]"
         ylabel = variables[1] if len(variables) > 1 else "x[1]"
         return xlabel, ylabel
+
+    def _pde_coordinate_labels(self, dimension: int) -> list[str]:
+        """Return safe displayed coordinate labels for a PDE result."""
+        fallback = ["x", "y", "z"][:dimension]
+        variables = self._result.metadata.get("variables", [])
+        if not isinstance(variables, (list, tuple)):
+            variables = []
+        return [
+            str(variables[index])
+            if index < len(variables) and variables[index]
+            else fallback[index]
+            for index in range(dimension)
+        ]
+
+    def _pde_sweep_axis(self, selected_label: str, dimension: int) -> Literal["x", "y", "z"]:
+        """Map a displayed coordinate label to the canonical sweep axis."""
+        labels = self._pde_coordinate_labels(dimension)
+        index = labels.index(selected_label) if selected_label in labels else dimension - 1
+        return cast(Literal["x", "y", "z"], "xyz"[index])
+
+    def _create_pde_2d_axis_sweep_figure(self) -> Figure:
+        """Build the selected stationary 2D PDE spatial-sweep animation."""
+        from plotting import create_line_animation_plot
+        from plotting.coordinates import prepare_scalar_axis_sweep_2d
+
+        result = self._result
+        y_grid = self._require_pde_y_grid()
+        x_label, y_label = self._pde_coordinate_labels(2)
+        field, field_label = self._selected_pde_field("_pde_2d_sweep_field_var")
+        axis = cast(Literal["x", "y"], self._pde_sweep_axis(self._pde_2d_sweep_axis_var.get(), 2))
+        sweep = prepare_scalar_axis_sweep_2d(result.x, y_grid, field, axis)
+        if axis == "x":
+            xlabel, frame_label = y_label, x_label
+        else:
+            xlabel, frame_label = x_label, y_label
+        equation_name = result.metadata.get("equation_name", "PDE")
+        return create_line_animation_plot(
+            sweep.sweep_coordinates,
+            sweep.axis_1,
+            sweep.frames,
+            title=f"{equation_name} — Axis sweep — {field_label}",
+            xlabel=xlabel,
+            ylabel=field_label,
+            frame_label=frame_label,
+        )
+
+    def _create_pde_3d_axis_sweep_figure(self) -> Figure:
+        """Build the selected stationary 3D PDE spatial-sweep animation."""
+        from plotting import create_image_animation_plot
+        from plotting.coordinates import prepare_scalar_axis_sweep_3d
+
+        result = self._result
+        if result.y_grid is None or result.z_grid is None:
+            raise ValueError("PDE 3D result is missing its y/z grids")
+        labels = self._pde_coordinate_labels(3)
+        axis = self._pde_sweep_axis(self._pde_3d_sweep_axis_var.get(), 3)
+        sweep = prepare_scalar_axis_sweep_3d(
+            result.x,
+            result.y_grid,
+            result.z_grid,
+            np.asarray(result.y),
+            axis,
+        )
+        axis_labels = {
+            "x": (labels[1], labels[2]),
+            "y": (labels[0], labels[2]),
+            "z": (labels[0], labels[1]),
+        }
+        xlabel, ylabel = axis_labels[axis]
+        equation_name = result.metadata.get("equation_name", "PDE 3D")
+        if sweep.axis_2 is None:
+            raise ValueError("3D axis sweep is missing its vertical coordinate")
+        return create_image_animation_plot(
+            sweep.sweep_coordinates,
+            sweep.frames,
+            title=f"{equation_name} — Axis sweep",
+            xlabel=xlabel,
+            ylabel=ylabel,
+            x_coordinates=sweep.axis_1,
+            y_coordinates=sweep.axis_2,
+            frame_label=labels["xyz".index(axis)],
+        )
+
+    def _replace_animation_plot(
+        self,
+        frame: ttk.Frame,
+        figure_factory: Callable[[], Figure],
+        canvas_attr: str,
+        export_prefix: str,
+    ) -> None:
+        """Replace an embedded animation and own only its current canvas."""
+        old_canvas: FigureCanvasTkAgg | None = getattr(self, canvas_attr, None)
+        if old_canvas is not None:
+            self._dispose_canvas(old_canvas)
+            self._unregister_canvas(old_canvas)
+        for child in frame.winfo_children():
+            child.destroy()
+        figure = figure_factory()
+        canvas = embed_animation_plot_in_tk(
+            figure,
+            frame,
+            on_export_mp4=lambda duration: self._export_axis_sweep_mp4(
+                figure_factory, duration, export_prefix
+            ),
+        )
+        setattr(self, canvas_attr, canvas)
+        self._register_canvas(canvas)
+
+    def _update_pde_2d_sweep(self) -> None:
+        """Render the selected stationary 2D PDE axis sweep."""
+        self._replace_animation_plot(
+            self._pde_2d_sweep_frame,
+            self._create_pde_2d_axis_sweep_figure,
+            "_pde_2d_sweep_canvas",
+            "axis_sweep",
+        )
+
+    def _update_pde_3d_sweep(self) -> None:
+        """Render the selected stationary 3D PDE axis sweep."""
+        self._replace_animation_plot(
+            self._pde_3d_sweep_frame,
+            self._create_pde_3d_axis_sweep_figure,
+            "_pde_3d_sweep_canvas",
+            "axis_sweep",
+        )
 
     def _transform_pde_along_axis(
         self,
@@ -1987,6 +2161,46 @@ class ResultDialog:
                 filepath,
                 title=f"{r.metadata.get('equation_name', 'ODE')} — f_i(x)",
                 duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
+
+    def _export_axis_sweep_mp4(
+        self,
+        figure_factory: Callable[[], Figure],
+        duration_seconds: float,
+        prefix: str = "axis_sweep",
+    ) -> None:
+        """Export a fresh PDE sweep figure using the current dialog selections."""
+        default_path = get_output_dir() / f"{generate_output_basename(prefix=prefix)}.mp4"
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+        filepath = Path(filepath_str)
+        try:
+            from plotting import export_animated_figure_to_mp4
+
+            export_animated_figure_to_mp4(
+                figure_factory(), filepath, duration_seconds=duration_seconds
             )
             messagebox.showinfo(
                 "Animation export saved",
