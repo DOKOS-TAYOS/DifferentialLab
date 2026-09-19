@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improved Pipe Flow result visualizations with unit-aware pressure, separated geometry
+  and steady-flow profiles, spatial steady diagnostics, and scale-separated transient diagnostics.
 - Deferred animated spectrum-tab construction until first selection and bounded spectrum
   history FFT temporaries to one stored frame for Schrodinger TD and nonlinear waves.
 - Corrected low-amplitude membrane animation scaling and included cached float32
