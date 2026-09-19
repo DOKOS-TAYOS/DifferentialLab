@@ -43,6 +43,36 @@ def _history(
     )
 
 
+def _evolving_history(
+    x: np.ndarray,
+    centers: np.ndarray,
+    amplitudes: np.ndarray,
+    widths: tuple[float, ...],
+) -> np.ndarray:
+    """Construct periodic frames with independently evolving peak heights."""
+    return np.array(
+        [
+            sum(
+                (
+                    periodic_soliton_profile(
+                        x,
+                        center=float(center),
+                        amplitude=float(amplitude),
+                        inverse_width=width,
+                        x_min=X_MIN,
+                        x_max=X_MAX,
+                    )
+                    for center, amplitude, width in zip(
+                        center_row, amplitude_row, widths, strict=True
+                    )
+                ),
+                start=np.zeros_like(x),
+            )
+            for center_row, amplitude_row in zip(centers, amplitudes, strict=True)
+        ]
+    )
+
+
 def _track(
     x: np.ndarray,
     t: np.ndarray,
@@ -182,6 +212,159 @@ def test_reliable_phase_displacement_can_exceed_one_quarter_domain() -> None:
     tracked = _track(x, t, expected[:, None], (1.0,), (0.9,), (-16.0,), (1.0,))
     np.testing.assert_allclose(tracked.centers[:, 0], expected, atol=0.04)
     assert tracked.centers[-1, 0] - (-16.0 + 8.0) > (X_MAX - X_MIN) / 4.0
+
+
+def test_reacquires_after_material_amplitude_evolution() -> None:
+    x = np.linspace(X_MIN, X_MAX, 512, endpoint=False)
+    t = np.linspace(0.0, 6.0, 121)
+    expected = -10.0 + t + np.where(t >= 3.0, 2.0, 0.0)
+    numerical = _evolving_history(
+        x,
+        expected[:, None],
+        np.where((t < 2.0)[:, None], 1.0, np.where((t < 3.0)[:, None], 0.0, 2.0)),
+        (1.0,),
+    )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(1.0,),
+        inverse_widths=(1.0,),
+        initial_centers=(-10.0,),
+        speeds=(1.0,),
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    assert not np.any(tracked.observed[(t >= 2.0) & (t < 3.0), 0])
+    assert np.any(tracked.observed[t >= 3.0, 0])
+    np.testing.assert_allclose(tracked.centers[-1, 0], expected[-1], atol=0.04)
+    assert np.max(np.abs(np.diff(tracked.centers[:, 0]))) < 0.2
+
+
+def test_amplitude_rank_protects_reacquired_identities() -> None:
+    x = np.linspace(X_MIN, X_MAX, 512, endpoint=False)
+    t = np.linspace(0.0, 6.0, 121)
+    free = np.column_stack((-12.0 + 1.2 * t, -2.0 + 0.8 * t, 9.0 + 0.4 * t))
+    expected = free + np.where((t >= 3.0)[:, None], (1.5, -1.0, 0.7), 0.0)
+    numerical = _evolving_history(
+        x,
+        expected,
+        np.where(
+            (t < 2.0)[:, None],
+            (3.0, 2.0, 1.0),
+            np.where((t < 3.0)[:, None], 0.0, (5.0, 3.5, 1.7)),
+        ),
+        (1.0, 1.0, 1.0),
+    )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(3.0, 2.0, 1.0),
+        inverse_widths=(1.0, 1.0, 1.0),
+        initial_centers=(-12.0, -2.0, 9.0),
+        speeds=(1.2, 0.8, 0.4),
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    assert np.all(np.any(tracked.observed[t >= 3.0], axis=0))
+    np.testing.assert_allclose(tracked.centers[-1], expected[-1], atol=0.05)
+
+
+def test_distorted_amplitude_rank_does_not_block_clear_continuity() -> None:
+    x = np.linspace(X_MIN, X_MAX, 512, endpoint=False)
+    t = np.linspace(0.0, 5.0, 101)
+    expected = np.column_stack((-12.0 + t, 0.0 + 0.7 * t, 10.0 + 0.4 * t))
+    numerical = _evolving_history(
+        x,
+        expected,
+        np.where(t[:, None] < 2.5, (3.0, 2.0, 1.0), (2.2, 5.0, 1.3)),
+        (1.0, 1.0, 1.0),
+    )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(3.0, 2.0, 1.0),
+        inverse_widths=(1.0, 1.0, 1.0),
+        initial_centers=(-12.0, 0.0, 10.0),
+        speeds=(1.0, 0.7, 0.4),
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    np.testing.assert_allclose(tracked.centers[-1], expected[-1], atol=0.05)
+    assert np.all(tracked.observed[-10:])
+
+
+def test_near_equal_candidates_remain_unassigned() -> None:
+    x = np.linspace(X_MIN, X_MAX, 512, endpoint=False)
+    t = np.linspace(0.0, 2.0, 21)
+    numerical = np.zeros((len(t), len(x)))
+    numerical[0] = periodic_soliton_profile(
+        x,
+        center=-5.0,
+        amplitude=1.0,
+        inverse_width=1.0,
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    for frame in range(1, len(t)):
+        numerical[frame] = sum(
+            (
+                periodic_soliton_profile(
+                    x,
+                    center=center,
+                    amplitude=1.0,
+                    inverse_width=1.0,
+                    x_min=X_MIN,
+                    x_max=X_MAX,
+                )
+                for center in (-7.0, -3.0)
+            ),
+            start=np.zeros_like(x),
+        )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(1.0,),
+        inverse_widths=(1.0,),
+        initial_centers=(-5.0,),
+        speeds=(0.0,),
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    assert not np.any(tracked.observed[1:, 0])
+
+
+def test_negative_soliton_ranks_reacquire_after_height_evolution() -> None:
+    x = np.linspace(X_MIN, X_MAX, 512, endpoint=False)
+    t = np.linspace(0.0, 5.0, 101)
+    free = np.column_stack((-12.0 + 1.1 * t, 6.0 + 0.5 * t))
+    expected = free + np.where((t >= 3.0)[:, None], (1.0, -0.8), 0.0)
+    numerical = _evolving_history(
+        x,
+        expected,
+        np.where(
+            (t < 2.0)[:, None],
+            (-3.0, -1.0),
+            np.where((t < 3.0)[:, None], 0.0, (-5.0, -2.0)),
+        ),
+        (1.0, 1.0),
+    )
+    tracked = track_kdv_soliton_centers(
+        x,
+        t,
+        numerical,
+        amplitudes=(-3.0, -1.0),
+        inverse_widths=(1.0, 1.0),
+        initial_centers=(-12.0, 6.0),
+        speeds=(1.1, 0.5),
+        x_min=X_MIN,
+        x_max=X_MAX,
+    )
+    assert np.all(np.any(tracked.observed[t >= 3.0], axis=0))
+    np.testing.assert_allclose(tracked.centers[-1], expected[-1], atol=0.05)
 
 
 def test_representative_kdv_train_reports_observational_diagnostics() -> None:

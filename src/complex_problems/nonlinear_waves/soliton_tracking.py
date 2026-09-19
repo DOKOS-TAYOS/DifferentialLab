@@ -37,6 +37,11 @@ _AMPLITUDE_RELATIVE_TOLERANCE = 0.30
 _AMPLITUDE_GLOBAL_TOLERANCE = 0.08
 _DUMMY_ASSIGNMENT_COST = 2.0
 _MAX_ACCEPTED_ASSIGNMENT_COST = 1.6
+_SOFT_AMPLITUDE_COST_CAP = 0.85
+_AMPLITUDE_RANK_COST_WEIGHT = 0.30
+_ASSIGNMENT_AMBIGUITY_MARGIN = 0.12
+_REACQUISITION_GAP = 0.20
+_REACQUISITION_MIN_PROMINENCE_FACTOR = 2.0
 
 
 def periodic_soliton_profile(
@@ -159,8 +164,10 @@ def track_kdv_soliton_centers(
     """Track identifiable periodic peaks and bridge ambiguous KdV interactions.
 
     The supplied numerical history is sampled only at bounded temporal anchors.
-    Observed centers are associated by peak amplitude and continuity, then their
-    phase shifts bridge intervals where overlapping pulses have no unique identity.
+    Observed centers are associated by peak amplitude rank and continuity, then
+    their phase shifts bridge intervals where overlapping pulses have no unique
+    identity. Nominal amplitude is a bounded identity cue, not an admissibility
+    condition: overlapping numerical trains can evolve peak heights substantially.
     """
     if numerical.shape != (len(t), len(x)):
         raise ValueError("numerical must have shape (len(t), len(x)).")
@@ -207,6 +214,7 @@ def track_kdv_soliton_centers(
     candidate_count = np.zeros(len(anchor_indices), dtype=int)
     last_centers = initial_values.copy()
     last_times = np.full(n_solitons, float(anchor_t[0]), dtype=float)
+    has_observed_peak = np.zeros(n_solitons, dtype=bool)
 
     for anchor_position in range(1, len(anchor_indices)):
         frame = np.asarray(numerical[anchor_indices[anchor_position]], dtype=float)
@@ -223,32 +231,40 @@ def track_kdv_soliton_centers(
             continue
 
         predictions = last_centers + speed_values * (anchor_t[anchor_position] - last_times)
-        compatible = np.array(
-            [
-                [
-                    abs(candidate.height - amplitude_values[index]) <= amplitude_scale[index]
-                    for candidate in candidates
-                ]
-                for index in range(n_solitons)
-            ],
-            dtype=bool,
-        )
         costs = np.full((n_solitons, len(candidates) + n_solitons), _DUMMY_ASSIGNMENT_COST)
         candidate_centers = np.empty((n_solitons, len(candidates)), dtype=float)
+        identity_ranks = np.empty(n_solitons, dtype=int)
+        identity_ranks[np.argsort(-np.abs(amplitude_values), kind="stable")] = np.arange(n_solitons)
+        candidate_ranks = np.empty(len(candidates), dtype=int)
+        candidate_ranks[
+            np.argsort(-np.abs([candidate.height for candidate in candidates]), kind="stable")
+        ] = np.arange(len(candidates))
         for identity in range(n_solitons):
+            gap = float(anchor_t[anchor_position] - last_times[identity])
+            profile_scale = 1.0 / width_values[identity]
+            continuity_scale = min(
+                length / 2.0,
+                max(4.0 * profile_scale, length / 8.0)
+                + 0.75 * gap * max(abs(speed_values[identity]), profile_scale),
+            )
             for candidate_index, candidate in enumerate(candidates):
                 unwrapped = _nearest_unwrapped(candidate.center, predictions[identity], length)
                 candidate_centers[identity, candidate_index] = unwrapped
-                if not compatible[identity, candidate_index]:
-                    costs[identity, candidate_index] = np.inf
-                    continue
-                amplitude_cost = (
-                    abs(candidate.height - amplitude_values[identity]) / amplitude_scale[identity]
+                raw_amplitude_cost = (
+                    abs(candidate.height - amplitude_values[identity]) / (amplitude_scale[identity])
                 )
-                distance_cost = abs(unwrapped - predictions[identity]) / (length / 2.0)
+                amplitude_cost = min(raw_amplitude_cost, _SOFT_AMPLITUDE_COST_CAP)
+                distance_cost = abs(unwrapped - predictions[identity]) / continuity_scale
                 quality_cost = minimum_prominence / max(candidate.prominence, minimum_prominence)
+                rank_cost = 0.0
+                if len(candidates) >= n_solitons and n_solitons > 1:
+                    rank_cost = (
+                        _AMPLITUDE_RANK_COST_WEIGHT
+                        * abs(candidate_ranks[candidate_index] - identity_ranks[identity])
+                        / (n_solitons - 1)
+                    )
                 costs[identity, candidate_index] = (
-                    amplitude_cost + distance_cost + 0.1 * quality_cost
+                    amplitude_cost + distance_cost + rank_cost + 0.1 * quality_cost
                 )
 
         identities, assignments = linear_sum_assignment(costs)
@@ -259,6 +275,40 @@ def track_kdv_soliton_centers(
                 candidate_index >= len(candidates)
                 or costs[identity, candidate_index] > _MAX_ACCEPTED_ASSIGNMENT_COST
             ):
+                continue
+            alternative_costs = np.delete(costs[identity], candidate_index)
+            if costs[identity, candidate_index] + _ASSIGNMENT_AMBIGUITY_MARGIN >= np.min(
+                alternative_costs
+            ):
+                continue
+            gap = float(anchor_t[anchor_position] - last_times[identity])
+            if (
+                gap >= _REACQUISITION_GAP
+                and candidates[candidate_index].prominence
+                < _REACQUISITION_MIN_PROMINENCE_FACTOR * minimum_prominence
+            ):
+                continue
+            if gap >= _REACQUISITION_GAP and (
+                len(candidates) < n_solitons and identity_ranks[identity] >= len(candidates)
+            ):
+                continue
+            overlaps_unassigned_prediction = any(
+                other != identity
+                and assigned_candidates[other] >= len(candidates)
+                and has_observed_peak[other]
+                and abs(candidates[candidate_index].height)
+                > 1.4 * max(abs(amplitude_values[identity]), abs(amplitude_values[other]))
+                and abs(
+                    _periodic_distance(
+                        candidates[candidate_index].center,
+                        predictions[other],
+                        length,
+                    )
+                )
+                < 1.25 * max(1.0 / width_values[identity], 1.0 / width_values[other])
+                for other in range(n_solitons)
+            )
+            if overlaps_unassigned_prediction:
                 continue
             # Two resolved numerical extrema closer than their profile scales are
             # still an ambiguous decomposition, even if assignment found a pairing.
@@ -282,6 +332,7 @@ def track_kdv_soliton_centers(
             observed_centers[anchor_position, identity] = center
             last_centers[identity] = center
             last_times[identity] = anchor_t[anchor_position]
+            has_observed_peak[identity] = True
 
     free_centers = initial_values[None, :] + (t[:, None] - t[0]) * speed_values[None, :]
     tracks = np.empty_like(free_centers)
