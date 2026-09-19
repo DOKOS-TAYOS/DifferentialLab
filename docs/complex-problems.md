@@ -1,7 +1,29 @@
 # Advanced Problems Guide
 
-`Advanced Problems` is a seven-plugin subsystem where each problem contributes a
+`Advanced Problems` is an eight-plugin subsystem where each problem contributes a
 specialized UI, solver, and result dialog.
+
+## Gravitational N-Body Dynamics
+
+This plugin solves classical Newtonian point-mass gravity in 2D or 3D using
+`scipy.integrate.solve_ivp`. Coordinates, time, mass, and `G` are a self-consistent
+user-selected unit system; built-in three-body presets use normalized `G=1` units.
+The force is `G m_j (r_j-r_i)/(r_ij²+epsilon²)^(3/2)` and its potential is
+`-G m_i m_j/sqrt(r_ij²+epsilon²)`. Thus `epsilon > 0` is a Plummer-softened model,
+not exact point gravity. Coincident initial bodies are rejected for `epsilon=0`.
+
+Choose **Three-body** for the Figure-eight equal-mass benchmark (period about 6.33),
+the analytic Lagrange equilateral orbit, the close-encounter Pythagorean 3-4-5 state,
+or custom values. The Figure-eight benchmark is associated with Alain Chenciner and
+Richard Montgomery, *A remarkable periodic solution of the three-body problem in the
+case of equal masses*, Annals of Mathematics 152 (2000), 881--901.
+
+Choose **General N-body** for 2--100 bodies, editable copy-friendly mass and state
+rows, a deterministic seeded random bound cluster, or a rotating ring built from its
+actual discrete radial acceleration. Pair-force work scales quadratically per RHS
+evaluation, so the dialog advises on expensive requests. The result notebook includes
+stable-bounds Orbit Animation (with inertial/COM frames and MP4 export), static
+trajectories, phase space, energy/conservation diagnostics, and separations.
 
 ## Plugin Contract
 

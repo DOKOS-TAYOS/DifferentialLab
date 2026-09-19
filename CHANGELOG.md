@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the **Gravitational N-Body Dynamics** Advanced Problem: curated Figure-eight,
+  Lagrange, and Pythagorean three-body studies; 2D/3D general systems up to 100 bodies;
+  softened Newtonian gravity, diagnostics, visualization notebook, and MP4 orbit export.
+
 - Added MP4 export to every interactive animated result view, including the main
   Schrodinger TD, nonlinear-waves profile, and transient Pipe Flow animations.
 

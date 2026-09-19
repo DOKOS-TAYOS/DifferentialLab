@@ -18,6 +18,7 @@ def test_registry_contains_expected_plugins() -> None:
     assert "antenna_radiation" in descriptors
     assert "aerodynamics_2d" in descriptors
     assert "pipe_flow" in descriptors
+    assert "gravitational_n_body" in descriptors
 
     desc = descriptors["coupled_oscillators"]
     assert desc.id == "coupled_oscillators"
@@ -70,6 +71,13 @@ def test_open_problem_dialog_dispatches_to_pipe_flow() -> None:
     parent = object()
     with patch("complex_problems.pipe_flow.problem.PROBLEM.open_dialog") as mock_open:
         open_problem_dialog("pipe_flow", parent)  # type: ignore[arg-type]
+    mock_open.assert_called_once_with(parent)
+
+
+def test_open_problem_dialog_dispatches_to_gravitational_n_body() -> None:
+    parent = object()
+    with patch("complex_problems.gravitational_n_body.problem.PROBLEM.open_dialog") as mock_open:
+        open_problem_dialog("gravitational_n_body", parent)  # type: ignore[arg-type]
     mock_open.assert_called_once_with(parent)
 
 

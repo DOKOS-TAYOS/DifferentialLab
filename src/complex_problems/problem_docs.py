@@ -172,6 +172,31 @@ _DOCS: dict[str, ProblemDoc] = {
             "Flow-rate and boundary-signal diagnostics.",
         ),
     ),
+    "gravitational_n_body": ProblemDoc(
+        problem_type="Classical Newtonian point-mass gravity",
+        extended_description=(
+            "Interactive 2D and 3D N-body dynamics in a self-consistent user-selected unit system. "
+            "A positive epsilon selects Plummer-softened gravity rather than exact point gravity; "
+            "the general model costs O(N²) per right-hand-side evaluation."
+        ),
+        equation_summary=("ṙᵢ=vᵢ, v̇ᵢ=GΣⱼ≠ᵢmⱼ(rⱼ−rᵢ)/(‖rⱼ−rᵢ‖²+ε²)³ᐟ², U=−GΣᵢ<ⱼmᵢmⱼ/√(rᵢⱼ²+ε²)"),
+        config_options_summary=(
+            "Choose curated three-body benchmarks or a configurable 2--100-body general state.",
+            "Enter masses as comma-separated values and positions/velocities as one "
+            "comma-separated body row per line.",
+            "Use deterministic random bound clusters or coherent rotating rings to start "
+            "a general experiment quickly.",
+            "Configure 2D/3D, G, softening, time range, output samples, and solve_ivp "
+            "method; DOP853 is recommended for presets.",
+        ),
+        visualizations_summary=(
+            "Orbit animation and static trajectories in inertial or center-of-mass frames, "
+            "with MP4 export.",
+            "Cartesian and radial reduced phase-space views for a selected body.",
+            "Energy, momentum, angular momentum, COM, inertia, virial-ratio, and "
+            "separation diagnostics.",
+        ),
+    ),
 }
 
 

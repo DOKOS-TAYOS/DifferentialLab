@@ -16,6 +16,8 @@ import pytest
 from complex_problems.aerodynamics_2d.solver import solve_aerodynamics_2d
 from complex_problems.antenna_radiation.solver import solve_antenna_radiation
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
+from complex_problems.gravitational_n_body.model import figure_eight_state
+from complex_problems.gravitational_n_body.solver import solve_n_body
 from complex_problems.membrane_2d.model import build_initial_displacement
 from complex_problems.membrane_2d.solver import solve_membrane_2d
 from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
@@ -151,6 +153,16 @@ _SMOKE_CASES: tuple[_SmokeCase, ...] = (
             p_out=1.9e5,
         ),
     ),
+    _SmokeCase(
+        "gravitational_n_body",
+        lambda: solve_n_body(
+            masses=figure_eight_state().masses,
+            positions=figure_eight_state().positions,
+            velocities=figure_eight_state().velocities,
+            t_max=0.1,
+            n_points=8,
+        ),
+    ),
 )
 
 
@@ -192,6 +204,7 @@ assert set(descriptors) == {
     "antenna_radiation",
     "aerodynamics_2d",
     "pipe_flow",
+    "gravitational_n_body",
 }
 for descriptor in descriptors.values():
     assert descriptor.id.strip()
@@ -239,10 +252,10 @@ def test_registered_plugin_contract_is_lazy_and_valid_in_isolated_interpreter() 
 
 
 def test_registered_plugin_descriptors_are_unique() -> None:
-    """All seven registered plugin descriptors have distinct identifiers."""
+    """All eight registered plugin descriptors have distinct identifiers."""
     descriptors = ProblemRegistry(_REGISTRATIONS).get_descriptors()
 
-    assert len(descriptors) == len(_REGISTRATIONS) == 7
+    assert len(descriptors) == len(_REGISTRATIONS) == 8
     assert set(descriptors) == {case.problem_id for case in _SMOKE_CASES}
 
 

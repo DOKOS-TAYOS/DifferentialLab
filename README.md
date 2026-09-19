@@ -30,7 +30,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   - 12 2D PDE examples
   - 4 scalar 3D PDE examples
   - 1 coupled Vector PDE example
-- Advanced Problems: 7 registered, lazily loaded plugins
+- Advanced Problems: 8 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
 
@@ -76,9 +76,14 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## Advanced Problems
 
-`Advanced Problems` is a seven-plugin subsystem. Internally, its Python package
+`Advanced Problems` is an eight-plugin subsystem. Internally, its Python package
 is named `complex_problems`; each plugin provides its own configuration dialog,
 solver, structured result, and result dialog.
+
+Gravitational N-Body Dynamics adds curated Figure-eight, Lagrange equilateral, and
+Pythagorean three-body studies plus configurable 2D/3D systems of 2--100 point masses.
+It uses self-consistent user-selected units; positive softening epsilon is explicitly
+the Plummer-softened model, while epsilon zero is exact Newtonian point gravity.
 
 Current modules:
 
