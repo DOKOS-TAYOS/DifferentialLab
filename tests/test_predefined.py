@@ -95,6 +95,7 @@ def test_catalog_boundary_defaults_are_valid_and_laplace_is_nontrivial() -> None
     }
     for equation in equations.values():
         assert all(isfinite(float(value)) for value in equation.default_domain)
+        assert all(isfinite(float(value)) for value in equation.default_initial_conditions)
         assert all(
             isfinite(float(info.get("default", 0.0))) for info in equation.parameters.values()
         )
