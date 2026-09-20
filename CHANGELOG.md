@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Standardized user-facing equation-family names and refreshed Help to match the current 125-equation catalog and Continue workflow.
 - Improved tooltips so keyboard focus can reveal help text without replacing existing widget bindings, and increased tooltip text to a readable size relative to the configured UI font.
 - Made Help and Transform Help windows resizable, with text wrapping to their visible scroll viewport.
 - Made Help section headers keyboard accessible with a clearly visible focus treatment.
