@@ -9,8 +9,20 @@ from typing import Any
 from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.solve_session import (
+    EquationSelection,
+    SolveSession,
+    choose_filtered_key,
+    filter_equation_keys,
+    matching_categories,
+)
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    fit_and_center,
+    make_modal,
+)
 from solver import load_predefined_equations
 
 
@@ -21,8 +33,14 @@ class EquationDialog:
         parent: Parent window.
     """
 
-    def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
+    def __init__(
+        self,
+        parent: tk.Tk | tk.Toplevel,
+        *,
+        session: SolveSession | None = None,
+    ) -> None:
         self.parent = parent
+        self.session = session or SolveSession()
         self.win = tk.Toplevel(parent)
         self.win.title("Choose an Equation")
 
@@ -33,11 +51,25 @@ class EquationDialog:
         self._filtered_keys: list[str] = []
         self._selected_category: str | None = None
         self._selected_key: str | None = None
-        self._equation_type_var = tk.StringVar(value="ode")
+        self._equation_type_var = tk.StringVar(value=self.session.current_family)
+        self._active_family = self.session.current_family
+        self._restoring_custom = False
 
         self._build_ui()
 
-        fit_and_center(self.win, min_width=1200, min_height=650)
+        min_width, min_height = calculate_screen_aware_minsize(
+            self.win.winfo_screenwidth(),
+            self.win.winfo_screenheight(),
+            1200,
+            700,
+        )
+        self.win.minsize(min_width, min_height)
+        fit_and_center(
+            self.win,
+            min_width=min_width,
+            min_height=min_height,
+            resizable=True,
+        )
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
@@ -51,25 +83,36 @@ class EquationDialog:
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
-        btn_inner = ttk.Frame(btn_frame)
-        btn_inner.pack()
-
-        self._btn_next = ttk.Button(
-            btn_inner,
-            text="Continue",
-            command=self._on_next,
-        )
-        self._btn_next.pack(side=tk.LEFT, padx=pad)
-
-        btn_cancel = ttk.Button(
-            btn_inner,
+        self._btn_cancel = ttk.Button(
+            btn_frame,
             text="Cancel",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self.win.destroy,
         )
-        btn_cancel.pack(side=tk.LEFT, padx=pad)
+        self._btn_cancel.pack(side=tk.LEFT)
 
-        setup_arrow_enter_navigation([[self._btn_next, btn_cancel]])
+        self._btn_next = ttk.Button(
+            btn_frame,
+            text="Continue",
+            style="Primary.TButton",
+            command=self._on_next,
+        )
+        self._btn_next.pack(side=tk.RIGHT)
+
+        setup_arrow_enter_navigation([[self._btn_cancel, self._btn_next]])
+
+        # ── Header ──
+        header = ttk.Frame(self.win, padding=(pad, pad, pad, 0))
+        header.pack(fill=tk.X)
+        title_row = ttk.Frame(header)
+        title_row.pack(fill=tk.X)
+        ttk.Label(title_row, text="Choose equation", style="Title.TLabel").pack(side=tk.LEFT)
+        ttk.Label(title_row, text="Step 1 of 3", style="Small.TLabel").pack(side=tk.RIGHT)
+        ttk.Label(
+            header,
+            text="Select a built-in equation or define a custom one.",
+            style="Small.TLabel",
+        ).pack(anchor=tk.W, pady=(2, pad))
 
         # ── Equation type selector ──
         type_frame = ttk.Frame(self.win)
@@ -77,52 +120,27 @@ class EquationDialog:
         ttk.Label(type_frame, text="Equation family:", style="Subtitle.TLabel").pack(
             side=tk.LEFT, padx=(0, pad)
         )
-        ttk.Radiobutton(
-            type_frame,
-            text="ODE",
-            variable=self._equation_type_var,
-            value="ode",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
-        ttk.Radiobutton(
-            type_frame,
-            text="Recurrence",
-            variable=self._equation_type_var,
-            value="difference",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
-        ttk.Radiobutton(
-            type_frame,
-            text="Vector ODE",
-            variable=self._equation_type_var,
-            value="vector_ode",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
-        ttk.Radiobutton(
-            type_frame,
-            text="2D PDE",
-            variable=self._equation_type_var,
-            value="pde",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
-        ttk.Radiobutton(
-            type_frame,
-            text="3D PDE",
-            variable=self._equation_type_var,
-            value="pde_3d",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
-        ttk.Radiobutton(
-            type_frame,
-            text="Vector PDE",
-            variable=self._equation_type_var,
-            value="vector_pde",
-            command=self._on_type_change,
-        ).pack(side=tk.LEFT, padx=pad)
+        families = (
+            ("ODE", "ode"),
+            ("Recurrence", "difference"),
+            ("Vector ODE", "vector_ode"),
+            ("2D PDE", "pde"),
+            ("3D PDE", "pde_3d"),
+            ("Vector PDE", "vector_pde"),
+        )
+        for label, value in families:
+            ttk.Radiobutton(
+                type_frame,
+                text=label,
+                variable=self._equation_type_var,
+                value=value,
+                command=self._on_type_change,
+            ).pack(side=tk.LEFT, padx=(0, 2 * pad))
 
         # ── Notebook ──
         self._notebook = ttk.Notebook(self.win)
         self._notebook.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
+        self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         # --- Tab 1: Predefined ---
         predef_frame = ttk.Frame(self._notebook, padding=pad)
@@ -133,15 +151,31 @@ class EquationDialog:
         select_bg, select_fg = get_select_colors(element_bg=btn_bg, text_fg=fg)
 
         predef_frame.columnconfigure(0, weight=1)
-        predef_frame.columnconfigure(1, weight=1)
-        predef_frame.rowconfigure(0, weight=3)
-        predef_frame.rowconfigure(1, weight=1)
+        predef_frame.rowconfigure(2, weight=1)
 
-        # Left column: category list (full height, 50% width)
-        left = ttk.Frame(predef_frame)
-        left.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, pad))
+        ttk.Label(predef_frame, text="Search", style="Subtitle.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
+        self._search_var = tk.StringVar(value=self.session.family_state().search_query)
+        self.search_entry = ttk.Entry(
+            predef_frame,
+            textvariable=self._search_var,
+            font=get_font(),
+        )
+        self.search_entry.grid(row=1, column=0, sticky="ew", pady=(4, pad))
+        self._search_var.trace_add("write", self._on_search_change)
 
-        ttk.Label(left, text="Category:", style="Subtitle.TLabel").pack(anchor=tk.W)
+        panes = ttk.PanedWindow(predef_frame, orient=tk.HORIZONTAL)
+        panes.grid(row=2, column=0, sticky="nsew")
+
+        left = ttk.Frame(panes, padding=(0, 0, pad, 0))
+        middle = ttk.Frame(panes, padding=(pad, 0))
+        details = ttk.LabelFrame(panes, text="Details", padding=pad)
+        panes.add(left, weight=1)
+        panes.add(middle, weight=2)
+        panes.add(details, weight=3)
+
+        ttk.Label(left, text="Categories", style="Subtitle.TLabel").pack(anchor=tk.W)
 
         cat_list_frame = ttk.Frame(left)
         cat_list_frame.pack(fill=tk.BOTH, expand=True)
@@ -164,22 +198,10 @@ class EquationDialog:
         cat_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.category_listbox.bind("<<ListboxSelect>>", self._on_select_category)
 
-        # Right column: equation list (3/4 height) + description (1/4 height), 50% width
-        right_container = ttk.Frame(predef_frame)
-        right_container.grid(row=0, column=1, rowspan=2, sticky="nsew")
-        right_container.columnconfigure(0, weight=1)
-        right_container.rowconfigure(0, weight=0)
-        right_container.rowconfigure(1, weight=3)
-        right_container.rowconfigure(2, weight=1)
+        ttk.Label(middle, text="Equations", style="Subtitle.TLabel").pack(anchor=tk.W)
 
-        ttk.Label(right_container, text="Equation:", style="Subtitle.TLabel").grid(
-            row=0, column=0, sticky="w"
-        )
-
-        eq_list_frame = ttk.Frame(right_container)
-        eq_list_frame.grid(row=1, column=0, sticky="nsew", pady=(pad, 0))
-        eq_list_frame.columnconfigure(0, weight=1)
-        eq_list_frame.rowconfigure(0, weight=1)
+        eq_list_frame = ttk.Frame(middle)
+        eq_list_frame.pack(fill=tk.BOTH, expand=True)
 
         eq_scrollbar = ttk.Scrollbar(eq_list_frame, orient=tk.VERTICAL)
         self.eq_listbox = tk.Listbox(
@@ -195,27 +217,22 @@ class EquationDialog:
             exportselection=False,
         )
         eq_scrollbar.config(command=self.eq_listbox.yview)
-        self.eq_listbox.grid(row=0, column=0, sticky="nsew")
-        eq_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.eq_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        eq_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.eq_listbox.bind("<<ListboxSelect>>", self._on_select_equation)
-
-        desc_frame = ttk.LabelFrame(right_container, text="Details", padding=pad)
-        desc_frame.grid(row=2, column=0, sticky="nsew", pady=(pad, 0))
-        desc_frame.columnconfigure(0, weight=1)
-        desc_frame.rowconfigure(0, weight=1)
+        self.eq_listbox.bind("<Return>", lambda _event: self._on_next())
 
         self.desc_label = ttk.Label(
-            desc_frame,
+            details,
             text="",
             style="Small.TLabel",
             justify=tk.LEFT,
+            anchor=tk.NW,
         )
         self.desc_label.pack(anchor=tk.W, fill=tk.BOTH, expand=True)
 
-        bind_wraplength(desc_frame, self.desc_label, pad=2 * pad)
-
-        self._populate_category_list()
+        bind_wraplength(details, self.desc_label, pad=2 * pad)
 
         # --- Tab 2: Custom ---
         self._custom_outer = ttk.Frame(self._notebook, padding=pad)
@@ -225,6 +242,9 @@ class EquationDialog:
         self._custom_inner: ttk.Frame | None = None
         self._vec_expr_widgets: list[tk.Text] = []
 
+        family_state = self.session.family_state()
+        self._notebook.select(0 if family_state.mode == "built_in" else 1)
+        self._populate_category_list()
         self.category_listbox.focus_set()
         self._rebuild_custom_tab()
 
@@ -234,28 +254,34 @@ class EquationDialog:
 
     def _get_categories_for_type(self) -> list[str]:
         """Return categories for equations matching the current equation type."""
-        eq_type = self._equation_type_var.get()
-        return sorted(
-            {
-                eq.category
-                for eq in self.equations.values()
-                if getattr(eq, "equation_type", "ode") == eq_type
-            }
+        return matching_categories(
+            self.equations,
+            self._equation_type_var.get(),
+            self._search_var.get(),
         )
 
     def _populate_category_list(self) -> None:
-        """Populate the category listbox and select first category."""
+        """Populate non-empty categories and restore a valid family selection."""
         categories = self._get_categories_for_type()
+        self._visible_categories = categories
         self.category_listbox.delete(0, tk.END)
         for cat in categories:
             self.category_listbox.insert(tk.END, cat)
-        self._selected_category = None
-        self._filtered_keys = []
-        self.eq_listbox.delete(0, tk.END)
-        self.desc_label.config(text="")
-        if categories:
-            self.category_listbox.selection_set(0)
-            self._on_select_category(None)
+        family_state = self.session.family_state()
+        selected_category = family_state.category
+        if selected_category not in categories:
+            selected_category = categories[0] if categories else None
+        self._selected_category = selected_category
+        if selected_category is None:
+            self._filtered_keys = []
+            self.eq_listbox.delete(0, tk.END)
+            self._selected_key = None
+            self.desc_label.config(text="No built-in equations match this search.")
+            return
+        category_index = categories.index(selected_category)
+        self.category_listbox.selection_set(category_index)
+        self.category_listbox.see(category_index)
+        self._on_select_category(None)
 
     def _on_select_category(self, _event: tk.Event | None) -> None:  # type: ignore[type-arg]
         """When category changes, populate the equation list."""
@@ -266,27 +292,64 @@ class EquationDialog:
             self.eq_listbox.delete(0, tk.END)
             self.desc_label.config(text="")
             return
-        categories = self._get_categories_for_type()
         idx = sel[0]
-        self._selected_category = categories[idx]
+        if idx >= len(self._visible_categories):
+            return
+        self._selected_category = self._visible_categories[idx]
         eq_type = self._equation_type_var.get()
-        self._filtered_keys = [
-            k
-            for k, eq in self.equations.items()
-            if eq.category == self._selected_category
-            and getattr(eq, "equation_type", "ode") == eq_type
-        ]
+        family_state = self.session.family_state()
+        if not self._search_var.get().strip():
+            family_state.category = self._selected_category
+        self._filtered_keys = filter_equation_keys(
+            self.equations,
+            eq_type,
+            self._search_var.get(),
+            self._selected_category,
+        )
         self.eq_listbox.delete(0, tk.END)
         for key in self._filtered_keys:
             self.eq_listbox.insert(tk.END, self.equations[key].name)
-        self._selected_key = None
-        self.desc_label.config(text="")
-        if self._filtered_keys:
-            self.eq_listbox.selection_set(0)
-            self._on_select_equation(None)
+        preferred_key = choose_filtered_key(self._filtered_keys, family_state.equation_key)
+        self._selected_key = preferred_key
+        if preferred_key is None:
+            self.desc_label.config(text="No built-in equations match this search.")
+            return
+        equation_index = self._filtered_keys.index(preferred_key)
+        self.eq_listbox.selection_set(equation_index)
+        self.eq_listbox.see(equation_index)
+        self._on_select_equation(None)
+
+    def _on_search_change(self, *_args: object) -> None:
+        """Apply a local, case-insensitive catalog filter for the active family."""
+        if not hasattr(self, "category_listbox"):
+            return
+        self.session.family_state().search_query = self._search_var.get()
+        self._populate_category_list()
+
+    def _on_tab_changed(self, _event: tk.Event | None) -> None:  # type: ignore[type-arg]
+        """Remember the Built-in/Custom mode independently for each family."""
+        if not hasattr(self, "_notebook"):
+            return
+        selected_tab = self._notebook.select()
+        if not selected_tab:
+            return
+        index = self._notebook.index(selected_tab)
+        self.session.family_state().mode = "built_in" if index == 0 else "custom"
 
     def _on_type_change(self) -> None:
         """When equation type changes, refresh predefined list and custom tab."""
+        previous_family = self._active_family
+        self._capture_custom_state(previous_family)
+        previous_state = self.session.family_state(previous_family)
+        if not self._search_var.get().strip():
+            previous_state.category = self._selected_category
+            previous_state.equation_key = self._selected_key
+
+        self._active_family = self._equation_type_var.get()
+        self.session.current_family = self._active_family
+        family_state = self.session.family_state()
+        self._search_var.set(family_state.search_query)
+        self._notebook.select(0 if family_state.mode == "built_in" else 1)
         self._populate_category_list()
         self._rebuild_custom_tab()
 
@@ -394,6 +457,114 @@ class EquationDialog:
             self._build_custom_pde(ci, pad, _btn_bg, _fg, _font)
         else:
             self._build_custom_scalar(ci, pad, _btn_bg, _fg, _font, eq_type)
+        self._apply_custom_state(eq_type)
+
+    @staticmethod
+    def _text_value(widget: tk.Text | None) -> str:
+        """Read a Text widget as plain user data."""
+        if widget is None:
+            return ""
+        return widget.get("1.0", tk.END).rstrip("\n")
+
+    @staticmethod
+    def _set_text(widget: tk.Text | None, value: str) -> None:
+        """Replace a Text widget's content with a plain string."""
+        if widget is None:
+            return
+        widget.delete("1.0", tk.END)
+        widget.insert("1.0", value)
+
+    def _capture_custom_state(self, family: str) -> None:
+        """Capture the active family's custom editor into pure session data."""
+        if not hasattr(self, "custom_params"):
+            return
+        draft = self.session.family_state(family).custom_draft
+        draft["order"] = self.custom_order_var.get()
+        draft["parameters"] = self.custom_params.get()
+        if family == "vector_ode":
+            draft["components"] = self._vec_n_var.get()
+            draft["mode"] = self._vec_mode_var.get()
+            self._capture_vector_widget_state(draft)
+        elif family == "vector_pde":
+            draft["components"] = self._vec_n_var.get()
+            draft["expressions"] = [self._text_value(widget) for widget in self._vec_expr_widgets]
+        else:
+            draft["expression"] = self._text_value(getattr(self, "custom_expr", None))
+            if family == "pde":
+                draft["operator"] = self._pde_op_var.get()
+                draft["variables"] = self._pde_nvars_var.get()
+
+    def _capture_vector_widget_state(self, draft: dict[str, Any]) -> None:
+        """Retain the current Vector ODE mode's orders and expressions."""
+        mode = getattr(self, "_active_vec_mode", self._vec_mode_var.get())
+        if mode == "bulk":
+            draft["bulk_order"] = self._vec_order_vars[0].get() if self._vec_order_vars else "2"
+            draft["bulk_expression"] = self._text_value(getattr(self, "_vec_bulk_expr", None))
+        else:
+            draft["component_orders"] = [variable.get() for variable in self._vec_order_vars]
+            draft["component_expressions"] = [
+                self._text_value(widget) for widget in self._vec_expr_widgets
+            ]
+
+    def _apply_custom_state(self, family: str) -> None:
+        """Restore the active family's custom editor from pure session data."""
+        draft = self.session.family_state(family).custom_draft
+        if not draft:
+            return
+        self._restoring_custom = True
+        try:
+            self.custom_order_var.set(str(draft.get("order", self.custom_order_var.get())))
+            self.custom_params.delete(0, tk.END)
+            self.custom_params.insert(0, str(draft.get("parameters", "")))
+            if family == "vector_ode":
+                self._vec_n_var.set(str(draft.get("components", "2")))
+                mode = str(draft.get("mode", "per_component"))
+                self._vec_mode_var.set(mode)
+                self._active_vec_mode = mode
+                self._refresh_vec_boxes()
+                self._restore_vector_widget_state(draft, mode)
+            elif family == "vector_pde":
+                self._vec_n_var.set(str(draft.get("components", "2")))
+                self._refresh_vector_pde_boxes()
+                for widget, value in zip(
+                    self._vec_expr_widgets,
+                    draft.get("expressions", []),
+                    strict=False,
+                ):
+                    self._set_text(widget, str(value))
+            else:
+                self._set_text(
+                    getattr(self, "custom_expr", None),
+                    str(draft.get("expression", "")),
+                )
+                if family == "pde":
+                    self._pde_op_var.set(str(draft.get("operator", self._pde_op_var.get())))
+                    self._pde_nvars_var.set(str(draft.get("variables", self._pde_nvars_var.get())))
+        finally:
+            self._restoring_custom = False
+
+    def _restore_vector_widget_state(self, draft: dict[str, Any], mode: str) -> None:
+        """Restore values for the currently visible Vector ODE editor mode."""
+        if mode == "bulk":
+            if self._vec_order_vars:
+                self._vec_order_vars[0].set(str(draft.get("bulk_order", "2")))
+            self._set_text(
+                getattr(self, "_vec_bulk_expr", None),
+                str(draft.get("bulk_expression", "")),
+            )
+            return
+        for variable, value in zip(
+            self._vec_order_vars,
+            draft.get("component_orders", []),
+            strict=False,
+        ):
+            variable.set(str(value))
+        for widget, value in zip(
+            self._vec_expr_widgets,
+            draft.get("component_expressions", []),
+            strict=False,
+        ):
+            self._set_text(widget, str(value))
 
     def _build_custom_scalar(
         self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any, eq_type: str
@@ -457,12 +628,14 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
-            anchor=tk.W
-        )
+        ttk.Label(ci, text="Parameters").pack(anchor=tk.W)
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
-        ToolTip(self.custom_params, "E.g.: \u03c9, \u03b3")
+        ToolTip(
+            self.custom_params,
+            "Comma-separated names to configure next, for example omega, gamma. "
+            "Use name[n] for an n-value parameter.",
+        )
 
     def _build_custom_vector_ode(
         self, ci: ttk.Frame, pad: int, btn_bg: str, fg: str, font: Any
@@ -492,6 +665,7 @@ class EquationDialog:
         mode_frame = ttk.Frame(ci)
         mode_frame.pack(fill=tk.X, pady=(0, pad))
         self._vec_mode_var = tk.StringVar(value="per_component")
+        self._active_vec_mode = "per_component"
         ttk.Radiobutton(
             mode_frame,
             text="Per-component expressions",
@@ -514,18 +688,22 @@ class EquationDialog:
         # Per-component order spinbox variables
         self._vec_order_vars: list[tk.StringVar] = []
 
-        ttk.Label(
-            ci,
-            text="Parameter names to configure later (comma-separated):",
-        ).pack(anchor=tk.W, pady=(pad, 0))
+        ttk.Label(ci, text="Parameters").pack(anchor=tk.W, pady=(pad, 0))
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
-        ToolTip(self.custom_params, "E.g.: \u03c9, k")
+        ToolTip(
+            self.custom_params,
+            "Comma-separated names to configure next, for example omega, k. "
+            "Use name[n] for an n-value parameter.",
+        )
 
         self._refresh_vec_boxes()
 
     def _on_vec_n_change(self, *args: object) -> None:
         """Update expression boxes when number of components changes (debounced)."""
+        if self._restoring_custom:
+            return
+        self._capture_custom_state(self._active_family)
         if self._vec_n_refresh_id is not None:
             try:
                 self.win.after_cancel(self._vec_n_refresh_id)
@@ -536,14 +714,27 @@ class EquationDialog:
     def _do_vec_n_refresh(self) -> None:
         """Perform the actual refresh (called after debounce delay)."""
         self._vec_n_refresh_id = None
+        draft = self.session.family_state().custom_draft
         if self._equation_type_var.get() == "vector_pde":
             self._refresh_vector_pde_boxes()
+            for widget, value in zip(
+                self._vec_expr_widgets,
+                draft.get("expressions", []),
+                strict=False,
+            ):
+                self._set_text(widget, str(value))
         else:
             self._refresh_vec_boxes()
+            self._restore_vector_widget_state(draft, self._vec_mode_var.get())
 
     def _on_vec_mode_change(self) -> None:
         """Switch between per-component and bulk expression modes."""
+        draft = self.session.family_state().custom_draft
+        self._capture_vector_widget_state(draft)
+        self._active_vec_mode = self._vec_mode_var.get()
+        draft["mode"] = self._active_vec_mode
         self._refresh_vec_boxes()
+        self._restore_vector_widget_state(draft, self._active_vec_mode)
 
     def _refresh_vec_boxes(self) -> None:
         """Rebuild the per-component or bulk expression widgets."""
@@ -798,12 +989,14 @@ class EquationDialog:
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
 
-        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
-            anchor=tk.W
-        )
+        ttk.Label(ci, text="Parameters").pack(anchor=tk.W)
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
-        ToolTip(self.custom_params, "E.g.: k, \u03b1")
+        ToolTip(
+            self.custom_params,
+            "Comma-separated names to configure next, for example k, alpha. "
+            "Use name[n] for an n-value parameter.",
+        )
 
     def _build_custom_pde_3d(
         self,
@@ -826,11 +1019,13 @@ class EquationDialog:
             font=font,
         )
         self.custom_expr.pack(fill=tk.X, pady=(4, pad))
-        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
-            anchor=tk.W
-        )
+        ttk.Label(ci, text="Parameters").pack(anchor=tk.W)
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        ToolTip(
+            self.custom_params,
+            "Comma-separated names to configure next. Use name[n] for an n-value parameter.",
+        )
 
     def _build_custom_vector_pde(
         self,
@@ -862,12 +1057,13 @@ class EquationDialog:
         self._vec_content_frame = ttk.Frame(ci)
         self._vec_content_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(ci, text="Parameter names to configure later (comma-separated):").pack(
-            anchor=tk.W,
-            pady=(pad, 0),
-        )
+        ttk.Label(ci, text="Parameters").pack(anchor=tk.W, pady=(pad, 0))
         self.custom_params = ttk.Entry(ci, width=50, font=font)
         self.custom_params.pack(fill=tk.X, pady=(4, pad))
+        ToolTip(
+            self.custom_params,
+            "Comma-separated names to configure next. Use name[n] for an n-value parameter.",
+        )
         self._refresh_vector_pde_boxes()
 
     def _refresh_vector_pde_boxes(self) -> None:
@@ -902,6 +1098,10 @@ class EquationDialog:
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
+        self._capture_custom_state(self._active_family)
+        self.session.family_state().mode = (
+            "built_in" if self._notebook.index(self._notebook.select()) == 0 else "custom"
+        )
         idx = self._notebook.index(self._notebook.select())
         if idx == 0:
             self._on_next_predefined()
@@ -911,14 +1111,56 @@ class EquationDialog:
     def _on_select_equation(self, _event: tk.Event | None) -> None:  # type: ignore[type-arg]
         sel = self.eq_listbox.curselection()
         if not sel:
-            self.desc_label.config(text="")
+            self.desc_label.config(text="No equation selected.")
             return
         idx = sel[0]
+        if idx >= len(self._filtered_keys):
+            return
         key = self._filtered_keys[idx]
         eq = self.equations[key]
         self._selected_key = key
+        state = self.session.family_state()
+        if not self._search_var.get().strip():
+            state.equation_key = key
+            state.category = eq.category
 
-        self.desc_label.config(text=eq.description)
+        family_names = {
+            "ode": "ODE",
+            "difference": "Recurrence",
+            "vector_ode": "Vector ODE",
+            "pde": "2D PDE",
+            "pde_3d": "3D PDE",
+            "vector_pde": "Vector PDE",
+        }
+        parameters = ", ".join(eq.parameters) if eq.parameters else "None"
+        details = (
+            f"{eq.name}\n\n"
+            f"{eq.description}\n\n"
+            f"Formula\n{eq.formula or 'Not provided'}\n\n"
+            f"Family\n{family_names.get(getattr(eq, 'equation_type', 'ode'), 'ODE')}\n\n"
+            f"Parameters\n{parameters}"
+        )
+        self.desc_label.config(text=details)
+
+    def _open_configuration(self, selection: EquationSelection) -> None:
+        """Store a selection, close Equation, and open Configuration."""
+        session = getattr(self, "session", None) or SolveSession(
+            current_family=selection.equation_type
+        )
+        self.session = session
+        session.family_state().category = getattr(self, "_selected_category", None)
+        session.family_state().equation_key = getattr(self, "_selected_key", None)
+        session.select_equation(selection)
+        self.win.destroy()
+
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            self.parent,
+            **selection.parameters_kwargs(),
+            session=session,
+            selection=selection,
+        )
 
     def _on_next_predefined(self) -> None:
         if self._selected_key is None:
@@ -930,33 +1172,31 @@ class EquationDialog:
             return
 
         eq = self.equations[self._selected_key]
-        params: dict[str, float] = {
+        params: dict[str, float | list[float]] = {
             pname: float(pinfo.get("default", 0.0)) for pname, pinfo in eq.parameters.items()
         }
-
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
 
         eq_type: str = getattr(eq, "equation_type", "ode")
         variables: list[str] = getattr(eq, "variables", ["x"])
         vector_expressions: list[str] | None = getattr(eq, "vector_expressions", None)
         vector_components: int = getattr(eq, "vector_components", 1)
-        ParametersDialog(
-            self.parent,
-            expression=eq.expression,
-            function_name=eq.function_name,
-            order=eq.order,
-            parameters=params,
-            parameters_schema=eq.parameters,
-            equation_name=eq.name,
-            default_y0=eq.default_initial_conditions,
-            default_domain=eq.default_domain,
-            display_formula=eq.formula,
-            equation_type=eq_type,
-            variables=variables,
-            vector_expressions=vector_expressions,
-            vector_components=vector_components,
-            default_boundary_conditions=eq.default_boundary_conditions,
+        self._open_configuration(
+            EquationSelection(
+                expression=eq.expression,
+                function_name=eq.function_name,
+                order=eq.order,
+                parameters=params,
+                parameters_schema=eq.parameters,
+                equation_name=eq.name,
+                default_y0=eq.default_initial_conditions,
+                default_domain=eq.default_domain,
+                display_formula=eq.formula,
+                equation_type=eq_type,
+                variables=variables,
+                vector_expressions=vector_expressions,
+                vector_components=vector_components,
+                default_boundary_conditions=eq.default_boundary_conditions,
+            )
         )
 
     def _parse_custom_params(self) -> dict[str, float | list[float]] | None:
@@ -1022,20 +1262,18 @@ class EquationDialog:
             return
 
         eq_type = self._equation_type_var.get()
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
-
         default_domain: list[float] = [0.0, 50.0] if eq_type == "difference" else [0.0, 10.0]
-        ParametersDialog(
-            self.parent,
-            expression=expr,
-            function_name=None,
-            order=order,
-            parameters=params,
-            equation_name="Custom Recurrence" if eq_type == "difference" else "Custom ODE",
-            default_y0=[1.0] * order,
-            default_domain=default_domain,
-            equation_type=eq_type,
+        self._open_configuration(
+            EquationSelection(
+                expression=expr,
+                function_name=None,
+                order=order,
+                parameters=params,
+                equation_name="Custom Recurrence" if eq_type == "difference" else "Custom ODE",
+                default_y0=[1.0] * order,
+                default_domain=default_domain,
+                equation_type=eq_type,
+            )
         )
 
     def _on_next_custom_vector(self) -> None:
@@ -1117,22 +1355,20 @@ class EquationDialog:
         n_state = sum(component_orders)
         default_y0 = [0.0] * n_state
 
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
-
-        ParametersDialog(
-            self.parent,
-            expression=None,
-            function_name=None,
-            order=order,
-            parameters=params,
-            equation_name="Custom Vector ODE",
-            default_y0=default_y0,
-            default_domain=[0.0, 10.0],
-            equation_type="vector_ode",
-            vector_expressions=vector_expressions,
-            vector_components=n_components,
-            component_orders=tuple(component_orders) if not all_same else None,
+        self._open_configuration(
+            EquationSelection(
+                expression=None,
+                function_name=None,
+                order=order,
+                parameters=params,
+                equation_name="Custom Vector ODE",
+                default_y0=default_y0,
+                default_domain=[0.0, 10.0],
+                equation_type="vector_ode",
+                vector_expressions=vector_expressions,
+                vector_components=n_components,
+                component_orders=tuple(component_orders) if not all_same else None,
+            )
         )
 
     def _on_next_custom_pde(self) -> None:
@@ -1168,22 +1404,20 @@ class EquationDialog:
         }
         pde_operator = _op_map.get(op_label, "neg_laplacian")
 
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
-
         default_domain = [0.0, 1.0, 0.0, 1.0]
-        ParametersDialog(
-            self.parent,
-            expression=expr,
-            function_name=None,
-            order=2,
-            parameters=params,
-            equation_name="Custom PDE",
-            default_y0=[],
-            default_domain=default_domain,
-            equation_type="pde",
-            variables=variables,
-            pde_operator=pde_operator,
+        self._open_configuration(
+            EquationSelection(
+                expression=expr,
+                function_name=None,
+                order=2,
+                parameters=params,
+                equation_name="Custom PDE",
+                default_y0=[],
+                default_domain=default_domain,
+                equation_type="pde",
+                variables=variables,
+                pde_operator=pde_operator,
+            )
         )
 
     def _on_next_custom_pde_3d(self) -> None:
@@ -1201,20 +1435,18 @@ class EquationDialog:
         params = self._parse_custom_params()
         if params is None:
             return
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
-
-        ParametersDialog(
-            self.parent,
-            expression=expression,
-            function_name=None,
-            order=2,
-            parameters=params,
-            equation_name="Custom PDE 3D",
-            default_y0=[],
-            default_domain=[0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
-            equation_type="pde_3d",
-            variables=["x", "y", "z"],
+        self._open_configuration(
+            EquationSelection(
+                expression=expression,
+                function_name=None,
+                order=2,
+                parameters=params,
+                equation_name="Custom PDE 3D",
+                default_y0=[],
+                default_domain=[0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+                equation_type="pde_3d",
+                variables=["x", "y", "z"],
+            )
         )
 
     def _on_next_custom_vector_pde(self) -> None:
@@ -1260,20 +1492,18 @@ class EquationDialog:
         params = self._parse_custom_params()
         if params is None:
             return
-        self.win.destroy()
-        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
-
-        ParametersDialog(
-            self.parent,
-            expression=None,
-            function_name=None,
-            order=2,
-            parameters=params,
-            equation_name="Custom Vector PDE",
-            default_y0=[],
-            default_domain=[0.0, 1.0, 0.0, 1.0],
-            equation_type="vector_pde",
-            variables=["x", "y"],
-            vector_expressions=residual_expressions,
-            vector_components=components,
+        self._open_configuration(
+            EquationSelection(
+                expression=None,
+                function_name=None,
+                order=2,
+                parameters=params,
+                equation_name="Custom Vector PDE",
+                default_y0=[],
+                default_domain=[0.0, 1.0, 0.0, 1.0],
+                equation_type="vector_pde",
+                variables=["x", "y"],
+                vector_expressions=residual_expressions,
+                vector_components=components,
+            )
         )

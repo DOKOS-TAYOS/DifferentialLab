@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added stateful Equation -> Configuration navigation, including Back with retained raw inputs and per-equation configuration snapshots.
+- Made the built-in equation browser searchable and resizable with full-height Categories, Equations, and Details panes.
 - Made Settings resizable and reorganized its four sections with scannable internal subgroups, a fixed action footer, and screen-aware sizing.
 - Added editable color previews with the standard system color chooser to individual color settings.
 - Added a confirmed Restore Defaults action that updates the form without saving until Save & Restart is selected.

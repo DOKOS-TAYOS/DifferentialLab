@@ -51,6 +51,7 @@ class MainMenu:
         self.root.configure(bg=bg)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._solve_session: Any | None = None
         self._build_ui()
 
         fit_and_center(self.root, min_width=520, min_height=480)
@@ -211,8 +212,10 @@ class MainMenu:
         """Open the equation selection dialog."""
         logger.info("User clicked Solve")
         from frontend.ui_dialogs import EquationDialog
+        from frontend.ui_dialogs.solve_session import SolveSession
 
-        EquationDialog(self.root)
+        self._solve_session = SolveSession()
+        EquationDialog(self.root, session=self._solve_session)
 
     def _on_transforms(self) -> None:
         """Open the function transforms dialog."""
