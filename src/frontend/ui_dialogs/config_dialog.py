@@ -283,7 +283,7 @@ class ConfigDialog:
             self._add_field(section.content, item, current)
 
     def _add_field(self, parent: ttk.Frame, item: dict[str, Any], current: dict[str, str]) -> None:
-        key = item["key"]
+        key: str = item["key"]
         cast_type = item["cast_type"]
         val = current.get(key, str(item["default"]))
         desc_text = item.get("description", "")
