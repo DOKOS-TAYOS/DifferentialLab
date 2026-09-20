@@ -180,6 +180,21 @@ class MainMenu:
             ]
         )
         setup_arrow_enter_navigation([[self.btn_info, self.btn_config, self.btn_quit]])
+
+        def _focus_boundary(_event: object, target: ttk.Button) -> str:
+            target.focus_set()
+            return "break"
+
+        self.btn_complex.bind(
+            "<Down>",
+            lambda event: _focus_boundary(event, self.btn_info),
+        )
+        for secondary_button in (self.btn_info, self.btn_config, self.btn_quit):
+            secondary_button.bind(
+                "<Up>",
+                lambda event: _focus_boundary(event, self.btn_complex),
+            )
+
         self.btn_solve.focus_set()
 
     def _on_close(self) -> None:
