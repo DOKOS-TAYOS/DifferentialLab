@@ -265,3 +265,25 @@ def test_animation_factory_remains_available_for_transient_fields() -> None:
             assert figure._animation_n_points == len(result.t)  # type: ignore[attr-defined]
         finally:
             plt.close(figure)
+
+
+def test_transient_animation_wires_export_for_each_selected_field() -> None:
+    dialog = object.__new__(result_dialog.PipeFlowResultDialog)
+    dialog._result = _transient_result()
+    dialog._anim_view_var = MagicMock()
+    dialog._anim_frame = object()
+    dialog._anim_canvas = None
+    captured: dict[str, object] = {}
+
+    def embed_figure(_figure: object, _parent: object, **kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    for view in ("pressure", "velocity", "reynolds"):
+        dialog._anim_view_var.get.return_value = view
+        with (
+            patch.object(result_dialog, "embed_animation_plot_in_tk", side_effect=embed_figure),
+            patch.object(result_dialog, "reset_embedded_animation"),
+        ):
+            dialog._update_animation()
+        assert callable(captured["on_export_mp4"])

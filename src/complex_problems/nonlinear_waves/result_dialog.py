@@ -14,10 +14,16 @@ from complex_problems.common.result_dialog_ui import (
     close_embedded_figures,
     reset_embedded_animation,
 )
+from complex_problems.nonlinear_waves.soliton_tracking import (
+    TrackedSolitonCenters,
+    periodic_soliton_profile,
+    track_kdv_soliton_centers,
+)
 from complex_problems.nonlinear_waves.solver import NonlinearWavesResult
 from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
+from frontend.ui_dialogs import ToolTip
 from frontend.window_utils import center_window, make_modal
 from plotting import (
     create_contour_plot,
@@ -41,6 +47,184 @@ class _SpectrumAnimationViewPayload:
     k: np.ndarray
     frames: np.ndarray
     title: str
+
+
+@dataclass(frozen=True)
+class _ProfileAnimationViewPayload:
+    """Prepared profile data shared by the embedded view and MP4 export."""
+
+    x: np.ndarray
+    t: np.ndarray
+    frames: np.ndarray
+    title: str
+    ylabel: str
+
+
+@dataclass(frozen=True)
+class _KdvReferenceAnimationPayload:
+    """Inputs for the selectable KdV numerical/reference animation."""
+
+    x: np.ndarray
+    t: np.ndarray
+    numerical: np.ndarray
+    amplitudes: tuple[float, ...]
+    centers: tuple[float, ...]
+    inverse_widths: tuple[float, ...]
+    speeds: tuple[float, ...]
+    x_min: float
+    x_max: float
+    selected: tuple[str, ...]
+    show_residual: bool
+    tracked_centers: np.ndarray | None
+
+
+def _periodic_reference_profile(
+    x: np.ndarray,
+    *,
+    center: float,
+    amplitude: float,
+    inverse_width: float,
+    x_min: float,
+    x_max: float,
+) -> np.ndarray:
+    """Return one fixed-shape soliton using minimum-image periodic distance."""
+    return periodic_soliton_profile(
+        x,
+        center=center,
+        amplitude=amplitude,
+        inverse_width=inverse_width,
+        x_min=x_min,
+        x_max=x_max,
+    )
+
+
+def _tracked_profiles_at_frame(
+    payload: _KdvReferenceAnimationPayload, frame: int
+) -> tuple[np.ndarray, ...]:
+    """Construct tracked fixed-shape profiles for one animation frame."""
+    if payload.tracked_centers is None:
+        return ()
+    return tuple(
+        _periodic_reference_profile(
+            payload.x,
+            center=float(payload.tracked_centers[frame, index]),
+            amplitude=amplitude,
+            inverse_width=inverse_width,
+            x_min=payload.x_min,
+            x_max=payload.x_max,
+        )
+        for index, (amplitude, inverse_width) in enumerate(
+            zip(
+                payload.amplitudes,
+                payload.inverse_widths,
+                strict=True,
+            )
+        )
+    )
+
+
+def _create_kdv_reference_animation_payload(
+    result: NonlinearWavesResult,
+    selected: tuple[str, ...],
+    *,
+    show_residual: bool = False,
+    tracked_centers: np.ndarray | None = None,
+) -> _KdvReferenceAnimationPayload:
+    """Prepare a KdV tracked-reference animation payload."""
+    metadata = result.metadata
+    return _KdvReferenceAnimationPayload(
+        x=result.x,
+        t=result.t,
+        numerical=np.real(result.field),
+        amplitudes=tuple(float(value) for value in metadata["soliton_amplitudes"]),
+        centers=tuple(float(value) for value in metadata["soliton_centers"]),
+        inverse_widths=tuple(float(value) for value in metadata["soliton_inverse_widths"]),
+        speeds=tuple(float(value) for value in metadata["soliton_speeds"]),
+        x_min=float(metadata["x_min"]),
+        x_max=float(metadata["x_max"]),
+        selected=selected,
+        show_residual=show_residual,
+        tracked_centers=tracked_centers,
+    )
+
+
+def _create_kdv_reference_animation_figure(
+    payload: _KdvReferenceAnimationPayload,
+) -> Figure:
+    """Build the KdV profile animation with optional tracked-fit overlays."""
+    import matplotlib.pyplot as plt
+
+    selected = set(payload.selected)
+    reference_labels = [f"Soliton {index + 1}" for index in range(len(payload.amplitudes))]
+    needs_references = bool(selected.intersection(reference_labels)) or payload.show_residual
+    global_max = float(np.max(np.abs(payload.numerical)))
+    if needs_references:
+        for frame, numerical in enumerate(payload.numerical):
+            profiles = _tracked_profiles_at_frame(payload, frame)
+            if payload.show_residual:
+                global_max = max(
+                    global_max,
+                    float(np.max(np.abs(numerical - np.sum(profiles, axis=0)))),
+                )
+            for index, label in enumerate(reference_labels):
+                if label in selected:
+                    global_max = max(global_max, float(np.max(np.abs(profiles[index]))))
+    y_lim = 1.1 * (global_max if global_max > 0.0 else 1.0)
+
+    fig, ax = plt.subplots()
+    lines: dict[str, object] = {}
+    initial_profiles = _tracked_profiles_at_frame(payload, 0) if needs_references else ()
+    initial_sum = np.sum(initial_profiles, axis=0) if initial_profiles else np.zeros_like(payload.x)
+    (line,) = ax.plot(payload.x, payload.numerical[0], linestyle="-", label="Numerical u")
+    lines["Numerical u"] = line
+    colors = plt.get_cmap("tab20")
+    for index, label in enumerate(reference_labels):
+        if label not in selected:
+            continue
+        (line,) = ax.plot(
+            payload.x,
+            initial_profiles[index],
+            linestyle="--",
+            color=colors(index % 20),
+            label=label,
+        )
+        lines[label] = line
+    if payload.show_residual:
+        (line,) = ax.plot(
+            payload.x,
+            payload.numerical[0] - initial_sum,
+            linestyle=":",
+            label="Interaction residual",
+        )
+        lines["Interaction residual"] = line
+
+    ax.set_xlim(float(payload.x[0]), float(payload.x[-1]))
+    ax.set_ylim(-y_lim, y_lim)
+    ax.set_xlabel("x")
+    ax.set_ylabel("u")
+    ax.set_title(f"KdV profile animation (t={payload.t[0]:.3g})")
+    if len(lines) > 1:
+        ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+
+    def _update(index: int) -> None:
+        """Update existing line artists for one selected frame."""
+        frame = max(0, min(index, len(payload.t) - 1))
+        profiles = _tracked_profiles_at_frame(payload, frame) if needs_references else ()
+        reference_sum = np.sum(profiles, axis=0) if profiles else np.zeros_like(payload.x)
+        lines["Numerical u"].set_ydata(payload.numerical[frame])  # type: ignore[attr-defined]
+        for soliton_index, label in enumerate(reference_labels):
+            line = lines.get(label)
+            if line is not None:
+                line.set_ydata(profiles[soliton_index])  # type: ignore[attr-defined]
+        residual_line = lines.get("Interaction residual")
+        if residual_line is not None:
+            residual_line.set_ydata(payload.numerical[frame] - reference_sum)  # type: ignore[attr-defined]
+        ax.set_title(f"KdV profile animation (t={payload.t[frame]:.3g})")
+        fig.canvas.draw_idle()
+
+    return attach_animation_metadata(fig, update=_update, n_points=len(payload.t))
 
 
 def _create_spectrum_animation_figure(payload: _SpectrumAnimationViewPayload) -> Figure:
@@ -101,6 +285,21 @@ def _create_line_animation_figure(
     return attach_animation_metadata(fig, update=_update, n_points=len(t))
 
 
+def _create_profile_animation_figure(
+    payload: _ProfileAnimationViewPayload | _KdvReferenceAnimationPayload,
+) -> Figure:
+    """Build a profile figure from the exact prepared display payload."""
+    if isinstance(payload, _KdvReferenceAnimationPayload):
+        return _create_kdv_reference_animation_figure(payload)
+    return _create_line_animation_figure(
+        payload.x,
+        payload.t,
+        payload.frames,
+        title=payload.title,
+        ylabel=payload.ylabel,
+    )
+
+
 class NonlinearWavesResultDialog:
     """Result window for nonlinear waves."""
 
@@ -116,6 +315,7 @@ class NonlinearWavesResultDialog:
         self._phase_canvas = None
         self._spec_canvas = None
         self._inv_canvas = None
+        self._tracked_soliton_centers: TrackedSolitonCenters | None = None
 
         self._build_ui()
         self.win.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -193,28 +393,117 @@ class NonlinearWavesResultDialog:
         ctrl = ttk.Frame(parent)
         ctrl.pack(fill=tk.X, padx=4, pady=4)
 
-        options = ["Field"] if self._result.model_type == "kdv" else ["Intensity", "Real", "Imag"]
-        self._anim_view_var = tk.StringVar(value=options[0])
-        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        combo = ttk.Combobox(
-            ctrl,
-            textvariable=self._anim_view_var,
-            values=options,
-            state="readonly",
-            width=12,
-            font=get_font(),
-        )
-        combo.pack(side=tk.LEFT)
-        combo.bind("<<ComboboxSelected>>", lambda _e: self._update_anim())
+        self._kdv_reference_mode = self._is_kdv_soliton_result()
+        if self._kdv_reference_mode:
+            count = int(self._result.metadata["soliton_count"])
+            self._anim_selection_labels = [f"Soliton {index + 1}" for index in range(count)]
+            ttk.Label(ctrl, text="Numerical u: always shown", style="Small.TLabel").pack(
+                side=tk.LEFT, padx=(0, 12)
+            )
+            ttk.Label(ctrl, text="Add solitons:", style="Small.TLabel").pack(
+                side=tk.LEFT, padx=(0, 4)
+            )
+            self._anim_selection = tk.Listbox(
+                ctrl,
+                selectmode=tk.EXTENDED,
+                exportselection=False,
+                height=min(len(self._anim_selection_labels), 3),
+                width=12,
+                font=get_font(),
+            )
+            for label in self._anim_selection_labels:
+                self._anim_selection.insert(tk.END, label)
+            self._anim_selection.pack(side=tk.LEFT, padx=(0, 8))
+            if count > 3:
+                scrollbar = ttk.Scrollbar(
+                    ctrl, orient=tk.VERTICAL, command=self._anim_selection.yview
+                )
+                self._anim_selection.configure(yscrollcommand=scrollbar.set)
+                scrollbar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+            self._show_interaction_residual = tk.BooleanVar(value=False)
+            residual_checkbox = ttk.Checkbutton(
+                ctrl,
+                text="Interaction residual",
+                variable=self._show_interaction_residual,
+                command=self._update_anim,
+            )
+            residual_checkbox.pack(side=tk.LEFT)
+            ToolTip(
+                self._anim_selection,
+                "Dashed curves use centers tracked from numerical peaks when pulses are "
+                "distinguishable. During strong overlap, ambiguous identities bridge reliable "
+                "pre/post-interaction observations. Residual = numerical u - sum of tracked "
+                "profiles.",
+            )
+            self._anim_selection.bind("<<ListboxSelect>>", lambda _e: self._update_anim())
+        else:
+            options = (
+                ["Field"] if self._result.model_type == "kdv" else ["Intensity", "Real", "Imag"]
+            )
+            self._anim_view_var = tk.StringVar(value=options[0])
+            ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+            combo = ttk.Combobox(
+                ctrl,
+                textvariable=self._anim_view_var,
+                values=options,
+                state="readonly",
+                width=12,
+                font=get_font(),
+            )
+            combo.pack(side=tk.LEFT)
+            combo.bind("<<ComboboxSelected>>", lambda _e: self._update_anim())
 
         self._anim_frame = ttk.Frame(parent)
         self._anim_frame.pack(fill=tk.BOTH, expand=True)
         self._update_anim()
 
+    def _is_kdv_soliton_result(self) -> bool:
+        """Return whether this result carries supported KdV soliton metadata."""
+        return self._result.model_type == "kdv" and self._result.metadata.get("profile") in {
+            "kdv_soliton",
+            "kdv_soliton_train",
+        }
+
+    def _selected_animation_labels(self) -> tuple[str, ...]:
+        """Read selected optional tracked-soliton overlays."""
+        return tuple(
+            self._anim_selection.get(index) for index in self._anim_selection.curselection()
+        )
+
+    def _get_tracked_soliton_centers(self) -> TrackedSolitonCenters:
+        """Compute and cache fixed-shape fitted centers for this result once."""
+        if self._tracked_soliton_centers is None:
+            metadata = self._result.metadata
+            self._tracked_soliton_centers = track_kdv_soliton_centers(
+                self._result.x,
+                self._result.t,
+                np.real(self._result.field),
+                amplitudes=tuple(float(value) for value in metadata["soliton_amplitudes"]),
+                inverse_widths=tuple(float(value) for value in metadata["soliton_inverse_widths"]),
+                initial_centers=tuple(float(value) for value in metadata["soliton_centers"]),
+                speeds=tuple(float(value) for value in metadata["soliton_speeds"]),
+                x_min=float(metadata["x_min"]),
+                x_max=float(metadata["x_max"]),
+            )
+        return self._tracked_soliton_centers
+
     def _update_anim(self) -> None:
         reset_embedded_animation(self._anim_frame, self._anim_canvas)
 
-        if self._result.model_type == "kdv":
+        if self._kdv_reference_mode:
+            selected = self._selected_animation_labels()
+            show_residual = self._show_interaction_residual.get()
+            tracked_centers = (
+                self._get_tracked_soliton_centers().centers if selected or show_residual else None
+            )
+            payload = _create_kdv_reference_animation_payload(
+                self._result,
+                selected,
+                show_residual=show_residual,
+                tracked_centers=tracked_centers,
+            )
+            fig = _create_kdv_reference_animation_figure(payload)
+        elif self._result.model_type == "kdv":
             y = np.real(self._result.field)
             title = "KdV profile"
             ylabel = "u"
@@ -231,14 +520,20 @@ class NonlinearWavesResultDialog:
                 ylabel = "|ψ|²"
             title = f"NLSE profile - {view}"
 
-        fig = _create_line_animation_figure(
-            self._result.x,
-            self._result.t,
-            y,
-            title=title,
-            ylabel=ylabel,
+        if not self._kdv_reference_mode:
+            payload = _ProfileAnimationViewPayload(
+                x=self._result.x,
+                t=self._result.t,
+                frames=y,
+                title=title,
+                ylabel=ylabel,
+            )
+            fig = _create_profile_animation_figure(payload)
+        self._anim_canvas = embed_animation_plot_in_tk(
+            fig,
+            self._anim_frame,
+            on_export_mp4=lambda duration: self._on_export_profile_mp4(payload, duration),
         )
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_frame)
 
     def _build_spacetime_tab(self, parent: ttk.Frame) -> None:
         ylabel = "t"
@@ -305,6 +600,48 @@ class NonlinearWavesResultDialog:
         try:
             export_animated_figure_to_mp4(
                 _create_spectrum_animation_figure(payload),
+                filepath,
+                duration_seconds=duration_seconds,
+            )
+            messagebox.showinfo(
+                "Animation export saved",
+                f"Animation was saved to:\n{filepath}",
+                parent=self.win,
+            )
+        except RuntimeError as exc:
+            logger.warning("MP4 export failed (ffmpeg): %s", exc)
+            messagebox.showerror(
+                "Animation export was not saved",
+                str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
+                parent=self.win,
+            )
+        except Exception as exc:
+            logger.error("MP4 export failed: %s", exc, exc_info=True)
+            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
+
+    def _on_export_profile_mp4(
+        self,
+        payload: _ProfileAnimationViewPayload | _KdvReferenceAnimationPayload,
+        duration_seconds: float,
+    ) -> None:
+        """Export the currently displayed profile, including KdV overlays."""
+        default_path = get_output_dir() / (
+            f"{generate_output_basename(prefix='nonlinear_waves')}.mp4"
+        )
+        filepath_str = filedialog.asksaveasfilename(
+            parent=self.win,
+            defaultextension=".mp4",
+            initialfile=default_path.name,
+            initialdir=str(default_path.parent),
+            filetypes=[("MP4 video", "*.mp4"), ("All files", "*.*")],
+        )
+        if not filepath_str:
+            return
+
+        filepath = Path(filepath_str)
+        try:
+            export_animated_figure_to_mp4(
+                _create_profile_animation_figure(payload),
                 filepath,
                 duration_seconds=duration_seconds,
             )

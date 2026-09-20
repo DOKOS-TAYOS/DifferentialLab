@@ -20,10 +20,13 @@ def _make_result(dimension: int = 2) -> SimpleNamespace:
     density = np.arange(3 * 4 * 5, dtype=float).reshape(3, 4, 5) / 10.0
     spectrum = density + 1.0
     if dimension == 1:
+        psi = np.array([[1.0 + 0.5j, 2.0 - 0.25j, 0.0, -1.0j, 0.5 + 0.75j] for _ in t])
         return SimpleNamespace(
             dimension=1,
             t=t,
             x=x,
+            psi=psi,
+            magnitude=np.abs(psi) ** 2,
             potential=np.ones(5),
             spectrum_power=spectrum[-1, 0],
         )
@@ -35,6 +38,7 @@ def _make_result(dimension: int = 2) -> SimpleNamespace:
         kx=np.linspace(-3.0, 3.0, 5),
         ky=np.linspace(-2.0, 2.0, 4),
         magnitude=density,
+        phase=np.sin(density),
         spectrum_power=spectrum[-1],
         spectrum_power_history=spectrum.astype(np.float32),
     )
@@ -103,6 +107,33 @@ def test_1d_potential_remains_static() -> None:
     create_plot.assert_called_once()
     embed_plot.assert_called_once()
     embed_animation.assert_not_called()
+
+
+def test_main_animation_uses_selected_representation_and_export_callback() -> None:
+    for dimension, views in ((1, ("Density", "Real", "Imag")), (2, ("Density", "Phase"))):
+        dialog = _make_dialog(_make_result(dimension))
+        dialog._anim_view_var = SimpleNamespace(get=lambda: views[-1])
+        dialog._anim_frame = object()
+        dialog._anim_canvas = None
+        captured: dict[str, object] = {}
+
+        def embed_figure(_figure: object, _parent: object, **kwargs: object) -> object:
+            captured.update(kwargs)
+            return object()
+
+        with (
+            patch.object(result_dialog, "embed_animation_plot_in_tk", side_effect=embed_figure),
+            patch.object(result_dialog, "reset_embedded_animation"),
+        ):
+            dialog._update_anim()
+
+        assert callable(captured["on_export_mp4"])
+        payload = dialog._get_main_animation_payload()
+        figure = result_dialog._create_animation_figure(payload)
+        try:
+            assert figure._animation_n_points == len(dialog._result.t)  # type: ignore[attr-defined]
+        finally:
+            plt.close(figure)
 
 
 def test_2d_spectrum_tab_initializes_only_on_first_selection() -> None:

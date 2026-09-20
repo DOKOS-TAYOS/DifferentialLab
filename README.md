@@ -30,7 +30,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   - 12 2D PDE examples
   - 4 scalar 3D PDE examples
   - 1 coupled Vector PDE example
-- Advanced Problems: 7 registered, lazily loaded plugins
+- Advanced Problems: 9 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
 
@@ -44,12 +44,14 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   structured Dirichlet/Neumann/Robin boundaries, non-duplicated periodic axes,
   component-aware ellipticity validation, and algebraic diagnostics
 - Linear strongly elliptic Vector PDE systems in 2D with matrix-valued coupling,
-  component-aware boundaries, sparse block assembly, component/magnitude views, and
+  component-aware boundaries, sparse block assembly, component/magnitude views,
+  component/magnitude spatial axis sweeps, and
   Cartesian quiver, stream, and radial/tangential visualizations for exactly
   two-component systems
 - Scalar linear elliptic PDEs on rectangular 3D grids with all six second-order
   coefficients, Dirichlet/Neumann/Robin faces, periodic axes, sparse diagnostics,
-  pre-run memory advice, and selectable coordinate-labelled orthogonal result slices
+  pre-run memory advice, selectable coordinate-labelled orthogonal result slices, and
+  selectable spatial axis sweeps
 - Cartesian scalar PDE views plus polar re-sampling for visualization; coordinate transforms
   are display-only and never alter the solved equation
 - Function transforms: Fourier, Laplace, Taylor, Hilbert, and Z-transform
@@ -61,7 +63,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 - Safe expression parsing with AST validation
 - Unified `f[...]` notation (`f[0]`, `f[1]`, `f[i,k]`)
 - Interactive result dialogs with derivative/component selection and dynamic redraw
-- CSV, JSON, static figure, and MP4 animation exports where supported
+- CSV, JSON, and static figure exports, plus MP4 export for every interactive animation result view
 - Environment-backed configuration through `.env` and the in-app `Settings` dialog
 - Rotating application logs with optional console output
 
@@ -74,9 +76,20 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## Advanced Problems
 
-`Advanced Problems` is a seven-plugin subsystem. Internally, its Python package
+`Advanced Problems` is a nine-plugin subsystem. Internally, its Python package
 is named `complex_problems`; each plugin provides its own configuration dialog,
 solver, structured result, and result dialog.
+
+Gravitational N-Body Dynamics adds curated Figure-eight, Lagrange equilateral, and
+Pythagorean three-body studies plus configurable 2D/3D systems of 2--100 point masses.
+It uses self-consistent user-selected units; positive softening epsilon is explicitly
+the Plummer-softened model, while epsilon zero is exact Newtonian point gravity.
+
+Fermi-Pasta-Ulam-Tsingou Experiment is a dedicated fixed-end alpha/beta chain workflow.
+It uses Velocity Verlet for recommended long-time exploration and offers legacy RK4 for
+historical comparison. Its exact nonlinear Hamiltonian is distinct from the linear
+normal-mode energy diagnostic; the result notebook includes modal recurrence fidelity,
+entropy/participation, strain structures, phase space, and sequential recurrence scaling.
 
 Current modules:
 
@@ -87,6 +100,8 @@ Current modules:
 - `antenna_radiation`: far-field patterns and antenna metrics
 - `aerodynamics_2d`: 2D incompressible obstacle-flow approximations
 - `pipe_flow`: steady and transient 1D pipe-flow models
+- `gravitational_n_body`: softened Newtonian N-body dynamics and orbit diagnostics
+- `fput_experiment`: dedicated Fermi-Pasta-Ulam-Tsingou recurrence and strain studies
 
 ## Requirements
 

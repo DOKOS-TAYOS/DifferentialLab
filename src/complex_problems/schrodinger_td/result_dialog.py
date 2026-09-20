@@ -53,8 +53,51 @@ class _SchrodingerAnimationViewPayload:
     symmetric_z_range: bool = True
 
 
-def _create_animation_figure(payload: _SchrodingerAnimationViewPayload) -> Figure:
+@dataclass(frozen=True)
+class _SchrodingerLineAnimationPayload:
+    """Prepared 1D data shared by the embedded view and MP4 export."""
+
+    x: np.ndarray
+    t: np.ndarray
+    frames: np.ndarray
+    title: str
+    ylabel: str
+
+
+@dataclass(frozen=True)
+class _SchrodingerMainImageAnimationPayload:
+    """Prepared 2D main-tab data shared by the embedded view and MP4 export."""
+
+    t: np.ndarray
+    frames: np.ndarray
+    title: str
+    symmetric: bool
+
+
+_SchrodingerAnimationPayload = (
+    _SchrodingerAnimationViewPayload
+    | _SchrodingerLineAnimationPayload
+    | _SchrodingerMainImageAnimationPayload
+)
+
+
+def _create_animation_figure(payload: _SchrodingerAnimationPayload) -> Figure:
     """Build the figure used both by Tk and by MP4 export."""
+    if isinstance(payload, _SchrodingerLineAnimationPayload):
+        return _create_line_anim_figure(
+            payload.x,
+            payload.t,
+            payload.frames,
+            title=payload.title,
+            ylabel=payload.ylabel,
+        )
+    if isinstance(payload, _SchrodingerMainImageAnimationPayload):
+        return _create_image_anim_figure(
+            payload.t,
+            payload.frames,
+            title=payload.title,
+            symmetric=payload.symmetric,
+        )
     if payload.kind == "surface":
         return create_surface_animation_plot(
             payload.t,
@@ -257,30 +300,42 @@ class SchrodingerTDResultDialog:
     def _update_anim(self) -> None:
         reset_embedded_animation(self._anim_frame, self._anim_canvas)
 
+        payload = self._get_main_animation_payload()
+        self._anim_canvas = embed_animation_plot_in_tk(
+            _create_animation_figure(payload),
+            self._anim_frame,
+            on_export_mp4=lambda duration: self._on_export_animation_mp4(payload, duration),
+        )
+
+    def _get_main_animation_payload(self) -> _SchrodingerAnimationPayload:
+        """Return the currently selected main-animation representation."""
         view = self._anim_view_var.get()
-        r = self._result
-        if r.dimension == 1:
+        result = self._result
+        if result.dimension == 1:
             if view == "Real":
-                y = np.real(r.psi)
-                ylabel = "Re(ψ)"
+                frames, ylabel = np.real(result.psi), "Re(ψ)"
             elif view == "Imag":
-                y = np.imag(r.psi)
-                ylabel = "Im(ψ)"
+                frames, ylabel = np.imag(result.psi), "Im(ψ)"
             else:
-                y = r.magnitude
-                ylabel = "|ψ|²"
-            fig = _create_line_anim_figure(r.x, r.t, y, title="TDSE 1D profile", ylabel=ylabel)
+                frames, ylabel = result.magnitude, "|ψ|²"
+            return _SchrodingerLineAnimationPayload(
+                x=result.x,
+                t=result.t,
+                frames=frames,
+                title="TDSE 1D profile",
+                ylabel=ylabel,
+            )
+
+        if view == "Phase":
+            frames, symmetric, title = result.phase, True, "TDSE 2D phase"
         else:
-            if view == "Phase":
-                frames = r.phase
-                symmetric = True
-                title = "TDSE 2D phase"
-            else:
-                frames = r.magnitude
-                symmetric = False
-                title = "TDSE 2D density"
-            fig = _create_image_anim_figure(r.t, frames, title=title, symmetric=symmetric)
-        self._anim_canvas = embed_animation_plot_in_tk(fig, self._anim_frame)
+            frames, symmetric, title = result.magnitude, False, "TDSE 2D density"
+        return _SchrodingerMainImageAnimationPayload(
+            t=result.t,
+            frames=frames,
+            title=title,
+            symmetric=symmetric,
+        )
 
     def _build_space_tab(self, parent: ttk.Frame) -> None:
         r = self._result
@@ -403,7 +458,7 @@ class SchrodingerTDResultDialog:
 
     def _on_export_animation_mp4(
         self,
-        payload: _SchrodingerAnimationViewPayload,
+        payload: _SchrodingerAnimationPayload,
         duration_seconds: float,
     ) -> None:
         """Export a selected 2D animation through the shared MP4 path."""

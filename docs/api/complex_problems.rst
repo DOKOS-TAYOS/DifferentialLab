@@ -188,3 +188,43 @@ pipe_flow
 .. automodule:: complex_problems.pipe_flow.result_dialog
    :members:
 
+gravitational_n_body
+--------------------
+
+.. automodule:: complex_problems.gravitational_n_body
+
+.. automodule:: complex_problems.gravitational_n_body.problem
+   :members:
+
+.. automodule:: complex_problems.gravitational_n_body.model
+   :members:
+
+.. automodule:: complex_problems.gravitational_n_body.solver
+   :members:
+
+.. automodule:: complex_problems.gravitational_n_body.ui
+   :members:
+
+.. automodule:: complex_problems.gravitational_n_body.result_dialog
+   :members:
+
+fput_experiment
+---------------
+
+.. automodule:: complex_problems.fput_experiment
+
+.. automodule:: complex_problems.fput_experiment.problem
+   :members:
+
+.. automodule:: complex_problems.fput_experiment.model
+   :members:
+
+.. automodule:: complex_problems.fput_experiment.solver
+   :members:
+
+.. automodule:: complex_problems.fput_experiment.ui
+   :members:
+
+.. automodule:: complex_problems.fput_experiment.result_dialog
+   :members:
+

@@ -17,6 +17,10 @@ _WARN_PDE_3D_UNKNOWNS = 75_000
 _CONFIRM_PDE_3D_UNKNOWNS = 300_000
 _WARN_HISTORY_BYTES = 128 * _MIB
 _CONFIRM_HISTORY_BYTES = 512 * _MIB
+_WARN_FPUT_PARTICLE_STEPS = 2_000_000
+_CONFIRM_FPUT_PARTICLE_STEPS = 20_000_000
+_WARN_FPUT_SAVED_VALUES = 500_000
+_CONFIRM_FPUT_SAVED_VALUES = 5_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,6 +313,56 @@ def assess_aerodynamics_request(
         points_per_frame=max(1, nx * ny),
         array_count=5,
         bytes_per_value=8,
+    )
+
+
+def assess_fput_request(
+    *,
+    n_particles: int,
+    t_start: float,
+    t_end: float,
+    dt: float,
+    sample_every: int,
+    run_count: int = 1,
+    n_particles_values: list[float] | None = None,
+) -> PerformanceAdvisory | None:
+    """Advise on FPUT integration work and the deliberately retained saved history."""
+    if n_particles < 1 or dt <= 0 or t_end <= t_start or sample_every < 1:
+        return None
+    if run_count < 1:
+        return None
+    steps = int(math.ceil((t_end - t_start) / dt))
+    frames = 1 + int(math.ceil(steps / sample_every))
+    particle_count = (
+        sum(int(value) for value in n_particles_values)
+        if n_particles_values is not None
+        else n_particles * run_count
+    )
+    particle_steps = steps * particle_count
+    saved_values = frames * particle_count
+    severity = _severity_from_thresholds(
+        value=max(
+            particle_steps // _WARN_FPUT_PARTICLE_STEPS,
+            saved_values // _WARN_FPUT_SAVED_VALUES,
+        ),
+        warn_threshold=1,
+        confirm_threshold=max(
+            _CONFIRM_FPUT_PARTICLE_STEPS // _WARN_FPUT_PARTICLE_STEPS,
+            _CONFIRM_FPUT_SAVED_VALUES // _WARN_FPUT_SAVED_VALUES,
+        ),
+    )
+    if severity is None:
+        return None
+    return PerformanceAdvisory(
+        severity=severity,
+        title="Expensive FPUT request",
+        message=(
+            f"This FPUT request estimates {steps:,} integration steps across {run_count:,} run(s) "
+            f"and {particle_count:,} total particle trajectories "
+            f"= {particle_steps:,} particle-steps and retains {frames:,} saved frames "
+            f"({saved_values:,} values per stored field). Historical multi-million-step studies "
+            "can take substantially longer; continue only if this is intentional."
+        ),
     )
 
 

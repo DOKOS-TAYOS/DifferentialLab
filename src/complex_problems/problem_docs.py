@@ -172,6 +172,57 @@ _DOCS: dict[str, ProblemDoc] = {
             "Flow-rate and boundary-signal diagnostics.",
         ),
     ),
+    "gravitational_n_body": ProblemDoc(
+        problem_type="Classical Newtonian point-mass gravity",
+        extended_description=(
+            "Interactive 2D and 3D N-body dynamics in a self-consistent user-selected unit system. "
+            "A positive epsilon selects Plummer-softened gravity rather than exact point gravity; "
+            "the general model costs O(N²) per right-hand-side evaluation."
+        ),
+        equation_summary=("ṙᵢ=vᵢ, v̇ᵢ=GΣⱼ≠ᵢmⱼ(rⱼ−rᵢ)/(‖rⱼ−rᵢ‖²+ε²)³ᐟ², U=−GΣᵢ<ⱼmᵢmⱼ/√(rᵢⱼ²+ε²)"),
+        config_options_summary=(
+            "Choose curated three-body benchmarks or a configurable 2--100-body general state.",
+            "Enter masses as comma-separated values and positions/velocities as one "
+            "comma-separated body row per line.",
+            "Use deterministic random bound clusters or coherent rotating rings to start "
+            "a general experiment quickly.",
+            "Configure 2D/3D, G, softening, time range, output samples, and solve_ivp "
+            "method; DOP853 is recommended for presets.",
+        ),
+        visualizations_summary=(
+            "Orbit animation and static trajectories in inertial or center-of-mass frames, "
+            "with MP4 export.",
+            "Cartesian and radial reduced phase-space views for a selected body.",
+            "Energy, momentum, angular momentum, COM, inertia, virial-ratio, and "
+            "separation diagnostics.",
+        ),
+    ),
+    "fput_experiment": ProblemDoc(
+        problem_type="Fixed-end nonlinear oscillator chain",
+        extended_description=(
+            "Dedicated Fermi-Pasta-Ulam-Tsingou workflow for alpha and beta chains. "
+            "It separates the exact nonlinear Hamiltonian from linear normal-mode "
+            "energy diagnostics."
+        ),
+        equation_summary=(
+            "H = 1/2 Σvᵢ² + Σⱼ[1/2 δⱼ² + αδⱼ³/3] (alpha) or "
+            "H = 1/2 Σvᵢ² + Σⱼ[1/2 δⱼ² + βδⱼ⁴/4] (beta), with fixed endpoints."
+        ),
+        config_options_summary=(
+            "Choose alpha or beta anharmonicity, a deterministic Velocity Verlet "
+            "or legacy RK4 stepper, and a saved-frame cadence.",
+            "Start from one or two normal modes, exact custom particle/modal states, "
+            "or the historical alpha kink-pair study state.",
+            "Use recurrence scaling to run sequential alpha-FPUT sweeps over N, alpha, "
+            "or amplitude.",
+        ),
+        visualizations_summary=(
+            "Recurrence fidelity, modal-energy redistribution, entropy, participation, "
+            "and exact Hamiltonian drift.",
+            "Displacement/strain lattice views, space-time and surface plots, and "
+            "particle or normal-mode phase space.",
+        ),
+    ),
 }
 
 

@@ -97,6 +97,8 @@ _REGISTRATIONS: tuple[ProblemRegistration, ...] = (
     ProblemRegistration(module_path="complex_problems.antenna_radiation.problem"),
     ProblemRegistration(module_path="complex_problems.aerodynamics_2d.problem"),
     ProblemRegistration(module_path="complex_problems.pipe_flow.problem"),
+    ProblemRegistration(module_path="complex_problems.gravitational_n_body.problem"),
+    ProblemRegistration(module_path="complex_problems.fput_experiment.problem"),
 )
 
 _REGISTRY = ProblemRegistry(_REGISTRATIONS)
