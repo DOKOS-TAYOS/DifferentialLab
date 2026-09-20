@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Improved tooltips so keyboard focus can reveal help text without replacing existing widget bindings, and increased tooltip text to a readable size relative to the configured UI font.
+
+### Fixed
+
+- Hide Taylor-only transform controls unless the Taylor series transform is selected.
+
 ## [0.7.0] - 2026-09-19
 
 ### Added
