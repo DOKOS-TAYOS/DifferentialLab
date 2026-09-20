@@ -93,21 +93,21 @@ class EquationDialog:
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="Vector ODE system",
+            text="Vector ODE",
             variable=self._equation_type_var,
             value="vector_ode",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="PDE (multivariate)",
+            text="2D PDE",
             variable=self._equation_type_var,
             value="pde",
             command=self._on_type_change,
         ).pack(side=tk.LEFT, padx=pad)
         ttk.Radiobutton(
             type_frame,
-            text="PDE 3D",
+            text="3D PDE",
             variable=self._equation_type_var,
             value="pde_3d",
             command=self._on_type_change,
@@ -1032,7 +1032,7 @@ class EquationDialog:
             function_name=None,
             order=order,
             parameters=params,
-            equation_name="Custom Difference" if eq_type == "difference" else "Custom ODE",
+            equation_name="Custom Recurrence" if eq_type == "difference" else "Custom ODE",
             default_y0=[1.0] * order,
             default_domain=default_domain,
             equation_type=eq_type,
