@@ -291,10 +291,22 @@ class TransformDialog:
         self._plot_container = ttk.Frame(plot_frame)
         self._plot_container.pack(fill=tk.BOTH, expand=True)
 
+        self._update_transform_options()
         self._on_apply()
 
+    def _update_transform_options(self) -> None:
+        """Show transform-specific controls only when they are applicable."""
+        is_taylor = self._transform_var.get() == TransformKind.TAYLOR.value
+        is_visible = bool(self._taylor_frame.winfo_manager())
+        if is_taylor and not is_visible:
+            pad: int = get_env_from_schema("UI_PADDING")
+            self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
+        elif not is_taylor and is_visible:
+            self._taylor_frame.pack_forget()
+
     def _on_transform_change(self, _event: object) -> None:
-        """When transform selection changes, refresh the plot."""
+        """When transform selection changes, refresh controls and the plot."""
+        self._update_transform_options()
         self._on_apply()
 
     def _on_display_change(self, _event: object) -> None:
