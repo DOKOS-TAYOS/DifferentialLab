@@ -197,6 +197,32 @@ _DOCS: dict[str, ProblemDoc] = {
             "separation diagnostics.",
         ),
     ),
+    "fput_experiment": ProblemDoc(
+        problem_type="Fixed-end nonlinear oscillator chain",
+        extended_description=(
+            "Dedicated Fermi-Pasta-Ulam-Tsingou workflow for alpha and beta chains. "
+            "It separates the exact nonlinear Hamiltonian from linear normal-mode "
+            "energy diagnostics."
+        ),
+        equation_summary=(
+            "H = 1/2 Σvᵢ² + Σⱼ[1/2 δⱼ² + αδⱼ³/3] (alpha) or "
+            "H = 1/2 Σvᵢ² + Σⱼ[1/2 δⱼ² + βδⱼ⁴/4] (beta), with fixed endpoints."
+        ),
+        config_options_summary=(
+            "Choose alpha or beta anharmonicity, a deterministic Velocity Verlet "
+            "or legacy RK4 stepper, and a saved-frame cadence.",
+            "Start from one or two normal modes, exact custom particle/modal states, "
+            "or the historical alpha kink-pair study state.",
+            "Use recurrence scaling to run sequential alpha-FPUT sweeps over N, alpha, "
+            "or amplitude.",
+        ),
+        visualizations_summary=(
+            "Recurrence fidelity, modal-energy redistribution, entropy, participation, "
+            "and exact Hamiltonian drift.",
+            "Displacement/strain lattice views, space-time and surface plots, and "
+            "particle or normal-mode phase space.",
+        ),
+    ),
 }
 
 

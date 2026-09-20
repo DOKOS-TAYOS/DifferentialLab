@@ -1,8 +1,5 @@
 # Changelog
 
-- Fix inertial N-body animation COM markers and validate custom coincident states
-  using the configured gravitational constant and softening.
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
@@ -13,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0] - 2026-09-19
 
 ### Added
+
+- Added the dedicated **Fermi-Pasta-Ulam-Tsingou Experiment** Advanced Problem with
+  fixed-end alpha/beta Hamiltonians, deterministic Velocity Verlet and legacy RK4,
+  modal recurrence diagnostics, strain views, and alpha recurrence-scaling studies.
 
 - Added the **Gravitational N-Body Dynamics** Advanced Problem: curated Figure-eight,
   Lagrange, and Pythagorean three-body studies; 2D/3D general systems up to 100 bodies;
@@ -42,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Vector PDE a manufactured nontrivial problem with a documented exact solution.
 
 ### Fixed
+
+- Fix inertial N-body animation COM markers and validate custom coincident states
+  using the configured gravitational constant and softening.
 
 - Corrected KdV ETDRK4 coefficients to retain complex full-contour means and cleanly reject
   non-finite numerical evolution instead of returning corrupted results.

@@ -1,6 +1,6 @@
 # Advanced Problems Guide
 
-`Advanced Problems` is an eight-plugin subsystem where each problem contributes a
+`Advanced Problems` is a nine-plugin subsystem where each problem contributes a
 specialized UI, solver, and result dialog.
 
 ## Gravitational N-Body Dynamics
@@ -24,6 +24,19 @@ actual discrete radial acceleration. Pair-force work scales quadratically per RH
 evaluation, so the dialog advises on expensive requests. The result notebook includes
 stable-bounds Orbit Animation (with inertial/COM frames and MP4 export), static
 trajectories, phase space, energy/conservation diagnostics, and separations.
+
+## Fermi-Pasta-Ulam-Tsingou Experiment
+
+This dedicated fixed-end normalized chain supports the cubic alpha potential
+`V(delta) = delta^2/2 + alpha delta^3/3` and the quartic beta potential
+`V(delta) = delta^2/2 + beta delta^4/4`. Its exact Hamiltonian includes both
+boundary bonds. Linear sine-mode energies are diagnostic quantities, not the complete
+nonlinear Hamiltonian. Velocity Verlet is the recommended long-time integrator; RK4 is
+available to reproduce the historical numerical method. The notebook provides recurrence
+fidelity, modal-energy/thermalization diagnostics, strain space-time and surface views,
+phase space, and sequential alpha recurrence-scaling studies. Localized strain is shown
+as a solitary-wave-like structure rather than asserted to be an exact soliton; use the
+separate Nonlinear Waves plugin for the KdV PDE solver.
 
 ## Plugin Contract
 
@@ -56,6 +69,7 @@ Plugins are registered lazily in `src/complex_problems/problem_registry.py`.
 | `antenna_radiation` | Antenna Radiation | Far-field patterns for dipole, loop, patch-like aperture, and uniform linear array models | gain/directivity maps, polar cuts, 3D pattern, field metrics |
 | `aerodynamics_2d` | Aerodynamics 2D | 2D incompressible flow around obstacles using projection/Stokes-style approximations | speed/vorticity/pressure views, drag/lift curves, streamlines |
 | `pipe_flow` | Pipe Flow | Steady Darcy-Weisbach and transient 1D pressure-wave pipe-flow models | pressure/velocity profiles, geometry plots, Reynolds/friction metrics, transient maps |
+| `fput_experiment` | Fermi-Pasta-Ulam-Tsingou Experiment | Fixed-end alpha/beta FPUT chains | recurrence, modal energy, strain, Hamiltonian drift, scaling fits |
 
 ## General Usage Pattern
 

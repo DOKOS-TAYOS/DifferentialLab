@@ -30,7 +30,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   - 12 2D PDE examples
   - 4 scalar 3D PDE examples
   - 1 coupled Vector PDE example
-- Advanced Problems: 8 registered, lazily loaded plugins
+- Advanced Problems: 9 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
 
@@ -76,7 +76,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## Advanced Problems
 
-`Advanced Problems` is an eight-plugin subsystem. Internally, its Python package
+`Advanced Problems` is a nine-plugin subsystem. Internally, its Python package
 is named `complex_problems`; each plugin provides its own configuration dialog,
 solver, structured result, and result dialog.
 
@@ -84,6 +84,12 @@ Gravitational N-Body Dynamics adds curated Figure-eight, Lagrange equilateral, a
 Pythagorean three-body studies plus configurable 2D/3D systems of 2--100 point masses.
 It uses self-consistent user-selected units; positive softening epsilon is explicitly
 the Plummer-softened model, while epsilon zero is exact Newtonian point gravity.
+
+Fermi-Pasta-Ulam-Tsingou Experiment is a dedicated fixed-end alpha/beta chain workflow.
+It uses Velocity Verlet for recommended long-time exploration and offers legacy RK4 for
+historical comparison. Its exact nonlinear Hamiltonian is distinct from the linear
+normal-mode energy diagnostic; the result notebook includes modal recurrence fidelity,
+entropy/participation, strain structures, phase space, and sequential recurrence scaling.
 
 Current modules:
 
@@ -94,6 +100,7 @@ Current modules:
 - `antenna_radiation`: far-field patterns and antenna metrics
 - `aerodynamics_2d`: 2D incompressible obstacle-flow approximations
 - `pipe_flow`: steady and transient 1D pipe-flow models
+- `fput_experiment`: dedicated Fermi-Pasta-Ulam-Tsingou recurrence and strain studies
 
 ## Requirements
 
