@@ -292,9 +292,24 @@ def configure_ttk_styles(root: tk.Tk) -> None:
     style.configure("Small.TLabel", font=font_small, foreground=fg)
     style.configure("ConfigDesc.TLabel", font=font_desc, foreground=fg)
 
-    # Collapsible-section header style
-    style.configure("SectionHeader.TFrame", background=btn_bg)
-    style.configure("SectionHeader.TLabel", background=btn_bg, foreground=btn_fg, font=font_bold)
+    # Collapsible-section headers act as compact keyboard-focusable buttons.
+    section_focus_bg = _lighten_color(btn_bg, 0.30)
+    style.configure(
+        "SectionHeader.TButton",
+        background=btn_bg,
+        foreground=btn_fg,
+        font=font_bold,
+        padding=(10, 8),
+        borderwidth=2,
+        relief="flat",
+        anchor=tk.W,
+        justify=tk.LEFT,
+    )
+    style.map(
+        "SectionHeader.TButton",
+        background=[("pressed", focus_bg), ("focus", section_focus_bg), ("active", focus_field_bg)],
+        relief=[("focus", "solid"), ("pressed", "sunken")],
+    )
 
     # --- Entry (larger font + focus highlight) ---
     style.configure(

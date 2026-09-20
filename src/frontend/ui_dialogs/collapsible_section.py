@@ -40,43 +40,46 @@ class CollapsibleSection:
         pad: int = 6,
     ) -> None:
         self._scroll = scroll
-        arrow_var = tk.StringVar(value=EXPANDED if expanded else COLLAPSED)
+        self._title = title
+        self._expanded = expanded
 
-        wrapper = ttk.Frame(parent)
-        wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
+        self._wrapper = ttk.Frame(parent)
+        self._wrapper.pack(fill=tk.X, pady=(pad // 2, 0))
 
-        header = ttk.Frame(wrapper, style="SectionHeader.TFrame")
-        header.configure(cursor="hand2")
-        header.pack(fill=tk.X)
-
-        arrow_lbl = ttk.Label(
-            header,
-            textvariable=arrow_var,
-            style="SectionHeader.TLabel",
+        self._header = ttk.Button(
+            self._wrapper,
+            text=self._header_text(),
+            style="SectionHeader.TButton",
+            command=self.toggle,
+            takefocus=True,
         )
-        arrow_lbl.pack(side=tk.LEFT, padx=(10, 6), pady=8)
+        self._header.pack(fill=tk.X)
+        for sequence in ("<Return>", "<KP_Enter>", "<space>"):
+            self._header.bind(sequence, self._on_key_toggle, add="+")
 
-        title_lbl = ttk.Label(
-            header,
-            text=title,
-            style="SectionHeader.TLabel",
-        )
-        title_lbl.pack(side=tk.LEFT, pady=8)
-
-        self.content = ttk.Frame(wrapper, padding=(16, 4, 4, 8))
+        self.content = ttk.Frame(self._wrapper, padding=(16, 4, 4, 8))
 
         if expanded:
             self.content.pack(fill=tk.X)
 
-        def toggle(_e: tk.Event | None = None) -> None:  # type: ignore[type-arg]
-            if self.content.winfo_manager():
-                self.content.pack_forget()
-                arrow_var.set(COLLAPSED)
-            else:
-                self.content.pack(fill=tk.X)
-                arrow_var.set(EXPANDED)
-                scroll.bind_new_children()
-            wrapper.after(_REFRESH_DELAY_MS, scroll.refresh_scroll_region)
+    def _header_text(self) -> str:
+        """Return the accessible header text for the current expansion state."""
+        arrow = EXPANDED if self._expanded else COLLAPSED
+        return f"{arrow}  {self._title}"
 
-        for w in (header, arrow_lbl, title_lbl):
-            w.bind("<Button-1>", toggle)
+    def _on_key_toggle(self, _event: tk.Event[tk.Misc]) -> str:
+        """Toggle once for an explicit keyboard activation sequence."""
+        self.toggle()
+        return "break"
+
+    def toggle(self) -> None:
+        """Show or hide the section body and refresh its scroll container."""
+        if self._expanded:
+            self.content.pack_forget()
+        else:
+            self.content.pack(fill=tk.X)
+            self._scroll.bind_new_children()
+
+        self._expanded = not self._expanded
+        self._header.configure(text=self._header_text())
+        self._wrapper.after(_REFRESH_DELAY_MS, self._scroll.refresh_scroll_region)

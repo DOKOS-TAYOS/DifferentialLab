@@ -17,7 +17,12 @@ from config import (
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    fit_and_center,
+    make_modal,
+)
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@whenphysics"
 
@@ -214,7 +219,14 @@ class HelpDialog:
         self._body_labels: list[ttk.Label] = []
         self._build_ui()
 
-        fit_and_center(self.win, min_width=1000, min_height=750)
+        fit_and_center(self.win, min_width=1000, min_height=750, resizable=True)
+        min_width, min_height = calculate_screen_aware_minsize(
+            self.win.winfo_screenwidth(),
+            self.win.winfo_screenheight(),
+            700,
+            520,
+        )
+        self.win.minsize(min_width, min_height)
         make_modal(self.win, parent)
 
     def _build_ui(self) -> None:
@@ -265,7 +277,7 @@ class HelpDialog:
 
         self._scroll.bind_new_children()
 
-        bind_wraplength(inner, self._body_labels, pad=48, min_wrap=200)
+        bind_wraplength(self._scroll.viewport, self._body_labels, pad=48, min_wrap=200)
 
     def _add_section(
         self,

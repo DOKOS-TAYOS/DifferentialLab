@@ -652,9 +652,16 @@ class _TransformHelpDialog:
         self._do_close = _do_close
         self._build_ui()
 
-        from frontend.window_utils import fit_and_center
+        from frontend.window_utils import calculate_screen_aware_minsize, fit_and_center
 
-        fit_and_center(self.win, min_width=780, min_height=520)
+        fit_and_center(self.win, min_width=780, min_height=520, resizable=True)
+        min_width, min_height = calculate_screen_aware_minsize(
+            self.win.winfo_screenwidth(),
+            self.win.winfo_screenheight(),
+            620,
+            420,
+        )
+        self.win.minsize(min_width, min_height)
         self.win.transient(parent)
         self.win.protocol("WM_DELETE_WINDOW", self._do_close)
 
@@ -696,7 +703,7 @@ class _TransformHelpDialog:
 
         self._scroll.bind_new_children()
 
-        bind_wraplength(inner, self._body_labels, pad=48, min_wrap=200)
+        bind_wraplength(self._scroll.viewport, self._body_labels, pad=48, min_wrap=200)
 
     def _add_section(
         self,

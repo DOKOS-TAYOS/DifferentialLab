@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Improved tooltips so keyboard focus can reveal help text without replacing existing widget bindings, and increased tooltip text to a readable size relative to the configured UI font.
+- Made Help and Transform Help windows resizable, with text wrapping to their visible scroll viewport.
+- Made Help section headers keyboard accessible with a clearly visible focus treatment.
 
 ### Fixed
 
 - Hide Taylor-only transform controls unless the Taylor series transform is selected.
+- Prevented Help text from clipping at the right edge after resizing.
 
 ## [0.7.0] - 2026-09-19
 
