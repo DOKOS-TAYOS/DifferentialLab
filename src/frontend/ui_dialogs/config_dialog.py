@@ -173,7 +173,6 @@ _FIELD_LABELS: dict[str, str] = {
 }
 
 
-
 class ConfigDialog:
     """Scrollable form to edit all ``.env`` configuration values.
 
