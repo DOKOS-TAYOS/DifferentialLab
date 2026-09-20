@@ -21,6 +21,20 @@ def calculate_wraplength(width: int, pad: int, min_wrap: int) -> int:
     return max(min_wrap, width - pad)
 
 
+def calculate_screen_aware_minsize(
+    screen_width: int,
+    screen_height: int,
+    min_width: int,
+    min_height: int,
+    *,
+    max_ratio: float = 0.9,
+) -> tuple[int, int]:
+    """Clamp desired minimum dimensions to the usable screen fraction."""
+    max_width = max(1, int(screen_width * max_ratio))
+    max_height = max(1, int(screen_height * max_ratio))
+    return min(min_width, max_width), min(min_height, max_height)
+
+
 def center_window(
     window: tk.Tk | tk.Toplevel,
     width: int | None = None,
@@ -181,8 +195,8 @@ def bind_wraplength(
 
             _job = frame.after(debounce_ms, _run)
 
-        frame.bind("<Configure>", _debounced)
+        frame.bind("<Configure>", _debounced, add="+")
     else:
-        frame.bind("<Configure>", _update)
+        frame.bind("<Configure>", _update, add="+")
 
     frame.after(100, _update)
