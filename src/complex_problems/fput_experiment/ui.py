@@ -130,10 +130,12 @@ class FPUTExperimentDialog:
             style="Small.TLabel",
         )
         self._state_hint.pack(anchor=tk.W, pady=3)
+        self._state_options_frame = ttk.Frame(root)
+        self._state_options_frame.pack(fill=tk.X)
         self._custom_x_var, self._custom_v_var, self._custom_q_var, self._custom_p_var = (
             tk.StringVar() for _ in range(4)
         )
-        self._custom_frame = ttk.Frame(root)
+        self._custom_frame = ttk.Frame(self._state_options_frame)
         self._custom_frame.pack(fill=tk.X, pady=3)
         self._custom_first_label = ttk.Label(self._custom_frame, text="x values")
         self._custom_first_label.pack(side=tk.LEFT, padx=(0, 4))
@@ -147,7 +149,7 @@ class FPUTExperimentDialog:
             self._custom_frame, textvariable=self._custom_v_var, width=42
         )
         self._custom_second_entry.pack(side=tk.LEFT, padx=(0, 10))
-        self._legacy_frame = ttk.Frame(root)
+        self._legacy_frame = ttk.Frame(self._state_options_frame)
         self._legacy_frame.pack(fill=tk.X, pady=3)
         self._legacy_width_var = tk.StringVar(value="0.5")
         self._legacy_first_center_var = tk.StringVar(value="6")
