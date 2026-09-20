@@ -60,33 +60,24 @@ class MainMenu:
         """Construct the main menu layout."""
         padding: int = get_env_from_schema("UI_PADDING")
 
-        main_frame = ttk.Frame(self.root, padding=padding * 3)
+        main_frame = ttk.Frame(self.root, padding=padding * 2)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Logo
         base_dir = Path(__file__).resolve().parent.parent.parent
         logo_path = base_dir / "images" / "DifferentialLab_logo.png"
         if logo_path.exists():
-            logo_img = tk.PhotoImage(file=str(logo_path)).subsample(2, 2)
+            # The source asset already includes the DifferentialLab wordmark.
+            logo_img = tk.PhotoImage(file=str(logo_path)).subsample(3, 3)
             logo_label = ttk.Label(main_frame, image=logo_img)
             cast(Any, logo_label).image = logo_img  # Keep reference
-            logo_label.pack(pady=(0, padding))
-
-        # Title
-        title_frame = ttk.Frame(main_frame)
-        title_frame.pack(fill=tk.X, pady=(0, padding * 2))
+            logo_label.pack(pady=(0, padding // 2))
 
         ttk.Label(
-            title_frame,
-            text=APP_NAME,
-            style="Title.TLabel",
-        ).pack()
-
-        ttk.Label(
-            title_frame,
+            main_frame,
             text=f"v{APP_VERSION}",
             style="Small.TLabel",
-        ).pack(pady=(4, 0))
+        ).pack(pady=(0, padding))
 
         # Description
         desc_lbl = ttk.Label(
@@ -98,103 +89,97 @@ class MainMenu:
             style="Small.TLabel",
             justify=tk.CENTER,
         )
-        desc_lbl.pack(pady=(0, padding * 2))
+        desc_lbl.pack(pady=(0, padding))
 
         bind_wraplength(main_frame, desc_lbl, pad=6 * padding, min_wrap=200)
 
-        # Buttons
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(expand=True)
-
-        # Center grid: columns and rows expand to center content
-        btn_frame.columnconfigure(0, weight=1)
-        btn_frame.columnconfigure(1, weight=1)
-        btn_frame.rowconfigure(0, weight=1)
-        btn_frame.rowconfigure(1, weight=0)
-        btn_frame.rowconfigure(2, weight=0)
-        btn_frame.rowconfigure(3, weight=0)
-        btn_frame.rowconfigure(4, weight=1)
+        # Primary application actions share one full-width visual treatment.
+        primary_frame = ttk.Frame(main_frame)
+        primary_frame.pack(fill=tk.X, expand=True, pady=(padding, 0))
 
         btn_width: int = get_env_from_schema("UI_BUTTON_WIDTH")
 
-        # Row 1: Solve Equation | Function Transform
         self.btn_solve = ttk.Button(
-            btn_frame,
-            text="Solve\nEquation",
+            primary_frame,
+            text="Solve Equation",
             width=btn_width,
+            style="Primary.TButton",
             command=self._on_solve,
         )
-        self.btn_solve.grid(row=1, column=0, padx=padding, pady=padding)
+        self.btn_solve.pack(fill=tk.X, pady=(0, padding))
         ToolTip(
             self.btn_solve,
             "Choose a built-in or custom equation, then configure and solve it.",
         )
 
         self.btn_transforms = ttk.Button(
-            btn_frame,
-            text="Function\nTransform",
+            primary_frame,
+            text="Function Transform",
             width=btn_width,
-            style="Accent2.TButton",
+            style="Primary.TButton",
             command=self._on_transforms,
         )
-        self.btn_transforms.grid(row=1, column=1, padx=padding, pady=padding)
+        self.btn_transforms.pack(fill=tk.X, pady=(0, padding))
         ToolTip(
             self.btn_transforms,
             "Enter f(x), apply a transform, inspect the plot, and export the data.",
         )
 
-        # Row 2: Advanced Problems | Help & About
         self.btn_complex = ttk.Button(
-            btn_frame,
-            text="Advanced\nProblems",
+            primary_frame,
+            text="Advanced Problems",
             width=btn_width,
-            style="Accent2.TButton",
+            style="Primary.TButton",
             command=self._on_complex_problems,
         )
-        self.btn_complex.grid(row=2, column=0, padx=padding, pady=padding)
+        self.btn_complex.pack(fill=tk.X)
         ToolTip(
             self.btn_complex,
             "Open specialized physics and engineering solvers with guided settings.",
         )
 
+        # Secondary actions are grouped separately and use a quieter style.
+        ttk.Separator(main_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(padding * 2, padding))
+        secondary_frame = ttk.Frame(main_frame)
+        secondary_frame.pack(fill=tk.X)
+        for column in range(3):
+            secondary_frame.columnconfigure(column, weight=1)
+
         self.btn_info = ttk.Button(
-            btn_frame,
+            secondary_frame,
             text="Help & About",
-            width=btn_width,
-            style="Accent2.TButton",
+            style="Secondary.TButton",
             command=self._on_info,
         )
-        self.btn_info.grid(row=2, column=1, padx=padding, pady=padding)
+        self.btn_info.grid(row=0, column=0, padx=(0, padding // 2), sticky="ew")
         ToolTip(self.btn_info, "Read usage notes, expression syntax, shortcuts, and app details.")
 
-        # Row 3: Settings | Exit (sized to text)
         self.btn_config = ttk.Button(
-            btn_frame,
+            secondary_frame,
             text="Settings",
-            width=len("Settings"),
-            style="SmallMenu.Accent2.TButton",
+            style="Secondary.TButton",
             command=self._on_config,
         )
-        self.btn_config.grid(row=3, column=0, padx=padding, pady=padding)
+        self.btn_config.grid(row=0, column=1, padx=padding // 2, sticky="ew")
         ToolTip(self.btn_config, "Adjust appearance, solver defaults, logging, and output paths.")
 
         self.btn_quit = ttk.Button(
-            btn_frame,
+            secondary_frame,
             text="Exit",
-            width=len("Exit"),
-            style="SmallMenu.Cancel.TButton",
+            style="Secondary.TButton",
             command=self._on_close,
         )
-        self.btn_quit.grid(row=3, column=1, padx=padding, pady=padding)
+        self.btn_quit.grid(row=0, column=2, padx=(padding // 2, 0), sticky="ew")
         ToolTip(self.btn_quit, "Close DifferentialLab.")
 
         setup_arrow_enter_navigation(
             [
-                [self.btn_solve, self.btn_transforms],
-                [self.btn_complex, self.btn_info],
-                [self.btn_config, self.btn_quit],
+                [self.btn_solve],
+                [self.btn_transforms],
+                [self.btn_complex],
             ]
         )
+        setup_arrow_enter_navigation([[self.btn_info, self.btn_config, self.btn_quit]])
         self.btn_solve.focus_set()
 
     def _on_close(self) -> None:

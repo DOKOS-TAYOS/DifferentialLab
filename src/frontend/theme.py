@@ -255,35 +255,37 @@ def configure_ttk_styles(root: tk.Tk) -> None:
         foreground=[("active", btn_fg), ("focus", btn_fg)],
     )
 
-    # Small menu buttons (Settings, Exit) - smaller font and padding
+    # Shared hierarchy styles for the main menu and workspace actions.
     style.configure(
-        "SmallMenu.TButton",
+        "Primary.TButton",
         background=btn_bg,
         foreground=btn_fg,
-        font=font_small,
-        padding=(4, 2),
+        font=font,
+        padding=(padding * 2, padding),
         borderwidth=1,
         relief="raised",
         justify=tk.CENTER,
     )
     style.map(
-        "SmallMenu.TButton",
+        "Primary.TButton",
         background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
         foreground=[("active", btn_fg), ("focus", btn_fg)],
     )
-    style.configure("SmallMenu.Accent2.TButton", foreground=btn_fg_accent2, justify=tk.CENTER)
-    style.map(
-        "SmallMenu.Accent2.TButton",
-        background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
-        foreground=[("active", btn_fg_accent2), ("focus", btn_fg_accent2)],
-    )
+
     style.configure(
-        "SmallMenu.Cancel.TButton", foreground=btn_fg_cancel, justify=tk.CENTER, padding=(50, 6)
+        "Secondary.TButton",
+        background=btn_bg,
+        foreground=fg,
+        font=font_small,
+        padding=(padding, max(3, padding // 2)),
+        borderwidth=1,
+        relief="raised",
+        justify=tk.CENTER,
     )
     style.map(
-        "SmallMenu.Cancel.TButton",
+        "Secondary.TButton",
         background=[("pressed", focus_bg), ("focus", focus_bg), ("active", focus_bg)],
-        foreground=[("active", btn_fg_cancel), ("focus", btn_fg_cancel)],
+        foreground=[("active", fg), ("focus", fg)],
     )
 
     # --- Labels ---

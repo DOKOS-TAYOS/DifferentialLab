@@ -56,7 +56,7 @@ def test_taylor_options_are_shown_for_taylor_transform(monkeypatch) -> None:
     assert frame.pack_calls == [{"fill": "x", "pady": (0, 8)}]
 
 
-def test_transform_change_updates_conditional_controls_before_recomputing() -> None:
+def test_transform_change_updates_conditional_controls_without_recomputing() -> None:
     dialog = TransformDialog.__new__(TransformDialog)
     calls: list[str] = []
     dialog._update_transform_options = lambda: calls.append("controls")  # type: ignore[method-assign]
@@ -64,4 +64,24 @@ def test_transform_change_updates_conditional_controls_before_recomputing() -> N
 
     dialog._on_transform_change(object())
 
-    assert calls == ["controls", "apply"]
+    assert calls == ["controls"]
+
+
+def test_display_change_does_not_recompute() -> None:
+    dialog = TransformDialog.__new__(TransformDialog)
+    calls: list[str] = []
+    dialog._on_apply = lambda: calls.append("apply")  # type: ignore[method-assign]
+
+    dialog._on_display_change(object())
+
+    assert calls == []
+
+
+def test_update_runs_the_existing_calculation_path() -> None:
+    dialog = TransformDialog.__new__(TransformDialog)
+    calls: list[str] = []
+    dialog._on_apply = lambda: calls.append("apply")  # type: ignore[method-assign]
+
+    dialog._on_update()
+
+    assert calls == ["apply"]
