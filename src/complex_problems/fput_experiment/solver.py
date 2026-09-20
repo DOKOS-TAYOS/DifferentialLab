@@ -96,6 +96,29 @@ def detect_recurrence_peaks(
     return accepted, time[accepted], values[accepted]
 
 
+def summarize_recurrence_peaks(
+    peak_times: np.ndarray, peak_fidelities: np.ndarray
+) -> dict[str, float | int | None]:
+    """Summarize accepted peaks, reserving "late" for peaks after the first."""
+    times = np.asarray(peak_times, dtype=float)
+    fidelities = np.asarray(peak_fidelities, dtype=float)
+    if times.ndim != 1 or fidelities.shape != times.shape:
+        raise ValueError("Recurrence peak times and fidelities must be equal-length vectors.")
+    late_times, late_fidelities = times[1:], fidelities[1:]
+    strongest_late = int(np.argmax(late_fidelities)) if late_times.size else None
+    return {
+        "first_recurrence_time": float(times[0]) if times.size else None,
+        "first_recurrence_fidelity": float(fidelities[0]) if fidelities.size else None,
+        "number_of_recurrence_peaks": int(times.size),
+        "highest_late_recurrence_time": (
+            float(late_times[strongest_late]) if strongest_late is not None else None
+        ),
+        "highest_late_recurrence_fidelity": (
+            float(late_fidelities[strongest_late]) if strongest_late is not None else None
+        ),
+    }
+
+
 def _validate_inputs(
     n_particles: int,
     model: FPUTModel,
@@ -245,19 +268,11 @@ def solve_fput(
         "final_hamiltonian": float(total[-1]),
         "maximum_absolute_hamiltonian_drift": max_abs_drift,
         "maximum_relative_hamiltonian_drift": max_abs_drift / denominator,
-        "first_recurrence_time": float(peak_times[0]) if peak_times.size else None,
-        "first_recurrence_fidelity": float(peak_fidelities[0]) if peak_fidelities.size else None,
-        "number_of_recurrence_peaks": int(peak_times.size),
-        "highest_late_recurrence_time": float(peak_times[np.argmax(peak_fidelities)])
-        if peak_times.size
-        else None,
-        "highest_late_recurrence_fidelity": float(np.max(peak_fidelities))
-        if peak_times.size
-        else None,
         "maximum_interaction_energy_identity_error": float(
             np.max(np.abs(total - np.sum(modal_energy, axis=1) - energies[:, 2]))
         ),
     }
+    summary.update(summarize_recurrence_peaks(peak_times, peak_fidelities))
     warnings: list[str] = []
     if model == "alpha" and np.any(alpha_nonconvex_bonds(displacement[0], coefficient)):
         warnings.append(

@@ -19,14 +19,22 @@ from complex_problems.fput_experiment.model import (
 )
 from complex_problems.fput_experiment.result_dialog import (
     create_fput_animation_figure,
+    create_hamiltonian_figure,
+    create_modal_energy_figure,
+    format_fput_summary,
+    fundamental_angular_frequency,
+    fundamental_cycles_to_time,
     prepare_fput_animation_payload,
+    time_to_fundamental_cycles,
 )
 from complex_problems.fput_experiment.solver import (
     detect_recurrence_peaks,
     recurrence_fidelity,
     solve_fput,
     solve_fput_recurrence_scaling,
+    summarize_recurrence_peaks,
 )
+from complex_problems.fput_experiment.ui import preset_study_transition
 
 
 def test_alpha_force_matches_hand_computation() -> None:
@@ -151,6 +159,35 @@ def test_synthetic_recurrence_detector_excludes_initial_time() -> None:
     np.testing.assert_allclose(recurrence_fidelity(fractions), [1.0, 0.75])
 
 
+def test_recurrence_peak_summary_reserves_late_for_peaks_after_first() -> None:
+    """A first recurrence alone is never described as a late recurrence."""
+    one_peak = summarize_recurrence_peaks(np.array([10.0]), np.array([0.91]))
+    assert one_peak["first_recurrence_time"] == 10.0
+    assert one_peak["highest_late_recurrence_time"] is None
+    assert one_peak["highest_late_recurrence_fidelity"] is None
+    multiple = summarize_recurrence_peaks(
+        np.array([10.0, 20.0, 30.0]), np.array([0.99, 0.91, 0.95])
+    )
+    assert multiple["first_recurrence_time"] == 10.0
+    assert multiple["highest_late_recurrence_time"] == 30.0
+    assert multiple["highest_late_recurrence_fidelity"] == 0.95
+
+
+def test_recurrence_scaling_preset_transition_never_reinterprets_beta_as_alpha() -> None:
+    """Selecting a beta preset while scaling returns to ordinary beta simulation."""
+    assert preset_study_transition("Recurrence scaling", "beta") == ("Single simulation", "beta")
+    assert preset_study_transition("Recurrence scaling", "alpha") == ("Recurrence scaling", "alpha")
+    assert preset_study_transition("Single simulation", "beta") == ("Single simulation", "beta")
+
+
+def test_fundamental_cycle_transform_round_trips_and_uses_fixed_end_frequency() -> None:
+    """The secondary recurrence axis uses the stated fundamental-mode transform."""
+    assert fundamental_angular_frequency(3) == pytest.approx(2.0 * np.sin(np.pi / 8.0))
+    time = np.array([0.0, 1.5, 7.0])
+    cycles = time_to_fundamental_cycles(time, 3)
+    np.testing.assert_allclose(fundamental_cycles_to_time(cycles, 3), time)
+
+
 @pytest.mark.parametrize(
     ("fidelity", "expected"),
     [
@@ -186,6 +223,33 @@ def test_alpha_recurrence_and_scaling_are_numerically_detected() -> None:
         value is not None and np.isfinite(value)
         for value in (sweep.slope, sweep.intercept, sweep.r_squared)
     )
+
+
+def test_short_scaling_horizon_marks_undetected_runs_and_excludes_fit() -> None:
+    """Too-short recurrence horizons retain NaN measurements outside the fit."""
+    sweep = solve_fput_recurrence_scaling(
+        sweep_variable="N", parameter_values=[8, 12, 16], t_end=1.0, dt=0.02, sample_every=10
+    )
+    assert np.any(~sweep.detected)
+    assert np.any(np.isnan(sweep.first_recurrence_times))
+    assert sweep.slope is None and sweep.intercept is None and sweep.r_squared is None
+
+
+def test_result_summary_and_energy_figures_use_cached_data() -> None:
+    """No-recurrence summaries and diagnostic layouts remain clear and separated."""
+    result = solve_fput(n_particles=4, t_end=0.1, dt=0.01, sample_every=2)
+    summary = format_fput_summary(result)
+    assert "not detected" in summary
+    identity = result.total_energy - np.sum(result.modal_energy, axis=1)
+    assert np.max(np.abs(identity - result.nonlinear_potential_energy)) < 1.0e-12
+    hamiltonian = create_hamiltonian_figure(result)
+    assert len(hamiltonian.axes) == 2
+    assert hamiltonian.axes[0].get_ylabel() == "energy"
+    assert hamiltonian.axes[1].get_ylabel() == "relative H error"
+    modal = create_modal_energy_figure(result, [1, 2], "Linear")
+    curve_axis, heatmap_axis = modal.axes[:2]
+    assert curve_axis is not heatmap_axis
+    assert curve_axis.get_position().y0 >= heatmap_axis.get_position().y1
 
 
 def test_legacy_kink_pair_formula_and_alpha_validation() -> None:

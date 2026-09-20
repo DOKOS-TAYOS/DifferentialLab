@@ -16,6 +16,7 @@ from complex_problems.common.dialog_ui import (
 )
 from complex_problems.fput_experiment.model import (
     FPUT_PRESETS,
+    FPUTModel,
     legacy_kink_pair_initial_state,
     particle_coordinates,
     single_mode_initial_state,
@@ -47,6 +48,13 @@ def parse_exact_vector(text: str, n: int, name: str) -> np.ndarray:
     if values.shape != (n,) or not np.all(np.isfinite(values)):
         raise ValueError(f"{name} must contain exactly {n} finite values.")
     return values
+
+
+def preset_study_transition(study: str, preset_model: FPUTModel) -> tuple[str, FPUTModel]:
+    """Keep alpha-only scaling distinct from every beta preset configuration."""
+    if study == "Recurrence scaling" and preset_model == "beta":
+        return "Single simulation", "beta"
+    return study, "alpha" if study == "Recurrence scaling" else preset_model
 
 
 class FPUTExperimentDialog:
@@ -170,8 +178,11 @@ class FPUTExperimentDialog:
     def _apply_preset(self) -> None:
         """Populate ordinary editable controls from the selected preset."""
         preset = FPUT_PRESETS[self._preset_var.get()]
+        study, model = preset_study_transition(self._study_var.get(), preset.model)
+        if study != self._study_var.get():
+            self._study_var.set(study)
         self._n_var.set(str(preset.n_particles))
-        self._model_var.set(preset.model)
+        self._model_var.set(model)
         self._coefficient_var.set(str(preset.coefficient))
         self._amplitude_var.set(str(preset.amplitude))
         self._mode_var.set(str(preset.mode))

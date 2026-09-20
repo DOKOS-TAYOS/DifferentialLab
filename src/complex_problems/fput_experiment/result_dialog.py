@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from complex_problems.fput_experiment.model import bond_strain
 from complex_problems.fput_experiment.solver import FPUTResult, FPUTSweepResult
@@ -103,6 +104,175 @@ def _line_figure(
     return figure
 
 
+def fundamental_angular_frequency(n_particles: int) -> float:
+    """Return the fixed-end linear angular frequency of the fundamental mode."""
+    if n_particles < 2:
+        raise ValueError("FPUT requires at least two particles.")
+    return float(2.0 * np.sin(np.pi / (2.0 * (n_particles + 1))))
+
+
+def time_to_fundamental_cycles(time: ArrayLike, n_particles: int) -> np.ndarray | float:
+    """Convert physical time to fundamental linear-mode cycles."""
+    cycles = np.asarray(time) * fundamental_angular_frequency(n_particles) / (2.0 * np.pi)
+    return float(cycles) if np.ndim(time) == 0 else cycles
+
+
+def fundamental_cycles_to_time(cycles: ArrayLike, n_particles: int) -> np.ndarray | float:
+    """Convert fundamental linear-mode cycles to physical time."""
+    time = np.asarray(cycles) * 2.0 * np.pi / fundamental_angular_frequency(n_particles)
+    return float(time) if np.ndim(cycles) == 0 else time
+
+
+def _format_value(value: float | int | None) -> str:
+    """Format cached scalar diagnostics without exposing Python None values."""
+    return "not detected" if value is None else f"{value:.6g}"
+
+
+def format_fput_summary(result: FPUTResult) -> str:
+    """Return the visible single-run summary using cached diagnostics only."""
+    summary = result.summary
+    metadata = result.metadata
+    first_time = _format_value(summary["first_recurrence_time"])
+    first_fidelity = _format_value(summary["first_recurrence_fidelity"])
+    initial_hamiltonian = _format_value(summary["initial_hamiltonian"])
+    final_hamiltonian = _format_value(summary["final_hamiltonian"])
+    absolute_drift = _format_value(summary["maximum_absolute_hamiltonian_drift"])
+    relative_drift = _format_value(summary["maximum_relative_hamiltonian_drift"])
+    identity_error = _format_value(summary["maximum_interaction_energy_identity_error"])
+    return "\n".join(
+        (
+            f"Model: {result.model}; coefficient: {result.coefficient:.6g}; "
+            f"integrator: {metadata['integrator']}",
+            f"requested dt: {metadata['requested_dt']:.6g}; "
+            f"integration steps: {metadata['number_of_integration_steps']}; "
+            f"saved frames: {result.t.size}",
+            f"first recurrence: {first_time}; fidelity: {first_fidelity}; "
+            f"accepted peaks: {summary['number_of_recurrence_peaks']}",
+            f"initial H: {initial_hamiltonian}; final H: {final_hamiltonian}; "
+            f"max |ΔH|: {absolute_drift}",
+            f"max relative |ΔH|: {relative_drift}; max |H - ΣEₖ - Vnl|: {identity_error}",
+        )
+    )
+
+
+def format_fput_sweep_summary(result: FPUTSweepResult) -> str:
+    """Return the compact cached recurrence-scaling summary."""
+    fit = "; ".join(
+        (
+            f"slope: {_format_value(result.slope)}",
+            f"intercept: {_format_value(result.intercept)}",
+            f"R²: {_format_value(result.r_squared)}",
+        )
+    )
+    return "\n".join(
+        (
+            (
+                f"Sweep variable: {result.sweep_variable}; runs: {result.parameter_values.size}; "
+                f"detected: {np.count_nonzero(result.detected)}"
+            ),
+            fit,
+        )
+    )
+
+
+def create_recurrence_figure(result: FPUTResult) -> Figure:
+    """Plot cached recurrence fidelity with actual fundamental-cycle coordinates."""
+    recurrence = _line_figure(
+        result.t, [(result.recurrence_fidelity, "F(t)")], "Recurrence fidelity", "t", "F"
+    )
+    axis = recurrence.axes[0]
+    peaks = result.recurrence_peak_indices
+    if peaks.size:
+        axis.scatter(
+            result.t[peaks],
+            result.recurrence_fidelity[peaks],
+            color="tab:red",
+            label="accepted peaks",
+        )
+        axis.plot(
+            result.t[peaks],
+            result.recurrence_fidelity[peaks],
+            color="tab:red",
+            linewidth=0.8,
+            alpha=0.75,
+            label="peak sequence",
+        )
+        late_time = result.summary["highest_late_recurrence_time"]
+        late_fidelity = result.summary["highest_late_recurrence_fidelity"]
+        if late_time is not None and late_fidelity is not None:
+            axis.annotate(
+                "superrecurrence candidate",
+                (late_time, late_fidelity),
+                xytext=(6, 8),
+                textcoords="offset points",
+            )
+        axis.legend()
+    n_particles = result.displacement.shape[1]
+    axis.secondary_xaxis(
+        "top",
+        functions=(
+            lambda time: time_to_fundamental_cycles(time, n_particles),
+            lambda cycles: fundamental_cycles_to_time(cycles, n_particles),
+        ),
+    ).set_xlabel("fundamental cycles")
+    return recurrence
+
+
+def create_hamiltonian_figure(result: FPUTResult) -> Figure:
+    """Separate energy-scale curves from the cached relative numerical error."""
+    from matplotlib.figure import Figure
+
+    figure = Figure(figsize=(8, 6), layout="constrained")
+    energy_axis, error_axis = figure.subplots(2, 1, sharex=True)
+    interaction = result.total_energy - np.sum(result.modal_energy, axis=1)
+    for values, label in (
+        (result.kinetic_energy, "kinetic"),
+        (result.harmonic_potential_energy, "harmonic potential"),
+        (result.nonlinear_potential_energy, "nonlinear potential"),
+        (result.total_energy, "total H"),
+        (interaction, "H - ΣE_k"),
+    ):
+        energy_axis.plot(result.t, values, label=label)
+    scale = max(abs(float(result.total_energy[0])), np.finfo(float).eps)
+    error_axis.plot(
+        result.t, (result.total_energy - result.total_energy[0]) / scale, label="relative H error"
+    )
+    energy_axis.set(title="Hamiltonian components and interaction identity", ylabel="energy")
+    error_axis.set(xlabel="t", ylabel="relative H error")
+    for axis in (energy_axis, error_axis):
+        axis.grid(True, alpha=0.25)
+        axis.legend()
+    return figure
+
+
+def create_modal_energy_figure(result: FPUTResult, modes: list[int], scale_name: str) -> Figure:
+    """Plot cached selected modes above the complete modal-energy heatmap."""
+    from matplotlib.figure import Figure
+
+    figure = Figure(figsize=(8, 6), layout="constrained")
+    curve_axis, heatmap_axis = figure.subplots(2, 1, height_ratios=(1, 1.2))
+    for mode in modes:
+        curve_axis.plot(result.t, result.modal_energy[:, mode - 1], label=f"E_{mode}")
+    curve_axis.set(title="Selected modal energies", ylabel="E_k")
+    curve_axis.grid(True, alpha=0.25)
+    curve_axis.legend()
+    values = result.modal_energy
+    label = "E_k"
+    if scale_name == "log10 normalized":
+        reference = max(float(np.sum(values[0])), np.finfo(float).eps)
+        values = np.log10(np.maximum(values / reference, np.finfo(float).eps))
+        label = "log10(E_k / initial total linear modal energy)"
+    image = heatmap_axis.imshow(
+        values.T,
+        origin="lower",
+        aspect="auto",
+        extent=(result.t[0], result.t[-1], 0.5, values.shape[1] + 0.5),
+    )
+    heatmap_axis.set(title="All-mode heatmap", xlabel="t", ylabel="mode")
+    figure.colorbar(image, ax=heatmap_axis, label=label)
+    return figure
+
+
 class FPUTResultDialog:
     """Visualization-rich notebook that never reruns a completed solver."""
 
@@ -144,30 +314,21 @@ class FPUTResultDialog:
         self._canvases.append(embed_plot_in_tk(figure, frame))
 
     def _build_ui(self) -> None:
+        summary_text = (
+            format_fput_sweep_summary(self.result)
+            if isinstance(self.result, FPUTSweepResult)
+            else format_fput_summary(self.result)
+        )
+        ttk.Label(
+            self.win, text=summary_text, justify=tk.LEFT, style="Small.TLabel", padding=(12, 8)
+        ).pack(fill=tk.X)
         notebook = ttk.Notebook(self.win)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         if isinstance(self.result, FPUTSweepResult):
             self._build_sweep(notebook)
             return
         result = self.result
-        peaks = result.recurrence_peak_indices
-        recurrence = _line_figure(
-            result.t,
-            [(result.recurrence_fidelity, "F(t)")],
-            self._summary_text(result),
-            "t",
-            "F",
-        )
-        axis = recurrence.axes[0]
-        if peaks.size:
-            axis.scatter(
-                result.t[peaks],
-                result.recurrence_fidelity[peaks],
-                color="tab:red",
-                label="accepted peaks",
-            )
-            axis.legend()
-        self._add_plot(notebook, "Overview / Recurrence", recurrence)
+        self._add_plot(notebook, "Overview / Recurrence", create_recurrence_figure(result))
         self._build_animation_tab(notebook)
         self._build_representation_tab(
             notebook, "Space-Time", self._space_representation_var, self._space_time_figure
@@ -177,24 +338,7 @@ class FPUTResultDialog:
         )
         self._build_modal_tab(notebook)
         self._build_phase_tab(notebook)
-        interaction = result.total_energy - np.sum(result.modal_energy, axis=1)
-        scale = max(abs(float(result.total_energy[0])), np.finfo(float).eps)
-        relative_error = (result.total_energy - result.total_energy[0]) / scale
-        hamiltonian = _line_figure(
-            result.t,
-            [
-                (result.kinetic_energy, "kinetic"),
-                (result.harmonic_potential_energy, "harmonic potential"),
-                (result.nonlinear_potential_energy, "nonlinear potential"),
-                (result.total_energy, "exact H"),
-                (relative_error, "relative H error"),
-                (interaction, "H - ΣE_k"),
-            ],
-            "Hamiltonian components and numerical diagnostics",
-            "t",
-            "energy / relative error",
-        )
-        self._add_plot(notebook, "Hamiltonian", hamiltonian)
+        self._add_plot(notebook, "Hamiltonian", create_hamiltonian_figure(result))
         self._add_plot(
             notebook,
             "Thermalization",
@@ -208,20 +352,6 @@ class FPUTResultDialog:
                 "t",
                 "diagnostic",
             ),
-        )
-
-    def _summary_text(self, result: FPUTResult) -> str:
-        """Return a compact numerical summary for the recurrence overview."""
-        summary = result.summary
-        first = summary["first_recurrence_time"]
-        fidelity = summary["first_recurrence_fidelity"]
-        late_time = summary["highest_late_recurrence_time"]
-        late_fidelity = summary["highest_late_recurrence_fidelity"]
-        return (
-            f"F(t), cycles₁ = ω₁t/(2π) | first recurrence: {first!s} / {fidelity!s}; "
-            f"accepted peaks: {summary['number_of_recurrence_peaks']}; "
-            f"highest later: {late_time!s} / {late_fidelity!s}; raw time: {result.t[-1]:.6g}; "
-            f"max relative H drift: {summary['maximum_relative_hamiltonian_drift']:.3g}"
         )
 
     def _representation_values(
@@ -385,28 +515,7 @@ class FPUTResultDialog:
             modes = [mode for mode in modes if 1 <= mode <= self.result.modal_energy.shape[1]] or [
                 1
             ]
-            figure = _line_figure(
-                self.result.t,
-                [(self.result.modal_energy[:, mode - 1], f"E_{mode}") for mode in modes],
-                "Selected modal energies",
-                "t",
-                "E_k",
-            )
-            axis = figure.add_axes((0.12, 0.08, 0.78, 0.22))
-            values = self.result.modal_energy
-            label = "E_k"
-            if self._modal_scale_var.get() == "log10 normalized":
-                reference = max(float(np.sum(values[0])), np.finfo(float).eps)
-                values = np.log10(np.maximum(values / reference, np.finfo(float).eps))
-                label = "log10(E_k / initial total linear modal energy)"
-            image = axis.imshow(
-                values.T,
-                origin="lower",
-                aspect="auto",
-                extent=(self.result.t[0], self.result.t[-1], 0.5, values.shape[1] + 0.5),
-            )
-            axis.set(xlabel="t", ylabel="mode", title="All-mode heatmap")
-            figure.colorbar(image, ax=axis, label=label)
+            figure = create_modal_energy_figure(self.result, modes, self._modal_scale_var.get())
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
 
