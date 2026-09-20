@@ -293,13 +293,14 @@ class ConfigDialog:
         row.pack(fill=tk.X, pady=2)
 
         label = _FIELD_LABELS.get(key, key)
-        ttk.Label(row, text=label, width=30, anchor=tk.W).pack(side=tk.LEFT)
+        field_label = ttk.Label(row, text=label, width=30, anchor=tk.W)
+        field_label.pack(side=tk.LEFT)
+        ToolTip(field_label, f"Configuration key: {key}")
 
         if cast_type is bool:
             bvar = tk.BooleanVar(value=val.lower() in ("true", "1", "yes"))
             cb = ttk.Checkbutton(row, variable=bvar)
             cb.pack(side=tk.LEFT)
-            ToolTip(cb, f"Configuration key: {key}")
             self._vars[key] = bvar
         elif "options" in item:
             svar = tk.StringVar(value=val)
@@ -312,13 +313,11 @@ class ConfigDialog:
                 font=get_font(),
             )
             combo.pack(side=tk.LEFT)
-            ToolTip(combo, f"Configuration key: {key}")
             self._vars[key] = svar
         else:
             svar = tk.StringVar(value=val)
             entry = ttk.Entry(row, textvariable=svar, width=25, font=get_font())
             entry.pack(side=tk.LEFT)
-            ToolTip(entry, f"Configuration key: {key}")
             self._vars[key] = svar
 
         if desc_text:
