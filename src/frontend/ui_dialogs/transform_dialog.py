@@ -20,7 +20,12 @@ from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import bind_wraplength, center_window, make_modal
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    center_window,
+    make_modal,
+)
 from transforms import (
     DisplayMode,
     TransformKind,
@@ -36,7 +41,8 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_LEFT_WIDTH = 320  # Width of controls panel (similar to ResultDialog layout)
+_LEFT_WIDTH = 460  # Controls need this width at the configured Windows font size.
+_MIN_HEIGHT = 700  # Keeps the full configuration stack visible, including Taylor options.
 
 
 def _format_coefficient_title(meta: dict[str, object] | None) -> str:
@@ -107,7 +113,13 @@ class TransformDialog:
         win_h = min(max(plot_h + chrome_h, 500), int(screen_h * 0.92))
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.92, resizable=True)
-        self.win.minsize(_LEFT_WIDTH + 500, 500)
+        min_width, min_height = calculate_screen_aware_minsize(
+            screen_w,
+            screen_h,
+            _LEFT_WIDTH + 500,
+            _MIN_HEIGHT,
+        )
+        self.win.minsize(min_width, min_height)
         make_modal(self.win, parent)
 
     def _build_ui(self) -> None:
@@ -121,32 +133,34 @@ class TransformDialog:
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
-        btn_inner = ttk.Frame(btn_frame)
-        btn_inner.pack(anchor=tk.CENTER)
-
         btn_help = ttk.Button(
-            btn_inner,
+            btn_frame,
             text="Help",
+            style="Secondary.TButton",
             command=self._on_help,
         )
-        btn_help.pack(side=tk.LEFT, padx=pad)
+        btn_help.pack(side=tk.LEFT)
         ToolTip(btn_help, "Open transform syntax, options, and export notes.")
 
+        btn_actions = ttk.Frame(btn_frame)
+        btn_actions.pack(side=tk.RIGHT)
+
         btn_export = ttk.Button(
-            btn_inner,
+            btn_actions,
             text="Export CSV...",
+            style="Secondary.TButton",
             command=self._on_export,
         )
-        btn_export.pack(side=tk.LEFT, padx=pad)
+        btn_export.pack(side=tk.LEFT, padx=(0, pad))
         ToolTip(btn_export, "Save the displayed curve or coefficients to a CSV file.")
 
         btn_close = ttk.Button(
-            btn_inner,
+            btn_actions,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self.win.destroy,
         )
-        btn_close.pack(side=tk.LEFT, padx=pad)
+        btn_close.pack(side=tk.LEFT)
 
         setup_arrow_enter_navigation([[btn_help, btn_export, btn_close]])
 
@@ -154,9 +168,15 @@ class TransformDialog:
         content = ttk.Frame(self.win)
         content.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
 
+        # ── Resizable scientific workspace ──
+        paned = ttk.PanedWindow(content, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
+        self._paned = paned
+
         # ── Left: controls ──
-        left = ttk.Frame(content)
-        left.pack(side=tk.LEFT, fill=tk.Y, padx=(0, pad))
+        left = ttk.Frame(paned, width=_LEFT_WIDTH)
+        left.pack_propagate(False)
+        paned.add(left, weight=0)
 
         # Function
         func_lf = ttk.LabelFrame(left, text="Function", padding=pad)
@@ -210,8 +230,11 @@ class TransformDialog:
         self._params_entry.pack(fill=tk.X, pady=(4, pad))
         ToolTip(self._params_entry, "E.g.: a=1.0, omega=2.0")
 
-        row1 = ttk.Frame(func_lf)
-        row1.pack(fill=tk.X, pady=(pad, 0))
+        # Domain
+        domain_lf = ttk.LabelFrame(left, text="Domain", padding=pad)
+        domain_lf.pack(fill=tk.X, pady=(0, pad))
+        row1 = ttk.Frame(domain_lf)
+        row1.pack(fill=tk.X)
         ttk.Label(row1, text="x\u2098\u1d62\u2099:").pack(side=tk.LEFT)  # x_min
         self._x_min_var = tk.StringVar(value="-10")
         ttk.Entry(row1, textvariable=self._x_min_var, width=10, font=_font).pack(
@@ -222,15 +245,6 @@ class TransformDialog:
         ttk.Entry(row1, textvariable=self._x_max_var, width=10, font=_font).pack(
             side=tk.LEFT, padx=(4, pad)
         )
-
-        # Apply button (below function/range)
-        self._btn_apply = ttk.Button(
-            left,
-            text="Apply transform",
-            command=self._on_apply,
-        )
-        self._btn_apply.pack(fill=tk.X, pady=(0, pad))
-        ToolTip(self._btn_apply, "Parse the function and refresh the plot.")
 
         # Transform
         trans_lf = ttk.LabelFrame(left, text="Transformation", padding=pad)
@@ -248,22 +262,10 @@ class TransformDialog:
         self._transform_combo.pack(fill=tk.X, pady=(0, pad))
         self._transform_combo.bind("<<ComboboxSelected>>", self._on_transform_change)
 
-        # Display mode (curve vs coefficients)
-        ttk.Label(trans_lf, text="Display:", style="Small.TLabel").pack(anchor=tk.W)
-        self._display_var = tk.StringVar(value=DisplayMode.CURVE.value)
-        display_combo = ttk.Combobox(
-            trans_lf,
-            textvariable=self._display_var,
-            values=[k.value for k in DisplayMode],
-            state="readonly",
-            width=26,
-            font=_font,
-        )
-        display_combo.pack(fill=tk.X, pady=(2, pad))
-        display_combo.bind("<<ComboboxSelected>>", self._on_display_change)
-
         # Taylor options (shown only when Taylor is selected)
-        self._taylor_frame = ttk.Frame(trans_lf)
+        transform_options = ttk.Frame(trans_lf)
+        transform_options.pack(fill=tk.X)
+        self._taylor_frame = ttk.Frame(transform_options)
         self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
         ttk.Label(self._taylor_frame, text="Taylor Order:").pack(side=tk.LEFT)
         self._taylor_order_var = tk.StringVar(value="5")
@@ -284,9 +286,33 @@ class TransformDialog:
             font=_font,
         ).pack(side=tk.LEFT, padx=(4, 0))
 
+        # Display mode (curve vs coefficients) follows transform-specific options.
+        ttk.Label(trans_lf, text="Display:", style="Small.TLabel").pack(anchor=tk.W)
+        self._display_var = tk.StringVar(value=DisplayMode.CURVE.value)
+        display_combo = ttk.Combobox(
+            trans_lf,
+            textvariable=self._display_var,
+            values=[k.value for k in DisplayMode],
+            state="readonly",
+            width=26,
+            font=_font,
+        )
+        display_combo.pack(fill=tk.X, pady=(2, 0))
+        display_combo.bind("<<ComboboxSelected>>", self._on_display_change)
+
+        # Update is deliberately after every calculation input.
+        self._btn_update = ttk.Button(
+            left,
+            text="Update",
+            style="Primary.TButton",
+            command=self._on_update,
+        )
+        self._btn_update.pack(fill=tk.X, pady=(0, pad))
+        ToolTip(self._btn_update, "Calculate the configured transform and refresh the plot.")
+
         # ── Right: plot ──
-        plot_frame = ttk.Frame(content)
-        plot_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        plot_frame = ttk.Frame(paned, padding=(pad, 0, 0, 0))
+        paned.add(plot_frame, weight=1)
 
         self._plot_container = ttk.Frame(plot_frame)
         self._plot_container.pack(fill=tk.BOTH, expand=True)
@@ -305,12 +331,14 @@ class TransformDialog:
             self._taylor_frame.pack_forget()
 
     def _on_transform_change(self, _event: object) -> None:
-        """When transform selection changes, refresh controls and the plot."""
+        """When transform selection changes, refresh only conditional controls."""
         self._update_transform_options()
-        self._on_apply()
 
     def _on_display_change(self, _event: object) -> None:
-        """When display mode changes, refresh the plot."""
+        """Keep display changes pending until the user presses Update."""
+
+    def _on_update(self) -> None:
+        """Run the existing calculation path for the explicit Update action."""
         self._on_apply()
 
     def _on_help(self) -> None:
@@ -520,7 +548,7 @@ class TransformDialog:
         if self._current_x is None or self._current_y is None:
             messagebox.showwarning(
                 "No data to export",
-                "Apply a transformation first to generate data.",
+                "Press Update first to generate transform data.",
                 parent=self.win,
             )
             return
@@ -572,7 +600,8 @@ _TRANSFORM_HELP_HOW_TO_USE = (
     "5.  For Taylor: adjust  Order  (1\u201315) and  Centre  as needed.\n"
     "6.  Pick  Display  mode:  Curve  (function vs domain) or  "
     "Coefficients  (a\u1d62 vs index).\n"
-    "7.  Click  Apply transform  after editing the function or range.\n"
+    "7.  Press  Update  after choosing and configuring the transformation.\n"
+    "    Changes to inputs and Display remain pending until you press Update.\n"
     "8.  Use  Export CSV  or the Matplotlib toolbar (floppy-disk icon) to save."
 )
 

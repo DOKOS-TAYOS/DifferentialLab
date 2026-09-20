@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refined the Main Menu hierarchy so core workflows share a clear primary action treatment while Help, Settings, and Exit remain neutral secondary actions.
+- Made Function Transform a resizable configuration-and-visualization workspace with an adjustable pane split.
+- Changed Function Transform to an explicit Update workflow: input, domain, transform, and display changes wait for the user to press Update.
 - Standardized user-facing equation-family names and refreshed Help to match the current 125-equation catalog and Continue workflow.
 - Improved tooltips so keyboard focus can reveal help text without replacing existing widget bindings, and increased tooltip text to a readable size relative to the configured UI font.
 - Made Help and Transform Help windows resizable, with text wrapping to their visible scroll viewport.
