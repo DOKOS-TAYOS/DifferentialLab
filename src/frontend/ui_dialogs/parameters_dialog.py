@@ -22,7 +22,7 @@ from frontend.performance_guard import (
     assess_pde_3d_request,
     confirm_performance_advisory,
 )
-from frontend.theme import get_contrast_foreground, get_font
+from frontend.theme import get_font
 from frontend.ui_dialogs.background_task import BackgroundTaskFailure, run_task_with_loading
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -45,6 +45,112 @@ logger = get_logger(__name__)
 
 _MAX_PDE_GRID = 1000
 _DEFAULT_VECTOR_PDE_GRID = 100
+_STACKED_LAYOUT_BREAKPOINT = 900
+_LAYOUT_DEBOUNCE_MS = 60
+
+_STATISTIC_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "Summary",
+        ("mean", "rms", "std", "median", "max", "min", "integral", "l2_norm"),
+    ),
+    (
+        "Oscillation / dynamics",
+        (
+            "zero_crossings",
+            "period",
+            "amplitude",
+            "dominant_frequency",
+            "angular_frequency",
+            "energy",
+        ),
+    ),
+    (
+        "Growth / decay",
+        ("exponential_rate", "half_life", "time_constant", "doubling_time"),
+    ),
+    ("PDE", ("gradient_norm",)),
+)
+
+_STATISTIC_LABELS: dict[str, str] = {
+    "mean": "Mean",
+    "rms": "RMS",
+    "std": "Standard deviation",
+    "median": "Median",
+    "max": "Maximum",
+    "min": "Minimum",
+    "integral": "Integral",
+    "l2_norm": "L2 norm",
+    "zero_crossings": "Zero crossings",
+    "period": "Period",
+    "amplitude": "Amplitude",
+    "dominant_frequency": "Dominant frequency",
+    "angular_frequency": "Angular frequency",
+    "energy": "Energy",
+    "exponential_rate": "Exponential rate",
+    "half_life": "Half-life",
+    "time_constant": "Time constant",
+    "doubling_time": "Doubling time",
+    "gradient_norm": "Gradient norm",
+}
+
+_PDE_FACE_SOLVER_ORDER: dict[str, tuple[str, ...]] = {
+    "2d": ("bottom", "top", "left", "right"),
+    "3d": ("z_min", "z_max", "y_min", "y_max", "x_min", "x_max"),
+}
+
+_PDE_FACE_VISUAL_ORDER: dict[str, tuple[str, ...]] = {
+    "2d": ("left", "right", "bottom", "top"),
+    "3d": ("x_min", "x_max", "y_min", "y_max", "z_min", "z_max"),
+}
+
+_PDE_FACE_LABELS: dict[str, str] = {
+    "left": "Left, x = xmin",
+    "right": "Right, x = xmax",
+    "bottom": "Bottom, y = ymin",
+    "top": "Top, y = ymax",
+    "x_min": "x min",
+    "x_max": "x max",
+    "y_min": "y min",
+    "y_max": "y max",
+    "z_min": "z min",
+    "z_max": "z max",
+}
+
+_PDE_FACE_FREE_VARIABLES: dict[str, str] = {
+    "left": "y",
+    "right": "y",
+    "bottom": "x",
+    "top": "x",
+    "x_min": "y and z",
+    "x_max": "y and z",
+    "y_min": "x and z",
+    "y_max": "x and z",
+    "z_min": "x and y",
+    "z_max": "x and y",
+}
+
+
+def _preferred_configuration_size(equation_type: str) -> tuple[int, int]:
+    """Return a family-appropriate preferred Configuration window size."""
+    return {
+        "difference": (760, 620),
+        "ode": (980, 720),
+        "vector_ode": (1080, 780),
+        "pde": (1120, 800),
+        "vector_pde": (1120, 800),
+        "pde_3d": (1180, 840),
+    }.get(equation_type, (980, 720))
+
+
+def _uses_stacked_layout(viewport_width: int) -> bool:
+    """Return whether Configuration content should use one logical column."""
+    return viewport_width < _STACKED_LAYOUT_BREAKPOINT
+
+
+def _pde_face_orders(equation_type: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return visual and solver serialization orders for a PDE family."""
+    dimension = "3d" if equation_type == "pde_3d" else "2d"
+    return _PDE_FACE_VISUAL_ORDER[dimension], _PDE_FACE_SOLVER_ORDER[dimension]
 
 
 def _default_pde_grid_points(equation_type: str) -> int:
@@ -186,9 +292,13 @@ class ParametersDialog:
         self._y0_vars: list[tk.StringVar] = []
         self._x0_vars: list[tk.StringVar] = []
         self._eq_param_vars: dict[str, tk.StringVar] = {}
+        self._stat_vars: dict[str, tk.BooleanVar] = {}
+        self.event_enabled_var: tk.BooleanVar | None = None
         self.event_expression_var: tk.StringVar | None = None
         self.event_terminal_var: tk.BooleanVar | None = None
         self.event_direction_var: tk.StringVar | None = None
+        self._layout_job: str | None = None
+        self._stacked_layout: bool | None = None
 
         self._build_ui(default_y0, default_domain)
 
@@ -197,19 +307,20 @@ class ParametersDialog:
             if snapshot is not None:
                 self.apply_form_state(snapshot)
 
+        preferred_width, preferred_height = _preferred_configuration_size(self.equation_type)
+        fit_and_center(
+            self.win,
+            min_width=preferred_width,
+            min_height=preferred_height,
+            resizable=True,
+        )
         min_width, min_height = calculate_screen_aware_minsize(
             self.win.winfo_screenwidth(),
             self.win.winfo_screenheight(),
-            1050,
-            700,
+            640,
+            520,
         )
         self.win.minsize(min_width, min_height)
-        fit_and_center(
-            self.win,
-            min_width=min_width,
-            min_height=min_height,
-            resizable=True,
-        )
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
@@ -241,11 +352,11 @@ class ParametersDialog:
         bind_wraplength(header, formula_lbl, pad=2 * pad, min_wrap=200)
 
         # ── Scrollable content ──
-        scroll = ScrollableFrame(self.win)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self._scroll = ScrollableFrame(self.win)
+        self._scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
+        self._scroll.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        scroll_frame = scroll.inner
+        scroll_frame = self._scroll.inner
         scroll_frame.configure(padding=pad)
 
         # Two-column layout: left = domain + ICs, right = solver + statistics
@@ -264,16 +375,12 @@ class ParametersDialog:
         self._build_solver_method_section(right_col, pad)
         self._build_event_section(right_col, pad)
 
-        # Statistics listbox (extended selection) — right column
-        stats_frame = self._build_statistics_section(right_col, pad)
+        self._build_statistics_section(right_col, pad)
 
-        bind_wraplength(
-            stats_frame,
-            [self.method_desc, self._stats_desc_label],
-            pad=2 * pad,
-            min_wrap=150,
-        )
-        scroll.bind_new_children()
+        bind_wraplength(self.method_frame, self.method_desc, pad=2 * pad, min_wrap=150)
+        self._scroll.bind_new_children()
+        self._scroll.viewport.bind("<Configure>", self._schedule_content_layout, add="+")
+        self._scroll.viewport.after(100, self._apply_content_layout)
         btn_solve.focus_set()
 
     # ------------------------------------------------------------------
@@ -331,15 +438,52 @@ class ParametersDialog:
         return formula_label
 
     def _build_layout_columns(self, parent: ttk.Frame, pad: int) -> tuple[ttk.Frame, ttk.Frame]:
-        """Build the two-column content layout."""
-        columns_frame = ttk.Frame(parent)
-        columns_frame.pack(fill=tk.BOTH, expand=True, pady=(0, pad))
+        """Build logical columns that can stack without recreating their controls."""
+        self._columns_frame = ttk.Frame(parent)
+        self._columns_frame.pack(fill=tk.BOTH, expand=True, pady=(0, pad))
 
-        left_col = ttk.Frame(columns_frame)
-        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, pad))
-        right_col = ttk.Frame(columns_frame)
-        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        return left_col, right_col
+        self._left_col = ttk.Frame(self._columns_frame)
+        self._right_col = ttk.Frame(self._columns_frame)
+        return self._left_col, self._right_col
+
+    def _schedule_content_layout(self, _event: tk.Event[tk.Misc]) -> None:
+        """Debounce the wide/tall Configuration layout switch."""
+        if self._layout_job is not None:
+            try:
+                self._scroll.viewport.after_cancel(self._layout_job)
+            except tk.TclError:
+                pass
+        self._layout_job = self._scroll.viewport.after(
+            _LAYOUT_DEBOUNCE_MS,
+            self._apply_content_layout,
+        )
+
+    def _apply_content_layout(self) -> None:
+        """Use two logical columns when wide and a natural vertical stack when narrow."""
+        self._layout_job = None
+        stacked = _uses_stacked_layout(self._scroll.viewport.winfo_width())
+        if stacked == self._stacked_layout:
+            return
+        self._stacked_layout = stacked
+        pad: int = get_env_from_schema("UI_PADDING")
+
+        self._left_col.grid_forget()
+        self._right_col.grid_forget()
+        for column in range(2):
+            self._columns_frame.columnconfigure(column, weight=0, minsize=0, uniform="")
+        for row in range(2):
+            self._columns_frame.rowconfigure(row, weight=0)
+
+        if stacked:
+            self._columns_frame.columnconfigure(0, weight=1)
+            self._left_col.grid(row=0, column=0, sticky=tk.EW, padx=0)
+            self._right_col.grid(row=1, column=0, sticky=tk.EW, padx=0)
+        else:
+            self._columns_frame.columnconfigure(0, weight=1, uniform="configuration")
+            self._columns_frame.columnconfigure(1, weight=1, uniform="configuration")
+            self._left_col.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, pad // 2))
+            self._right_col.grid(row=0, column=1, sticky=tk.NSEW, padx=(pad // 2, 0))
+        self._scroll.refresh_scroll_region()
 
     def _build_domain_and_parameter_sections(
         self,
@@ -347,184 +491,154 @@ class ParametersDialog:
         pad: int,
         default_domain: list[float],
     ) -> bool:
-        """Build domain, parameter, and grid-size controls."""
-        # Domain (left column)
-        domain_label = (
-            "Domain (n\u2098\u1d62\u2099, n\u2098\u2090\u2093)"  # n_min, n_max
-            if self.equation_type == "difference"
-            else "Domain"
-        )
-        domain_frame = ttk.LabelFrame(left_col, text=domain_label, padding=pad)
+        """Build a simple 1D domain form or a structured PDE axis table."""
+        is_diff = self.equation_type == "difference"
+        domain_frame = ttk.LabelFrame(left_col, text="Domain", padding=pad)
         domain_frame.pack(fill=tk.X, pady=(0, pad))
 
-        # n_min/x_min, n_max/x_max
-        var0 = self.variables[0] if self.variables else "x"
-        if self.equation_type == "difference":
-            x_min_label = "n\u2098\u1d62\u2099:"
-            x_max_label = "n\u2098\u2090\u2093:"
-        elif self.is_pde:
-            x_min_label = "x[0]\u2098\u1d62\u2099:"
-            x_max_label = "x[0]\u2098\u2090\u2093:"
-        else:
-            x_min_label = f"{var0}\u2098\u1d62\u2099:"
-            x_max_label = f"{var0}\u2098\u2090\u2093:"
-        row_d = ttk.Frame(domain_frame)
-        row_d.pack(fill=tk.X)
-        ttk.Label(row_d, text=x_min_label).pack(side=tk.LEFT)
-        is_diff = self.equation_type == "difference"
         xmin_val = int(default_domain[0]) if is_diff else default_domain[0]
-        self.xmin_var = tk.StringVar(value=str(xmin_val))
-        ttk.Entry(row_d, textvariable=self.xmin_var, width=12, font=get_font()).pack(
-            side=tk.LEFT, padx=pad
-        )
-        ttk.Label(row_d, text=x_max_label).pack(side=tk.LEFT)
         xmax_val = int(default_domain[1]) if is_diff else default_domain[1]
+        self.xmin_var = tk.StringVar(value=str(xmin_val))
         self.xmax_var = tk.StringVar(value=str(xmax_val))
-        ttk.Entry(row_d, textvariable=self.xmax_var, width=12, font=get_font()).pack(
-            side=tk.LEFT, padx=pad
-        )
-
         self.ymin_var: tk.StringVar | None = None
         self.ymax_var: tk.StringVar | None = None
         self.npoints_y_var: tk.StringVar | None = None
         self.zmin_var: tk.StringVar | None = None
         self.zmax_var: tk.StringVar | None = None
         self.npoints_z_var: tk.StringVar | None = None
-        if self.is_pde and len(default_domain) >= 4:
-            pde_label_1 = "x[1]"
-            row_y = ttk.Frame(domain_frame)
-            row_y.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_y, text=f"{pde_label_1}\u2098\u1d62\u2099:").pack(side=tk.LEFT)
+
+        if self.is_pde:
+            self.npoints_var = tk.StringVar(value=str(_default_pde_grid_points(self.equation_type)))
             self.ymin_var = tk.StringVar(value=str(default_domain[2]))
-            ttk.Entry(row_y, textvariable=self.ymin_var, width=12, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
-            ttk.Label(row_y, text=f"{pde_label_1}\u2098\u2090\u2093:").pack(side=tk.LEFT)
             self.ymax_var = tk.StringVar(value=str(default_domain[3]))
-            ttk.Entry(row_y, textvariable=self.ymax_var, width=12, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
-            row_ny = ttk.Frame(domain_frame)
-            row_ny.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_ny, text=f"Grid points ({pde_label_1}):").pack(side=tk.LEFT)
             self.npoints_y_var = tk.StringVar(
                 value=str(_default_pde_grid_points(self.equation_type))
             )
-            ttk.Entry(row_ny, textvariable=self.npoints_y_var, width=10, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
+            axis_rows: list[tuple[str, tk.StringVar, tk.StringVar, tk.StringVar]] = [
+                ("x", self.xmin_var, self.xmax_var, self.npoints_var),
+                ("y", self.ymin_var, self.ymax_var, self.npoints_y_var),
+            ]
+            if self.equation_type == "pde_3d":
+                self.zmin_var = tk.StringVar(value=str(default_domain[4]))
+                self.zmax_var = tk.StringVar(value=str(default_domain[5]))
+                self.npoints_z_var = tk.StringVar(value="25")
+                axis_rows.append(("z", self.zmin_var, self.zmax_var, self.npoints_z_var))
 
-        if self.equation_type == "pde_3d" and len(default_domain) >= 6:
-            row_z = ttk.Frame(domain_frame)
-            row_z.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_z, text="x[2]ₘᵢₙ:").pack(side=tk.LEFT)
-            self.zmin_var = tk.StringVar(value=str(default_domain[4]))
-            ttk.Entry(row_z, textvariable=self.zmin_var, width=12, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
-            ttk.Label(row_z, text="x[2]ₘₐₓ:").pack(side=tk.LEFT)
-            self.zmax_var = tk.StringVar(value=str(default_domain[5]))
-            ttk.Entry(row_z, textvariable=self.zmax_var, width=12, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
-            row_nz = ttk.Frame(domain_frame)
-            row_nz.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_nz, text="Grid points (x[2]):").pack(side=tk.LEFT)
-            self.npoints_z_var = tk.StringVar(value="25")
-            ttk.Entry(row_nz, textvariable=self.npoints_z_var, width=10, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
+            for column, text in enumerate(("Axis", "Min", "Max", "Grid points")):
+                ttk.Label(domain_frame, text=text, style="Small.TLabel").grid(
+                    row=0,
+                    column=column,
+                    sticky=tk.W,
+                    padx=(0, pad),
+                    pady=(0, pad // 2),
+                )
+            for row_index, (axis, min_var, max_var, points_var) in enumerate(axis_rows, start=1):
+                ttk.Label(domain_frame, text=axis, width=6).grid(
+                    row=row_index,
+                    column=0,
+                    sticky=tk.W,
+                    pady=2,
+                )
+                for column, variable in enumerate((min_var, max_var, points_var), start=1):
+                    ttk.Entry(
+                        domain_frame,
+                        textvariable=variable,
+                        width=12,
+                        font=get_font(),
+                    ).grid(
+                        row=row_index,
+                        column=column,
+                        sticky=tk.EW,
+                        padx=(0, pad),
+                        pady=2,
+                    )
+            for column in range(1, 4):
+                domain_frame.columnconfigure(column, weight=1)
+        else:
+            labels = ("n min", "n max") if is_diff else ("x min", "x max")
+            for row_index, (label, variable) in enumerate(
+                zip(labels, (self.xmin_var, self.xmax_var), strict=True)
+            ):
+                ttk.Label(domain_frame, text=label).grid(
+                    row=row_index,
+                    column=0,
+                    sticky=tk.W,
+                    padx=(0, pad),
+                    pady=2,
+                )
+                ttk.Entry(
+                    domain_frame,
+                    textvariable=variable,
+                    width=16,
+                    font=get_font(),
+                ).grid(row=row_index, column=1, sticky=tk.EW, pady=2)
+            domain_frame.columnconfigure(1, weight=1)
+            if not is_diff:
+                self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
+                ttk.Label(domain_frame, text="Sample points").grid(
+                    row=2,
+                    column=0,
+                    sticky=tk.W,
+                    padx=(0, pad),
+                    pady=2,
+                )
+                ttk.Spinbox(
+                    domain_frame,
+                    textvariable=self.npoints_var,
+                    from_=10,
+                    to=10_000_000,
+                    increment=100,
+                    width=14,
+                    font=get_font(),
+                ).grid(row=2, column=1, sticky=tk.W, pady=2)
 
-        # Equation parameters (ω, γ, etc.) — left column, 2 per row
-        if self.parameters:
-            _sub_digits = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089"
-
-            def _subscript_n(n: int) -> str:
-                """Return subscript digits for integer n (e.g. 12 → '₁₂')."""
-                return "".join(_sub_digits[int(d)] if d.isdigit() else d for d in str(n))
-
-            eq_params_frame = ttk.LabelFrame(left_col, text="Equation Parameters", padding=pad)
-            eq_params_frame.pack(fill=tk.X, pady=(0, pad))
-            params_items = list(self.parameters.items())
-
-            def _display_name_for(pname: str) -> str:
-                pinfo = self.parameters_schema.get(pname, {})
-                m = re.match(r"^(.+)\[(\d+)\]$", pname)
-                if m:
-                    return f"{m.group(1)}{_subscript_n(int(m.group(2)))}"
-                display = pinfo.get("display")
-                return str(display) if display is not None else pname
-
-            label_width = max(len(_display_name_for(p)) for p in self.parameters) + 1
-
-            for i in range(0, len(params_items), 2):
-                row = ttk.Frame(eq_params_frame)
-                row.pack(fill=tk.X, pady=2)
-                for pname, val in params_items[i : i + 2]:
-                    pinfo = self.parameters_schema.get(pname, {})
-                    display_name = _display_name_for(pname)
-
-                    # Detect list parameter
-                    if isinstance(val, list):
-                        ttk.Label(row, text=f"{display_name}:", width=label_width).pack(
-                            side=tk.LEFT,
-                        )
-                        default_csv = ", ".join(str(v) for v in val)
-                        var = tk.StringVar(value=default_csv)
-                        entry = ttk.Entry(row, textvariable=var, width=20, font=get_font())
-                        entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
-                        self._eq_param_vars[pname] = var
-                        m = re.match(r"^(.+)\[(\d+)\]$", pname)
-                        n = int(m.group(2)) if m else len(val)
-                        ToolTip(
-                            entry,
-                            pinfo.get("description", "")
-                            or f"Comma-separated values ({n} components)",
-                        )
-                    else:
-                        ttk.Label(row, text=f"{display_name}:", width=label_width).pack(
-                            side=tk.LEFT,
-                        )
-                        var = tk.StringVar(value=str(val))
-                        entry = ttk.Entry(row, textvariable=var, width=12, font=get_font())
-                        entry.pack(side=tk.LEFT, padx=(pad, pad * 2))
-                        self._eq_param_vars[pname] = var
-                        ToolTip(entry, pinfo.get("description", ""))
-
-        if self.equation_type != "difference" and not self.is_pde:
-            row_n = ttk.Frame(domain_frame)
-            row_n.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_n, text="Sample points:").pack(side=tk.LEFT)
-            self.npoints_var = tk.StringVar(value=str(get_env_from_schema("SOLVER_NUM_POINTS")))
-            npoints_entry = ttk.Entry(
-                row_n, textvariable=self.npoints_var, width=10, font=get_font()
-            )
-            npoints_entry.pack(side=tk.LEFT, padx=pad)
-            btn_decrease = ttk.Button(
-                row_n,
-                text="−",
-                width=3,
-                style="Small.TButton",
-                command=lambda: self._change_npoints(0.1),
-            )
-            btn_decrease.pack(side=tk.LEFT, padx=(0, 2))
-            btn_increase = ttk.Button(
-                row_n,
-                text="+",
-                width=3,
-                style="Small.TButton",
-                command=lambda: self._change_npoints(10),
-            )
-            btn_increase.pack(side=tk.LEFT)
-        elif self.is_pde:
-            row_n = ttk.Frame(domain_frame)
-            row_n.pack(fill=tk.X, pady=(pad, 0))
-            ttk.Label(row_n, text="Grid points (x[0]):").pack(side=tk.LEFT)
-            self.npoints_var = tk.StringVar(value=str(_default_pde_grid_points(self.equation_type)))
-            ttk.Entry(row_n, textvariable=self.npoints_var, width=10, font=get_font()).pack(
-                side=tk.LEFT, padx=pad
-            )
+        self._build_equation_parameters_section(left_col, pad)
         return is_diff
+
+    def _build_equation_parameters_section(self, parent: ttk.Frame, pad: int) -> None:
+        """Build aligned equation-parameter controls while preserving raw parsing."""
+        if not self.parameters:
+            return
+        sub_digits = "₀₁₂₃₄₅₆₇₈₉"
+
+        def _subscript_n(number: int) -> str:
+            return "".join(sub_digits[int(digit)] for digit in str(number))
+
+        def _display_name_for(parameter_name: str) -> str:
+            info = self.parameters_schema.get(parameter_name, {})
+            match = re.match(r"^(.+)\[(\d+)\]$", parameter_name)
+            if match:
+                return f"{match.group(1)}{_subscript_n(int(match.group(2)))}"
+            display = info.get("display")
+            return str(display) if display is not None else parameter_name
+
+        frame = ttk.LabelFrame(parent, text="Equation Parameters", padding=pad)
+        frame.pack(fill=tk.X, pady=(0, pad))
+        frame.columnconfigure(1, weight=1)
+        for row_index, (parameter_name, value) in enumerate(self.parameters.items()):
+            info = self.parameters_schema.get(parameter_name, {})
+            ttk.Label(frame, text=_display_name_for(parameter_name)).grid(
+                row=row_index,
+                column=0,
+                sticky=tk.W,
+                padx=(0, pad),
+                pady=2,
+            )
+            default_text = (
+                ", ".join(str(item) for item in value) if isinstance(value, list) else str(value)
+            )
+            variable = tk.StringVar(value=default_text)
+            entry = ttk.Entry(frame, textvariable=variable, width=22, font=get_font())
+            entry.grid(row=row_index, column=1, sticky=tk.EW, pady=2)
+            self._eq_param_vars[parameter_name] = variable
+            match = re.match(r"^(.+)\[(\d+)\]$", parameter_name)
+            expected_count = (
+                int(match.group(2)) if match else (len(value) if isinstance(value, list) else 1)
+            )
+            help_text = str(info.get("description", ""))
+            if isinstance(value, list) and not help_text:
+                help_text = f"Comma-separated values ({expected_count} components)"
+            ToolTip(entry, help_text)
 
     def _build_initial_or_boundary_sections(
         self,
@@ -534,206 +648,232 @@ class ParametersDialog:
         default_domain: list[float],
         is_diff: bool,
     ) -> None:
-        """Build PDE boundary controls or non-PDE initial-condition controls."""
-        # Initial conditions (skip for PDE) — left column
+        """Build structured initial-condition or PDE boundary tables."""
         self._bc_vars: list[tk.StringVar] = []
         self._bc_type_vars: list[tk.StringVar] = []
+        self._bc_expression_vars_by_face: dict[str, tk.StringVar] = {}
+        self._bc_type_vars_by_face: dict[str, tk.StringVar] = {}
         self._domain_shape_var: tk.StringVar | None = None
         self._mask_expr_var: tk.StringVar | None = None
         self._contour_bc_expr_var: tk.StringVar | None = None
         self._contour_bc_type_var: tk.StringVar | None = None
         self._rect_bc_frame: ttk.LabelFrame | None = None
         self._contour_bc_frame: ttk.LabelFrame | None = None
-        if self.is_pde:
-            # Domain shape selector
-            shape_frame = ttk.LabelFrame(left_col, text="Domain Shape", padding=pad)
-            shape_frame.pack(fill=tk.X, pady=(0, pad))
 
-            row_shape = ttk.Frame(shape_frame)
-            row_shape.pack(fill=tk.X)
-            ttk.Label(row_shape, text="Shape:").pack(side=tk.LEFT)
-            self._domain_shape_var = tk.StringVar(value="Rectangle")
-            shape_combo = ttk.Combobox(
-                row_shape,
-                textvariable=self._domain_shape_var,
-                values=(
-                    ["Rectangle"]
-                    if self.equation_type == "pde_3d"
-                    else ["Rectangle", "Custom contour"]
-                ),
+        if self.is_pde:
+            self._build_pde_boundary_sections(left_col, pad)
+            return
+
+        frame = ttk.LabelFrame(left_col, text="Initial Conditions", padding=pad)
+        frame.pack(fill=tk.X, pady=(0, pad))
+        headings = (
+            ("Quantity", "Initial value")
+            if is_diff
+            else (
+                "Quantity",
+                "Initial value",
+                "At x",
+            )
+        )
+        for column, text in enumerate(headings):
+            ttk.Label(frame, text=text, style="Small.TLabel").grid(
+                row=0,
+                column=column,
+                sticky=tk.W,
+                padx=(0, pad),
+                pady=(0, pad // 2),
+            )
+        frame.columnconfigure(1, weight=1)
+        if not is_diff:
+            frame.columnconfigure(2, weight=1)
+
+        if self.component_orders:
+            n_initial = sum(self.component_orders)
+        elif self.is_vector:
+            n_initial = self.order * self.vector_components
+        else:
+            n_initial = self.order
+        default_position = str(int(default_domain[0]) if is_diff else default_domain[0])
+        labels = self._ic_labels()
+        for index in range(n_initial):
+            ttk.Label(frame, text=labels[index]).grid(
+                row=index + 1,
+                column=0,
+                sticky=tk.W,
+                padx=(0, pad),
+                pady=2,
+            )
+            value_var = tk.StringVar(
+                value=str(default_y0[index] if index < len(default_y0) else 1.0)
+            )
+            ttk.Entry(frame, textvariable=value_var, width=14, font=get_font()).grid(
+                row=index + 1,
+                column=1,
+                sticky=tk.EW,
+                padx=(0, pad),
+                pady=2,
+            )
+            position_var = tk.StringVar(value=default_position)
+            if not is_diff:
+                ttk.Entry(
+                    frame,
+                    textvariable=position_var,
+                    width=14,
+                    font=get_font(),
+                ).grid(row=index + 1, column=2, sticky=tk.EW, pady=2)
+            self._y0_vars.append(value_var)
+            self._x0_vars.append(position_var)
+
+    def _build_pde_boundary_sections(self, parent: ttk.Frame, pad: int) -> None:
+        """Build shape controls and face-keyed boundary tables for PDE families."""
+        shape_frame = ttk.LabelFrame(parent, text="Domain Shape", padding=pad)
+        shape_frame.pack(fill=tk.X, pady=(0, pad))
+        shape_frame.columnconfigure(1, weight=1)
+        ttk.Label(shape_frame, text="Shape").grid(
+            row=0,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+        )
+        self._domain_shape_var = tk.StringVar(value="Rectangle")
+        shape_combo = ttk.Combobox(
+            shape_frame,
+            textvariable=self._domain_shape_var,
+            values=(
+                ["Rectangle"] if self.equation_type == "pde_3d" else ["Rectangle", "Custom contour"]
+            ),
+            state="readonly",
+            width=18,
+            font=get_font(),
+        )
+        shape_combo.grid(row=0, column=1, sticky=tk.W)
+        shape_combo.bind("<<ComboboxSelected>>", self._on_domain_shape_change)
+
+        self._mask_row = ttk.Frame(shape_frame)
+        self._mask_row.columnconfigure(1, weight=1)
+        ttk.Label(self._mask_row, text="Mask expression").grid(
+            row=0,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+        )
+        self._mask_expr_var = tk.StringVar(value="x**2 + y**2 <= 1")
+        mask_entry = ttk.Entry(
+            self._mask_row,
+            textvariable=self._mask_expr_var,
+            width=30,
+            font=get_font(),
+        )
+        mask_entry.grid(row=0, column=1, sticky=tk.EW)
+        ToolTip(
+            mask_entry,
+            "Boolean expression defining the domain, for example x**2 + y**2 <= 1.",
+        )
+
+        self._rect_bc_frame = ttk.LabelFrame(
+            parent,
+            text=(
+                "Shared Boundary Conditions (all components)"
+                if self.equation_type == "vector_pde"
+                else "Boundary Conditions"
+            ),
+            padding=pad,
+        )
+        self._rect_bc_frame.pack(fill=tk.X, pady=(0, pad))
+        for column, text in enumerate(("Boundary", "Type", "Value")):
+            ttk.Label(self._rect_bc_frame, text=text, style="Small.TLabel").grid(
+                row=0,
+                column=column,
+                sticky=tk.W,
+                padx=(0, pad),
+                pady=(0, pad // 2),
+            )
+        self._rect_bc_frame.columnconfigure(2, weight=1)
+
+        visual_order, solver_order = _pde_face_orders(self.equation_type)
+        for row_index, face in enumerate(visual_order, start=1):
+            ttk.Label(self._rect_bc_frame, text=_PDE_FACE_LABELS[face]).grid(
+                row=row_index,
+                column=0,
+                sticky=tk.W,
+                padx=(0, pad),
+                pady=2,
+            )
+            preset = self.default_boundary_conditions.get(face, {})
+            type_var = tk.StringVar(value=preset.get("type", "Dirichlet"))
+            ttk.Combobox(
+                self._rect_bc_frame,
+                textvariable=type_var,
+                values=["Dirichlet", "Neumann"],
                 state="readonly",
+                width=11,
+                font=get_font(),
+            ).grid(row=row_index, column=1, sticky=tk.W, padx=(0, pad), pady=2)
+            expression_var = tk.StringVar(value=preset.get("expression", "0"))
+            entry = ttk.Entry(
+                self._rect_bc_frame,
+                textvariable=expression_var,
                 width=18,
                 font=get_font(),
             )
-            shape_combo.pack(side=tk.LEFT, padx=pad)
-            shape_combo.bind("<<ComboboxSelected>>", self._on_domain_shape_change)
-
-            # Mask expression entry (hidden by default)
-            self._mask_row = ttk.Frame(shape_frame)
-            ttk.Label(self._mask_row, text="Mask expression:").pack(side=tk.LEFT)
-            self._mask_expr_var = tk.StringVar(value="x**2 + y**2 <= 1")
-            mask_entry = ttk.Entry(
-                self._mask_row,
-                textvariable=self._mask_expr_var,
-                width=30,
-                font=get_font(),
-            )
-            mask_entry.pack(side=tk.LEFT, padx=pad)
+            entry.grid(row=row_index, column=2, sticky=tk.EW, pady=2)
             ToolTip(
-                mask_entry,
-                "Boolean expression defining the domain, e.g. x**2 + y**2 <= 1",
+                entry,
+                f"Expression in {_PDE_FACE_FREE_VARIABLES[face]}. Dirichlet sets the value; "
+                "Neumann sets the outward-normal derivative.",
             )
+            self._bc_type_vars_by_face[face] = type_var
+            self._bc_expression_vars_by_face[face] = expression_var
 
-            # Rectangular boundary conditions
-            self._rect_bc_frame = ttk.LabelFrame(
-                left_col,
-                text=(
-                    "Shared Boundary Conditions (all components)"
-                    if self.equation_type == "vector_pde"
-                    else "Boundary Conditions"
-                ),
-                padding=pad,
-            )
-            self._rect_bc_frame.pack(fill=tk.X, pady=(0, pad))
+        # These compatibility lists deliberately retain the historical solver order.
+        self._bc_vars = [self._bc_expression_vars_by_face[face] for face in solver_order]
+        self._bc_type_vars = [self._bc_type_vars_by_face[face] for face in solver_order]
 
-            idx0 = "x[0]"
-            idx1 = "x[1]"
-            if self.equation_type == "pde_3d":
-                idx2 = "x[2]"
-                boundaries = [
-                    (f"{idx2} = {idx2}\u2098\u1d62\u2099 (z min)", "x, y, z"),
-                    (f"{idx2} = {idx2}\u2098\u2090\u2093 (z max)", "x, y, z"),
-                    (f"{idx1} = {idx1}\u2098\u1d62\u2099 (y min)", "x, y, z"),
-                    (f"{idx1} = {idx1}\u2098\u2090\u2093 (y max)", "x, y, z"),
-                    (f"{idx0} = {idx0}\u2098\u1d62\u2099 (x min)", "x, y, z"),
-                    (f"{idx0} = {idx0}\u2098\u2090\u2093 (x max)", "x, y, z"),
-                ]
-                boundary_faces = ["z_min", "z_max", "y_min", "y_max", "x_min", "x_max"]
-            else:
-                boundaries = [
-                    (f"{idx1} = {idx1}\u2098\u1d62\u2099 (bottom)", idx0),
-                    (f"{idx1} = {idx1}\u2098\u2090\u2093 (top)", idx0),
-                    (f"{idx0} = {idx0}\u2098\u1d62\u2099 (left)", idx1),
-                    (f"{idx0} = {idx0}\u2098\u2090\u2093 (right)", idx1),
-                ]
-                boundary_faces = ["bottom", "top", "left", "right"]
-            for (label_text, free_var), face in zip(boundaries, boundary_faces, strict=True):
-                row = ttk.Frame(self._rect_bc_frame)
-                row.pack(fill=tk.X, pady=1)
-                ttk.Label(row, text=f"{label_text}:", width=24).pack(side=tk.LEFT)
-                preset = self.default_boundary_conditions.get(face, {})
-                bc_type_var = tk.StringVar(value=preset.get("type", "Dirichlet"))
-                bc_type_combo = ttk.Combobox(
-                    row,
-                    textvariable=bc_type_var,
-                    values=["Dirichlet", "Neumann"],
-                    state="readonly",
-                    width=10,
-                    font=get_font(),
-                )
-                bc_type_combo.pack(side=tk.LEFT, padx=(pad, 2))
-                self._bc_type_vars.append(bc_type_var)
-                bc_var = tk.StringVar(value=preset.get("expression", "0"))
-                bc_entry = ttk.Entry(
-                    row,
-                    textvariable=bc_var,
-                    width=16,
-                    font=get_font(),
-                )
-                bc_entry.pack(side=tk.LEFT, padx=(2, 0))
-                ToolTip(
-                    bc_entry,
-                    f"Expression as a function of {free_var}, e.g. sin(pi*{free_var}). "
-                    "For Dirichlet: value. For Neumann: normal derivative.",
-                )
-                self._bc_vars.append(bc_var)
-
-            # Contour boundary conditions (hidden by default)
-            self._contour_bc_frame = ttk.LabelFrame(
-                left_col,
-                text=(
-                    "Shared Contour Boundary (all components)"
-                    if self.equation_type == "vector_pde"
-                    else "Contour Boundary Conditions"
-                ),
-                padding=pad,
-            )
-            row_cbc_type = ttk.Frame(self._contour_bc_frame)
-            row_cbc_type.pack(fill=tk.X, pady=1)
-            ttk.Label(row_cbc_type, text="BC type:").pack(side=tk.LEFT)
-            self._contour_bc_type_var = tk.StringVar(value="Dirichlet")
-            ttk.Combobox(
-                row_cbc_type,
-                textvariable=self._contour_bc_type_var,
-                values=["Dirichlet", "Neumann"],
-                state="readonly",
-                width=10,
-                font=get_font(),
-            ).pack(side=tk.LEFT, padx=pad)
-
-            row_cbc_expr = ttk.Frame(self._contour_bc_frame)
-            row_cbc_expr.pack(fill=tk.X, pady=1)
-            ttk.Label(row_cbc_expr, text="Value:").pack(side=tk.LEFT)
-            self._contour_bc_expr_var = tk.StringVar(value="0")
-            contour_bc_entry = ttk.Entry(
-                row_cbc_expr,
-                textvariable=self._contour_bc_expr_var,
-                width=25,
-                font=get_font(),
-            )
-            contour_bc_entry.pack(side=tk.LEFT, padx=pad)
-            ToolTip(
-                contour_bc_entry,
-                "Expression for boundary value (Dirichlet) or normal derivative (Neumann), "
-                "as a function of x and y.",
-            )
-        else:
-            ic_frame = ttk.LabelFrame(left_col, text="Initial Conditions", padding=pad)
-            ic_frame.pack(fill=tk.X, pady=(0, pad))
-
-            _subscripts = "₀₁₂₃₄₅₆₇₈₉"
-            ic_labels = self._ic_labels()
-            if self.component_orders:
-                n_ic = sum(self.component_orders)
-            elif self.is_vector:
-                n_ic = self.order * self.vector_components
-            else:
-                n_ic = self.order
-            ic_label_width = max(len(label) for label in ic_labels) + 1
-            x0_label_width = (
-                max(
-                    len(f"x{_subscripts[i] if i < len(_subscripts) else str(i)} =")
-                    for i in range(n_ic)
-                )
-                + 1
-            )
-            x0_val = int(default_domain[0]) if is_diff else default_domain[0]
-            default_x0_val = str(x0_val)
-            for i in range(n_ic):
-                row = ttk.Frame(ic_frame)
-                row.pack(fill=tk.X, pady=2)
-                default_val = default_y0[i] if i < len(default_y0) else 1.0
-                sub = _subscripts[i] if i < len(_subscripts) else str(i)
-
-                ttk.Label(row, text=f"{ic_labels[i]} =", width=ic_label_width).pack(side=tk.LEFT)
-                var = tk.StringVar(value=str(default_val))
-                ttk.Entry(row, textvariable=var, width=10, font=get_font()).pack(
-                    side=tk.LEFT,
-                    padx=(pad, pad * 2),
-                )
-
-                if self.equation_type != "difference":
-                    ttk.Label(row, text=f"x{sub} =", width=x0_label_width).pack(side=tk.LEFT)
-                    x_var = tk.StringVar(value=default_x0_val)
-                    ttk.Entry(row, textvariable=x_var, width=10, font=get_font()).pack(
-                        side=tk.LEFT,
-                        padx=pad,
-                    )
-                    self._x0_vars.append(x_var)
-                else:
-                    self._x0_vars.append(tk.StringVar(value=default_x0_val))
-
-                self._y0_vars.append(var)
+        self._contour_bc_frame = ttk.LabelFrame(
+            parent,
+            text=(
+                "Shared Contour Boundary (all components)"
+                if self.equation_type == "vector_pde"
+                else "Contour Boundary Conditions"
+            ),
+            padding=pad,
+        )
+        self._contour_bc_frame.columnconfigure(1, weight=1)
+        ttk.Label(self._contour_bc_frame, text="Boundary type").grid(
+            row=0,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+            pady=2,
+        )
+        self._contour_bc_type_var = tk.StringVar(value="Dirichlet")
+        ttk.Combobox(
+            self._contour_bc_frame,
+            textvariable=self._contour_bc_type_var,
+            values=["Dirichlet", "Neumann"],
+            state="readonly",
+            width=11,
+            font=get_font(),
+        ).grid(row=0, column=1, sticky=tk.W, pady=2)
+        ttk.Label(self._contour_bc_frame, text="Boundary value").grid(
+            row=1,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+            pady=2,
+        )
+        self._contour_bc_expr_var = tk.StringVar(value="0")
+        contour_entry = ttk.Entry(
+            self._contour_bc_frame,
+            textvariable=self._contour_bc_expr_var,
+            width=25,
+            font=get_font(),
+        )
+        contour_entry.grid(row=1, column=1, sticky=tk.EW, pady=2)
+        ToolTip(
+            contour_entry,
+            "Expression in x and y for a boundary value or outward-normal derivative.",
+        )
 
     def _build_solver_method_section(self, parent: ttk.Frame, pad: int) -> None:
         """Build solver-method controls."""
@@ -763,93 +903,115 @@ class ParametersDialog:
             self.method_frame.pack_forget()
 
     def _build_event_section(self, parent: ttk.Frame, pad: int) -> None:
-        """Build safe optional event controls for initial-value ODE solves."""
-        event_frame = ttk.LabelFrame(parent, text="IVP Event (optional)", padding=pad)
-        event_frame.pack(fill=tk.X, pady=(0, pad))
+        """Build progressively disclosed event controls for ODE IVP solves."""
+        if self.equation_type == "difference" or self.is_pde:
+            self._event_frame = None
+            self._event_controls_frame = None
+            return
 
-        expression_row = ttk.Frame(event_frame)
-        expression_row.pack(fill=tk.X)
-        ttk.Label(expression_row, text="Expression:").pack(side=tk.LEFT)
+        self._event_frame = ttk.LabelFrame(parent, text="Event", padding=pad)
+        self._event_frame.pack(fill=tk.X, pady=(0, pad))
+        self.event_enabled_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            self._event_frame,
+            text="Detect an event",
+            variable=self.event_enabled_var,
+            command=self._on_event_enabled_change,
+        ).pack(anchor=tk.W)
+
+        self._event_controls_frame = ttk.Frame(self._event_frame)
+        self._event_controls_frame.columnconfigure(1, weight=1)
         self.event_expression_var = tk.StringVar(value="")
+        ttk.Label(self._event_controls_frame, text="Expression").grid(
+            row=0,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+            pady=(pad, 2),
+        )
         expression_entry = ttk.Entry(
-            expression_row,
+            self._event_controls_frame,
             textvariable=self.event_expression_var,
             width=24,
             font=get_font(),
         )
-        expression_entry.pack(side=tk.LEFT, padx=pad, fill=tk.X, expand=True)
+        expression_entry.grid(row=0, column=1, sticky=tk.EW, pady=(pad, 2))
         ToolTip(
             expression_entry,
-            "A safe expression in x and the ODE state (for example f[0] - 1). "
-            "A zero marks the event. Events are available for initial-value solves only.",
+            "A safe expression in x and the ODE state, for example f[0] - 1. "
+            "A zero marks the event.",
         )
 
-        options_row = ttk.Frame(event_frame)
-        options_row.pack(fill=tk.X, pady=(pad, 0))
-        self.event_terminal_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
-            options_row,
-            text="Stop at event",
-            variable=self.event_terminal_var,
-        ).pack(side=tk.LEFT)
-        ttk.Label(options_row, text="Direction:").pack(side=tk.LEFT, padx=(2 * pad, pad))
         self.event_direction_var = tk.StringVar(value="0")
+        ttk.Label(self._event_controls_frame, text="Direction").grid(
+            row=1,
+            column=0,
+            sticky=tk.W,
+            padx=(0, pad),
+            pady=2,
+        )
         ttk.Combobox(
-            options_row,
+            self._event_controls_frame,
             textvariable=self.event_direction_var,
             values=("-1", "0", "1"),
             state="readonly",
-            width=4,
+            width=5,
             font=get_font(),
-        ).pack(side=tk.LEFT)
+        ).grid(row=1, column=1, sticky=tk.W, pady=2)
 
-        if self.equation_type == "difference" or self.is_pde:
-            event_frame.pack_forget()
+        self.event_terminal_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            self._event_controls_frame,
+            text="Stop integration at event",
+            variable=self.event_terminal_var,
+        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
+        self._on_event_enabled_change()
 
     def _build_statistics_section(self, parent: ttk.Frame, pad: int) -> ttk.LabelFrame:
-        """Build statistics selection controls."""
-        stats_frame = ttk.LabelFrame(parent, text="Statistics and Magnitudes", padding=pad)
-        stats_frame.pack(fill=tk.X, pady=(0, pad))
+        """Build grouped checkbox controls for every computed metric."""
+        frame = ttk.LabelFrame(parent, text="Computed metrics", padding=pad)
+        frame.pack(fill=tk.X, pady=(0, pad))
+        self._stat_keys = list(AVAILABLE_STATISTICS)
+        self._stat_vars = {key: tk.BooleanVar(value=True) for key in self._stat_keys}
 
-        self._stat_keys = list(AVAILABLE_STATISTICS.keys())
+        actions = ttk.Frame(frame)
+        actions.pack(fill=tk.X, pady=(0, pad // 2))
+        ttk.Button(
+            actions,
+            text="Select all",
+            style="Small.TButton",
+            command=self._select_all_statistics,
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            actions,
+            text="Clear",
+            style="Small.TButton",
+            command=self._clear_statistics,
+        ).pack(side=tk.LEFT, padx=(pad // 2, 0))
 
-        stats_list_frame = ttk.Frame(stats_frame)
-        stats_list_frame.pack(fill=tk.X)
-
-        btn_bg: str = get_env_from_schema("UI_BUTTON_BG")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
-        stats_select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-        stats_select_fg: str = get_contrast_foreground(stats_select_bg)
-        stats_scrollbar = ttk.Scrollbar(stats_list_frame, orient=tk.VERTICAL)
-        self._stats_listbox = tk.Listbox(
-            stats_list_frame,
-            selectmode=tk.EXTENDED,
-            height=min(len(self._stat_keys), 6),
-            bg=btn_bg,
-            fg=fg,
-            selectbackground=stats_select_bg,
-            selectforeground=stats_select_fg,
-            font=get_font(),
-            exportselection=False,
-            yscrollcommand=stats_scrollbar.set,
-        )
-        stats_scrollbar.config(command=self._stats_listbox.yview)
-        self._stats_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        stats_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        for key in self._stat_keys:
-            self._stats_listbox.insert(tk.END, key)
-        self._stats_listbox.select_set(0, tk.END)
-
-        self._stats_desc_label = ttk.Label(
-            stats_frame,
-            text="",
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        )
-        self._stats_desc_label.pack(anchor=tk.W, pady=(4, 0))
-        self._stats_listbox.bind("<<ListboxSelect>>", self._on_stats_select)
-        return stats_frame
+        groups = ttk.Frame(frame)
+        groups.pack(fill=tk.X)
+        groups.columnconfigure(0, weight=1, uniform="metric-group")
+        groups.columnconfigure(1, weight=1, uniform="metric-group")
+        for group_index, (title, keys) in enumerate(_STATISTIC_GROUPS):
+            group = ttk.Frame(groups)
+            group.grid(
+                row=group_index // 2,
+                column=group_index % 2,
+                sticky=tk.NW,
+                padx=(0, pad if group_index % 2 == 0 else 0),
+                pady=(0, pad // 2),
+            )
+            ttk.Label(group, text=title, style="Small.TLabel").pack(anchor=tk.W)
+            for key in keys:
+                checkbox = ttk.Checkbutton(
+                    group,
+                    text=_STATISTIC_LABELS[key],
+                    variable=self._stat_vars[key],
+                )
+                checkbox.pack(anchor=tk.W)
+                ToolTip(checkbox, AVAILABLE_STATISTICS[key])
+        return frame
 
     def _ic_labels(self) -> list[str]:
         subscripts = "₀₁₂₃₄₅₆₇₈₉"
@@ -873,32 +1035,21 @@ class ParametersDialog:
                         primes = "\u2032" * k
                         labels.append(f"f{primes}{comp_sub}")
             return labels
-        labels = [f"f(x{subscripts[0]})"]
-        for i in range(1, self.order):
-            primes = "\u2032" * i
-            sub = subscripts[i] if i < len(subscripts) else str(i)
-            labels.append(f"f{primes}(x{sub})")
-        return labels
-
-    def _change_npoints(self, factor: float) -> None:
-        """Change evaluation points by an order of magnitude.
-
-        Args:
-            factor: Multiplication factor (10 to increase, 0.1 to decrease).
-        """
-        try:
-            current = int(self.npoints_var.get())
-            new_value = max(10, int(current * factor))
-            self.npoints_var.set(str(new_value))
-        except ValueError:
-            # If invalid, reset to default
-            self.npoints_var.set(str(get_env_from_schema("SOLVER_NUM_POINTS")))
+        return [
+            "f" if derivative == 0 else f"f{'′' * derivative}" for derivative in range(self.order)
+        ]
 
     def _on_domain_shape_change(self, _event: Any) -> None:
         """Toggle visibility between rectangular and custom contour BC sections."""
         is_custom = self._domain_shape_var and self._domain_shape_var.get() == "Custom contour"
         if is_custom:
-            self._mask_row.pack(fill=tk.X, pady=(4, 0))
+            self._mask_row.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky=tk.EW,
+                pady=(4, 0),
+            )
             if self._rect_bc_frame:
                 self._rect_bc_frame.pack_forget()
             if self._contour_bc_frame:
@@ -912,7 +1063,7 @@ class ParametersDialog:
             if self.ymax_var:
                 self.ymax_var.set("1.0")
         else:
-            self._mask_row.pack_forget()
+            self._mask_row.grid_remove()
             if self._contour_bc_frame:
                 self._contour_bc_frame.pack_forget()
             if self._rect_bc_frame:
@@ -923,14 +1074,26 @@ class ParametersDialog:
         desc = SOLVER_METHOD_DESCRIPTIONS.get(method, "")
         self.method_desc.config(text=desc)
 
-    def _on_stats_select(self, _event: Any) -> None:
-        indices = self._stats_listbox.curselection()
-        if not indices:
-            self._stats_desc_label.config(text="")
+    def _on_event_enabled_change(self) -> None:
+        """Show enabled event controls and remove disabled controls from tab traversal."""
+        if self._event_controls_frame is None or self.event_enabled_var is None:
             return
-        last_key = self._stat_keys[indices[-1]]
-        desc = AVAILABLE_STATISTICS.get(last_key, "")
-        self._stats_desc_label.config(text=desc)
+        if self.event_enabled_var.get():
+            self._event_controls_frame.pack(fill=tk.X)
+        else:
+            self._event_controls_frame.pack_forget()
+        if hasattr(self, "_scroll"):
+            self._scroll.refresh_scroll_region()
+
+    def _select_all_statistics(self) -> None:
+        """Select every available computed metric."""
+        for variable in self._stat_vars.values():
+            variable.set(True)
+
+    def _clear_statistics(self) -> None:
+        """Clear every computed metric selection."""
+        for variable in self._stat_vars.values():
+            variable.set(False)
 
     @staticmethod
     def _raw_value(variable: Any) -> str | None:
@@ -941,8 +1104,9 @@ class ParametersDialog:
 
     def capture_form_state(self) -> ParametersFormState:
         """Capture every current form value without validating or retaining Tk objects."""
-        selected_indices = self._stats_listbox.curselection()
-        selected_statistics = tuple(self._stat_keys[index] for index in selected_indices)
+        selected_statistics = tuple(
+            key for key in self._stat_keys if bool(self._stat_vars[key].get())
+        )
         return ParametersFormState(
             x_min=str(self.xmin_var.get()),
             x_max=str(self.xmax_var.get()),
@@ -960,6 +1124,9 @@ class ParametersDialog:
             },
             method=self._raw_value(getattr(self, "method_var", None)) or "",
             statistics=selected_statistics,
+            event_enabled=(
+                bool(self.event_enabled_var.get()) if self.event_enabled_var is not None else False
+            ),
             event_expression=self._raw_value(self.event_expression_var),
             event_terminal=(
                 bool(self.event_terminal_var.get())
@@ -1008,16 +1175,16 @@ class ParametersDialog:
         if getattr(self, "method_var", None) is not None:
             self._on_method_change(None)
 
-        self._stats_listbox.selection_clear(0, tk.END)
         selected = set(snapshot.statistics)
-        for index, key in enumerate(self._stat_keys):
-            if key in selected:
-                self._stats_listbox.selection_set(index)
-        self._on_stats_select(None)
+        for key, variable in self._stat_vars.items():
+            variable.set(key in selected)
 
+        self._set_raw_value(self.event_enabled_var, snapshot.event_enabled)
         self._set_raw_value(self.event_expression_var, snapshot.event_expression)
         self._set_raw_value(self.event_terminal_var, snapshot.event_terminal)
         self._set_raw_value(self.event_direction_var, snapshot.event_direction)
+        if self.event_enabled_var is not None:
+            self._on_event_enabled_change()
         for variable, value in zip(self._bc_vars, snapshot.boundary_expressions, strict=False):
             variable.set(value)
         for variable, value in zip(self._bc_type_vars, snapshot.boundary_types, strict=False):
@@ -1032,6 +1199,7 @@ class ParametersDialog:
         vars_to_discard.extend(self._y0_vars)
         vars_to_discard.extend(self._x0_vars)
         vars_to_discard.extend(self._eq_param_vars.values())
+        vars_to_discard.extend(self._stat_vars.values())
         vars_to_discard.extend(self._bc_vars)
         vars_to_discard.extend(self._bc_type_vars)
         for attr in (
@@ -1045,6 +1213,7 @@ class ParametersDialog:
             "npoints_y_var",
             "npoints_z_var",
             "method_var",
+            "event_enabled_var",
             "event_expression_var",
             "event_terminal_var",
             "event_direction_var",
@@ -1061,8 +1230,11 @@ class ParametersDialog:
         self._y0_vars.clear()
         self._x0_vars.clear()
         self._eq_param_vars.clear()
+        self._stat_vars.clear()
         self._bc_vars.clear()
         self._bc_type_vars.clear()
+        self._bc_expression_vars_by_face.clear()
+        self._bc_type_vars_by_face.clear()
         vars_to_discard.clear()
 
     def _on_back(self) -> None:
@@ -1324,8 +1496,7 @@ class ParametersDialog:
             method = self.method_var.get()
             y0 = self._parse_initial_conditions()
 
-        selected_indices = self._stats_listbox.curselection()
-        selected_stats = {self._stat_keys[i] for i in selected_indices}
+        selected_stats = {key for key in self._stat_keys if bool(self._stat_vars[key].get())}
         (
             bc_expressions,
             bc_types,
@@ -1337,7 +1508,15 @@ class ParametersDialog:
         event_expression: str | None = None
         event_terminal = False
         event_direction = 0
-        if self.equation_type not in ("difference", "pde", "pde_3d", "vector_pde"):
+        event_enabled = (
+            bool(self.event_enabled_var.get()) if self.event_enabled_var is not None else False
+        )
+        if event_enabled and self.equation_type not in (
+            "difference",
+            "pde",
+            "pde_3d",
+            "vector_pde",
+        ):
             if self.event_expression_var is not None:
                 event_expression = self.event_expression_var.get().strip() or None
             if self.event_terminal_var is not None:

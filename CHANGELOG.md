@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made Configuration forms responsive and family-sized, with structured PDE axis and boundary tables and clearer initial-condition tables.
+- Added progressive disclosure for optional ODE events and grouped checkbox controls for computed metrics.
 - Added stateful Equation -> Configuration navigation, including Back with retained raw inputs and per-equation configuration snapshots.
 - Made the built-in equation browser searchable and resizable with full-height Categories, Equations, and Details panes.
 - Made Settings resizable and reorganized its four sections with scannable internal subgroups, a fixed action footer, and screen-aware sizing.

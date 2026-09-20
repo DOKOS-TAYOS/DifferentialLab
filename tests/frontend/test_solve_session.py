@@ -77,6 +77,7 @@ def _snapshot(x_min: str = "0") -> ParametersFormState:
         parameter_values={"omega": "2.5"},
         method="DOP853",
         statistics=("mean", "rms"),
+        event_enabled=True,
         event_expression="f[0] - 0.25",
         event_terminal=True,
         event_direction="-1",
