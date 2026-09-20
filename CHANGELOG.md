@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made Settings resizable and reorganized its four sections with scannable internal subgroups, a fixed action footer, and screen-aware sizing.
+- Added editable color previews with the standard system color chooser to individual color settings.
+- Added a confirmed Restore Defaults action that updates the form without saving until Save & Restart is selected.
 - Reorganized Settings into user-facing Appearance, Plots, Solver Defaults, and Advanced groups with readable field labels while keeping technical .env keys available as control tooltips.
 - Refined the Main Menu hierarchy so core workflows share a clear primary action treatment while Help, Settings, and Exit remain neutral secondary actions.
 - Made Function Transform a resizable configuration-and-visualization workspace with an adjustable pane split.
