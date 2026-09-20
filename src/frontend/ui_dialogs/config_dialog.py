@@ -1,4 +1,4 @@
-"""Settings dialog - edit .env variables with collapsible sections."""
+"""Settings dialog with human-readable preferences backed by .env."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
+from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
 from utils import get_logger
 
@@ -25,8 +26,8 @@ logger = get_logger(__name__)
 
 _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
     (
-        "ui_theme",
-        "Interface Theme",
+        "appearance",
+        "Appearance",
         [
             "UI_BACKGROUND",
             "UI_FOREGROUND",
@@ -38,12 +39,6 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
             "UI_FONT_SIZE",
             "UI_FONT_FAMILY",
             "UI_PADDING",
-        ],
-    ),
-    (
-        "ui_tooltips",
-        "Tooltips",
-        [
             "UI_TOOLTIP_DELAY_MS",
             "UI_TOOLTIP_WRAPLENGTH",
             "UI_TOOLTIP_PADX",
@@ -51,8 +46,8 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "plot_style",
-        "Plot Style",
+        "plots",
+        "Plots",
         [
             "PLOT_FIGSIZE_WIDTH",
             "PLOT_FIGSIZE_HEIGHT",
@@ -63,54 +58,24 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
             "PLOT_LINE_WIDTH",
             "PLOT_LINE_STYLE",
             "PLOT_COLOR_SCHEME",
-        ],
-    ),
-    (
-        "plot_fonts",
-        "Plot Fonts",
-        [
             "FONT_FAMILY",
             "FONT_TITLE_SIZE",
             "FONT_TITLE_WEIGHT",
             "FONT_AXIS_SIZE",
             "FONT_AXIS_STYLE",
             "FONT_TICK_SIZE",
-        ],
-    ),
-    (
-        "plot_markers",
-        "Plot Markers",
-        [
             "PLOT_MARKER_FORMAT",
             "PLOT_MARKER_SIZE",
             "PLOT_MARKER_FACE_COLOR",
             "PLOT_MARKER_EDGE_COLOR",
-        ],
-    ),
-    (
-        "plot_phase",
-        "Phase-Space Plots",
-        [
             "PLOT_PHASE_START_COLOR",
             "PLOT_PHASE_END_COLOR",
             "PLOT_PHASE_MARKER_SIZE",
-        ],
-    ),
-    (
-        "plot_surface",
-        "3D and Contour Plots",
-        [
             "PLOT_SURFACE_CMAP",
             "PLOT_CONTOUR_LEVELS",
             "PLOT_GRID_ALPHA",
             "PLOT_SURFACE_ALPHA",
             "PLOT_COLORBAR_SHRINK",
-        ],
-    ),
-    (
-        "plot_animation",
-        "Animations",
-        [
             "PLOT_ANIMATION_LINE_WIDTH",
             "PLOT_VLINES_LINE_WIDTH",
             "PLOT_VLINES_ALPHA",
@@ -129,8 +94,8 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "logging",
-        "Logging and Updates",
+        "advanced",
+        "Advanced",
         [
             "LOG_LEVEL",
             "LOG_FILE",
@@ -144,6 +109,68 @@ _SECTION_ORDER: list[tuple[str, str, list[str]]] = [
         ],
     ),
 ]
+
+_FIELD_LABELS: dict[str, str] = {
+    "UI_BACKGROUND": "Background color",
+    "UI_FOREGROUND": "Text color",
+    "UI_BUTTON_BG": "Control background",
+    "UI_BUTTON_WIDTH": "Main-menu button width",
+    "UI_BUTTON_FG": "Primary accent text",
+    "UI_BUTTON_FG_CANCEL": "Destructive / cancel text",
+    "UI_BUTTON_FG_ACCENT2": "Secondary accent text",
+    "UI_FONT_SIZE": "Interface font size",
+    "UI_FONT_FAMILY": "Interface font family",
+    "UI_PADDING": "Interface spacing",
+    "UI_TOOLTIP_DELAY_MS": "Tooltip delay (ms)",
+    "UI_TOOLTIP_WRAPLENGTH": "Tooltip maximum width",
+    "UI_TOOLTIP_PADX": "Tooltip horizontal padding",
+    "UI_TOOLTIP_PADY": "Tooltip vertical padding",
+    "PLOT_FIGSIZE_WIDTH": "Figure width (inches)",
+    "PLOT_FIGSIZE_HEIGHT": "Figure height (inches)",
+    "DPI": "Plot DPI",
+    "PLOT_SHOW_TITLE": "Show plot title",
+    "PLOT_SHOW_GRID": "Show plot grid",
+    "PLOT_LINE_COLOR": "Main line color",
+    "PLOT_LINE_WIDTH": "Main line width",
+    "PLOT_LINE_STYLE": "Main line style",
+    "PLOT_COLOR_SCHEME": "Additional-series colormap",
+    "FONT_FAMILY": "Plot font family",
+    "FONT_TITLE_SIZE": "Plot title size",
+    "FONT_TITLE_WEIGHT": "Plot title weight",
+    "FONT_AXIS_SIZE": "Axis-label size",
+    "FONT_AXIS_STYLE": "Axis-label style",
+    "FONT_TICK_SIZE": "Tick-label size",
+    "PLOT_MARKER_FORMAT": "Marker shape",
+    "PLOT_MARKER_SIZE": "Marker size",
+    "PLOT_MARKER_FACE_COLOR": "Marker fill color",
+    "PLOT_MARKER_EDGE_COLOR": "Marker edge color",
+    "PLOT_PHASE_START_COLOR": "Phase start color",
+    "PLOT_PHASE_END_COLOR": "Phase end color",
+    "PLOT_PHASE_MARKER_SIZE": "Phase marker size",
+    "PLOT_SURFACE_CMAP": "Surface / contour colormap",
+    "PLOT_CONTOUR_LEVELS": "Contour levels",
+    "PLOT_GRID_ALPHA": "Grid opacity",
+    "PLOT_SURFACE_ALPHA": "Surface opacity",
+    "PLOT_COLORBAR_SHRINK": "Colorbar size",
+    "PLOT_ANIMATION_LINE_WIDTH": "Animation line width",
+    "PLOT_VLINES_LINE_WIDTH": "Guide-line width",
+    "PLOT_VLINES_ALPHA": "Guide-line opacity",
+    "PLOT_ANIMATION_Y_MARGIN": "Animation y-axis margin",
+    "ANIMATION_MAX_FPS": "Maximum animation FPS",
+    "SOLVER_MAX_STEP": "Maximum solver step",
+    "SOLVER_RTOL": "Relative tolerance",
+    "SOLVER_ATOL": "Absolute tolerance",
+    "SOLVER_NUM_POINTS": "Default output points",
+    "LOG_LEVEL": "Logging level",
+    "LOG_FILE": "Log filename",
+    "LOG_MAX_BYTES": "Maximum log size (bytes)",
+    "LOG_BACKUP_COUNT": "Log backup files",
+    "LOG_CONSOLE": "Also log to console",
+    "CHECK_UPDATES": "Check for updates on startup",
+    "UPDATE_CHECK_INTERVAL_DAYS": "Update check interval (days)",
+    "CHECK_UPDATES_FORCE": "Force check every startup",
+    "UPDATE_CHECK_URL": "Update metadata URL",
+}
 
 
 class ConfigDialog:
@@ -256,7 +283,7 @@ class ConfigDialog:
             self._add_field(section.content, item, current)
 
     def _add_field(self, parent: ttk.Frame, item: dict[str, Any], current: dict[str, str]) -> None:
-        key = item["key"]
+        key: str = item["key"]
         cast_type = item["cast_type"]
         val = current.get(key, str(item["default"]))
         desc_text = item.get("description", "")
@@ -264,7 +291,10 @@ class ConfigDialog:
         row = ttk.Frame(parent)
         row.pack(fill=tk.X, pady=2)
 
-        ttk.Label(row, text=key, width=28, anchor=tk.W).pack(side=tk.LEFT)
+        label = _FIELD_LABELS.get(key, key)
+        field_label = ttk.Label(row, text=label, width=30, anchor=tk.W)
+        field_label.pack(side=tk.LEFT)
+        ToolTip(field_label, f"Configuration key: {key}")
 
         if cast_type is bool:
             bvar = tk.BooleanVar(value=val.lower() in ("true", "1", "yes"))
