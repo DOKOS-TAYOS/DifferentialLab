@@ -18,6 +18,9 @@ class _FakeVar:
     def get(self) -> object:
         return self._value
 
+    def set(self, value: object) -> None:
+        self._value = value
+
 
 class _FakeListbox:
     def __init__(self, selected: tuple[int, ...]) -> None:
@@ -25,6 +28,12 @@ class _FakeListbox:
 
     def curselection(self) -> tuple[int, ...]:
         return self._selected
+
+    def selection_clear(self, _first: object, _last: object) -> None:
+        self._selected = ()
+
+    def selection_set(self, index: int) -> None:
+        self._selected = (*self._selected, index)
 
 
 class _FakeParent:
@@ -54,6 +63,8 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog.parameters = {"a": 1.0, "weights[3]": [1.0, 1.0, 1.0]}
     dialog.equation_name = "Test equation"
     dialog.equation_type = "ode"
+    dialog.session = None
+    dialog.selection = None
     dialog.variables = ["x"]
     dialog.vector_expressions = None
     dialog.vector_components = 1
@@ -67,6 +78,7 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog.xmax_var = _FakeVar("1.0")
     dialog.npoints_var = _FakeVar("50")
     dialog.method_var = _FakeVar("RK45")
+    dialog.method_desc = MagicMock()
     dialog.event_expression_var = _FakeVar("f[0] - 0.5")
     dialog.event_terminal_var = _FakeVar(True)
     dialog.event_direction_var = _FakeVar("-1")
@@ -78,6 +90,7 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog._y0_vars = [_FakeVar("1.0"), _FakeVar("0.0")]
     dialog._stats_listbox = _FakeListbox((0,))
     dialog._stat_keys = ["mean", "rms"]
+    dialog._stats_desc_label = MagicMock()
     dialog._bc_vars = []
     dialog._bc_type_vars = []
     dialog._domain_shape_var = None
@@ -91,6 +104,19 @@ def _build_scalar_dialog_stub() -> parameters_ui.ParametersDialog:
     dialog.zmax_var = None
     dialog.npoints_z_var = None
     return dialog
+
+
+def _selection(equation_type: str = "ode") -> parameters_ui.EquationSelection:
+    return parameters_ui.EquationSelection(
+        expression="a * f",
+        function_name=None,
+        order=2,
+        parameters={"a": 1.0},
+        equation_name="Test equation",
+        default_y0=[1.0, 0.0],
+        default_domain=[0.0, 1.0],
+        equation_type=equation_type,
+    )
 
 
 @pytest.mark.parametrize(
@@ -125,6 +151,93 @@ def test_collect_solver_inputs_builds_scalar_pipeline_kwargs() -> None:
     assert collected.event_direction == -1
     assert collected.parameters["a"] == 2.5
     np.testing.assert_allclose(collected.parameters["weights"], np.array([1.0, 2.0, 3.0]))
+
+
+def test_scalar_form_snapshot_round_trips_raw_values() -> None:
+    dialog = _build_scalar_dialog_stub()
+
+    snapshot = dialog.capture_form_state()
+    dialog.xmin_var.set("changed")
+    dialog._y0_vars[0].set("changed")
+    dialog.method_var.set("changed")
+    dialog._eq_param_vars["a"].set("changed")
+    dialog.apply_form_state(snapshot)
+
+    assert dialog.xmin_var.get() == "0.0"
+    assert dialog.xmax_var.get() == "1.0"
+    assert [variable.get() for variable in dialog._y0_vars] == ["1.0", "0.0"]
+    assert dialog.method_var.get() == "RK45"
+    assert dialog._stats_listbox.curselection() == (0,)
+    assert dialog.event_expression_var.get() == "f[0] - 0.5"
+    assert dialog.event_terminal_var.get() is True
+    assert dialog.event_direction_var.get() == "-1"
+    assert dialog._eq_param_vars["a"].get() == "2.5"
+
+
+def test_pde_form_snapshot_keeps_domains_grid_and_boundary_modes() -> None:
+    dialog = _build_scalar_dialog_stub()
+    dialog.equation_type = "pde"
+    dialog.is_pde = True
+    dialog.ymin_var = _FakeVar("-2")
+    dialog.ymax_var = _FakeVar("3")
+    dialog.npoints_var = _FakeVar("41")
+    dialog.npoints_y_var = _FakeVar("51")
+    dialog._domain_shape_var = _FakeVar("Custom contour")
+    dialog._bc_vars = [_FakeVar("x"), _FakeVar("y"), _FakeVar("1"), _FakeVar("2")]
+    dialog._bc_type_vars = [
+        _FakeVar("Dirichlet"),
+        _FakeVar("Neumann"),
+        _FakeVar("Dirichlet"),
+        _FakeVar("Neumann"),
+    ]
+    dialog._mask_expr_var = _FakeVar("x**2 + y**2 <= 1")
+    dialog._contour_bc_expr_var = _FakeVar("sin(x)")
+    dialog._contour_bc_type_var = _FakeVar("Neumann")
+
+    snapshot = dialog.capture_form_state()
+
+    assert (snapshot.y_min, snapshot.y_max) == ("-2", "3")
+    assert (snapshot.n_points, snapshot.n_points_y) == ("41", "51")
+    assert snapshot.domain_shape == "Custom contour"
+    assert snapshot.boundary_expressions == ("x", "y", "1", "2")
+    assert snapshot.boundary_types[1] == "Neumann"
+    assert snapshot.mask_expression == "x**2 + y**2 <= 1"
+    assert snapshot.contour_boundary_expression == "sin(x)"
+    assert snapshot.contour_boundary_type == "Neumann"
+
+
+def test_vector_form_snapshot_keeps_component_initial_state() -> None:
+    dialog = _build_scalar_dialog_stub()
+    dialog.equation_type = "vector_ode"
+    dialog.is_vector = True
+    dialog.vector_components = 2
+    dialog.component_orders = (1, 2)
+    dialog._y0_vars = [_FakeVar("1"), _FakeVar("2"), _FakeVar("3")]
+    dialog._x0_vars = [_FakeVar("0"), _FakeVar("0.1"), _FakeVar("0.2")]
+
+    snapshot = dialog.capture_form_state()
+
+    assert snapshot.initial_values == ("1", "2", "3")
+    assert snapshot.initial_positions == ("0", "0.1", "0.2")
+
+
+def test_back_saves_snapshot_releases_tk_state_and_reopens_equation() -> None:
+    dialog = _build_scalar_dialog_stub()
+    session = parameters_ui.SolveSession()
+    selection = _selection()
+    snapshot = dialog.capture_form_state()
+    dialog.session = session
+    dialog.selection = selection
+    dialog.capture_form_state = MagicMock(return_value=snapshot)  # type: ignore[method-assign]
+    dialog._release_tk_state = MagicMock()  # type: ignore[method-assign]
+
+    with patch("frontend.ui_dialogs.equation_dialog.EquationDialog") as equation_dialog:
+        dialog._on_back()
+
+    assert session.configuration_for(selection) == snapshot
+    assert dialog.win.destroy_calls == 1
+    dialog._release_tk_state.assert_called_once_with()
+    equation_dialog.assert_called_once_with(dialog.parent, session=session)
 
 
 def test_collect_solver_inputs_reports_invalid_parameter_with_title() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import tkinter as tk
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from tkinter import messagebox, ttk
 from typing import Any, cast
@@ -25,8 +26,18 @@ from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.background_task import BackgroundTaskFailure, run_task_with_loading
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
+from frontend.ui_dialogs.solve_session import (
+    EquationSelection,
+    ParametersFormState,
+    SolveSession,
+)
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    fit_and_center,
+    make_modal,
+)
 from solver.predefined import EquationType
 from utils import DifferentialLabError, get_logger
 
@@ -133,6 +144,8 @@ class ParametersDialog:
         pde_operator: str = "neg_laplacian",
         component_orders: tuple[int, ...] | None = None,
         default_boundary_conditions: dict[str, dict[str, str]] | None = None,
+        session: SolveSession | None = None,
+        selection: EquationSelection | None = None,
     ) -> None:
         self.parent = parent
         self.expression = expression
@@ -161,6 +174,8 @@ class ParametersDialog:
         self.is_pde = equation_type in ("pde", "pde_3d", "vector_pde") or len(self.variables) > 1
         self.component_orders = component_orders
         self.default_boundary_conditions = default_boundary_conditions or {}
+        self.session = session
+        self.selection = selection
 
         self.win = tk.Toplevel(parent)
         self.win.title(f"Solve - {equation_name}")
@@ -177,7 +192,24 @@ class ParametersDialog:
 
         self._build_ui(default_y0, default_domain)
 
-        fit_and_center(self.win, min_width=1050, min_height=700)
+        if self.session is not None and self.selection is not None:
+            snapshot = self.session.configuration_for(self.selection)
+            if snapshot is not None:
+                self.apply_form_state(snapshot)
+
+        min_width, min_height = calculate_screen_aware_minsize(
+            self.win.winfo_screenwidth(),
+            self.win.winfo_screenheight(),
+            1050,
+            700,
+        )
+        self.win.minsize(min_width, min_height)
+        fit_and_center(
+            self.win,
+            min_width=min_width,
+            min_height=min_height,
+            resizable=True,
+        )
         make_modal(self.win, parent)
 
     # ------------------------------------------------------------------
@@ -190,6 +222,24 @@ class ParametersDialog:
         # ── Fixed bottom button bar ──
         btn_solve = self._build_action_buttons(pad)
 
+        header = ttk.Frame(self.win, padding=(pad, pad, pad, 0))
+        header.pack(side=tk.TOP, fill=tk.X)
+        title_row = ttk.Frame(header)
+        title_row.pack(fill=tk.X)
+        ttk.Label(title_row, text="Configure equation", style="Title.TLabel").pack(side=tk.LEFT)
+        ttk.Label(title_row, text="Step 2 of 3", style="Small.TLabel").pack(side=tk.RIGHT)
+        ttk.Label(header, text=self.equation_name, style="Subtitle.TLabel").pack(
+            anchor=tk.W, pady=(pad, 2)
+        )
+        formula_lbl = ttk.Label(
+            header,
+            text=self.display_formula,
+            style="Small.TLabel",
+            justify=tk.LEFT,
+        )
+        formula_lbl.pack(anchor=tk.W, fill=tk.X, pady=(0, pad))
+        bind_wraplength(header, formula_lbl, pad=2 * pad, min_wrap=200)
+
         # ── Scrollable content ──
         scroll = ScrollableFrame(self.win)
         scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
@@ -197,9 +247,6 @@ class ParametersDialog:
 
         scroll_frame = scroll.inner
         scroll_frame.configure(padding=pad)
-
-        # Equation summary
-        formula_lbl = self._build_equation_summary(scroll_frame, pad)
 
         # Two-column layout: left = domain + ICs, right = solver + statistics
         left_col, right_col = self._build_layout_columns(scroll_frame, pad)
@@ -220,7 +267,6 @@ class ParametersDialog:
         # Statistics listbox (extended selection) — right column
         stats_frame = self._build_statistics_section(right_col, pad)
 
-        bind_wraplength(scroll_frame, formula_lbl, pad=2 * pad, min_wrap=200)
         bind_wraplength(
             stats_frame,
             [self.method_desc, self._stats_desc_label],
@@ -239,21 +285,35 @@ class ParametersDialog:
         btn_frame = ttk.Frame(self.win)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
 
+        self._btn_back = ttk.Button(
+            btn_frame,
+            text="Back",
+            style="Secondary.TButton",
+            command=self._on_back,
+        )
+        self._btn_back.pack(side=tk.LEFT)
+
         btn_inner = ttk.Frame(btn_frame)
-        btn_inner.pack()
+        btn_inner.pack(side=tk.RIGHT)
 
-        btn_solve = ttk.Button(btn_inner, text="Solve", command=self._on_solve)
-        btn_solve.pack(side=tk.LEFT, padx=pad)
-
-        btn_cancel = ttk.Button(
+        self._btn_cancel = ttk.Button(
             btn_inner,
             text="Cancel",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self.win.destroy,
         )
-        btn_cancel.pack(side=tk.LEFT, padx=pad)
+        self._btn_cancel.pack(side=tk.LEFT, padx=(0, pad))
 
-        setup_arrow_enter_navigation([[btn_solve, btn_cancel]])
+        btn_solve = ttk.Button(
+            btn_inner,
+            text="Solve",
+            style="Primary.TButton",
+            command=self._on_solve,
+        )
+        self._btn_solve = btn_solve
+        btn_solve.pack(side=tk.LEFT)
+
+        setup_arrow_enter_navigation([[self._btn_back, self._btn_cancel, btn_solve]])
         return btn_solve
 
     def _build_equation_summary(self, parent: ttk.Frame, pad: int) -> ttk.Label:
@@ -872,6 +932,154 @@ class ParametersDialog:
         desc = AVAILABLE_STATISTICS.get(last_key, "")
         self._stats_desc_label.config(text=desc)
 
+    @staticmethod
+    def _raw_value(variable: Any) -> str | None:
+        """Return a Tk-like variable value as plain text."""
+        if variable is None:
+            return None
+        return str(variable.get())
+
+    def capture_form_state(self) -> ParametersFormState:
+        """Capture every current form value without validating or retaining Tk objects."""
+        selected_indices = self._stats_listbox.curselection()
+        selected_statistics = tuple(self._stat_keys[index] for index in selected_indices)
+        return ParametersFormState(
+            x_min=str(self.xmin_var.get()),
+            x_max=str(self.xmax_var.get()),
+            n_points=self._raw_value(getattr(self, "npoints_var", None)) or "",
+            y_min=self._raw_value(self.ymin_var),
+            y_max=self._raw_value(self.ymax_var),
+            n_points_y=self._raw_value(self.npoints_y_var),
+            z_min=self._raw_value(self.zmin_var),
+            z_max=self._raw_value(self.zmax_var),
+            n_points_z=self._raw_value(self.npoints_z_var),
+            initial_values=tuple(str(variable.get()) for variable in self._y0_vars),
+            initial_positions=tuple(str(variable.get()) for variable in self._x0_vars),
+            parameter_values={
+                name: str(variable.get()) for name, variable in self._eq_param_vars.items()
+            },
+            method=self._raw_value(getattr(self, "method_var", None)) or "",
+            statistics=selected_statistics,
+            event_expression=self._raw_value(self.event_expression_var),
+            event_terminal=(
+                bool(self.event_terminal_var.get())
+                if self.event_terminal_var is not None
+                else False
+            ),
+            event_direction=self._raw_value(self.event_direction_var),
+            domain_shape=self._raw_value(self._domain_shape_var),
+            boundary_expressions=tuple(str(variable.get()) for variable in self._bc_vars),
+            boundary_types=tuple(str(variable.get()) for variable in self._bc_type_vars),
+            mask_expression=self._raw_value(self._mask_expr_var),
+            contour_boundary_expression=self._raw_value(self._contour_bc_expr_var),
+            contour_boundary_type=self._raw_value(self._contour_bc_type_var),
+        )
+
+    @staticmethod
+    def _set_raw_value(variable: Any, value: str | bool | None) -> None:
+        """Apply a plain value to a compatible Tk-like variable when both exist."""
+        if variable is not None and value is not None:
+            variable.set(value)
+
+    def apply_form_state(self, snapshot: ParametersFormState) -> None:
+        """Restore a compatible raw Configuration snapshot after normal control creation."""
+        self._set_raw_value(self._domain_shape_var, snapshot.domain_shape)
+        if self._domain_shape_var is not None:
+            self._on_domain_shape_change(None)
+
+        self._set_raw_value(self.xmin_var, snapshot.x_min)
+        self._set_raw_value(self.xmax_var, snapshot.x_max)
+        self._set_raw_value(getattr(self, "npoints_var", None), snapshot.n_points)
+        self._set_raw_value(self.ymin_var, snapshot.y_min)
+        self._set_raw_value(self.ymax_var, snapshot.y_max)
+        self._set_raw_value(self.npoints_y_var, snapshot.n_points_y)
+        self._set_raw_value(self.zmin_var, snapshot.z_min)
+        self._set_raw_value(self.zmax_var, snapshot.z_max)
+        self._set_raw_value(self.npoints_z_var, snapshot.n_points_z)
+
+        for variable, value in zip(self._y0_vars, snapshot.initial_values, strict=False):
+            variable.set(value)
+        for variable, value in zip(self._x0_vars, snapshot.initial_positions, strict=False):
+            variable.set(value)
+        for name, value in snapshot.parameter_values.items():
+            self._set_raw_value(self._eq_param_vars.get(name), value)
+
+        self._set_raw_value(getattr(self, "method_var", None), snapshot.method)
+        if getattr(self, "method_var", None) is not None:
+            self._on_method_change(None)
+
+        self._stats_listbox.selection_clear(0, tk.END)
+        selected = set(snapshot.statistics)
+        for index, key in enumerate(self._stat_keys):
+            if key in selected:
+                self._stats_listbox.selection_set(index)
+        self._on_stats_select(None)
+
+        self._set_raw_value(self.event_expression_var, snapshot.event_expression)
+        self._set_raw_value(self.event_terminal_var, snapshot.event_terminal)
+        self._set_raw_value(self.event_direction_var, snapshot.event_direction)
+        for variable, value in zip(self._bc_vars, snapshot.boundary_expressions, strict=False):
+            variable.set(value)
+        for variable, value in zip(self._bc_type_vars, snapshot.boundary_types, strict=False):
+            variable.set(value)
+        self._set_raw_value(self._mask_expr_var, snapshot.mask_expression)
+        self._set_raw_value(self._contour_bc_expr_var, snapshot.contour_boundary_expression)
+        self._set_raw_value(self._contour_bc_type_var, snapshot.contour_boundary_type)
+
+    def _release_tk_state(self) -> None:
+        """Drop all Tk variable references while execution is still on the Tk thread."""
+        vars_to_discard: list[Any] = []
+        vars_to_discard.extend(self._y0_vars)
+        vars_to_discard.extend(self._x0_vars)
+        vars_to_discard.extend(self._eq_param_vars.values())
+        vars_to_discard.extend(self._bc_vars)
+        vars_to_discard.extend(self._bc_type_vars)
+        for attr in (
+            "xmin_var",
+            "xmax_var",
+            "ymin_var",
+            "ymax_var",
+            "zmin_var",
+            "zmax_var",
+            "npoints_var",
+            "npoints_y_var",
+            "npoints_z_var",
+            "method_var",
+            "event_expression_var",
+            "event_terminal_var",
+            "event_direction_var",
+            "_domain_shape_var",
+            "_mask_expr_var",
+            "_contour_bc_expr_var",
+            "_contour_bc_type_var",
+        ):
+            if hasattr(self, attr):
+                value = getattr(self, attr)
+                if value is not None:
+                    vars_to_discard.append(value)
+                setattr(self, attr, None)
+        self._y0_vars.clear()
+        self._x0_vars.clear()
+        self._eq_param_vars.clear()
+        self._bc_vars.clear()
+        self._bc_type_vars.clear()
+        vars_to_discard.clear()
+
+    def _on_back(self) -> None:
+        """Save raw Configuration state and return to the retained Equation step."""
+        if self.session is None or self.selection is None:
+            self.win.destroy()
+            return
+        self.session.save_configuration(self.capture_form_state(), self.selection)
+        parent = self.parent
+        session = self.session
+        self.win.destroy()
+        self._release_tk_state()
+
+        from frontend.ui_dialogs.equation_dialog import EquationDialog
+
+        EquationDialog(parent, session=session)
+
     # ------------------------------------------------------------------
     # Solve
     # ------------------------------------------------------------------
@@ -1205,6 +1413,10 @@ class ParametersDialog:
 
     def _on_solve(self) -> None:
         """Parse inputs, run the solver pipeline, and open the result dialog."""
+        session = getattr(self, "session", None)
+        selection = getattr(self, "selection", None)
+        if session is not None and selection is not None:
+            session.save_configuration(self.capture_form_state(), selection)
         try:
             solver_inputs = self._collect_solver_inputs()
         except _InputValidationError as exc:
@@ -1248,6 +1460,8 @@ class ParametersDialog:
             "event_terminal": solver_inputs.event_terminal,
             "event_direction": solver_inputs.event_direction,
         }
+        if session is not None:
+            session.latest_pipeline_inputs = deepcopy(pipeline_kwargs)
         parent = self.parent
 
         self.win.destroy()
@@ -1255,42 +1469,7 @@ class ParametersDialog:
         # Release every Tk-backed value before the worker begins.  The task below
         # closes over only pipeline data, so a solver-thread allocation cannot
         # become the last reference to this dialog or one of its Tk variables.
-        vars_to_discard: list[tk.Variable] = []
-        vars_to_discard.extend(self._y0_vars)
-        vars_to_discard.extend(self._x0_vars)
-        vars_to_discard.extend(self._eq_param_vars.values())
-        vars_to_discard.extend(self._bc_vars)
-        vars_to_discard.extend(self._bc_type_vars)
-        for attr in (
-            "xmin_var",
-            "xmax_var",
-            "ymin_var",
-            "ymax_var",
-            "zmin_var",
-            "zmax_var",
-            "npoints_var",
-            "npoints_y_var",
-            "npoints_z_var",
-            "method_var",
-            "event_expression_var",
-            "event_terminal_var",
-            "event_direction_var",
-            "_domain_shape_var",
-            "_mask_expr_var",
-            "_contour_bc_expr_var",
-            "_contour_bc_type_var",
-        ):
-            if hasattr(self, attr):
-                value = getattr(self, attr)
-                if value is not None:
-                    vars_to_discard.append(value)
-                setattr(self, attr, None)
-        self._y0_vars.clear()
-        self._x0_vars.clear()
-        self._eq_param_vars.clear()
-        self._bc_vars.clear()
-        self._bc_type_vars.clear()
-        vars_to_discard.clear()
+        self._release_tk_state()
 
         def _run_solver_pipeline() -> Any:
             from pipeline import run_solver_pipeline
