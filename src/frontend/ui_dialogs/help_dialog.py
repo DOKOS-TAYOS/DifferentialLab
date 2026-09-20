@@ -43,7 +43,8 @@ _ABOUT = (
     "Hilbert, and Z-transform\n\n"
     "Under the hood the application relies on SciPy's solve_ivp integrator "
     "for ODEs and finite-difference discretisation for PDEs.\n\n"
-    "Tip: hover over a supported control or move keyboard focus to it to see a short contextual tooltip."
+    "Tip: hover over a supported control or move keyboard focus to it to see a "
+    "short contextual tooltip."
 )
 
 _HOW_TO_USE = (
@@ -109,7 +110,8 @@ _PREDEFINED_EQUATIONS = (
     "    Harmonic \u00b7 Damped \u00b7 Van der Pol \u00b7 Pendulum \u00b7 Rayleigh \u00b7 "
     "Duffing \u00b7 Mathieu \u00b7 Blasius \u00b7 Logistic \u00b7 Riccati \u00b7 and more\n\n"
     "Vector ODE (50 systems):\n"
-    "    Lorenz \u00b7 R\u00f6ssler \u00b7 Chen \u00b7 Lotka-Volterra \u00b7 SIR \u00b7 SEIR \u00b7 "
+    "    Lorenz \u00b7 R\u00f6ssler \u00b7 Chen \u00b7 Lotka-Volterra \u00b7 SIR \u00b7 "
+    "SEIR \u00b7 "
     "FitzHugh-Nagumo \u00b7 Brusselator \u00b7 hyperchaotic systems \u00b7 and more\n\n"
     "Recurrence (10 equations):\n"
     "    Geometric Growth \u00b7 Logistic Map \u00b7 Fibonacci \u00b7 Linear Recurrence \u00b7 "
