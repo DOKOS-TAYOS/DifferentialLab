@@ -7,6 +7,20 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 
+def calculate_wraplength(width: int, pad: int, min_wrap: int) -> int:
+    """Return a safe label wraplength for an available viewport width.
+
+    Args:
+        width: Visible width of the containing viewport in pixels.
+        pad: Horizontal space reserved for padding and borders.
+        min_wrap: Smallest allowed wraplength in pixels.
+
+    Returns:
+        A positive wraplength that stays inside the available viewport when possible.
+    """
+    return max(min_wrap, width - pad)
+
+
 def center_window(
     window: tk.Tk | tk.Toplevel,
     width: int | None = None,
@@ -144,7 +158,7 @@ def bind_wraplength(
     def _update(event: object | None = None) -> None:
         w = frame.winfo_width()
         if w > 100:
-            wrap = max(min_wrap, w - pad)
+            wrap = calculate_wraplength(w, pad, min_wrap)
             for lbl in labels:
                 if lbl.winfo_exists():
                     cast(Any, lbl).configure(wraplength=wrap)

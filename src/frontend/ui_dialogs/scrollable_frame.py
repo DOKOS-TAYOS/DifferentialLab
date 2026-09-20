@@ -51,6 +51,11 @@ class ScrollableFrame(ttk.Frame):
         """
         self._canvas.configure(bg=bg)
 
+    @property
+    def viewport(self) -> tk.Canvas:
+        """Return the visible canvas whose width constrains child content."""
+        return self._canvas
+
     def refresh_scroll_region(self) -> None:
         """Force-update the scroll region after dynamic content changes.
 

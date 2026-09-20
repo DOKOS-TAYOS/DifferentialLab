@@ -214,7 +214,8 @@ class HelpDialog:
         self._body_labels: list[ttk.Label] = []
         self._build_ui()
 
-        fit_and_center(self.win, min_width=1000, min_height=750)
+        fit_and_center(self.win, min_width=1000, min_height=750, resizable=True)
+        self.win.minsize(700, 520)
         make_modal(self.win, parent)
 
     def _build_ui(self) -> None:
@@ -265,7 +266,7 @@ class HelpDialog:
 
         self._scroll.bind_new_children()
 
-        bind_wraplength(inner, self._body_labels, pad=48, min_wrap=200)
+        bind_wraplength(self._scroll.viewport, self._body_labels, pad=48, min_wrap=200)
 
     def _add_section(
         self,
