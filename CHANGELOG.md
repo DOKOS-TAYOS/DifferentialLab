@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reorganized Settings into user-facing Appearance, Plots, Solver Defaults, and Advanced groups with readable field labels while keeping technical .env keys available as control tooltips.
 - Refined the Main Menu hierarchy so core workflows share a clear primary action treatment while Help, Settings, and Exit remain neutral secondary actions.
 - Made Function Transform a resizable configuration-and-visualization workspace with an adjustable pane split.
 - Changed Function Transform to an explicit Update workflow: input, domain, transform, and display changes wait for the user to press Update.
