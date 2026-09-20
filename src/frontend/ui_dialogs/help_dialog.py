@@ -43,7 +43,7 @@ _ABOUT = (
     "Hilbert, and Z-transform\n\n"
     "Under the hood the application relies on SciPy's solve_ivp integrator "
     "for ODEs and finite-difference discretisation for PDEs.\n\n"
-    "Tip: hover over or keyboard-focus supported controls to see short contextual tooltips."
+    "Tip: hover over a supported control or move keyboard focus to it to see a short contextual tooltip."
 )
 
 _HOW_TO_USE = (
