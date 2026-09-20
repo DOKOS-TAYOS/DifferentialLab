@@ -6,9 +6,11 @@ import numpy as np
 import pytest
 
 from complex_problems.fput_experiment.model import (
+    FPUT_PRESETS,
     bond_strain,
     energy_components,
     fput_force,
+    legacy_kink_pair_initial_state,
     modal_coordinates,
     normal_mode_basis,
     particle_coordinates,
@@ -23,6 +25,7 @@ from complex_problems.fput_experiment.solver import (
     detect_recurrence_peaks,
     recurrence_fidelity,
     solve_fput,
+    solve_fput_recurrence_scaling,
 )
 
 
@@ -90,7 +93,8 @@ def test_harmonic_single_mode_has_no_modal_transfer() -> None:
 
 def test_entropy_participation_and_zero_energy_are_safe() -> None:
     """Modal-spreading diagnostics honor their physical bounds and zero-energy convention."""
-    result = solve_fput(n_particles=5, x0=np.zeros(5), v0=np.zeros(5), t_end=1.0, dt=0.1)
+    with np.errstate(all="raise"):
+        result = solve_fput(n_particles=5, x0=np.zeros(5), v0=np.zeros(5), t_end=1.0, dt=0.1)
     assert np.all(result.spectral_entropy == 0.0)
     assert np.all(result.participation_number == 0.0)
     nonzero = solve_fput(n_particles=5, t_end=1.0, dt=0.1)
@@ -145,6 +149,76 @@ def test_synthetic_recurrence_detector_excludes_initial_time() -> None:
     np.testing.assert_allclose(values, [0.91, 0.95])
     fractions = np.array([[0.5, 0.5], [0.25, 0.75]])
     np.testing.assert_allclose(recurrence_fidelity(fractions), [1.0, 0.75])
+
+
+@pytest.mark.parametrize(
+    ("fidelity", "expected"),
+    [
+        (np.ones(6), []),
+        (np.array([1.0, 0.7, 0.79, 0.7, 0.75, 0.7]), []),
+        (np.array([1.0, 0.7, 0.91, 0.7, 0.95, 0.7]), [2, 4]),
+        (np.array([1.0, 0.7, 0.79, 0.78, 0.7]), []),
+    ],
+)
+def test_recurrence_detector_synthetic_acceptance_cases(
+    fidelity: np.ndarray, expected: list[int]
+) -> None:
+    """Detector requires departure, rejects weak maxima, and keeps accepted peaks."""
+    indices, _, _ = detect_recurrence_peaks(np.arange(fidelity.size, dtype=float), fidelity)
+    np.testing.assert_array_equal(indices, expected)
+
+
+def test_alpha_recurrence_and_scaling_are_numerically_detected() -> None:
+    """Cheap alpha cases depart and recover with finite recurrence measurements."""
+    result = solve_fput(
+        n_particles=8, model="alpha", coefficient=0.25, t_end=500.0, dt=0.02, sample_every=20
+    )
+    assert np.min(result.recurrence_fidelity) < 0.8
+    assert result.summary["first_recurrence_time"] is not None
+    assert result.summary["first_recurrence_fidelity"] > 0.9  # type: ignore[operator]
+    sweep = solve_fput_recurrence_scaling(
+        sweep_variable="N", parameter_values=[8, 12, 16], t_end=2200.0, dt=0.02, sample_every=20
+    )
+    assert np.all(sweep.detected)
+    assert np.all(np.isfinite(sweep.first_recurrence_times))
+    assert np.all((sweep.recurrence_fidelities > 0.8) & (sweep.recurrence_fidelities <= 1.0))
+    assert all(
+        value is not None and np.isfinite(value)
+        for value in (sweep.slope, sweep.intercept, sweep.r_squared)
+    )
+
+
+def test_legacy_kink_pair_formula_and_alpha_validation() -> None:
+    """Legacy CC0 state is finite, parameterized, and rejects zero alpha."""
+    x, v = legacy_kink_pair_initial_state(4, 1.0, 0.25)
+    edited_x, edited_v = legacy_kink_pair_initial_state(
+        4, 1.0, 0.25, width=0.7, first_center=2.0, second_center=5.0
+    )
+    assert np.all(np.isfinite(x)) and np.all(np.isfinite(v))
+    assert not np.allclose(x, edited_x) and not np.allclose(v, edited_v)
+    with pytest.raises(ValueError, match="non-zero alpha"):
+        legacy_kink_pair_initial_state(4, 1.0, 0.0)
+
+
+def test_historical_preset_constants_are_preserved() -> None:
+    """Historical source-derived configurations remain explicit regressions."""
+    expected = {
+        "Historical alpha recurrence": (32, "alpha", 0.25, 1, 11500.0, 0.01, 100),
+        "Historical alpha superrecurrence": (32, "alpha", 0.5, 1, 240000.0, 0.02, 200),
+        "Historical phase-space study": (3, "alpha", 0.25, 1, 15000.0, 0.01, 10),
+        "Historical beta recurrence": (32, "beta", 10.0, 2, 600.0, 1.0e-4, 400),
+    }
+    for name, values in expected.items():
+        preset = FPUT_PRESETS[name]
+        assert (
+            preset.n_particles,
+            preset.model,
+            preset.coefficient,
+            preset.mode,
+            preset.t_end,
+            preset.dt,
+            preset.sample_every,
+        ) == values
 
 
 def test_displacement_and_strain_animation_payloads_have_shared_metadata() -> None:

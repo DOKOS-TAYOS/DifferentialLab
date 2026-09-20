@@ -6,7 +6,7 @@ import tkinter as tk
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import numpy as np
 
@@ -116,6 +116,12 @@ class FPUTResultDialog:
         self._animation_canvas: object | None = None
         self._animation_plot_frame: ttk.Frame | None = None
         self._representation_var = tk.StringVar(value="strain")
+        self._space_representation_var = tk.StringVar(value="strain")
+        self._surface_representation_var = tk.StringVar(value="strain")
+        self._modal_scale_var = tk.StringVar(value="Linear")
+        self._phase_kind_var = tk.StringVar(value="Normal mode")
+        self._phase_index_var = tk.StringVar(value="1")
+        self._mode_selection_var = tk.StringVar(value="1, 2, 3")
         self._build_ui()
         self.win.protocol("WM_DELETE_WINDOW", self._on_close)
         center_window(self.win, width=1200, height=800, max_width_ratio=0.96, resizable=True)
@@ -148,7 +154,7 @@ class FPUTResultDialog:
         recurrence = _line_figure(
             result.t,
             [(result.recurrence_fidelity, "F(t)")],
-            "Modal-energy recurrence fidelity",
+            self._summary_text(result),
             "t",
             "F",
         )
@@ -163,45 +169,32 @@ class FPUTResultDialog:
             axis.legend()
         self._add_plot(notebook, "Overview / Recurrence", recurrence)
         self._build_animation_tab(notebook)
-        strain = bond_strain(result.displacement)
-        self._add_plot(
-            notebook,
-            "Space-Time",
-            self._heatmap(result.t, strain, "Strain space-time map", "bond coordinate", "strain"),
+        self._build_representation_tab(
+            notebook, "Space-Time", self._space_representation_var, self._space_time_figure
         )
-        self._add_plot(notebook, "3D Surface", self._surface(result.t, strain, "Strain surface"))
-        self._add_plot(
-            notebook,
-            "Modal Energies",
-            self._heatmap(result.t, result.modal_energy, "Linear modal energy", "mode", "E_k"),
+        self._build_representation_tab(
+            notebook, "3D Surface", self._surface_representation_var, self._surface_figure
         )
-        self._add_plot(
-            notebook,
-            "Phase Space",
-            _line_figure(
-                result.modal_q[:, 0],
-                [(result.modal_p[:, 0], "mode 1")],
-                "Normal-mode phase space",
-                "Q₁",
-                "P₁",
-            ),
+        self._build_modal_tab(notebook)
+        self._build_phase_tab(notebook)
+        interaction = result.total_energy - np.sum(result.modal_energy, axis=1)
+        scale = max(abs(float(result.total_energy[0])), np.finfo(float).eps)
+        relative_error = (result.total_energy - result.total_energy[0]) / scale
+        hamiltonian = _line_figure(
+            result.t,
+            [
+                (result.kinetic_energy, "kinetic"),
+                (result.harmonic_potential_energy, "harmonic potential"),
+                (result.nonlinear_potential_energy, "nonlinear potential"),
+                (result.total_energy, "exact H"),
+                (relative_error, "relative H error"),
+                (interaction, "H - ΣE_k"),
+            ],
+            "Hamiltonian components and numerical diagnostics",
+            "t",
+            "energy / relative error",
         )
-        self._add_plot(
-            notebook,
-            "Hamiltonian",
-            _line_figure(
-                result.t,
-                [
-                    (result.kinetic_energy, "kinetic"),
-                    (result.harmonic_potential_energy, "harmonic potential"),
-                    (result.nonlinear_potential_energy, "nonlinear potential"),
-                    (result.total_energy, "exact H"),
-                ],
-                "Hamiltonian components",
-                "t",
-                "energy",
-            ),
-        )
+        self._add_plot(notebook, "Hamiltonian", hamiltonian)
         self._add_plot(
             notebook,
             "Thermalization",
@@ -215,6 +208,88 @@ class FPUTResultDialog:
                 "t",
                 "diagnostic",
             ),
+        )
+
+    def _summary_text(self, result: FPUTResult) -> str:
+        """Return a compact numerical summary for the recurrence overview."""
+        summary = result.summary
+        first = summary["first_recurrence_time"]
+        fidelity = summary["first_recurrence_fidelity"]
+        late_time = summary["highest_late_recurrence_time"]
+        late_fidelity = summary["highest_late_recurrence_fidelity"]
+        return (
+            f"F(t), cycles₁ = ω₁t/(2π) | first recurrence: {first!s} / {fidelity!s}; "
+            f"accepted peaks: {summary['number_of_recurrence_peaks']}; "
+            f"highest later: {late_time!s} / {late_fidelity!s}; raw time: {result.t[-1]:.6g}; "
+            f"max relative H drift: {summary['maximum_relative_hamiltonian_drift']:.3g}"
+        )
+
+    def _representation_values(
+        self, representation: str
+    ) -> tuple[np.ndarray, np.ndarray, str, str]:
+        """Return cached values and physical coordinates for a selected representation."""
+        assert isinstance(self.result, FPUTResult)
+        if representation == "displacement":
+            values = np.pad(self.result.displacement, ((0, 0), (1, 1)))
+            return (
+                values,
+                np.arange(values.shape[1], dtype=float),
+                "particle coordinate",
+                "displacement",
+            )
+        values = bond_strain(self.result.displacement)
+        return values, np.arange(values.shape[1], dtype=float) + 0.5, "bond coordinate", "strain"
+
+    def _build_representation_tab(
+        self,
+        notebook: ttk.Notebook,
+        title: str,
+        variable: tk.StringVar,
+        builder: Callable[[str], Figure],
+    ) -> None:
+        """Build a cached displacement/strain display with no solver callback."""
+        tab = ttk.Frame(notebook)
+        notebook.add(tab, text=f"  {title}  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=6, pady=6)
+        ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
+        combo = ttk.Combobox(
+            controls,
+            textvariable=variable,
+            values=("displacement", "strain"),
+            state="readonly",
+            width=16,
+        )
+        combo.pack(side=tk.LEFT, padx=6)
+        plot_frame = ttk.Frame(tab)
+        plot_frame.pack(fill=tk.BOTH, expand=True)
+        canvas: list[object | None] = [None]
+
+        def update(_event: object | None = None) -> None:
+            from complex_problems.common.result_dialog_ui import reset_embedded_animation
+
+            reset_embedded_animation(plot_frame, canvas[0])
+            figure = cast("Figure", builder(variable.get()))
+            canvas[0] = embed_plot_in_tk(figure, plot_frame)
+            self._canvases.append(canvas[0])
+
+        combo.bind("<<ComboboxSelected>>", update)
+        update()
+
+    def _space_time_figure(self, representation: str) -> Figure:
+        """Build a space-time map from cached displacement or bond strain."""
+        assert isinstance(self.result, FPUTResult)
+        values, coordinate, xlabel, label = self._representation_values(representation)
+        return self._heatmap(
+            self.result.t, values, f"{label.title()} space-time map", xlabel, label, coordinate
+        )
+
+    def _surface_figure(self, representation: str) -> Figure:
+        """Build a coordinate-time surface from cached displacement or bond strain."""
+        assert isinstance(self.result, FPUTResult)
+        values, coordinate, xlabel, label = self._representation_values(representation)
+        return self._surface(
+            self.result.t, values, f"{label.title()} surface", coordinate, xlabel, label
         )
 
     def _build_animation_tab(self, notebook: ttk.Notebook) -> None:
@@ -275,55 +350,228 @@ class FPUTResultDialog:
         except RuntimeError as exc:
             messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
+    def _build_modal_tab(self, notebook: ttk.Notebook) -> None:
+        """Provide selected cached modal curves and a selectable all-mode heatmap scale."""
+        tab = ttk.Frame(notebook)
+        notebook.add(tab, text="  Modal Energies  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=6, pady=6)
+        ttk.Label(controls, text="Modes (1..N):").pack(side=tk.LEFT)
+        ttk.Entry(controls, textvariable=self._mode_selection_var, width=14).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Label(controls, text="Heatmap scale:").pack(side=tk.LEFT)
+        scale = ttk.Combobox(
+            controls,
+            textvariable=self._modal_scale_var,
+            values=("Linear", "log10 normalized"),
+            state="readonly",
+            width=18,
+        )
+        scale.pack(side=tk.LEFT, padx=5)
+        frame = ttk.Frame(tab)
+        frame.pack(fill=tk.BOTH, expand=True)
+        canvas: list[object | None] = [None]
+
+        def update(_event: object | None = None) -> None:
+            from complex_problems.common.result_dialog_ui import reset_embedded_animation
+
+            reset_embedded_animation(frame, canvas[0])
+            assert isinstance(self.result, FPUTResult)
+            try:
+                modes = [int(value.strip()) for value in self._mode_selection_var.get().split(",")]
+            except ValueError:
+                modes = [1, 2, 3]
+            modes = [mode for mode in modes if 1 <= mode <= self.result.modal_energy.shape[1]] or [
+                1
+            ]
+            figure = _line_figure(
+                self.result.t,
+                [(self.result.modal_energy[:, mode - 1], f"E_{mode}") for mode in modes],
+                "Selected modal energies",
+                "t",
+                "E_k",
+            )
+            axis = figure.add_axes((0.12, 0.08, 0.78, 0.22))
+            values = self.result.modal_energy
+            label = "E_k"
+            if self._modal_scale_var.get() == "log10 normalized":
+                reference = max(float(np.sum(values[0])), np.finfo(float).eps)
+                values = np.log10(np.maximum(values / reference, np.finfo(float).eps))
+                label = "log10(E_k / initial total linear modal energy)"
+            image = axis.imshow(
+                values.T,
+                origin="lower",
+                aspect="auto",
+                extent=(self.result.t[0], self.result.t[-1], 0.5, values.shape[1] + 0.5),
+            )
+            axis.set(xlabel="t", ylabel="mode", title="All-mode heatmap")
+            figure.colorbar(image, ax=axis, label=label)
+            canvas[0] = embed_plot_in_tk(figure, frame)
+            self._canvases.append(canvas[0])
+
+        scale.bind("<<ComboboxSelected>>", update)
+        self._mode_selection_var.trace_add("write", lambda *_args: update())
+        update()
+
+    def _build_phase_tab(self, notebook: ttk.Notebook) -> None:
+        """Provide particle or normal-mode phase portraits from cached coordinates."""
+        assert isinstance(self.result, FPUTResult)
+        tab = ttk.Frame(notebook)
+        notebook.add(tab, text="  Phase Space  ")
+        controls = ttk.Frame(tab)
+        controls.pack(fill=tk.X, padx=6, pady=6)
+        kind = ttk.Combobox(
+            controls,
+            textvariable=self._phase_kind_var,
+            values=("Particle", "Normal mode"),
+            state="readonly",
+            width=14,
+        )
+        kind.pack(side=tk.LEFT)
+        ttk.Label(controls, text="Index (1..N):").pack(side=tk.LEFT, padx=(12, 4))
+        index = ttk.Spinbox(
+            controls,
+            from_=1,
+            to=self.result.displacement.shape[1],
+            textvariable=self._phase_index_var,
+            width=6,
+        )
+        index.pack(side=tk.LEFT)
+        frame = ttk.Frame(tab)
+        frame.pack(fill=tk.BOTH, expand=True)
+        canvas: list[object | None] = [None]
+
+        def update(_event: object | None = None) -> None:
+            from complex_problems.common.result_dialog_ui import reset_embedded_animation
+
+            reset_embedded_animation(frame, canvas[0])
+            assert isinstance(self.result, FPUTResult)
+            try:
+                selected = (
+                    min(max(int(self._phase_index_var.get()), 1), self.result.displacement.shape[1])
+                    - 1
+                )
+            except ValueError:
+                selected = 0
+            if self._phase_kind_var.get() == "Particle":
+                figure = _line_figure(
+                    self.result.displacement[:, selected],
+                    [(self.result.velocity[:, selected], f"particle {selected + 1}")],
+                    "Particle phase space",
+                    f"x_{selected + 1}",
+                    f"v_{selected + 1}",
+                )
+            else:
+                figure = _line_figure(
+                    self.result.modal_q[:, selected],
+                    [(self.result.modal_p[:, selected], f"mode {selected + 1}")],
+                    "Normal-mode phase space",
+                    f"Q_{selected + 1}",
+                    f"P_{selected + 1}",
+                )
+            canvas[0] = embed_plot_in_tk(figure, frame)
+            self._canvases.append(canvas[0])
+
+        kind.bind("<<ComboboxSelected>>", update)
+        self._phase_index_var.trace_add("write", lambda *_args: update())
+        update()
+
     def _heatmap(
-        self, t: np.ndarray, values: np.ndarray, title: str, xlabel: str, label: str
+        self,
+        t: np.ndarray,
+        values: np.ndarray,
+        title: str,
+        xlabel: str,
+        label: str,
+        coordinate: np.ndarray | None = None,
     ) -> Figure:
         """Create a cached two-dimensional result view."""
         from matplotlib.figure import Figure
 
         figure = Figure(figsize=(8, 5), tight_layout=True)
         axis = figure.add_subplot(111)
-        image = axis.imshow(
-            values, origin="lower", aspect="auto", extent=(0.5, values.shape[1] + 0.5, t[0], t[-1])
+        extent = (
+            (coordinate[0], coordinate[-1], t[0], t[-1])
+            if coordinate is not None
+            else (0.5, values.shape[1] + 0.5, t[0], t[-1])
         )
+        image = axis.imshow(values, origin="lower", aspect="auto", extent=extent)
         axis.set(title=title, xlabel=xlabel, ylabel="t")
         figure.colorbar(image, ax=axis, label=label)
         return figure
 
-    def _surface(self, t: np.ndarray, values: np.ndarray, title: str) -> Figure:
+    def _surface(
+        self,
+        t: np.ndarray,
+        values: np.ndarray,
+        title: str,
+        coordinate: np.ndarray,
+        xlabel: str,
+        zlabel: str,
+    ) -> Figure:
         """Create a cached coordinate-time-amplitude surface."""
         from matplotlib.figure import Figure
 
         figure = Figure(figsize=(8, 5), tight_layout=True)
         axis = figure.add_subplot(111, projection="3d")
-        coordinate, time = np.meshgrid(np.arange(values.shape[1]), t)
+        coordinate_grid, time = np.meshgrid(coordinate, t)
         axis.plot_surface(
-            coordinate,
+            coordinate_grid,
             time,
             values,
             cmap="viridis",
             rcount=min(100, values.shape[0]),
             ccount=values.shape[1],
         )
-        axis.set(title=title, xlabel="bond", ylabel="t", zlabel="strain")
+        axis.set(title=title, xlabel=xlabel, ylabel="t", zlabel=zlabel)
         return figure
 
     def _build_sweep(self, notebook: ttk.Notebook) -> None:
         """Show detected and explicitly undetected recurrence-scaling measurements."""
         result = self.result
         assert isinstance(result, FPUTSweepResult)
-        series = [
-            (result.first_recurrence_times, "first recurrence time"),
-            (result.recurrence_fidelities, "recurrence fidelity"),
-        ]
         self._add_plot(
             notebook,
-            "Recurrence Scaling",
+            "Recurrence Time",
             _line_figure(
                 result.parameter_values,
-                series,
-                "Recurrence scaling (NaN = undetected)",
+                [(result.first_recurrence_times, "first recurrence time")],
+                "First recurrence time (NaN = undetected)",
                 result.sweep_variable,
-                "value",
+                "T_R",
+            ),
+        )
+        detected = result.detected & (result.parameter_values > 0.0)
+        log_x = np.log(result.parameter_values[detected])
+        log_y = np.log(result.first_recurrence_times[detected])
+        figure = _line_figure(
+            log_x,
+            [(log_y, "detected runs")],
+            "Log-log recurrence scaling",
+            f"log({result.sweep_variable})",
+            "log(T_R)",
+        )
+        if result.slope is not None and result.intercept is not None:
+            axis = figure.axes[0]
+            axis.plot(log_x, result.slope * log_x + result.intercept, label="least-squares fit")
+            axis.set_title(
+                f"Log-log scaling: slope={result.slope:.4g}, "
+                f"intercept={result.intercept:.4g}, R²={result.r_squared:.4g}"
+            )
+            axis.legend()
+        self._add_plot(notebook, "Log-Log Scaling", figure)
+        self._add_plot(
+            notebook,
+            "Quality",
+            _line_figure(
+                result.parameter_values,
+                [
+                    (result.recurrence_fidelities, "recurrence fidelity"),
+                    (result.max_relative_hamiltonian_drift, "max relative Hamiltonian drift"),
+                ],
+                "Sweep quality (NaN = undetected recurrence)",
+                result.sweep_variable,
+                "quality",
             ),
         )

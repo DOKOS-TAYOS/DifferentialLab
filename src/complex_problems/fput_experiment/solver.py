@@ -223,7 +223,10 @@ def solve_fput(
     valid = modal_sum > 0.0
     if n > 1:
         p = fractions[valid]
-        entropy[valid] = -np.sum(np.where(p > 0.0, p * np.log(p), 0.0), axis=1) / np.log(n)
+        log_terms = np.zeros_like(p)
+        positive = p > 0.0
+        log_terms[positive] = p[positive] * np.log(p[positive])
+        entropy[valid] = -np.sum(log_terms, axis=1) / np.log(n)
     participation = np.zeros(t.size)
     participation[valid] = 1.0 / np.sum(fractions[valid] ** 2, axis=1)
     energies = np.asarray(
@@ -251,6 +254,9 @@ def solve_fput(
         "highest_late_recurrence_fidelity": float(np.max(peak_fidelities))
         if peak_times.size
         else None,
+        "maximum_interaction_energy_identity_error": float(
+            np.max(np.abs(total - np.sum(modal_energy, axis=1) - energies[:, 2]))
+        ),
     }
     warnings: list[str] = []
     if model == "alpha" and np.any(alpha_nonconvex_bonds(displacement[0], coefficient)):

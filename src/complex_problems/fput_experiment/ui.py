@@ -91,8 +91,14 @@ class FPUTExperimentDialog:
             tk.StringVar(value=value) for value in ("16", "0.25", "1", "1")
         )
         make_labeled_entry(row, "N", self._n_var, width=7)
-        make_labeled_combo(row, "Model", self._model_var, ("alpha", "beta"), width=10)
-        make_labeled_entry(row, "α / β", self._coefficient_var, width=10)
+        self._model_combo = make_labeled_combo(
+            row, "Model", self._model_var, ("alpha", "beta"), width=10
+        )
+        self._coefficient_label = ttk.Label(row, text="α / β")
+        self._coefficient_label.pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Entry(row, textvariable=self._coefficient_var, width=10).pack(
+            side=tk.LEFT, padx=(0, 10)
+        )
         make_labeled_entry(row, "Amplitude", self._amplitude_var, width=10)
         make_labeled_entry(row, "Mode", self._mode_var, width=7)
         row = ttk.Frame(root)
@@ -109,6 +115,7 @@ class FPUTExperimentDialog:
         row.pack(fill=tk.X, pady=3)
         state = make_labeled_combo(row, "Initial state", self._state_var, _INITIAL_STATES, width=28)
         state.bind("<<ComboboxSelected>>", lambda _event: self._update_state_hint())
+        self._study_var.trace_add("write", self._update_study_mode)
         self._state_hint = ttk.Label(
             root,
             text="Single-mode displacement x_j = A sin(mπj/(N+1)); velocities are zero.",
@@ -120,8 +127,30 @@ class FPUTExperimentDialog:
         )
         self._custom_frame = ttk.Frame(root)
         self._custom_frame.pack(fill=tk.X, pady=3)
-        make_labeled_entry(self._custom_frame, "x values", self._custom_x_var, width=42)
-        make_labeled_entry(self._custom_frame, "v values", self._custom_v_var, width=42)
+        self._custom_first_label = ttk.Label(self._custom_frame, text="x values")
+        self._custom_first_label.pack(side=tk.LEFT, padx=(0, 4))
+        self._custom_first_entry = ttk.Entry(
+            self._custom_frame, textvariable=self._custom_x_var, width=42
+        )
+        self._custom_first_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self._custom_second_label = ttk.Label(self._custom_frame, text="v values")
+        self._custom_second_label.pack(side=tk.LEFT, padx=(0, 4))
+        self._custom_second_entry = ttk.Entry(
+            self._custom_frame, textvariable=self._custom_v_var, width=42
+        )
+        self._custom_second_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self._legacy_frame = ttk.Frame(root)
+        self._legacy_frame.pack(fill=tk.X, pady=3)
+        self._legacy_width_var = tk.StringVar(value="0.5")
+        self._legacy_first_center_var = tk.StringVar(value="6")
+        self._legacy_second_center_var = tk.StringVar(value="26")
+        make_labeled_entry(self._legacy_frame, "Width", self._legacy_width_var, width=10)
+        make_labeled_entry(
+            self._legacy_frame, "First center", self._legacy_first_center_var, width=10
+        )
+        make_labeled_entry(
+            self._legacy_frame, "Second center", self._legacy_second_center_var, width=10
+        )
         self._sweep_var = tk.StringVar(value="N")
         self._sweep_values_var = tk.StringVar(value="8, 12, 16")
         row = ttk.Frame(root)
@@ -161,7 +190,7 @@ class FPUTExperimentDialog:
         hints = {
             "Two adjacent modes": "Historical equal A/2 superposition of modes m and m+1.",
             "Custom particle state": "Enter exactly N comma-separated x and v values.",
-            "Custom modal state": "Enter exactly N comma-separated Q and P values in the x fields.",
+            "Custom modal state": "Enter exactly N comma-separated Q and P modal values.",
             "Legacy kink-pair study": (
                 "Historical alpha-FPUT kink-pair study; not claimed to be an "
                 "exact discrete soliton."
@@ -173,6 +202,35 @@ class FPUTExperimentDialog:
                 "Single-mode displacement x_j = A sin(mπj/(N+1)); velocities are zero.",
             )
         )
+        state = self._state_var.get()
+        custom = state in {"Custom particle state", "Custom modal state"}
+        legacy = state == "Legacy kink-pair study"
+        self._custom_frame.pack_forget()
+        self._legacy_frame.pack_forget()
+        if custom:
+            modal = state == "Custom modal state"
+            self._custom_first_label.configure(text="Q values" if modal else "x values")
+            self._custom_second_label.configure(text="P values" if modal else "v values")
+            self._custom_first_entry.configure(
+                textvariable=self._custom_q_var if modal else self._custom_x_var
+            )
+            self._custom_second_entry.configure(
+                textvariable=self._custom_p_var if modal else self._custom_v_var
+            )
+            self._custom_frame.pack(fill=tk.X, pady=3)
+        if legacy:
+            self._legacy_frame.pack(fill=tk.X, pady=3)
+
+    def _update_study_mode(self, *_args: object) -> None:
+        """Make the alpha-only scaling interpretation visible and unambiguous."""
+        scaling = self._study_var.get() == "Recurrence scaling"
+        if scaling:
+            self._model_var.set("alpha")
+            self._model_combo.configure(state="disabled")
+            self._coefficient_label.configure(text="alpha (scaling uses alpha-FPUT)")
+        else:
+            self._model_combo.configure(state="readonly")
+            self._coefficient_label.configure(text="α / β")
 
     def _collect_single(self) -> dict[str, object]:
         n = parse_positive_int(self._n_var.get(), name="N", min_value=2)
@@ -192,11 +250,24 @@ class FPUTExperimentDialog:
             )
         elif state == "Custom modal state":
             x0, v0 = particle_coordinates(
-                parse_exact_vector(self._custom_x_var.get(), n, "Modal Q"),
-                parse_exact_vector(self._custom_v_var.get(), n, "Modal P"),
+                parse_exact_vector(self._custom_q_var.get(), n, "Modal Q"),
+                parse_exact_vector(self._custom_p_var.get(), n, "Modal P"),
             )
         else:
-            x0, v0 = legacy_kink_pair_initial_state(n, amplitude, coefficient)
+            if model != "alpha":
+                raise ValueError(
+                    "Legacy kink-pair study is available only for the alpha-FPUT model."
+                )
+            x0, v0 = legacy_kink_pair_initial_state(
+                n,
+                amplitude,
+                coefficient,
+                width=parse_positive_float(self._legacy_width_var.get(), name="Width"),
+                first_center=parse_float(self._legacy_first_center_var.get(), name="First center"),
+                second_center=parse_float(
+                    self._legacy_second_center_var.get(), name="Second center"
+                ),
+            )
         return {
             "n_particles": n,
             "model": model,
@@ -258,5 +329,15 @@ class FPUTExperimentDialog:
                 t_end=cast(float, params["t_end"]),
                 dt=cast(float, params["dt"]),
                 sample_every=cast(int, params["sample_every"]),
+                run_count=(
+                    len(cast(list[float], params["parameter_values"]))
+                    if "parameter_values" in params
+                    else 1
+                ),
+                n_particles_values=(
+                    cast(list[float], params["parameter_values"])
+                    if params.get("sweep_variable") == "N"
+                    else None
+                ),
             ),
         )

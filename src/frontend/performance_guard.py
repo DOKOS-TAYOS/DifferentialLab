@@ -323,14 +323,23 @@ def assess_fput_request(
     t_end: float,
     dt: float,
     sample_every: int,
+    run_count: int = 1,
+    n_particles_values: list[float] | None = None,
 ) -> PerformanceAdvisory | None:
     """Advise on FPUT integration work and the deliberately retained saved history."""
     if n_particles < 1 or dt <= 0 or t_end <= t_start or sample_every < 1:
         return None
+    if run_count < 1:
+        return None
     steps = int(math.ceil((t_end - t_start) / dt))
     frames = 1 + int(math.ceil(steps / sample_every))
-    particle_steps = steps * n_particles
-    saved_values = frames * n_particles
+    particle_count = (
+        sum(int(value) for value in n_particles_values)
+        if n_particles_values is not None
+        else n_particles * run_count
+    )
+    particle_steps = steps * particle_count
+    saved_values = frames * particle_count
     severity = _severity_from_thresholds(
         value=max(
             particle_steps // _WARN_FPUT_PARTICLE_STEPS,
@@ -348,7 +357,8 @@ def assess_fput_request(
         severity=severity,
         title="Expensive FPUT request",
         message=(
-            f"This FPUT run estimates {steps:,} integration steps × {n_particles:,} particles "
+            f"This FPUT request estimates {steps:,} integration steps across {run_count:,} run(s) "
+            f"and {particle_count:,} total particle trajectories "
             f"= {particle_steps:,} particle-steps and retains {frames:,} saved frames "
             f"({saved_values:,} values per stored field). Historical multi-million-step studies "
             "can take substantially longer; continue only if this is intentional."

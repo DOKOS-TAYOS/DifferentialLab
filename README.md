@@ -100,6 +100,7 @@ Current modules:
 - `antenna_radiation`: far-field patterns and antenna metrics
 - `aerodynamics_2d`: 2D incompressible obstacle-flow approximations
 - `pipe_flow`: steady and transient 1D pipe-flow models
+- `gravitational_n_body`: softened Newtonian N-body dynamics and orbit diagnostics
 - `fput_experiment`: dedicated Fermi-Pasta-Ulam-Tsingou recurrence and strain studies
 
 ## Requirements
