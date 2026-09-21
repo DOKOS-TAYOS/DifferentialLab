@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refined the background-task progress dialog with clearer operation/status hierarchy and an indeterminate progress state that cannot be dismissed while non-cancellable work is running.
 - Made Configuration forms responsive and family-sized, with structured PDE axis and boundary tables and clearer initial-condition tables.
 - Added progressive disclosure for optional ODE events and grouped checkbox controls for computed metrics.
 - Added stateful Equation -> Configuration navigation, including Back with retained raw inputs and per-equation configuration snapshots.
