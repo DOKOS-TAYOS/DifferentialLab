@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Modernized Result visualization controls with responsive grouped layouts, accessible multi-series selection, physical 3D slice coordinates, and contextual Vector PDE origins.
 - Rebuilt standard Results as a screen-aware, resizable workspace with an adjustable summary/visualization split.
 - Reorganized Results into factual run summaries, computed metrics, events, and collapsible solver diagnostics.
 - Added Results -> Modify setup navigation that restores the retained Configuration state for re-solving.

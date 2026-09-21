@@ -11,6 +11,7 @@ import pytest
 from frontend.ui_dialogs.equation_dialog import EquationDialog
 from frontend.ui_dialogs.result_dialog import ResultDialog
 from pipeline import SolverResult, run_solver_pipeline
+from plotting.coordinates import extract_scalar_3d_slice
 from solver.equation_parser import parse_pde_3d_residual_expression
 from solver.predefined import load_predefined_equations
 
@@ -212,7 +213,13 @@ def test_result_dialog_selects_scalar_pde_3d_orthogonal_slice_without_display() 
         captured.update(frame=frame, figure=figure, canvas_attr=canvas_attr)
 
     dialog._replace_plot = replace_plot  # type: ignore[method-assign]
-    with patch("plotting.create_contour_plot", return_value="figure") as create_plot:
+    with (
+        patch("plotting.create_contour_plot", return_value="figure") as create_plot,
+        patch(
+            "plotting.coordinates.extract_scalar_3d_slice",
+            wraps=extract_scalar_3d_slice,
+        ) as extract_slice,
+    ):
         dialog._update_pde_3d_slice()
 
     args = create_plot.call_args.args
@@ -224,3 +231,4 @@ def test_result_dialog_selects_scalar_pde_3d_orthogonal_slice_without_display() 
     assert kwargs["ylabel"] == "z"
     assert "y=1" in kwargs["title"]
     assert captured["figure"] == "figure"
+    assert extract_slice.call_args.args[5] == 1
