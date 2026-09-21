@@ -175,10 +175,11 @@ class TransformDialog:
         paned.pack(fill=tk.BOTH, expand=True)
         self._paned = paned
 
-        # ── Left: controls ──
-        left = ttk.Frame(paned, width=_LEFT_WIDTH)
-        left.pack_propagate(False)
-        paned.add(left, weight=0)
+        # ── Left: vertically scrollable controls ──
+        self._controls_scroll = ScrollableFrame(paned, width=_LEFT_WIDTH)
+        self._controls_scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
+        paned.add(self._controls_scroll, weight=0)
+        left = self._controls_scroll.inner
 
         # Function
         func_lf = ttk.LabelFrame(left, text="Function", padding=pad)
@@ -306,6 +307,8 @@ class TransformDialog:
         self._plot_container = ttk.Frame(plot_frame)
         self._plot_container.pack(fill=tk.BOTH, expand=True)
 
+        self._controls_scroll.bind_new_children()
+        self._controls_scroll.refresh_scroll_region()
         self._update_transform_options()
         self._on_apply()
 
@@ -318,6 +321,7 @@ class TransformDialog:
             self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
         elif not is_taylor and is_visible:
             self._taylor_frame.pack_forget()
+        self._controls_scroll.refresh_scroll_region()
 
     def _on_transform_change(self, _event: object) -> None:
         """When transform selection changes, refresh only conditional controls."""
