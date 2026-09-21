@@ -540,7 +540,10 @@ def create_contour_plot(
     contour_levels: int = get_env_from_schema("PLOT_CONTOUR_LEVELS")
     surface_cmap: str = get_env_from_schema("PLOT_SURFACE_CMAP")
     contour = ax.contourf(X, Y, z_masked, levels=contour_levels, cmap=surface_cmap)
-    fig.colorbar(contour, ax=ax)
+    colorbar = fig.colorbar(contour, ax=ax)
+    offset_text = colorbar.ax.yaxis.get_offset_text()
+    offset_text.set_x(2.5)
+    offset_text.set_ha("left")
     _finalize_plot(ax, title, xlabel, ylabel)
     fig.tight_layout()
     return fig

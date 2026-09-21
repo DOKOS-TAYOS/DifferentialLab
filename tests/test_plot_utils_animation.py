@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from config import get_env_from_schema as configured_env  # noqa: E402
 from plotting import (
+    create_contour_plot,
     create_image_animation_plot,
     create_line_animation_plot,
     create_surface_animation_plot,
@@ -366,3 +367,26 @@ def test_figure_animation_export_uses_attached_animation_payload(tmp_path: Path)
 
     assert output == tmp_path / "animated.mp4"
     assert captured["title"].endswith("t=1)")
+
+
+def test_contour_colorbar_offset_is_positioned_away_from_title() -> None:
+    x = np.linspace(-1.0, 1.0, 5)
+    y = np.linspace(-0.5, 0.5, 4)
+    xx, yy = np.meshgrid(x, y)
+    z = 1e-17 * np.sin(np.pi * xx) * np.cos(np.pi * yy)
+
+    figure = create_contour_plot(
+        x,
+        y,
+        z,
+        title="Long scientific contour title",
+        xlabel="x",
+        ylabel="y",
+    )
+    try:
+        colorbar_axis = figure.axes[1]
+        offset_text = colorbar_axis.yaxis.get_offset_text()
+        assert offset_text.get_position()[0] == 2.5
+        assert offset_text.get_ha() == "left"
+    finally:
+        plt.close(figure)
