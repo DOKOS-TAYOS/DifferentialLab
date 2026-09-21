@@ -25,6 +25,13 @@ def test_exp_with_parameter() -> None:
     np.testing.assert_allclose(y, [1.0, np.exp(-1), np.exp(-2)])
 
 
+def test_unicode_parameter_identifier_remains_literal_and_valid() -> None:
+    """A configured Unicode identifier is evaluated without alias conversion."""
+    func = parse_scalar_function("ω*x", parameters={"ω": 2.5})
+
+    assert np.isclose(func(4.0), 10.0)
+
+
 def test_polynomial() -> None:
     """Parse x**2 + 2*x + 1."""
     func = parse_scalar_function("x**2 + 2*x + 1")

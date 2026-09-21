@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Redesigned every Custom equation-family editor into a responsive definition/reference workspace.
+- Added a shared, keyboard-accessible SymbolPalette with literal insertion into the last active editor.
+- Replaced Function Transform's copy-only Unicode reference with direct function/parameter insertion.
 - Moved contour-plot scientific-notation offsets away from plot titles to avoid ambiguous overlap in very small-value PDE slices.
 - Made Help dialog Close actions neutral so ordinary dismissal no longer uses destructive styling.
 - Modernized Result visualization controls with responsive grouped layouts, accessible multi-series selection, physical 3D slice coordinates, and contextual Vector PDE origins.
