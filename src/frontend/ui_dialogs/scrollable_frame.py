@@ -97,9 +97,9 @@ class ScrollableFrame(ttk.Frame):
         return "break"
 
     def _bind_mousewheel_recursive(self, widget: tk.Misc) -> None:
-        widget.bind("<MouseWheel>", self._on_mousewheel)
-        widget.bind("<Button-4>", self._on_mousewheel)
-        widget.bind("<Button-5>", self._on_mousewheel)
+        for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            if not widget.bind(sequence):
+                widget.bind(sequence, self._on_mousewheel)
         for child in widget.winfo_children():
             self._bind_mousewheel_recursive(child)
 
