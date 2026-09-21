@@ -9,6 +9,7 @@ from typing import Any
 from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
+from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.solve_session import (
     EquationSelection,
     SolveSession,
@@ -236,8 +237,10 @@ class EquationDialog:
         bind_wraplength(details, self.desc_label, pad=2 * pad)
 
         # --- Tab 2: Custom ---
-        self._custom_outer = ttk.Frame(self._notebook, padding=pad)
-        self._notebook.add(self._custom_outer, text="  Custom  ")
+        self._custom_scroll = ScrollableFrame(self._notebook)
+        self._custom_scroll.apply_bg(bg)
+        self._custom_outer = self._custom_scroll.inner
+        self._notebook.add(self._custom_scroll, text="  Custom  ")
 
         # The custom content is rebuilt dynamically when equation type changes.
         self._custom_inner: ttk.Frame | None = None
@@ -392,10 +395,16 @@ class EquationDialog:
         ci.bind("<Configure>", self._on_custom_workspace_configure, add="+")
         self._layout_custom_workspace(1200)
         self._apply_custom_state(eq_type)
+        self._refresh_custom_scroll()
 
     def _on_custom_workspace_configure(self, event: tk.Event) -> None:  # type: ignore[type-arg]
         """Switch the Custom editor between side-by-side and stacked layouts."""
         self._layout_custom_workspace(event.width)
+
+    def _refresh_custom_scroll(self) -> None:
+        """Refresh scrolling after dynamic Custom-editor widgets are rebuilt."""
+        self._custom_scroll.bind_new_children()
+        self._custom_scroll.refresh_scroll_region()
 
     def _layout_custom_workspace(self, width: int) -> None:
         """Place editor and reference panels without requiring horizontal scrolling."""
@@ -1150,6 +1159,7 @@ class EquationDialog:
             expression.grid(row=component + 1, column=1, sticky="ew", pady=2)
             self._vec_expr_widgets.append(expression)
             self._register_symbol_target(expression)
+        self._refresh_custom_scroll()
 
     def _on_next(self) -> None:
         """Route to predefined or custom handler based on active tab."""
