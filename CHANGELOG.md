@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Made Help dialog Close actions neutral so ordinary dismissal no longer uses destructive styling.
 - Modernized Result visualization controls with responsive grouped layouts, accessible multi-series selection, physical 3D slice coordinates, and contextual Vector PDE origins.
 - Rebuilt standard Results as a screen-aware, resizable workspace with an adjustable summary/visualization split.
 - Reorganized Results into factual run summaries, computed metrics, events, and collapsible solver diagnostics.
