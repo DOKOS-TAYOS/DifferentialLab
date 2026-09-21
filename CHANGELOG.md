@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rebuilt standard Results as a screen-aware, resizable workspace with an adjustable summary/visualization split.
+- Reorganized Results into factual run summaries, computed metrics, events, and collapsible solver diagnostics.
+- Added Results -> Modify setup navigation that restores the retained Configuration state for re-solving.
+- Moved CSV and JSON data exports into the fixed Results footer while preserving plot-toolbar figure export.
 - Refined the background-task progress dialog with clearer operation/status hierarchy and an indeterminate progress state that cannot be dismissed while non-cancellable work is running.
 - Made Configuration forms responsive and family-sized, with structured PDE axis and boundary tables and clearer initial-condition tables.
 - Added progressive disclosure for optional ODE events and grouped checkbox controls for computed metrics.

@@ -63,16 +63,28 @@ class _FakeWidget:
     def configure(self, **_kwargs: object) -> None:
         pass
 
+    def add(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
 
 class _FakeButton(_FakeWidget):
     def __init__(self, *_args: object, **kwargs: object) -> None:
         super().__init__(*_args, **kwargs)
         self.command = kwargs["command"]
+        self.text = str(kwargs.get("text", ""))
 
     def pack(self, **_kwargs: object) -> None:
         pass
 
     def focus_set(self) -> None:
+        pass
+
+
+class _FakeStyle:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+    def configure(self, *_args: object, **_kwargs: object) -> None:
         pass
 
 
@@ -151,6 +163,26 @@ def test_result_dialog_sets_geometry_and_materializes_layout_before_first_plot()
 
     assert events == ["geometry", "minsize", "controls", "tabs", "layout", "render", "modal"]
     assert dialog._initial_plot_callbacks == []
+
+
+def test_result_geometry_clamps_minimum_to_a_small_screen() -> None:
+    """Results never imposes a minimum larger than the supported screen fraction."""
+    dialog = object.__new__(result_dialog_ui.ResultDialog)
+    dialog.win = MagicMock()
+    dialog.win.winfo_screenwidth.return_value = 800
+    dialog.win.winfo_screenheight.return_value = 600
+
+    with patch.object(result_dialog_ui, "center_window") as center_window:
+        dialog._set_window_geometry()
+
+    center_window.assert_called_once_with(
+        dialog.win,
+        752,
+        528,
+        max_width_ratio=0.96,
+        resizable=True,
+    )
+    dialog.win.minsize.assert_called_once_with(720, 540)
 
 
 def test_animation_replacement_stops_and_closes_previous_owned_figure() -> None:
@@ -256,9 +288,14 @@ def test_close_button_and_window_manager_use_the_same_cleanup_callback() -> None
     with (
         patch.object(result_dialog_ui.tk, "Toplevel", return_value=window),
         patch.object(result_dialog_ui.ttk, "Frame", _FakeWidget),
+        patch.object(result_dialog_ui.ttk, "Label", _FakeWidget),
         patch.object(result_dialog_ui.ttk, "Button", side_effect=make_button),
         patch.object(result_dialog_ui.ttk, "Notebook", _FakeWidget),
+        patch.object(result_dialog_ui.ttk, "Panedwindow", _FakeWidget),
+        patch.object(result_dialog_ui.ttk, "Separator", _FakeWidget),
+        patch.object(result_dialog_ui.ttk, "Style", _FakeStyle),
         patch.object(result_dialog_ui, "ScrollableFrame", _FakeScrollableFrame),
+        patch.object(result_dialog_ui, "ToolTip"),
         patch.object(result_dialog_ui.ResultDialog, "_set_window_geometry"),
         patch.object(result_dialog_ui.ResultDialog, "_build_left_panel"),
         patch.object(result_dialog_ui.ResultDialog, "_build_plot_tabs"),
@@ -268,8 +305,49 @@ def test_close_button_and_window_manager_use_the_same_cleanup_callback() -> None
         dialog = result_dialog_ui.ResultDialog(MagicMock(), result=result)
 
     protocol_callback = window.protocol.call_args.args[1]
-    button_callback = buttons[0].command
+    assert "Modify setup" not in {button.text for button in buttons}
+    button_callback = next(button.command for button in buttons if button.text == "Close")
     assert protocol_callback.__self__ is dialog
     assert button_callback.__self__ is dialog
     assert protocol_callback.__func__ is result_dialog_ui.ResultDialog._close
     assert button_callback.__func__ is result_dialog_ui.ResultDialog._close
+
+
+def test_modify_setup_cleans_plots_and_reopens_configuration_with_same_state() -> None:
+    """Modify setup destroys Results before restoring the saved Configuration."""
+    window = _FakeWindow()
+    dialog = object.__new__(result_dialog_ui.ResultDialog)
+    dialog.parent = MagicMock()
+    dialog.win = window
+    dialog._closed = False
+    dialog._canvases = [_FakeCanvas(plt.figure())]
+    session = MagicMock()
+    selection = MagicMock()
+    selection.parameters_kwargs.return_value = {
+        "expression": "f",
+        "function_name": None,
+        "order": 1,
+        "parameters": {},
+        "equation_name": "Test equation",
+        "default_y0": [1.0],
+        "default_domain": [0.0, 1.0],
+    }
+    dialog._session = session
+    dialog._selection = selection
+
+    with patch("frontend.ui_dialogs.parameters_dialog.ParametersDialog") as parameters_dialog:
+        dialog._modify_setup()
+
+    assert dialog._closed is True
+    assert dialog._canvases == []
+    assert window.destroy_calls == 1
+    selection.parameters_kwargs.assert_called_once_with()
+    parameters_dialog.assert_called_once_with(
+        dialog.parent,
+        **selection.parameters_kwargs.return_value,
+        session=session,
+        selection=selection,
+    )
+
+    dialog._close()
+    assert window.destroy_calls == 1

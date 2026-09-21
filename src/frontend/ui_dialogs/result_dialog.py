@@ -1,4 +1,4 @@
-"""Result dialog — left panel (stats, info, export) + right panel (interactive plots)."""
+"""Result workspace with scientific summaries and interactive plot tabs."""
 
 from __future__ import annotations
 
@@ -9,13 +9,24 @@ from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
 
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import (
+    AVAILABLE_STATISTICS,
+    generate_output_basename,
+    get_env_from_schema,
+    get_output_dir,
+)
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
 from frontend.theme import get_contrast_foreground, get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.window_utils import center_window, make_modal
+from frontend.ui_dialogs.tooltip import ToolTip
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    center_window,
+    make_modal,
+)
 from solver.notation import FNotation, generate_derivative_labels, generate_phase_space_options
 from utils import export_csv_to_path, export_json_to_path, get_logger
 
@@ -23,24 +34,163 @@ if TYPE_CHECKING:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     from matplotlib.figure import Figure
 
+    from frontend.ui_dialogs.solve_session import EquationSelection, SolveSession
     from pipeline import SolverResult
 
 logger = get_logger(__name__)
 _EXTRAPOLATE_FILL: Any = "extrapolate"
 
-_MAGNITUDE_KEYS = {
-    "mean",
-    "rms",
-    "std",
-    "integral",
-    "l2_norm",
-    "half_life",
-    "time_constant",
-    "doubling_time",
-    "angular_frequency",
+_METRIC_LABELS = {
+    "rms": "RMS",
+    "std": "Standard deviation",
+    "l2_norm": "L2 norm",
+    "dominant_frequency": "Dominant frequency",
+    "gradient_norm": "Gradient norm",
+    "zero_crossings": "Zero crossings",
+    "nnz": "Nonzero count",
 }
 
-_LEFT_MIN_WIDTH = 580
+_DIAGNOSTIC_HELP = {
+    "Relative residual": (
+        "Residual norm divided by a reference scale. Interpretation depends on the equation, "
+        "discretization, and problem setup."
+    ),
+    "Jacobian evaluations": "Number of Jacobian evaluations reported by the solver.",
+    "LU decompositions": "Number of LU matrix decompositions reported by the solver.",
+    "Sparse nnz": "Number of nonzero entries in the assembled sparse matrix.",
+    "Condition estimate": (
+        "Estimated matrix condition number. Its significance depends on scaling and formulation."
+    ),
+}
+
+_SIDEBAR_INITIAL_WIDTH = 400
+
+
+def modify_setup_available(session: object | None, selection: object | None) -> bool:
+    """Return whether Results can navigate directly back to Configuration."""
+    return session is not None and selection is not None
+
+
+def humanize_metric_label(key: str) -> str:
+    """Return a deterministic user-facing label without changing the metric key."""
+    return _METRIC_LABELS.get(key, key.replace("_", " ").strip().capitalize())
+
+
+def computed_metric_items(
+    statistics: dict[str, Any],
+) -> list[tuple[str, Any, str | None]]:
+    """Return humanized metric rows while preserving each structured value."""
+    return [
+        (humanize_metric_label(key), value, AVAILABLE_STATISTICS.get(key))
+        for key, value in statistics.items()
+    ]
+
+
+def _has_display_value(value: Any) -> bool:
+    """Return whether *value* contains information worth showing."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (dict, list, tuple, set)):
+        return bool(value)
+    if isinstance(value, np.ndarray):
+        return value.size > 0
+    return True
+
+
+def run_summary_items(metadata: dict[str, Any]) -> list[tuple[str, Any]]:
+    """Extract concise, available run-level metadata in display order."""
+    items: list[tuple[str, Any]] = []
+    success = metadata.get("solver_success")
+    if success is True:
+        items.append(("Status", "Completed successfully"))
+    elif success is False:
+        items.append(("Status", "Solver reported failure"))
+
+    fields = (
+        ("Method", "method"),
+        ("Points", "num_points"),
+        ("Function evaluations", "n_evaluations"),
+        ("Relative tolerance", "rtol"),
+        ("Absolute tolerance", "atol"),
+    )
+    for label, key in fields:
+        value = metadata.get(key)
+        if _has_display_value(value):
+            items.append((label, value))
+    return items
+
+
+def diagnostic_items(metadata: dict[str, Any]) -> list[tuple[str, Any]]:
+    """Extract factual solver diagnostics without applying quality thresholds."""
+    fields = (
+        ("Solver message", "solver_message"),
+        ("Solver status", "solver_status"),
+        ("Residual maximum", "residual_max"),
+        ("Residual mean", "residual_mean"),
+        ("Residual RMS", "residual_rms"),
+        ("Discrete residual L2", "discrete_residual_l2"),
+        ("Relative residual", "relative_residual_l2"),
+        ("Component residuals", "component_residual_l2"),
+        ("Component relative residuals", "component_relative_residual_l2"),
+        ("Jacobian evaluations", "n_jacobian_evals"),
+        ("LU decompositions", "n_lu_decompositions"),
+        ("Sparse matrix shape", "matrix_shape"),
+        ("Sparse nnz", "nnz"),
+        ("Condition estimate", "condition_estimate"),
+        ("PDE warnings", "pde_warnings"),
+    )
+    return [
+        (label, metadata[key])
+        for label, key in fields
+        if key in metadata and _has_display_value(metadata[key])
+    ]
+
+
+def event_summary_items(metadata: dict[str, Any]) -> list[tuple[str, Any]]:
+    """Summarize event metadata without exposing event-state arrays."""
+    event_times = metadata.get("event_times")
+    event_states = metadata.get("event_states")
+    if event_times is None and event_states is None:
+        return []
+
+    if event_times is None:
+        return [("Detected events", 0)]
+
+    groups: list[Any]
+    if isinstance(event_times, np.ndarray) and event_times.ndim <= 1:
+        groups = [event_times]
+    elif isinstance(event_times, (list, tuple)):
+        groups = list(event_times)
+    else:
+        groups = [event_times]
+
+    normalized: dict[str, Any] = {}
+    count = 0
+    for index, group in enumerate(groups, start=1):
+        values = np.asarray(group).reshape(-1).tolist()
+        count += len(values)
+        if values:
+            normalized[f"Event {index}"] = values
+
+    items: list[tuple[str, Any]] = [("Detected events", count)]
+    if normalized:
+        items.append(("Event times", normalized))
+    return items
+
+
+def _format_display_value(value: Any) -> str:
+    """Format a scalar or short sequence for a wrapping display row."""
+    if value is None:
+        return "N/A"
+    if isinstance(value, (float, np.floating)):
+        return f"{float(value):.6g}"
+    if isinstance(value, np.ndarray):
+        return ", ".join(_format_display_value(item) for item in value.reshape(-1).tolist())
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_format_display_value(item) for item in value)
+    return str(value)
 
 
 class ResultDialog:
@@ -53,6 +203,8 @@ class ResultDialog:
     Args:
         parent: Parent window.
         result: A data-only ``SolverResult`` from the pipeline.
+        session: Optional state owner for the standard solve workflow.
+        selection: Optional equation selection used to rebuild Configuration.
     """
 
     def __init__(
@@ -60,9 +212,13 @@ class ResultDialog:
         parent: tk.Tk | tk.Toplevel,
         *,
         result: SolverResult,
+        session: SolveSession | None = None,
+        selection: EquationSelection | None = None,
     ) -> None:
         self.parent = parent
         self._result = result
+        self._session = session
+        self._selection = selection
         self._notation: FNotation = result.notation or FNotation(
             kind="ode", order=result.vector_order
         )
@@ -99,6 +255,26 @@ class ResultDialog:
             self.win.destroy()
         except tk.TclError:
             pass
+
+    def _modify_setup(self) -> None:
+        """Close Results and reopen Configuration from the retained solve session."""
+        session = self._session
+        selection = self._selection
+        if session is None or selection is None:
+            return
+
+        parent = self.parent
+        parameters_kwargs = selection.parameters_kwargs()
+        self._close()
+
+        from frontend.ui_dialogs.parameters_dialog import ParametersDialog
+
+        ParametersDialog(
+            parent,
+            **parameters_kwargs,
+            session=session,
+            selection=selection,
+        )
 
     @staticmethod
     def _dispose_canvas(canvas: FigureCanvasTkAgg | None) -> None:
@@ -151,10 +327,17 @@ class ResultDialog:
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
         win_w = int(screen_w * 0.94)
-        win_h = min(int(screen_h * 0.85), 900)
+        win_h = min(int(screen_h * 0.88), 920)
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(_LEFT_MIN_WIDTH + 500, 500)
+        min_w, min_h = calculate_screen_aware_minsize(
+            screen_w,
+            screen_h,
+            900,
+            560,
+            max_ratio=0.9,
+        )
+        self.win.minsize(min_w, min_h)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -164,32 +347,80 @@ class ResultDialog:
         pad: int = get_env_from_schema("UI_PADDING")
         result = self._result
 
-        # ── Fixed bottom button bar ──
-        btn_frame = ttk.Frame(self.win)
-        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
+        # ── Fixed workflow header ──
+        header = ttk.Frame(self.win, padding=(pad, pad, pad, max(4, pad // 2)))
+        header.pack(side=tk.TOP, fill=tk.X)
+        title_row = ttk.Frame(header)
+        title_row.pack(fill=tk.X)
+        ttk.Label(title_row, text="Results", style="Title.TLabel").pack(side=tk.LEFT)
+        ttk.Label(title_row, text="Step 3 of 3", style="Small.TLabel").pack(side=tk.RIGHT)
+        equation_name = str(result.metadata.get("equation_name") or "Solved equation")
+        ttk.Label(header, text=equation_name, style="Subtitle.TLabel").pack(
+            fill=tk.X,
+            pady=(max(3, pad // 2), 0),
+        )
+        status_items = run_summary_items(result.metadata)
+        status = next((value for label, value in status_items if label == "Status"), None)
+        if status is not None:
+            ttk.Label(header, text=str(status), style="Small.TLabel").pack(fill=tk.X)
 
-        btn_close = ttk.Button(
-            btn_frame,
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(side=tk.TOP, fill=tk.X)
+
+        # ── Fixed data/action footer ──
+        footer = ttk.Frame(self.win, padding=(pad, max(4, pad // 2), pad, pad))
+        footer.pack(side=tk.BOTTOM, fill=tk.X)
+        navigation_buttons: list[ttk.Button] = []
+        if modify_setup_available(self._session, self._selection):
+            modify_button = ttk.Button(
+                footer,
+                text="Modify setup",
+                style="Secondary.TButton",
+                command=self._modify_setup,
+            )
+            modify_button.pack(side=tk.LEFT)
+            navigation_buttons.append(modify_button)
+
+        button_row = ttk.Frame(footer)
+        button_row.pack(side=tk.RIGHT)
+        csv_button = ttk.Button(
+            button_row,
+            text="Export CSV...",
+            style="Secondary.TButton",
+            command=self._on_save_csv,
+        )
+        csv_button.pack(side=tk.LEFT, padx=(0, max(4, pad // 2)))
+        json_button = ttk.Button(
+            button_row,
+            text="Export JSON...",
+            style="Secondary.TButton",
+            command=self._on_save_json,
+        )
+        json_button.pack(side=tk.LEFT, padx=(0, max(4, pad // 2)))
+        close_button = ttk.Button(
+            button_row,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self._close,
         )
-        btn_close.pack()
-        setup_arrow_enter_navigation([[btn_close]])
-        btn_close.focus_set()
+        close_button.pack(side=tk.LEFT)
+        navigation_buttons.extend((csv_button, json_button, close_button))
+        setup_arrow_enter_navigation([navigation_buttons])
+        close_button.focus_set()
+        ToolTip(csv_button, "Export the numerical solution data as CSV.")
+        ToolTip(json_button, "Export computed metrics and solver metadata as JSON.")
 
-        # ── Main content area (grid: left info | right plot) ──
-        content = ttk.Frame(self.win)
-        content.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
+        ttk.Separator(self.win, orient=tk.HORIZONTAL).pack(side=tk.BOTTOM, fill=tk.X)
 
-        content.columnconfigure(0, weight=0, minsize=_LEFT_MIN_WIDTH)
-        content.columnconfigure(1, weight=1, minsize=400)
-        content.rowconfigure(0, weight=1)
+        # ── Resizable workspace: summary | plots ──
+        content = ttk.Frame(self.win, padding=(pad, pad, pad, max(4, pad // 2)))
+        content.pack(fill=tk.BOTH, expand=True)
+        self._paned = ttk.Panedwindow(content, orient=tk.HORIZONTAL)
+        self._paned.pack(fill=tk.BOTH, expand=True)
 
-        # ── LEFT: scrollable info panel ──
-        left_frame = ttk.Frame(content, width=_LEFT_MIN_WIDTH)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, pad))
-        left_frame.grid_propagate(False)
+        left_frame = ttk.Frame(self._paned, width=_SIDEBAR_INITIAL_WIDTH)
+        right_frame = ttk.Frame(self._paned)
+        self._paned.add(left_frame, weight=0)
+        self._paned.add(right_frame, weight=1)
 
         left_scroll = ScrollableFrame(left_frame)
         left_scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
@@ -200,11 +431,10 @@ class ResultDialog:
         self._build_left_panel(left_inner, left_scroll, result.statistics, result.metadata, pad)
         left_scroll.bind_new_children()
 
-        # ── RIGHT: plots ──
-        right_frame = ttk.Frame(content)
-        right_frame.grid(row=0, column=1, sticky="nsew")
-
-        self._notebook = ttk.Notebook(right_frame)
+        # ── RIGHT: existing scientific visualization tabs ──
+        notebook_style = ttk.Style(self.win)
+        notebook_style.configure("Result.TNotebook.Tab", padding=(pad + 2, max(4, pad // 2)))
+        self._notebook = ttk.Notebook(right_frame, style="Result.TNotebook")
         self._notebook.pack(fill=tk.BOTH, expand=True)
 
     def _build_left_panel(
@@ -215,75 +445,118 @@ class ResultDialog:
         metadata: dict[str, Any],
         pad: int,
     ) -> None:
-        """Build magnitudes, statistics, solver info, and export sections."""
-        magnitudes = {k: v for k, v in statistics.items() if k in _MAGNITUDE_KEYS}
-        other_stats = {k: v for k, v in statistics.items() if k not in _MAGNITUDE_KEYS}
+        """Build the run summary, metrics, events, and diagnostics hierarchy."""
+        run_section = CollapsibleSection(inner, scroll, "Run summary", expanded=True, pad=pad)
+        run_items = run_summary_items(metadata)
+        if run_items:
+            self._render_display_items(run_section.content, run_items)
+        else:
+            ttk.Label(
+                run_section.content,
+                text="No run summary metadata is available.",
+                style="Small.TLabel",
+                wraplength=300,
+            ).pack(fill=tk.X)
 
-        if magnitudes:
-            mag_section = CollapsibleSection(inner, scroll, "Magnitudes", expanded=True, pad=pad)
-            for key, val in magnitudes.items():
-                self._render_stat_entry(mag_section.content, key, val, pad)
-
-        if other_stats:
-            stat_section = CollapsibleSection(inner, scroll, "Statistics", expanded=True, pad=pad)
-            for key, val in other_stats.items():
-                self._render_stat_entry(stat_section.content, key, val, pad)
-
-        # Solver info
-        info_section = CollapsibleSection(inner, scroll, "Solver Summary", expanded=True, pad=pad)
-        info_items: list[tuple[str, Any]] = [
-            ("Method", metadata.get("method", "?")),
-            ("Success", "Yes" if metadata.get("solver_success") else "No"),
-            ("Evaluations", metadata.get("n_evaluations", "?")),
-            ("Points", metadata.get("num_points", "?")),
-        ]
-        if metadata.get("rtol") is not None:
-            info_items.append(("rtol", metadata["rtol"]))
-        if metadata.get("atol") is not None:
-            info_items.append(("atol", metadata["atol"]))
-        if metadata.get("residual_max") is not None:
-            info_items.append(("Residual max", f"{metadata['residual_max']:.2e}"))
-        if metadata.get("residual_mean") is not None:
-            info_items.append(("Residual mean", f"{metadata['residual_mean']:.2e}"))
-        if metadata.get("residual_rms") is not None:
-            info_items.append(("Residual RMS", f"{metadata['residual_rms']:.2e}"))
-        if metadata.get("n_jacobian_evals") is not None:
-            info_items.append(("Jacobian evals", metadata["n_jacobian_evals"]))
-        if metadata.get("n_lu_decompositions") is not None:
-            info_items.append(("LU decompositions", metadata["n_lu_decompositions"]))
-        if metadata.get("solver_status") is not None:
-            info_items.append(("Solver status", metadata["solver_status"]))
-        if metadata.get("event_times"):
-            event_count = sum(len(times) for times in metadata["event_times"])
-            info_items.append(("Detected events", event_count))
-        if metadata.get("relative_residual_l2") is not None:
-            info_items.append(("Relative residual", f"{metadata['relative_residual_l2']:.2e}"))
-        if metadata.get("component_relative_residual_l2") is not None:
-            component_values = metadata["component_relative_residual_l2"]
-            info_items.append(
-                (
-                    "Component residuals",
-                    ", ".join(f"{float(value):.2e}" for value in component_values),
-                )
+        if statistics:
+            metrics_section = CollapsibleSection(
+                inner,
+                scroll,
+                "Computed metrics",
+                expanded=True,
+                pad=pad,
             )
-        if metadata.get("matrix_shape") is not None:
-            info_items.append(("Sparse system", metadata["matrix_shape"]))
-        if metadata.get("nnz") is not None:
-            info_items.append(("Sparse nnz", metadata["nnz"]))
-        for label, value in info_items:
-            row = ttk.Frame(info_section.content)
-            row.pack(fill=tk.X, pady=1)
-            ttk.Label(row, text=f"{label}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
-            ttk.Label(row, text=str(value), style="Small.TLabel").pack(side=tk.LEFT)
+            for label, value, description in computed_metric_items(statistics):
+                help_text = {label: description} if description else None
+                self._render_display_entry(
+                    metrics_section.content,
+                    label,
+                    value,
+                    help_text=help_text,
+                )
 
-        # Export
-        export_section = CollapsibleSection(inner, scroll, "Export Results", expanded=True, pad=pad)
-        btn_row = ttk.Frame(export_section.content)
-        btn_row.pack(fill=tk.X, pady=2)
-        ttk.Button(btn_row, text="Export CSV...", command=self._on_save_csv).pack(
-            side=tk.LEFT, padx=(0, pad)
+        events = event_summary_items(metadata)
+        if events:
+            events_section = CollapsibleSection(inner, scroll, "Events", expanded=True, pad=pad)
+            self._render_display_items(events_section.content, events)
+
+        diagnostics = diagnostic_items(metadata)
+        if diagnostics:
+            diagnostics_section = CollapsibleSection(
+                inner,
+                scroll,
+                "Solver diagnostics",
+                expanded=False,
+                pad=pad,
+            )
+            self._render_display_items(
+                diagnostics_section.content,
+                diagnostics,
+                help_text=_DIAGNOSTIC_HELP,
+            )
+
+    def _render_display_items(
+        self,
+        parent: tk.Widget,
+        items: list[tuple[str, Any]],
+        *,
+        help_text: dict[str, str] | None = None,
+    ) -> None:
+        """Render consistently aligned, wrapping rows for structured information."""
+        for label, value in items:
+            self._render_display_entry(parent, label, value, help_text=help_text)
+
+    def _render_display_entry(
+        self,
+        parent: tk.Widget,
+        label: str,
+        value: Any,
+        *,
+        indent: int = 0,
+        help_text: dict[str, str] | None = None,
+    ) -> None:
+        """Render one scalar or nested mapping without losing component identity."""
+        if isinstance(value, dict):
+            heading = ttk.Label(
+                parent,
+                text=label,
+                style="Subtitle.TLabel" if indent == 0 else "Small.TLabel",
+            )
+            heading.pack(fill=tk.X, padx=(indent * 12, 0), pady=(3, 1))
+            if help_text and label in help_text:
+                ToolTip(heading, help_text[label])
+            for nested_label, nested_value in value.items():
+                nested_key = str(nested_label)
+                nested_display_label = humanize_metric_label(nested_key)
+                nested_help = dict(help_text or {})
+                nested_description = AVAILABLE_STATISTICS.get(nested_key)
+                if nested_description:
+                    nested_help[nested_display_label] = nested_description
+                self._render_display_entry(
+                    parent,
+                    nested_display_label,
+                    nested_value,
+                    indent=indent + 1,
+                    help_text=nested_help or None,
+                )
+            return
+
+        row = ttk.Frame(parent)
+        row.pack(fill=tk.X, padx=(indent * 12, 0), pady=2)
+        row.columnconfigure(1, weight=1)
+        label_widget = ttk.Label(row, text=label, anchor=tk.NW, width=20)
+        label_widget.grid(row=0, column=0, sticky="nw", padx=(0, 8))
+        value_widget = ttk.Label(
+            row,
+            text=_format_display_value(value),
+            style="Small.TLabel",
+            anchor=tk.NW,
+            justify=tk.LEFT,
         )
-        ttk.Button(btn_row, text="Export JSON...", command=self._on_save_json).pack(side=tk.LEFT)
+        value_widget.grid(row=0, column=1, sticky="ew")
+        bind_wraplength(row, value_widget, pad=175, min_wrap=120)
+        if help_text and label in help_text:
+            ToolTip(label_widget, help_text[label])
 
     # ------------------------------------------------------------------
     # Transform controls helper
@@ -2052,31 +2325,6 @@ class ResultDialog:
             self._unregister_canvas(old_canvas)
         setattr(self, canvas_attr, canvas)
         self._register_canvas(canvas)
-
-    # ------------------------------------------------------------------
-    # Stat rendering
-    # ------------------------------------------------------------------
-
-    def _render_stat_entry(self, parent: tk.Widget, key: str, val: Any, pad: int) -> None:
-        if isinstance(val, dict):
-            hdr = ttk.Frame(parent)
-            hdr.pack(fill=tk.X, pady=(2, 0))
-            ttk.Label(hdr, text=f"{key}:", width=16, anchor=tk.W, style="Small.TLabel").pack(
-                side=tk.LEFT
-            )
-            for sub_key, sub_val in val.items():
-                sub_row = ttk.Frame(parent)
-                sub_row.pack(fill=tk.X, pady=0)
-                ttk.Label(sub_row, text=f"  {sub_key}:", width=22, anchor=tk.W).pack(side=tk.LEFT)
-                formatted = f"{sub_val:.6g}" if isinstance(sub_val, float) else str(sub_val)
-                ttk.Label(sub_row, text=formatted, style="Small.TLabel").pack(
-                    side=tk.LEFT, padx=(2, 0)
-                )
-        else:
-            row = ttk.Frame(parent)
-            row.pack(fill=tk.X, pady=1)
-            ttk.Label(row, text=f"{key}:", width=16, anchor=tk.W).pack(side=tk.LEFT)
-            ttk.Label(row, text=self._format_stat(val), style="Small.TLabel").pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
     # Export
