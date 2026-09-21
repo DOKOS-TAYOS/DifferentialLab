@@ -182,6 +182,8 @@ def event_summary_items(metadata: dict[str, Any]) -> list[tuple[str, Any]]:
 
 def _format_display_value(value: Any) -> str:
     """Format a scalar or short sequence for a wrapping display row."""
+    if value is None:
+        return "N/A"
     if isinstance(value, (float, np.floating)):
         return f"{float(value):.6g}"
     if isinstance(value, np.ndarray):
