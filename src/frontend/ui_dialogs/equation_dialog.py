@@ -238,7 +238,7 @@ class EquationDialog:
 
         # --- Tab 2: Custom ---
         self._custom_scroll = ScrollableFrame(self._notebook, padding=pad)
-        self._custom_scroll.apply_bg(bg)
+        self._custom_scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
         self._custom_outer = self._custom_scroll.inner
         self._notebook.add(self._custom_scroll, text="  Custom  ")
 
