@@ -369,7 +369,6 @@ def test_figure_animation_export_uses_attached_animation_payload(tmp_path: Path)
     assert captured["title"].endswith("t=1)")
 
 
-
 def test_contour_colorbar_offset_is_positioned_away_from_title() -> None:
     x = np.linspace(-1.0, 1.0, 5)
     y = np.linspace(-0.5, 0.5, 4)
