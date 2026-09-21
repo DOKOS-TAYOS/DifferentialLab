@@ -82,8 +82,6 @@ def test_metric_labels_and_nested_values_are_preserved_for_display() -> None:
     assert computed_metric_items({}) == []
 
 
-
-
 def test_unavailable_display_values_render_as_na() -> None:
     assert _format_display_value(None) == "N/A"
     assert _format_display_value([1.0, None]) == "1, N/A"
