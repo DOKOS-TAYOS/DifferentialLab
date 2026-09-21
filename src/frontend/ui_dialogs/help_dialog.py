@@ -248,7 +248,7 @@ class HelpDialog:
         btn_close = ttk.Button(
             btn_frame,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self.win.destroy,
         )
         btn_close.pack(side=tk.LEFT)

@@ -704,7 +704,7 @@ class _TransformHelpDialog:
         btn_close = ttk.Button(
             btn_frame,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self._do_close,
         )
         btn_close.pack()
