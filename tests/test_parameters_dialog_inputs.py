@@ -504,6 +504,32 @@ def test_on_solve_delegates_to_shared_background_runner() -> None:
     assert dialog.win.destroy_calls == 1
 
 
+def test_successful_solve_passes_session_and_selection_to_results() -> None:
+    """The standard workflow preserves its state owner through the Results step."""
+    dialog = _build_scalar_dialog_stub()
+    session = parameters_ui.SolveSession()
+    selection = _selection()
+    dialog.session = session
+    dialog.selection = selection
+    solver_inputs = dialog._collect_solver_inputs()
+    dialog._collect_solver_inputs = MagicMock(return_value=solver_inputs)  # type: ignore[method-assign]
+
+    with patch.object(parameters_ui, "run_task_with_loading", create=True) as run_task:
+        dialog._on_solve()
+
+    result = MagicMock()
+    on_success = run_task.call_args.kwargs["on_success"]
+    with patch("frontend.ui_dialogs.result_dialog.ResultDialog") as result_dialog:
+        on_success(result)
+
+    result_dialog.assert_called_once_with(
+        dialog.parent,
+        result=result,
+        session=session,
+        selection=selection,
+    )
+
+
 def test_on_solve_releases_pde_3d_tk_vars_before_starting_worker() -> None:
     dialog = _build_scalar_dialog_stub()
     solver_inputs = dialog._collect_solver_inputs()

@@ -1661,7 +1661,12 @@ class ParametersDialog:
 
             from frontend.ui_dialogs.result_dialog import ResultDialog
 
-            ResultDialog(parent, result=result)
+            ResultDialog(
+                parent,
+                result=result,
+                session=session,
+                selection=selection,
+            )
 
         run_task_with_loading(
             parent=self.parent,
