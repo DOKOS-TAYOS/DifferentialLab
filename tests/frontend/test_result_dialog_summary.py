@@ -86,6 +86,7 @@ def test_unavailable_display_values_render_as_na() -> None:
     assert _format_display_value(None) == "N/A"
     assert _format_display_value([1.0, None]) == "1, N/A"
 
+
 def test_modify_setup_requires_both_workflow_objects() -> None:
     session = object()
     selection = object()
