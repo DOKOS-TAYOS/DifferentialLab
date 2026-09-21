@@ -386,7 +386,7 @@ def test_contour_colorbar_offset_is_positioned_away_from_title() -> None:
     try:
         colorbar_axis = figure.axes[1]
         offset_text = colorbar_axis.yaxis.get_offset_text()
-        assert offset_text.get_x() == 2.5
+        assert offset_text.get_position()[0] == 2.5
         assert offset_text.get_ha() == "left"
     finally:
         plt.close(figure)
