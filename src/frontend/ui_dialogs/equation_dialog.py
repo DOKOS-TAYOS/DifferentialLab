@@ -237,7 +237,7 @@ class EquationDialog:
         bind_wraplength(details, self.desc_label, pad=2 * pad)
 
         # --- Tab 2: Custom ---
-        self._custom_scroll = ScrollableFrame(self._notebook)
+        self._custom_scroll = ScrollableFrame(self._notebook, padding=pad)
         self._custom_scroll.apply_bg(bg)
         self._custom_outer = self._custom_scroll.inner
         self._notebook.add(self._custom_scroll, text="  Custom  ")
@@ -991,6 +991,8 @@ class EquationDialog:
             _bind_mousewheel(canvas)
             _bind_mousewheel(scrollbar)
             _bind_mousewheel(inner)
+
+        self._refresh_custom_scroll()
 
     def _build_custom_pde(self, ci: tk.Misc, pad: int, btn_bg: str, fg: str, font: Any) -> None:
         """Build the custom tab for PDE."""
