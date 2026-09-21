@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 
 from frontend.ui_dialogs.equation_dialog import EquationDialog
-from frontend.ui_dialogs.result_dialog import ResultDialog
+from frontend.ui_dialogs.result_dialog import ResultDialog, vector_field_uses_origin
 
 
 class _FakeVar:
@@ -92,8 +92,8 @@ def test_three_component_vector_pde_ui_omits_planar_field_views() -> None:
     assert dialog._vector_pde_view_labels() == ["Components", "Magnitude"]
 
 
-def test_vector_pde_field_view_dispatches_quiver_without_display() -> None:
-    """The result dialog selects the plotting view and preserves the chosen origin."""
+def test_vector_pde_field_view_dispatches_quiver_without_origin_semantics() -> None:
+    """Views that do not consume an origin are dispatched without one."""
     dialog = ResultDialog.__new__(ResultDialog)
     dialog._result = SimpleNamespace(
         x=np.array([0.0, 1.0]),
@@ -114,5 +114,34 @@ def test_vector_pde_field_view_dispatches_quiver_without_display() -> None:
         dialog._update_vector_pde_field()
 
     assert create_plot.call_args.kwargs["view"] == "quiver"
-    assert create_plot.call_args.kwargs["origin"] == (1.5, -2.0)
+    assert "origin" not in create_plot.call_args.kwargs
     assert captured["figure"] == "figure"
+
+
+def test_vector_pde_origin_is_progressively_disclosed_and_preserved() -> None:
+    """Only radial/tangential uses the retained origin entry values."""
+    assert not vector_field_uses_origin("Components")
+    assert not vector_field_uses_origin("Magnitude")
+    assert not vector_field_uses_origin("Quiver")
+    assert not vector_field_uses_origin("Streamlines")
+    assert vector_field_uses_origin("Radial/Tangential")
+
+    dialog = ResultDialog.__new__(ResultDialog)
+    dialog._result = SimpleNamespace(
+        x=np.array([0.0, 1.0]),
+        y=np.array([[[1.0, 2.0]], [[3.0, 4.0]]]),
+        metadata={"equation_name": "Vector field"},
+    )
+    dialog._vector_pde_view_var = _FakeVar("Radial/Tangential")
+    dialog._vector_pde_origin_x_var = _FakeVar("1.5")
+    dialog._vector_pde_origin_y_var = _FakeVar("-2")
+    dialog._vector_pde_field_frame = object()
+    dialog._require_pde_y_grid = lambda: np.array([0.0])  # type: ignore[method-assign]
+    dialog._replace_plot = lambda *_args: None  # type: ignore[method-assign]
+
+    with patch("plotting.create_vector_field_plot", return_value="figure") as create_plot:
+        dialog._update_vector_pde_field()
+
+    assert create_plot.call_args.kwargs["origin"] == (1.5, -2.0)
+    assert dialog._vector_pde_origin_x_var.get() == "1.5"
+    assert dialog._vector_pde_origin_y_var.get() == "-2"

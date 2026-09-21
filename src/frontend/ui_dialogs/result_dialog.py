@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING, Any, Callable, Literal, cast
@@ -16,7 +17,7 @@ from config import (
     get_output_dir,
 )
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
-from frontend.theme import get_contrast_foreground, get_font
+from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
@@ -64,6 +65,261 @@ _DIAGNOSTIC_HELP = {
 }
 
 _SIDEBAR_INITIAL_WIDTH = 400
+_CONTROL_GAP = 10
+_SERIES_VISIBLE_LIMIT = 6
+
+SlicePlane = Literal["XY", "XZ", "YZ"]
+
+
+def responsive_control_rows(
+    available_width: int,
+    group_widths: Sequence[int],
+    *,
+    gap: int = _CONTROL_GAP,
+) -> tuple[tuple[int, ...], ...]:
+    """Lay out ordered control groups without splitting a label from its widget."""
+    usable_width = max(1, available_width)
+    rows: list[list[int]] = []
+    current: list[int] = []
+    current_width = 0
+    for index, requested_width in enumerate(group_widths):
+        width = max(1, requested_width)
+        proposed_width = current_width + (gap if current else 0) + width
+        if current and proposed_width > usable_width:
+            rows.append(current)
+            current = [index]
+            current_width = width
+        else:
+            current.append(index)
+            current_width = proposed_width
+    if current:
+        rows.append(current)
+    return tuple(tuple(row) for row in rows)
+
+
+def normalized_series_selection(
+    selected: Iterable[int],
+    *,
+    count: int,
+    fallback_index: int = 0,
+) -> tuple[int, ...]:
+    """Return valid selected row indexes while guaranteeing one visible selection."""
+    if count <= 0:
+        return ()
+    valid = tuple(sorted({index for index in selected if 0 <= index < count}))
+    if valid:
+        return valid
+    return (min(max(fallback_index, 0), count - 1),)
+
+
+def pde_3d_fixed_grid(
+    plane: SlicePlane,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+) -> tuple[str, np.ndarray]:
+    """Return the physical grid fixed by an orthogonal slice plane."""
+    if plane == "XY":
+        return "z", z_grid
+    if plane == "XZ":
+        return "y", y_grid
+    return "x", x_grid
+
+
+def pde_fixed_axis_label(varying_axis: str, x_label: str, y_label: str) -> str:
+    """Return the coordinate held fixed for a varying PDE slice axis."""
+    return y_label if varying_axis == x_label else x_label
+
+
+def extract_pde_line_slice(
+    varying_axis: str,
+    x_label: str,
+    y_label: str,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    field: np.ndarray,
+    fixed_value: float,
+) -> tuple[np.ndarray, np.ndarray, str, str, int]:
+    """Extract a 1D PDE slice using the documented varying/fixed-axis rule."""
+    if varying_axis == x_label:
+        fixed_index = int(np.argmin(np.abs(y_grid - fixed_value)))
+        return x_grid, field[fixed_index, :], x_label, y_label, fixed_index
+    fixed_index = int(np.argmin(np.abs(x_grid - fixed_value)))
+    return y_grid, field[:, fixed_index], y_label, x_label, fixed_index
+
+
+def vector_field_uses_origin(view: str) -> bool:
+    """Return whether a Vector PDE field view consumes an origin."""
+    return view == "Radial/Tangential"
+
+
+def _format_grid_coordinate(value: float) -> str:
+    """Format a coordinate with enough precision to preserve its float identity."""
+    return np.format_float_positional(float(value), unique=True, trim="-")
+
+
+class _ViewControls(ttk.LabelFrame):
+    """Result-local responsive container for indivisible label/control groups."""
+
+    def __init__(self, parent: tk.Widget) -> None:
+        super().__init__(parent, text="View controls", padding=(10, 6))
+        self._groups: list[ttk.Frame] = []
+        self._hidden_groups: set[ttk.Frame] = set()
+        self._layout_after_id: str | None = None
+        self.bind("<Configure>", self._schedule_layout, add="+")
+        self.bind("<Destroy>", self._cancel_layout, add="+")
+
+    def add_group(self, label: str | None = None) -> ttk.Frame:
+        """Create a group whose label and controls always reflow together."""
+        group = ttk.Frame(self)
+        if label:
+            ttk.Label(group, text=label).pack(side=tk.LEFT, anchor=tk.N, padx=(0, 5), pady=3)
+        self._groups.append(group)
+        self._layout_groups()
+        return group
+
+    def set_group_visible(self, group: ttk.Frame, visible: bool) -> None:
+        """Show or hide a group and exclude hidden controls from focus traversal."""
+        for child in group.winfo_children():
+            if child.winfo_class() in {
+                "TButton",
+                "TCheckbutton",
+                "TCombobox",
+                "TEntry",
+                "TMenubutton",
+            }:
+                cast(Any, child).configure(takefocus=visible)
+        if visible:
+            self._hidden_groups.discard(group)
+        else:
+            self._hidden_groups.add(group)
+        self._layout_groups()
+
+    def _schedule_layout(self, _event: tk.Event[tk.Widget]) -> None:
+        if self._layout_after_id is not None:
+            try:
+                self.after_cancel(self._layout_after_id)
+            except tk.TclError:
+                return
+        self._layout_after_id = self.after_idle(self._layout_groups)
+
+    def _cancel_layout(self, event: tk.Event[tk.Widget]) -> None:
+        if event.widget is not self or self._layout_after_id is None:
+            return
+        try:
+            self.after_cancel(self._layout_after_id)
+        except tk.TclError:
+            pass
+        self._layout_after_id = None
+
+    def _layout_groups(self) -> None:
+        self._layout_after_id = None
+        visible_groups = [group for group in self._groups if group not in self._hidden_groups]
+        if not visible_groups:
+            return
+        for group in self._groups:
+            group.place_forget()
+        widths = [group.winfo_reqwidth() for group in visible_groups]
+        available = max(1, self.winfo_width() - 20)
+        rows = responsive_control_rows(available, widths)
+        y_position = 4
+        for row in rows:
+            x_position = 0
+            row_height = max(visible_groups[group_index].winfo_reqheight() for group_index in row)
+            for group_index in row:
+                group = visible_groups[group_index]
+                group.place(x=x_position, y=y_position)
+                x_position += group.winfo_reqwidth() + _CONTROL_GAP
+            y_position += row_height + 6
+        self.configure(height=y_position + 28)
+
+
+class _SeriesSelector(ttk.Frame):
+    """Accessible multi-series selector that always keeps one row selected."""
+
+    def __init__(
+        self,
+        parent: tk.Widget,
+        labels: Sequence[str],
+        on_change: Callable[[], None],
+    ) -> None:
+        super().__init__(parent)
+        self._labels = tuple(labels)
+        self._on_change = on_change
+        self._variables = [tk.BooleanVar(value=index == 0) for index in range(len(labels))]
+        self._menu_button: ttk.Menubutton | None = None
+        if len(labels) <= _SERIES_VISIBLE_LIMIT:
+            self._build_visible_checkbuttons()
+        else:
+            self._build_compact_menu()
+
+    def selected_indices(self) -> list[int]:
+        """Return selected indexes in exact plotted-row order."""
+        return list(
+            normalized_series_selection(
+                (index for index, variable in enumerate(self._variables) if variable.get()),
+                count=len(self._variables),
+            )
+        )
+
+    def select_all(self) -> None:
+        """Select every available series and redraw immediately."""
+        for variable in self._variables:
+            variable.set(True)
+        self._refresh_menu_label()
+        self._on_change()
+
+    def _build_visible_checkbuttons(self) -> None:
+        for index, (label, variable) in enumerate(zip(self._labels, self._variables)):
+            checkbutton = ttk.Checkbutton(
+                self,
+                text=label,
+                variable=variable,
+                command=lambda changed=index: self._toggle(changed),
+                takefocus=True,
+            )
+            checkbutton.grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 8), pady=1)
+        if len(self._labels) > 1:
+            ttk.Button(self, text="Select all", command=self.select_all, takefocus=True).grid(
+                row=(len(self._labels) - 1) // 3 + 1,
+                column=0,
+                columnspan=3,
+                sticky="w",
+                pady=(3, 0),
+            )
+
+    def _build_compact_menu(self) -> None:
+        self._menu_button = ttk.Menubutton(self)
+        self._menu_button.configure(takefocus=True)
+        menu = tk.Menu(self._menu_button, tearoff=False)
+        for index, (label, variable) in enumerate(zip(self._labels, self._variables)):
+            menu.add_checkbutton(
+                label=label,
+                variable=variable,
+                command=lambda changed=index: self._toggle(changed),
+            )
+        menu.add_separator()
+        menu.add_command(label="Select all", command=self.select_all)
+        self._menu_button.configure(menu=menu)
+        self._menu_button.pack(side=tk.LEFT)
+        self._refresh_menu_label()
+
+    def _toggle(self, changed_index: int) -> None:
+        selected = normalized_series_selection(
+            (index for index, variable in enumerate(self._variables) if variable.get()),
+            count=len(self._variables),
+            fallback_index=changed_index,
+        )
+        for index, variable in enumerate(self._variables):
+            variable.set(index in selected)
+        self._refresh_menu_label()
+        self._on_change()
+
+    def _refresh_menu_label(self) -> None:
+        if self._menu_button is None:
+            return
+        selected = self.selected_indices()
+        self._menu_button.configure(text=f"Choose series ({len(selected)} selected)")
 
 
 def modify_setup_available(session: object | None, selection: object | None) -> bool:
@@ -559,33 +815,27 @@ class ResultDialog:
             ToolTip(label_widget, help_text[label])
 
     # ------------------------------------------------------------------
-    # Transform controls helper
+    # Result-local view controls helpers
     # ------------------------------------------------------------------
+
+    def _create_view_controls(self, parent: ttk.Frame) -> _ViewControls:
+        """Create the shared responsive control surface above a plot workspace."""
+        controls = _ViewControls(parent)
+        controls.pack(fill=tk.X, padx=8, pady=(8, 6))
+        return controls
 
     def _build_transform_controls(
         self,
         parent: ttk.Frame,
-        callback: Any,
+        callback: Callable[[], None],
         prefix: str,
-        *,
-        label_style: str | None = None,
-    ) -> None:
-        """Add a transform dropdown to a tab's control bar.
+    ) -> ttk.Combobox:
+        """Add a transform dropdown to an existing labelled control group.
 
         The ``StringVar`` is stored as ``self._transform_{prefix}_var``.
         """
         from transforms import TransformKind
 
-        sep = ttk.Separator(parent, orient=tk.VERTICAL)
-        sep.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=2)
-
-        if label_style:
-            ttk.Label(parent, text="Transform:", style=label_style).pack(
-                side=tk.LEFT,
-                padx=(0, 4),
-            )
-        else:
-            ttk.Label(parent, text="Transform:").pack(side=tk.LEFT, padx=(0, 4))
         var = tk.StringVar(value=TransformKind.ORIGINAL.value)
         setattr(self, f"_transform_{prefix}_var", var)
 
@@ -597,41 +847,9 @@ class ResultDialog:
             width=20,
             font=get_font(),
         )
-        combo.pack(side=tk.LEFT, padx=(0, 4))
+        combo.pack(side=tk.LEFT)
         combo.bind("<<ComboboxSelected>>", lambda _e: callback())
-
-    def _create_styled_listbox(
-        self,
-        parent: tk.Widget,
-        labels: list[str],
-        on_select: Callable[[], None],
-        *,
-        height: int = 4,
-        width: int = 12,
-    ) -> tk.Listbox:
-        """Create a themed multi-select Listbox for derivative/component selection."""
-        bg: str = get_env_from_schema("UI_BUTTON_BG")
-        fg: str = get_env_from_schema("UI_FOREGROUND")
-        select_bg: str = get_env_from_schema("UI_BUTTON_FG")
-        select_fg: str = get_contrast_foreground(select_bg)
-        lb = tk.Listbox(
-            parent,
-            selectmode=tk.EXTENDED,
-            height=min(len(labels), height),
-            width=width,
-            bg=bg,
-            fg=fg,
-            selectbackground=select_bg,
-            selectforeground=select_fg,
-            font=get_font(),
-            exportselection=False,
-        )
-        for lbl in labels:
-            lb.insert(tk.END, lbl)
-        lb.select_set(0)
-        lb.pack(side=tk.LEFT, padx=4)
-        lb.bind("<<ListboxSelect>>", lambda _e: on_select())
-        return lb
+        return combo
 
     # ------------------------------------------------------------------
     # Plot tab construction
@@ -679,17 +897,19 @@ class ResultDialog:
         sol_tab = ttk.Frame(nb)
         nb.add(sol_tab, text="  Solution f(x)  ")
 
-        ctrl = ttk.Frame(sol_tab)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = self._create_view_controls(sol_tab)
 
         self._sol_labels = generate_derivative_labels(notation)
-        ttk.Label(ctrl, text="Show:").pack(side=tk.LEFT, padx=(0, 4))
-
-        self._sol_listbox = self._create_styled_listbox(
-            ctrl, self._sol_labels, self._update_solution_plot, height=4
+        series_group = ctrl.add_group("Series")
+        self._sol_series_selector = _SeriesSelector(
+            series_group,
+            self._sol_labels,
+            self._update_solution_plot,
         )
+        self._sol_series_selector.pack(side=tk.LEFT)
 
-        self._build_transform_controls(ctrl, self._update_solution_plot, "sol")
+        transform_group = ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_solution_plot, "sol")
 
         self._sol_plot_frame = ttk.Frame(sol_tab)
         self._sol_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -702,13 +922,11 @@ class ResultDialog:
             phase_tab = ttk.Frame(nb)
             nb.add(phase_tab, text="  Phase Space  ")
 
-            phase_ctrl = ttk.Frame(phase_tab)
-            phase_ctrl.pack(fill=tk.X, padx=4, pady=4)
+            phase_ctrl = self._create_view_controls(phase_tab)
 
             ps_options = generate_phase_space_options(notation)
             ps_labels = [lbl for lbl, _ in ps_options]
 
-            ttk.Label(phase_ctrl, text="X-axis:").pack(side=tk.LEFT, padx=(0, 2))
             # Default phase portrait: f vs f' for order>=2, x vs f for order 1
             if order >= 2 and len(ps_labels) >= 3:
                 default_x = ps_labels[1]  # f
@@ -719,32 +937,34 @@ class ResultDialog:
             else:
                 default_x = ps_labels[0] if ps_labels else "f"
                 default_y_ax = ps_labels[0] if ps_labels else "f"
+            x_group = phase_ctrl.add_group("X axis")
             self._phase_x_var = tk.StringVar(value=default_x)
             phase_x_combo = ttk.Combobox(
-                phase_ctrl,
+                x_group,
                 textvariable=self._phase_x_var,
                 values=ps_labels,
                 state="readonly",
                 width=6,
                 font=get_font(),
             )
-            phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
+            phase_x_combo.pack(side=tk.LEFT)
             phase_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_phase_plot())
 
-            ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
+            y_group = phase_ctrl.add_group("Y axis")
             self._phase_y_var = tk.StringVar(value=default_y_ax)
             phase_y_combo = ttk.Combobox(
-                phase_ctrl,
+                y_group,
                 textvariable=self._phase_y_var,
                 values=ps_labels,
                 state="readonly",
                 width=6,
                 font=get_font(),
             )
-            phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
+            phase_y_combo.pack(side=tk.LEFT)
             phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_phase_plot())
 
-            self._build_transform_controls(phase_ctrl, self._update_phase_plot, "phase")
+            transform_group = phase_ctrl.add_group("Transform")
+            self._build_transform_controls(transform_group, self._update_phase_plot, "phase")
 
             self._phase_options_map = {lbl: idx for lbl, idx in ps_options}
             self._phase_plot_frame = ttk.Frame(phase_tab)
@@ -828,9 +1048,7 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
-        selected = list(self._sol_listbox.curselection())
-        if not selected:
-            selected = [0]
+        selected = self._sol_series_selector.selected_indices()
 
         xlabel = "n" if r.equation_type == "difference" else "x"
         eq_name = r.metadata.get("equation_name", "f(x)")
@@ -999,17 +1217,19 @@ class ResultDialog:
         sol_tab = ttk.Frame(nb)
         nb.add(sol_tab, text="  Solution f(x)  ")
 
-        ctrl = ttk.Frame(sol_tab)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = self._create_view_controls(sol_tab)
 
         self._vec_sol_labels = generate_derivative_labels(notation)
-        ttk.Label(ctrl, text="Show:").pack(side=tk.LEFT, padx=(0, 4))
-
-        self._vec_sol_listbox = self._create_styled_listbox(
-            ctrl, self._vec_sol_labels, self._update_vec_solution_plot, height=6
+        series_group = ctrl.add_group("Series")
+        self._vec_sol_series_selector = _SeriesSelector(
+            series_group,
+            self._vec_sol_labels,
+            self._update_vec_solution_plot,
         )
+        self._vec_sol_series_selector.pack(side=tk.LEFT)
 
-        self._build_transform_controls(ctrl, self._update_vec_solution_plot, "vec_sol")
+        transform_group = ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_vec_solution_plot, "vec_sol")
 
         self._vec_sol_plot_frame = ttk.Frame(sol_tab)
         self._vec_sol_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -1020,8 +1240,7 @@ class ResultDialog:
         phase_tab = ttk.Frame(nb)
         nb.add(phase_tab, text="  Phase Space  ")
 
-        phase_ctrl = ttk.Frame(phase_tab)
-        phase_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        phase_ctrl = self._create_view_controls(phase_tab)
 
         ps_options = generate_phase_space_options(notation)
         ps_labels = [lbl for lbl, _ in ps_options]
@@ -1038,33 +1257,34 @@ class ResultDialog:
             default_x_phase = ps_labels[0] if ps_labels else "f"
             default_y_phase = ps_labels[0] if ps_labels else "f"
 
-        ttk.Label(phase_ctrl, text="X-axis:").pack(side=tk.LEFT, padx=(0, 2))
+        x_group = phase_ctrl.add_group("X axis")
         self._vec_phase_x_var = tk.StringVar(value=default_x_phase)
         vec_phase_x_combo = ttk.Combobox(
-            phase_ctrl,
+            x_group,
             textvariable=self._vec_phase_x_var,
             values=ps_labels,
             state="readonly",
             width=6,
             font=get_font(),
         )
-        vec_phase_x_combo.pack(side=tk.LEFT, padx=(0, 8))
+        vec_phase_x_combo.pack(side=tk.LEFT)
         vec_phase_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_plot())
 
-        ttk.Label(phase_ctrl, text="Y-axis:").pack(side=tk.LEFT, padx=(0, 2))
+        y_group = phase_ctrl.add_group("Y axis")
         self._vec_phase_y_var = tk.StringVar(value=default_y_phase)
         vec_phase_y_combo = ttk.Combobox(
-            phase_ctrl,
+            y_group,
             textvariable=self._vec_phase_y_var,
             values=ps_labels,
             state="readonly",
             width=6,
             font=get_font(),
         )
-        vec_phase_y_combo.pack(side=tk.LEFT, padx=(0, 8))
+        vec_phase_y_combo.pack(side=tk.LEFT)
         vec_phase_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_plot())
 
-        self._build_transform_controls(phase_ctrl, self._update_vec_phase_plot, "vec_phase")
+        transform_group = phase_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_vec_phase_plot, "vec_phase")
 
         self._vec_phase_options_map = {lbl: idx for lbl, idx in ps_options}
         self._vec_phase_plot_frame = ttk.Frame(phase_tab)
@@ -1076,8 +1296,7 @@ class ResultDialog:
         phase3d_tab = ttk.Frame(nb)
         nb.add(phase3d_tab, text="  Phase 3D  ")
 
-        phase3d_ctrl = ttk.Frame(phase3d_tab)
-        phase3d_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        phase3d_ctrl = self._create_view_controls(phase3d_tab)
 
         # Default axes: f₀, f₁, f₂ for 3+ components; x, f₀, f₁ otherwise
         n_comp = r.vector_components
@@ -1098,46 +1317,47 @@ class ResultDialog:
             def_3d_y = ps_labels[1] if len(ps_labels) > 1 else def_3d_x
             def_3d_z = ps_labels[2] if len(ps_labels) > 2 else def_3d_y
 
-        ttk.Label(phase3d_ctrl, text="X:").pack(side=tk.LEFT, padx=(0, 2))
+        x_group = phase3d_ctrl.add_group("X axis")
         self._vec_phase3d_x_var = tk.StringVar(value=def_3d_x)
         phase3d_x_combo = ttk.Combobox(
-            phase3d_ctrl,
+            x_group,
             textvariable=self._vec_phase3d_x_var,
             values=ps_labels,
             state="readonly",
             width=6,
             font=get_font(),
         )
-        phase3d_x_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_x_combo.pack(side=tk.LEFT)
         phase3d_x_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
-        ttk.Label(phase3d_ctrl, text="Y:").pack(side=tk.LEFT, padx=(0, 2))
+        y_group = phase3d_ctrl.add_group("Y axis")
         self._vec_phase3d_y_var = tk.StringVar(value=def_3d_y)
         phase3d_y_combo = ttk.Combobox(
-            phase3d_ctrl,
+            y_group,
             textvariable=self._vec_phase3d_y_var,
             values=ps_labels,
             state="readonly",
             width=6,
             font=get_font(),
         )
-        phase3d_y_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_y_combo.pack(side=tk.LEFT)
         phase3d_y_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
-        ttk.Label(phase3d_ctrl, text="Z:").pack(side=tk.LEFT, padx=(0, 2))
+        z_group = phase3d_ctrl.add_group("Z axis")
         self._vec_phase3d_z_var = tk.StringVar(value=def_3d_z)
         phase3d_z_combo = ttk.Combobox(
-            phase3d_ctrl,
+            z_group,
             textvariable=self._vec_phase3d_z_var,
             values=ps_labels,
             state="readonly",
             width=6,
             font=get_font(),
         )
-        phase3d_z_combo.pack(side=tk.LEFT, padx=(0, 6))
+        phase3d_z_combo.pack(side=tk.LEFT)
         phase3d_z_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_vec_phase_3d())
 
-        self._build_transform_controls(phase3d_ctrl, self._update_vec_phase_3d, "vec_phase3d")
+        transform_group = phase3d_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_vec_phase_3d, "vec_phase3d")
 
         self._vec_phase3d_plot_frame = ttk.Frame(phase3d_tab)
         self._vec_phase3d_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -1148,23 +1368,23 @@ class ResultDialog:
         anim_tab = ttk.Frame(nb)
         nb.add(anim_tab, text="  Animation  ")
 
-        anim_ctrl = ttk.Frame(anim_tab)
-        anim_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(anim_ctrl, text="Derivative order:").pack(side=tk.LEFT, padx=(0, 4))
+        anim_ctrl = self._create_view_controls(anim_tab)
+        order_group = anim_ctrl.add_group("Derivative order")
         self._anim_order_var = tk.StringVar(value="0")
         orders = [str(k) for k in range(r.vector_order)]
         anim_order_combo = ttk.Combobox(
-            anim_ctrl,
+            order_group,
             textvariable=self._anim_order_var,
             values=orders,
             state="readonly",
             width=4,
             font=get_font(),
         )
-        anim_order_combo.pack(side=tk.LEFT, padx=(0, 8))
+        anim_order_combo.pack(side=tk.LEFT)
         anim_order_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_animation())
 
-        self._build_transform_controls(anim_ctrl, self._update_animation, "anim")
+        transform_group = anim_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_animation, "anim")
 
         self._anim_plot_frame = ttk.Frame(anim_tab)
         self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -1175,22 +1395,22 @@ class ResultDialog:
         tab_3d = ttk.Frame(nb)
         nb.add(tab_3d, text="  3D Surface  ")
 
-        ctrl_3d = ttk.Frame(tab_3d)
-        ctrl_3d.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(ctrl_3d, text="Derivative order:").pack(side=tk.LEFT, padx=(0, 4))
+        ctrl_3d = self._create_view_controls(tab_3d)
+        order_group = ctrl_3d.add_group("Derivative order")
         self._3d_order_var = tk.StringVar(value="0")
         order_3d_combo = ttk.Combobox(
-            ctrl_3d,
+            order_group,
             textvariable=self._3d_order_var,
             values=orders,
             state="readonly",
             width=4,
             font=get_font(),
         )
-        order_3d_combo.pack(side=tk.LEFT, padx=(0, 8))
+        order_3d_combo.pack(side=tk.LEFT)
         order_3d_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_3d_plot())
 
-        self._build_transform_controls(ctrl_3d, self._update_3d_plot, "vec_3d")
+        transform_group = ctrl_3d.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_3d_plot, "vec_3d")
 
         self._3d_plot_frame = ttk.Frame(tab_3d)
         self._3d_plot_frame.pack(fill=tk.BOTH, expand=True)
@@ -1203,9 +1423,7 @@ class ResultDialog:
         from transforms import TransformKind
 
         r = self._result
-        selected = list(self._vec_sol_listbox.curselection())
-        if not selected:
-            selected = [0]
+        selected = self._vec_sol_series_selector.selected_indices()
 
         eq_name = r.metadata.get("equation_name", "f(x)")
         kind = self._get_transform_kind("vec_sol")
@@ -1514,78 +1732,98 @@ class ResultDialog:
         """Build component-free orthogonal slice access for scalar PDE 3D."""
         tab = ttk.Frame(self._notebook)
         self._notebook.add(tab, text="  Orthogonal Slice  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(controls, text="Plane:").pack(side=tk.LEFT, padx=(0, 4))
+        controls = self._create_view_controls(tab)
+        plane_group = controls.add_group("Plane")
         self._pde_3d_slice_plane_var = tk.StringVar(value="XY")
         plane_combo = ttk.Combobox(
-            controls,
+            plane_group,
             textvariable=self._pde_3d_slice_plane_var,
             values=["XY", "XZ", "YZ"],
             state="readonly",
             width=4,
             font=get_font(),
         )
-        plane_combo.pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Label(controls, text="Fixed-axis index:").pack(side=tk.LEFT, padx=(0, 4))
-        self._pde_3d_slice_index_var = tk.StringVar(value="0")
-        self._pde_3d_slice_index_combo = ttk.Combobox(
-            controls,
-            textvariable=self._pde_3d_slice_index_var,
+        plane_combo.pack(side=tk.LEFT)
+        coordinate_group = controls.add_group()
+        self._pde_3d_fixed_axis_label = ttk.Label(coordinate_group, text="Fixed z")
+        self._pde_3d_fixed_axis_label.pack(side=tk.LEFT, padx=(0, 5))
+        self._pde_3d_slice_coordinate_var = tk.StringVar(value="")
+        self._pde_3d_slice_coordinate_combo = ttk.Combobox(
+            coordinate_group,
+            textvariable=self._pde_3d_slice_coordinate_var,
             state="readonly",
-            width=7,
+            width=14,
             font=get_font(),
         )
-        self._pde_3d_slice_index_combo.pack(side=tk.LEFT, padx=(0, 4))
+        self._pde_3d_slice_coordinate_combo.pack(side=tk.LEFT)
+        self._pde_3d_slice_index_var = tk.StringVar(value="0")
+        self._pde_3d_slice_index_context_var = tk.StringVar(value="")
+        index_group = controls.add_group()
+        ttk.Label(index_group, textvariable=self._pde_3d_slice_index_context_var).pack(side=tk.LEFT)
 
-        def refresh_indices(*, render: bool = True) -> None:
-            """Refresh valid fixed-axis indexes and redraw the selected slice."""
-            result = self._result
-            plane = self._pde_3d_slice_plane_var.get()
-            size = (
-                len(result.z_grid)
-                if plane == "XY" and result.z_grid is not None
-                else len(result.y_grid)
-                if plane == "XZ" and result.y_grid is not None
-                else len(result.x)
-            )
-            values = [str(index) for index in range(size)]
-            self._pde_3d_slice_index_combo.configure(values=values)
-            self._pde_3d_slice_index_var.set(str(size // 2))
-            if render:
-                self._update_pde_3d_slice()
-
-        plane_combo.bind("<<ComboboxSelected>>", lambda _event: refresh_indices())
-        self._pde_3d_slice_index_combo.bind(
-            "<<ComboboxSelected>>", lambda _event: self._update_pde_3d_slice()
+        plane_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda _event: self._refresh_pde_3d_slice_coordinates(),
+        )
+        self._pde_3d_slice_coordinate_combo.bind(
+            "<<ComboboxSelected>>", lambda _event: self._select_pde_3d_slice_coordinate()
         )
         self._pde_3d_slice_frame = ttk.Frame(tab)
         self._pde_3d_slice_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_slice_canvas: FigureCanvasTkAgg | None = None
-        refresh_indices(render=False)
+        self._refresh_pde_3d_slice_coordinates(render=False)
         self._queue_initial_plot(self._update_pde_3d_slice)
 
         sweep_tab = ttk.Frame(self._notebook)
         self._notebook.add(sweep_tab, text="  Axis Sweep  ")
-        sweep_controls = ttk.Frame(sweep_tab)
-        sweep_controls.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(sweep_controls, text="Sweep coordinate:").pack(side=tk.LEFT, padx=(0, 4))
+        sweep_controls = self._create_view_controls(sweep_tab)
+        sweep_group = sweep_controls.add_group("Sweep along")
         labels = self._pde_coordinate_labels(3)
         self._pde_3d_sweep_axis_var = tk.StringVar(value=labels[2])
         sweep_selector = ttk.Combobox(
-            sweep_controls,
+            sweep_group,
             textvariable=self._pde_3d_sweep_axis_var,
             values=labels,
             state="readonly",
             width=max(5, max(map(len, labels))),
             font=get_font(),
         )
-        sweep_selector.pack(side=tk.LEFT, padx=(0, 4))
+        sweep_selector.pack(side=tk.LEFT)
         sweep_selector.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_3d_sweep())
         self._pde_3d_sweep_frame = ttk.Frame(sweep_tab)
         self._pde_3d_sweep_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_3d_sweep_canvas: FigureCanvasTkAgg | None = None
         self._queue_initial_plot(self._update_pde_3d_sweep)
+
+    def _refresh_pde_3d_slice_coordinates(self, *, render: bool = True) -> None:
+        """Refresh physical position choices for the selected orthogonal plane."""
+        result = self._result
+        if result.y_grid is None or result.z_grid is None:
+            raise ValueError("PDE 3D result is missing its y/z grids")
+        selected_plane = self._pde_3d_slice_plane_var.get()
+        plane = cast(SlicePlane, selected_plane) if selected_plane in {"XY", "XZ", "YZ"} else "XY"
+        fixed_axis, grid = pde_3d_fixed_grid(plane, result.x, result.y_grid, result.z_grid)
+        labels = self._pde_coordinate_labels(3)
+        fixed_label = labels["xyz".index(fixed_axis)]
+        self._pde_3d_fixed_axis_label.configure(text=f"Fixed {fixed_label}")
+        display_values = [_format_grid_coordinate(value) for value in grid]
+        self._pde_3d_slice_coordinate_combo.configure(values=display_values)
+        index = len(grid) // 2
+        self._pde_3d_slice_coordinate_combo.current(index)
+        self._pde_3d_slice_index_var.set(str(index))
+        self._pde_3d_slice_index_context_var.set(f"index {index} / {len(grid)}")
+        if render:
+            self._update_pde_3d_slice()
+
+    def _select_pde_3d_slice_coordinate(self) -> None:
+        """Map the displayed coordinate choice back to its exact array index."""
+        index = self._pde_3d_slice_coordinate_combo.current()
+        if index < 0:
+            return
+        size = len(self._pde_3d_slice_coordinate_combo.cget("values"))
+        self._pde_3d_slice_index_var.set(str(index))
+        self._pde_3d_slice_index_context_var.set(f"index {index} / {size}")
+        self._update_pde_3d_slice()
 
     def _update_pde_3d_slice(self) -> None:
         """Render the selected XY, XZ, or YZ scalar slice."""
@@ -1600,10 +1838,8 @@ class ResultDialog:
             variables[index] if len(variables) > index else "xyz"[index] for index in range(3)
         ]
         selected_plane = self._pde_3d_slice_plane_var.get()
-        plane: Literal["XY", "XZ", "YZ"] = (
-            cast(Literal["XY", "XZ", "YZ"], selected_plane)
-            if selected_plane in {"XY", "XZ", "YZ"}
-            else "XY"
+        plane: SlicePlane = (
+            cast(SlicePlane, selected_plane) if selected_plane in {"XY", "XZ", "YZ"} else "XY"
         )
         try:
             requested_index = int(self._pde_3d_slice_index_var.get())
@@ -1640,22 +1876,27 @@ class ResultDialog:
         surf_tab = ttk.Frame(nb)
         nb.add(surf_tab, text="  Solution 3D  ")
 
-        surf_ctrl = ttk.Frame(surf_tab)
-        surf_ctrl.pack(fill=tk.X, padx=4, pady=4)
-
-        ttk.Label(surf_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
+        surf_ctrl = self._create_view_controls(surf_tab)
+        axis_group = surf_ctrl.add_group("Transform along")
         self._pde_3d_axis_var = tk.StringVar(value=xlabel)
-        ttk.Combobox(
-            surf_ctrl,
+        axis_combo = ttk.Combobox(
+            axis_group,
             textvariable=self._pde_3d_axis_var,
             values=[xlabel, ylabel],
             state="readonly",
             width=4,
             font=get_font(),
-        ).pack(side=tk.LEFT, padx=(0, 4))
+        )
+        axis_combo.pack(side=tk.LEFT)
+        axis_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_3d())
 
-        self._build_transform_controls(surf_ctrl, self._update_pde_3d, "pde_3d")
-        self._add_vector_pde_field_selector(surf_ctrl, "_pde_3d_field_var", self._update_pde_3d)
+        transform_group = surf_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_pde_3d, "pde_3d")
+        if self._result.equation_type == "vector_pde":
+            field_group = surf_ctrl.add_group("Field")
+            self._add_vector_pde_field_selector(
+                field_group, "_pde_3d_field_var", self._update_pde_3d
+            )
 
         self._pde_3d_frame = ttk.Frame(surf_tab)
         self._pde_3d_frame.pack(fill=tk.BOTH, expand=True)
@@ -1666,26 +1907,29 @@ class ResultDialog:
         contour_tab = ttk.Frame(nb)
         nb.add(contour_tab, text="  Solution 2D  ")
 
-        contour_ctrl = ttk.Frame(contour_tab)
-        contour_ctrl.pack(fill=tk.X, padx=4, pady=4)
-
-        ttk.Label(contour_ctrl, text="Transform along:").pack(side=tk.LEFT, padx=(0, 4))
+        contour_ctrl = self._create_view_controls(contour_tab)
+        axis_group = contour_ctrl.add_group("Transform along")
         self._pde_2d_axis_var = tk.StringVar(value=xlabel)
-        ttk.Combobox(
-            contour_ctrl,
+        axis_combo = ttk.Combobox(
+            axis_group,
             textvariable=self._pde_2d_axis_var,
             values=[xlabel, ylabel],
             state="readonly",
             width=4,
             font=get_font(),
-        ).pack(side=tk.LEFT, padx=(0, 4))
-
-        self._build_transform_controls(contour_ctrl, self._update_pde_2d, "pde_2d")
-        self._add_vector_pde_field_selector(
-            contour_ctrl,
-            "_pde_2d_field_var",
-            self._update_pde_2d,
         )
+        axis_combo.pack(side=tk.LEFT)
+        axis_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_2d())
+
+        transform_group = contour_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_pde_2d, "pde_2d")
+        if self._result.equation_type == "vector_pde":
+            field_group = contour_ctrl.add_group("Field")
+            self._add_vector_pde_field_selector(
+                field_group,
+                "_pde_2d_field_var",
+                self._update_pde_2d,
+            )
 
         self._pde_2d_frame = ttk.Frame(contour_tab)
         self._pde_2d_frame.pack(fill=tk.BOTH, expand=True)
@@ -1695,19 +1939,21 @@ class ResultDialog:
         if self._result.equation_type == "pde":
             polar_tab = ttk.Frame(nb)
             nb.add(polar_tab, text="  Polar View  ")
-            polar_ctrl = ttk.Frame(polar_tab)
-            polar_ctrl.pack(fill=tk.X, padx=4, pady=4)
-            ttk.Label(polar_ctrl, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+            polar_ctrl = self._create_view_controls(polar_tab)
+            origin_x_group = polar_ctrl.add_group("Origin x")
             self._pde_polar_origin_x_var = tk.StringVar(value="0")
-            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_x_var, width=7).pack(
-                side=tk.LEFT, padx=(0, 6)
+            ttk.Entry(origin_x_group, textvariable=self._pde_polar_origin_x_var, width=9).pack(
+                side=tk.LEFT
             )
-            ttk.Label(polar_ctrl, text="y:").pack(side=tk.LEFT, padx=(0, 3))
+            origin_y_group = polar_ctrl.add_group("Origin y")
             self._pde_polar_origin_y_var = tk.StringVar(value="0")
-            ttk.Entry(polar_ctrl, textvariable=self._pde_polar_origin_y_var, width=7).pack(
-                side=tk.LEFT, padx=(0, 6)
+            ttk.Entry(origin_y_group, textvariable=self._pde_polar_origin_y_var, width=9).pack(
+                side=tk.LEFT
             )
-            ttk.Button(polar_ctrl, text="Update", command=self._update_pde_polar).pack(side=tk.LEFT)
+            action_group = polar_ctrl.add_group()
+            ttk.Button(action_group, text="Update", command=self._update_pde_polar).pack(
+                side=tk.LEFT
+            )
             self._pde_polar_frame = ttk.Frame(polar_tab)
             self._pde_polar_frame.pack(fill=tk.BOTH, expand=True)
             self._pde_polar_canvas: FigureCanvasTkAgg | None = None
@@ -1718,26 +1964,27 @@ class ResultDialog:
 
         sweep_tab = ttk.Frame(nb)
         nb.add(sweep_tab, text="  Axis Sweep  ")
-        sweep_ctrl = ttk.Frame(sweep_tab)
-        sweep_ctrl.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(sweep_ctrl, text="Sweep coordinate:").pack(side=tk.LEFT, padx=(0, 4))
+        sweep_ctrl = self._create_view_controls(sweep_tab)
+        sweep_group = sweep_ctrl.add_group("Sweep along")
         sweep_labels = self._pde_coordinate_labels(2)
         self._pde_2d_sweep_axis_var = tk.StringVar(value=sweep_labels[1])
         sweep_selector = ttk.Combobox(
-            sweep_ctrl,
+            sweep_group,
             textvariable=self._pde_2d_sweep_axis_var,
             values=sweep_labels,
             state="readonly",
             width=max(5, max(map(len, sweep_labels))),
             font=get_font(),
         )
-        sweep_selector.pack(side=tk.LEFT, padx=(0, 8))
+        sweep_selector.pack(side=tk.LEFT)
         sweep_selector.bind("<<ComboboxSelected>>", lambda _event: self._update_pde_2d_sweep())
-        self._add_vector_pde_field_selector(
-            sweep_ctrl,
-            "_pde_2d_sweep_field_var",
-            self._update_pde_2d_sweep,
-        )
+        if self._result.equation_type == "vector_pde":
+            field_group = sweep_ctrl.add_group("Field")
+            self._add_vector_pde_field_selector(
+                field_group,
+                "_pde_2d_sweep_field_var",
+                self._update_pde_2d_sweep,
+            )
         self._pde_2d_sweep_frame = ttk.Frame(sweep_tab)
         self._pde_2d_sweep_frame.pack(fill=tk.BOTH, expand=True)
         self._pde_2d_sweep_canvas: FigureCanvasTkAgg | None = None
@@ -1747,55 +1994,53 @@ class ResultDialog:
         trans_tab = ttk.Frame(nb)
         nb.add(trans_tab, text="  Transform  ")
 
-        trans_ctrl = ttk.Frame(trans_tab)
-        trans_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        trans_ctrl = self._create_view_controls(trans_tab)
 
         xlabel, ylabel = self._pde_axis_labels()
 
-        ttk.Label(trans_ctrl, text="Slice along:", style="Small.TLabel").pack(
-            side=tk.LEFT, padx=(0, 4)
-        )
+        varying_group = trans_ctrl.add_group("Vary axis")
         self._pde_slice_var = tk.StringVar(value=xlabel)
-        ttk.Combobox(
-            trans_ctrl,
+        varying_combo = ttk.Combobox(
+            varying_group,
             textvariable=self._pde_slice_var,
             values=[xlabel, ylabel],
             state="readonly",
             width=2,
             font=get_font(),
-        ).pack(side=tk.LEFT, padx=(0, 2))
+        )
+        varying_combo.pack(side=tk.LEFT)
 
         y_grid = self._require_pde_y_grid()
         y_mid = float((y_grid[0] + y_grid[-1]) / 2) if len(y_grid) > 0 else 0.5
 
-        ttk.Label(trans_ctrl, text="at fixed value:", style="Small.TLabel").pack(
-            side=tk.LEFT, padx=(0, 4)
-        )
+        fixed_group = trans_ctrl.add_group()
+        self._pde_fixed_axis_label = ttk.Label(fixed_group, text=f"Fixed {ylabel}")
+        self._pde_fixed_axis_label.pack(side=tk.LEFT, padx=(0, 5))
         self._pde_slice_val_var = tk.StringVar(value=str(round(y_mid, 4)))
         ttk.Entry(
-            trans_ctrl,
+            fixed_group,
             textvariable=self._pde_slice_val_var,
-            width=4,
+            width=9,
             font=get_font(),
-        ).pack(side=tk.LEFT, padx=(0, 2))
+        ).pack(side=tk.LEFT)
 
-        self._build_transform_controls(
-            trans_ctrl,
-            self._update_pde_transform,
-            "pde",
-            label_style="Small.TLabel",
-        )
-        self._add_vector_pde_field_selector(
-            trans_ctrl,
-            "_pde_slice_field_var",
-            self._update_pde_transform,
-        )
+        transform_group = trans_ctrl.add_group("Transform")
+        self._build_transform_controls(transform_group, self._update_pde_transform, "pde")
+        if self._result.equation_type == "vector_pde":
+            field_group = trans_ctrl.add_group("Field")
+            self._add_vector_pde_field_selector(
+                field_group,
+                "_pde_slice_field_var",
+                self._update_pde_transform,
+            )
 
+        action_group = trans_ctrl.add_group()
         ttk.Button(
-            trans_ctrl,
+            action_group,
             text="Update",
             command=self._update_pde_transform,
-        ).pack(side=tk.LEFT, padx=4)
+        ).pack(side=tk.LEFT)
+        varying_combo.bind("<<ComboboxSelected>>", lambda _event: self._change_pde_slice_axis())
 
         self._pde_trans_frame = ttk.Frame(trans_tab)
         self._pde_trans_frame.pack(fill=tk.BOTH, expand=True)
@@ -1813,7 +2058,6 @@ class ResultDialog:
             return
         labels = [f"Component {index}" for index in range(self._result.vector_components)]
         labels.append("Magnitude")
-        ttk.Label(parent, text="Field:").pack(side=tk.LEFT, padx=(8, 4))
         variable = tk.StringVar(value=labels[0])
         setattr(self, variable_name, variable)
         combo = ttk.Combobox(
@@ -1824,7 +2068,7 @@ class ResultDialog:
             width=13,
             font=get_font(),
         )
-        combo.pack(side=tk.LEFT, padx=(0, 4))
+        combo.pack(side=tk.LEFT)
         combo.bind("<<ComboboxSelected>>", lambda _event: callback())
 
     def _selected_pde_field(self, variable_name: str) -> tuple[np.ndarray, str]:
@@ -2167,34 +2411,37 @@ class ResultDialog:
         """Build field-specific views without duplicating the plot canvas lifecycle."""
         tab = ttk.Frame(self._notebook)
         self._notebook.add(tab, text="  Vector Field  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=4, pady=4)
-        ttk.Label(controls, text="View:").pack(side=tk.LEFT, padx=(0, 4))
+        controls = self._create_view_controls(tab)
+        self._vector_pde_controls = controls
+        view_group = controls.add_group("View")
         self._vector_pde_view_var = tk.StringVar(value="Magnitude")
         views = self._vector_pde_view_labels()
         selector = ttk.Combobox(
-            controls,
+            view_group,
             textvariable=self._vector_pde_view_var,
             values=views,
             state="readonly",
             width=19,
             font=get_font(),
         )
-        selector.pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Label(controls, text="Origin x:").pack(side=tk.LEFT, padx=(0, 3))
+        selector.pack(side=tk.LEFT)
+        origin_x_group = controls.add_group("Origin x")
         self._vector_pde_origin_x_var = tk.StringVar(value="0")
-        ttk.Entry(controls, textvariable=self._vector_pde_origin_x_var, width=7).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        ttk.Label(controls, text="y:").pack(side=tk.LEFT, padx=(0, 3))
-        self._vector_pde_origin_y_var = tk.StringVar(value="0")
-        ttk.Entry(controls, textvariable=self._vector_pde_origin_y_var, width=7).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        selector.bind("<<ComboboxSelected>>", lambda _event: self._update_vector_pde_field())
-        ttk.Button(controls, text="Update", command=self._update_vector_pde_field).pack(
+        ttk.Entry(origin_x_group, textvariable=self._vector_pde_origin_x_var, width=9).pack(
             side=tk.LEFT
         )
+        origin_y_group = controls.add_group("Origin y")
+        self._vector_pde_origin_y_var = tk.StringVar(value="0")
+        ttk.Entry(origin_y_group, textvariable=self._vector_pde_origin_y_var, width=9).pack(
+            side=tk.LEFT
+        )
+        action_group = controls.add_group()
+        ttk.Button(action_group, text="Update", command=self._update_vector_pde_field).pack(
+            side=tk.LEFT,
+        )
+        self._vector_pde_origin_groups = (origin_x_group, origin_y_group, action_group)
+        selector.bind("<<ComboboxSelected>>", lambda _event: self._change_vector_pde_view())
+        self._set_vector_pde_origin_visibility(False)
         self._vector_pde_field_frame = ttk.Frame(tab)
         self._vector_pde_field_frame.pack(fill=tk.BOTH, expand=True)
         self._vector_pde_field_canvas: FigureCanvasTkAgg | None = None
@@ -2206,6 +2453,18 @@ class ResultDialog:
         if self._result.vector_components == 2:
             views.extend(["Quiver", "Streamlines", "Radial/Tangential"])
         return views
+
+    def _set_vector_pde_origin_visibility(self, visible: bool) -> None:
+        """Apply progressive disclosure to Radial/Tangential origin controls."""
+        for group in self._vector_pde_origin_groups:
+            self._vector_pde_controls.set_group_visible(group, visible)
+
+    def _change_vector_pde_view(self) -> None:
+        """Refresh disclosure and plot immediately after choosing a field view."""
+        self._set_vector_pde_origin_visibility(
+            vector_field_uses_origin(self._vector_pde_view_var.get())
+        )
+        self._update_vector_pde_field()
 
     def _update_vector_pde_field(self) -> None:
         """Render the selected vector PDE field view."""
@@ -2219,26 +2478,36 @@ class ResultDialog:
             "Radial/Tangential": "radial_tangential",
         }
         selected = self._vector_pde_view_var.get()
-        try:
-            origin = (
-                float(self._vector_pde_origin_x_var.get()),
-                float(self._vector_pde_origin_y_var.get()),
-            )
-        except ValueError:
-            origin = (0.0, 0.0)
+        plot_kwargs: dict[str, Any] = {
+            "view": view_map.get(selected, "magnitude"),
+            "title": f"{self._result.metadata.get('equation_name', 'Vector PDE')} — {selected}",
+        }
+        if vector_field_uses_origin(selected):
+            try:
+                plot_kwargs["origin"] = (
+                    float(self._vector_pde_origin_x_var.get()),
+                    float(self._vector_pde_origin_y_var.get()),
+                )
+            except ValueError:
+                plot_kwargs["origin"] = (0.0, 0.0)
         figure = create_vector_field_plot(
             self._result.x,
             self._require_pde_y_grid(),
             np.asarray(self._result.y),
-            view=view_map.get(selected, "magnitude"),
-            origin=origin,
-            title=f"{self._result.metadata.get('equation_name', 'Vector PDE')} — {selected}",
+            **plot_kwargs,
         )
         self._replace_plot(
             self._vector_pde_field_frame,
             figure,
             "_vector_pde_field_canvas",
         )
+
+    def _change_pde_slice_axis(self) -> None:
+        """Synchronize the fixed-coordinate label and redraw the current slice."""
+        xlabel, ylabel = self._pde_axis_labels()
+        fixed_axis = pde_fixed_axis_label(self._pde_slice_var.get(), xlabel, ylabel)
+        self._pde_fixed_axis_label.configure(text=f"Fixed {fixed_axis}")
+        self._update_pde_transform()
 
     def _update_pde_transform(self) -> None:
         """Render a 1D transform of a slice through the PDE solution."""
@@ -2257,20 +2526,16 @@ class ResultDialog:
         except ValueError:
             slice_val = 0.5
 
-        if slice_var == xlabel:
-            # Slice along x[0] at a fixed x[1] value
-            y_idx = int(np.argmin(np.abs(y_grid - slice_val)))
-            data_1d = field[y_idx, :]
-            x_1d = r.x
-            slice_label = f"{ylabel}={slice_val:.3g}"
-            axis_label = xlabel
-        else:
-            # Slice along x[1] at a fixed x[0] value
-            x_idx = int(np.argmin(np.abs(r.x - slice_val)))
-            data_1d = field[:, x_idx]
-            x_1d = y_grid
-            slice_label = f"{xlabel}={slice_val:.3g}"
-            axis_label = ylabel
+        x_1d, data_1d, axis_label, fixed_axis_label, _fixed_index = extract_pde_line_slice(
+            slice_var,
+            xlabel,
+            ylabel,
+            r.x,
+            y_grid,
+            field,
+            slice_val,
+        )
+        slice_label = f"{fixed_axis_label}={slice_val:.3g}"
 
         eq_name = r.metadata.get("equation_name", "PDE")
 
