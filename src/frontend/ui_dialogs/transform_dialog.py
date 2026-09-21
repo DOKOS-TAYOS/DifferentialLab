@@ -19,6 +19,7 @@ from frontend.theme import get_font
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
+from frontend.ui_dialogs.symbol_palette import SymbolPalette, SymbolTargetTracker
 from frontend.ui_dialogs.tooltip import ToolTip
 from frontend.window_utils import (
     bind_wraplength,
@@ -96,6 +97,7 @@ class TransformDialog:
         self._canvas: FigureCanvasTkAgg | None = None
         self._fig: Figure | None = None
         self._ax = None
+        self._symbol_tracker = SymbolTargetTracker()
 
         self._build_ui()
 
@@ -173,10 +175,11 @@ class TransformDialog:
         paned.pack(fill=tk.BOTH, expand=True)
         self._paned = paned
 
-        # ── Left: controls ──
-        left = ttk.Frame(paned, width=_LEFT_WIDTH)
-        left.pack_propagate(False)
-        paned.add(left, weight=0)
+        # ── Left: vertically scrollable controls ──
+        self._controls_scroll = ScrollableFrame(paned, width=_LEFT_WIDTH)
+        self._controls_scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
+        paned.add(self._controls_scroll, weight=0)
+        left = self._controls_scroll.inner
 
         # Function
         func_lf = ttk.LabelFrame(left, text="Function", padding=pad)
@@ -188,28 +191,6 @@ class TransformDialog:
             style="Small.TLabel",
         )
         func_hint_lbl.pack(anchor=tk.W)
-
-        # Unicode symbols — copy and paste directly
-        _unicode_hint = (
-            "\u03b1 \u03b2 \u03b3 \u03b4 \u03b5 \u03b6 \u03b7 "
-            "\u03b8 \u03bb \u03bc \u03be \u03c0 \u03c1 \u03c3 "
-            "\u03c6 \u03c9 \u0394 \u03a3 \u03a6 \u03a9"
-        )
-        _font_small = (_font[0], max(9, _font[1] - 4))
-        unicode_text = tk.Text(
-            func_lf,
-            height=1,
-            width=30,
-            bg=btn_bg,
-            fg=fg,
-            font=_font_small,
-            borderwidth=0,
-            highlightthickness=0,
-            wrap="none",
-        )
-        unicode_text.insert("1.0", _unicode_hint)
-        unicode_text.config(state="disabled")
-        unicode_text.pack(fill=tk.X, pady=(2, 4))
 
         bind_wraplength(func_lf, func_hint_lbl, pad=2 * pad, min_wrap=150)
 
@@ -224,11 +205,20 @@ class TransformDialog:
         )
         self._func_entry.insert("1.0", "sin(x)")
         self._func_entry.pack(fill=tk.X, pady=(4, pad))
+        self._symbol_tracker.register_target(self._func_entry)
 
         ttk.Label(func_lf, text="Parameters (name=value, comma-separated):").pack(anchor=tk.W)
         self._params_entry = ttk.Entry(func_lf, width=32, font=_font)
         self._params_entry.pack(fill=tk.X, pady=(4, pad))
+        self._symbol_tracker.register_target(self._params_entry)
         ToolTip(self._params_entry, "E.g.: a=1.0, omega=2.0")
+
+        self._symbol_palette = SymbolPalette(
+            func_lf,
+            tracker=self._symbol_tracker,
+            columns=10,
+        )
+        self._symbol_palette.pack(fill=tk.X)
 
         # Domain
         domain_lf = ttk.LabelFrame(left, text="Domain", padding=pad)
@@ -317,6 +307,8 @@ class TransformDialog:
         self._plot_container = ttk.Frame(plot_frame)
         self._plot_container.pack(fill=tk.BOTH, expand=True)
 
+        self._controls_scroll.bind_new_children()
+        self._controls_scroll.refresh_scroll_region()
         self._update_transform_options()
         self._on_apply()
 
@@ -329,6 +321,9 @@ class TransformDialog:
             self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
         elif not is_taylor and is_visible:
             self._taylor_frame.pack_forget()
+        controls_scroll = getattr(self, "_controls_scroll", None)
+        if controls_scroll is not None:
+            controls_scroll.refresh_scroll_region()
 
     def _on_transform_change(self, _event: object) -> None:
         """When transform selection changes, refresh only conditional controls."""

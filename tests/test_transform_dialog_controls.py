@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from frontend.ui_dialogs.symbol_palette import SymbolTargetTracker
 from frontend.ui_dialogs.transform_dialog import TransformDialog
 from transforms import TransformKind
 
@@ -28,6 +29,22 @@ class _FakeFrame:
 
     def pack_forget(self) -> None:
         self.manager = ""
+
+
+class _FakeTransformEditor:
+    def __init__(self, value: str, cursor: int) -> None:
+        self.value = value
+        self.cursor = cursor
+        self.focused = False
+
+    def insert(self, _index: str, text: str) -> None:
+        self.value = self.value[: self.cursor] + text + self.value[self.cursor :]
+
+    def focus_set(self) -> None:
+        self.focused = True
+
+    def winfo_exists(self) -> int:
+        return 1
 
 
 def test_taylor_options_are_hidden_for_non_taylor_transforms() -> None:
@@ -85,3 +102,23 @@ def test_update_runs_the_existing_calculation_path() -> None:
     dialog._on_update()
 
     assert calls == ["apply"]
+
+
+def test_transform_symbol_insertion_keeps_update_explicit() -> None:
+    dialog = TransformDialog.__new__(TransformDialog)
+    calls: list[str] = []
+    dialog._on_apply = lambda: calls.append("apply")  # type: ignore[method-assign]
+    dialog._symbol_tracker = SymbolTargetTracker()
+    function_editor = _FakeTransformEditor("sin(x)", cursor=0)
+    parameter_editor = _FakeTransformEditor("=2", cursor=0)
+
+    dialog._symbol_tracker.remember_target(function_editor)
+    assert dialog._symbol_tracker.insert("ω") is True
+    dialog._symbol_tracker.remember_target(parameter_editor)
+    assert dialog._symbol_tracker.insert("π") is True
+
+    assert function_editor.value == "ωsin(x)"
+    assert parameter_editor.value == "π=2"
+    assert function_editor.focused is True
+    assert parameter_editor.focused is True
+    assert calls == []
