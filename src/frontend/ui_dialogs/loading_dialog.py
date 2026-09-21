@@ -43,11 +43,17 @@ class LoadingDialog:
         main_frame = ttk.Frame(self.win, padding=(pad * 2, pad * 2))
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        screen_width = self.win.winfo_screenwidth()
+        max_dialog_width = max(280, min(480, int(screen_width * 0.8)))
+        wraplength = max(140, max_dialog_width - 4 * pad)
+
         ttk.Label(
             main_frame,
             text=message,
             style="Subtitle.TLabel",
             anchor=tk.W,
+            justify=tk.LEFT,
+            wraplength=wraplength,
         ).pack(fill=tk.X, pady=(0, pad // 2))
 
         ttk.Label(
@@ -55,21 +61,26 @@ class LoadingDialog:
             text="Please wait while DifferentialLab finishes this operation.",
             style="Small.TLabel",
             anchor=tk.W,
+            justify=tk.LEFT,
+            wraplength=wraplength,
         ).pack(fill=tk.X, pady=(0, pad))
 
         self._progress = ttk.Progressbar(
             main_frame,
             mode="indeterminate",
-            length=320,
+            length=min(320, wraplength),
         )
         self._progress.pack(fill=tk.X, pady=(pad // 2, 0))
         self._progress.start(10)
 
         self.win.update_idletasks()
+        requested_width = min(max_dialog_width, max(280, main_frame.winfo_reqwidth() + 2 * pad))
+        requested_height = main_frame.winfo_reqheight() + 2 * pad
         center_window(
             self.win,
-            width=380,
-            height=150,
+            width=requested_width,
+            height=requested_height,
+            max_width_ratio=0.8,
             preserve_size=False,
         )
 
