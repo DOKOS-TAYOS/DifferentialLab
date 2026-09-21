@@ -75,6 +75,7 @@ class ParametersFormState:
     parameter_values: dict[str, str] = field(default_factory=dict)
     method: str = ""
     statistics: tuple[str, ...] = ()
+    event_enabled: bool = False
     event_expression: str | None = None
     event_terminal: bool = False
     event_direction: str | None = None
