@@ -81,6 +81,13 @@ def test_compute_statistics_none_selected_uses_all() -> None:
     assert "zero_crossings" in stats
 
 
+def test_compute_statistics_empty_selection_computes_nothing() -> None:
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x).reshape(1, -1)
+
+    assert compute_statistics(x, y, selected=set()) == {}
+
+
 def test_compute_statistics_reuses_exponential_rate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -146,3 +153,11 @@ def test_compute_statistics_2d_integral() -> None:
     u = np.ones((21, 21))  # constant 1 over unit square
     stats = compute_statistics_2d(x_grid, y_grid, u, selected={"integral"})
     assert stats["integral"] == pytest.approx(1.0, rel=1e-3)
+
+
+def test_compute_statistics_2d_empty_selection_computes_nothing() -> None:
+    x_grid = np.linspace(0, 1, 11)
+    y_grid = np.linspace(0, 1, 11)
+    u = np.ones((11, 11))
+
+    assert compute_statistics_2d(x_grid, y_grid, u, selected=set()) == {}

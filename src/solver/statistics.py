@@ -30,7 +30,7 @@ def compute_statistics(
     """
     y_2d = np.atleast_2d(y)
     y_primary = y_2d[0]
-    all_stats = selected or set(AVAILABLE_STATISTICS.keys())
+    all_stats = set(AVAILABLE_STATISTICS) if selected is None else selected
 
     results: dict[str, Any] = {}
 
@@ -373,7 +373,7 @@ def compute_statistics_2d(
     Returns:
         Dictionary with mean, std, max, min, integral_2d.
     """
-    all_stats = selected or {"mean", "std", "max", "min", "integral"}
+    all_stats = {"mean", "std", "max", "min", "integral"} if selected is None else selected
     results: dict[str, Any] = {}
 
     flat = u.ravel()
