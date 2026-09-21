@@ -321,7 +321,9 @@ class TransformDialog:
             self._taylor_frame.pack(fill=tk.X, pady=(0, pad))
         elif not is_taylor and is_visible:
             self._taylor_frame.pack_forget()
-        self._controls_scroll.refresh_scroll_region()
+        controls_scroll = getattr(self, "_controls_scroll", None)
+        if controls_scroll is not None:
+            controls_scroll.refresh_scroll_region()
 
     def _on_transform_change(self, _event: object) -> None:
         """When transform selection changes, refresh only conditional controls."""
