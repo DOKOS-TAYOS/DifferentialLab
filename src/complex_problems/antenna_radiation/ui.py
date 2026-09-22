@@ -13,14 +13,15 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     run_solver_dialog,
 )
 from config import get_env_from_schema
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _ANTENNA_TYPES = ("dipole", "loop", "patch", "array")
 
@@ -32,42 +33,35 @@ class AntennaRadiationDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Antenna Radiation")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=980, min_height=760, padding=32, resizable=True)
-        self.win.minsize(920, 700)
+        self._shell.finish(AdvancedDialogSize(900, 720, 660, 500))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="Antenna Radiation", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(
-            body,
-            text=(
-                "Compute far-field radiation maps, gain/directivity, and RMS field estimates.\n"
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Antenna Radiation",
+            description=(
+                "Compute far-field radiation maps, gain/directivity, and RMS field estimates. "
                 "Choose an antenna family, then set geometry and sampling resolution."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="antenna_radiation",
             pad=pad,
             wraplength=780,
         )
 
-        row = ttk.Frame(body)
+        system = ttk.LabelFrame(body, text="Antenna and excitation", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._antenna_type_var = tk.StringVar(value="dipole")
         at_combo = make_labeled_combo(
@@ -77,9 +71,10 @@ class AntennaRadiationDialog:
             _ANTENNA_TYPES,
             width=12,
         )
+        self._initial_focus = at_combo
         at_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._frequency_mhz_var = tk.StringVar(value="1000")
         self._power_w_var = tk.StringVar(value="10")
@@ -87,64 +82,60 @@ class AntennaRadiationDialog:
         self._distance_m_var = tk.StringVar(value="50")
         make_labeled_entry(row, "Frequency (MHz)", self._frequency_mhz_var, width=11)
         make_labeled_entry(row, "Pₜₓ (W)", self._power_w_var, width=9)
+        row = ttk.Frame(system)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "Efficiency η", self._efficiency_var, width=10)
         make_labeled_entry(row, "Observation r (m)", self._distance_m_var, width=13)
         ToolTip(row, "Efficiency must be between 0 and 1.")
 
-        row = ttk.Frame(body)
+        sampling = ttk.LabelFrame(body, text="Angular sampling", padding=pad)
+        sampling.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(sampling)
         row.pack(fill=tk.X, pady=pad // 2)
         self._n_theta_var = tk.StringVar(value="181")
         self._n_phi_var = tk.StringVar(value="360")
         make_labeled_entry(row, "N_θ", self._n_theta_var, width=8)
         make_labeled_entry(row, "N_φ", self._n_phi_var, width=8)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Geometry and array parameters", style="Small.TLabel").pack(
-            anchor=tk.W
-        )
+        geometry = ttk.LabelFrame(body, text="Geometry and array parameters", padding=pad)
+        geometry.pack(fill=tk.X)
 
-        self._dipole_row = ttk.Frame(body)
+        self._dipole_row = ttk.Frame(geometry)
         self._dipole_row.pack(fill=tk.X, pady=pad // 2)
         self._dipole_length_var = tk.StringVar(value="0.5")
         make_labeled_entry(self._dipole_row, "Length (λ)", self._dipole_length_var, width=10)
 
-        self._loop_row = ttk.Frame(body)
+        self._loop_row = ttk.Frame(geometry)
         self._loop_row.pack(fill=tk.X, pady=pad // 2)
         self._loop_radius_var = tk.StringVar(value="0.10")
         make_labeled_entry(self._loop_row, "Radius (λ)", self._loop_radius_var, width=10)
 
-        self._patch_row = ttk.Frame(body)
+        self._patch_row = ttk.Frame(geometry)
         self._patch_row.pack(fill=tk.X, pady=pad // 2)
         self._patch_length_var = tk.StringVar(value="0.5")
         self._patch_width_var = tk.StringVar(value="0.4")
         make_labeled_entry(self._patch_row, "Patch L (λ)", self._patch_length_var, width=10)
         make_labeled_entry(self._patch_row, "Patch W (λ)", self._patch_width_var, width=10)
 
-        self._array_row = ttk.Frame(body)
+        self._array_row = ttk.Frame(geometry)
         self._array_row.pack(fill=tk.X, pady=pad // 2)
         self._array_elements_var = tk.StringVar(value="8")
         self._array_spacing_var = tk.StringVar(value="0.5")
         self._array_phase_var = tk.StringVar(value="0.0")
         self._array_steer_var = tk.StringVar(value="90.0")
-        make_labeled_entry(self._array_row, "Elements", self._array_elements_var, width=8)
-        make_labeled_entry(self._array_row, "Spacing (λ)", self._array_spacing_var, width=10)
-        make_labeled_entry(self._array_row, "Phase (deg)", self._array_phase_var, width=10)
-        make_labeled_entry(self._array_row, "Steer θ (deg)", self._array_steer_var, width=12)
+        array_row = ttk.Frame(self._array_row)
+        array_row.pack(fill=tk.X, pady=pad // 2)
+        make_labeled_entry(array_row, "Elements", self._array_elements_var, width=8)
+        make_labeled_entry(array_row, "Spacing (λ)", self._array_spacing_var, width=10)
+        array_row = ttk.Frame(self._array_row)
+        array_row.pack(fill=tk.X, pady=pad // 2)
+        make_labeled_entry(array_row, "Phase (deg)", self._array_phase_var, width=10)
+        make_labeled_entry(array_row, "Steer θ (deg)", self._array_steer_var, width=12)
 
-        self._btn_row = ttk.Frame(body)
-        self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(self._btn_row, text="Solve", command=self._on_solve).pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
-        ttk.Button(
-            self._btn_row,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        ).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
         self._update_visibility()
-        scroll.bind_new_children()
 
     def _update_visibility(self) -> None:
         atype = self._antenna_type_var.get()
@@ -153,13 +144,14 @@ class AntennaRadiationDialog:
         self._patch_row.pack_forget()
         self._array_row.pack_forget()
         if atype == "dipole":
-            self._dipole_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._dipole_row.pack(fill=tk.X, pady=4)
         elif atype == "loop":
-            self._loop_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._loop_row.pack(fill=tk.X, pady=4)
         elif atype == "patch":
-            self._patch_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._patch_row.pack(fill=tk.X, pady=4)
         else:
-            self._array_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._array_row.pack(fill=tk.X, pady=4)
+        self._shell.refresh()
 
     def _collect_inputs(self) -> dict[str, object]:
         frequency_mhz = parse_positive_float(self._frequency_mhz_var.get(), name="Frequency (MHz)")

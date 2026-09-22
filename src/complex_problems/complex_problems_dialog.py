@@ -11,7 +11,12 @@ from config import get_env_from_schema
 from frontend.theme import get_font, get_select_colors
 from frontend.ui_dialogs import ToolTip, setup_arrow_enter_navigation
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
-from frontend.window_utils import bind_wraplength, fit_and_center, make_modal
+from frontend.window_utils import (
+    bind_wraplength,
+    calculate_screen_aware_minsize,
+    center_window,
+    make_modal,
+)
 from utils import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +39,14 @@ class ComplexProblemsDialog:
 
         self._build_ui()
 
-        fit_and_center(self.win, min_width=1120, min_height=760, resizable=True)
+        min_width, min_height = calculate_screen_aware_minsize(
+            self.win.winfo_screenwidth(),
+            self.win.winfo_screenheight(),
+            760,
+            520,
+        )
+        self.win.minsize(min_width, min_height)
+        center_window(self.win, 1020, 700, resizable=True)
         make_modal(self.win, parent)
         logger.info("Complex problems dialog opened")
 
@@ -52,7 +64,7 @@ class ComplexProblemsDialog:
             main_frame,
             text="Advanced Problems",
             style="Title.TLabel",
-        ).pack(pady=(0, pad))
+        ).pack(fill=tk.X, anchor=tk.W, pady=(0, pad))
 
         intro = ttk.Label(
             main_frame,
@@ -61,14 +73,14 @@ class ComplexProblemsDialog:
                 "the physical context, key settings, and available outputs."
             ),
             style="Small.TLabel",
-            justify=tk.CENTER,
+            justify=tk.LEFT,
         )
-        intro.pack(pady=(0, pad * 2))
+        intro.pack(fill=tk.X, anchor=tk.W, pady=(0, pad * 2))
         bind_wraplength(main_frame, intro, pad=4 * pad, min_wrap=260)
 
         content = ttk.Frame(main_frame)
         content.pack(fill=tk.BOTH, expand=True)
-        content.columnconfigure(0, weight=0, minsize=300)
+        content.columnconfigure(0, weight=0, minsize=330)
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=1)
 
@@ -84,7 +96,7 @@ class ComplexProblemsDialog:
         list_scrollbar = ttk.Scrollbar(left_list_frame, orient=tk.VERTICAL)
         self._problem_listbox = tk.Listbox(
             left_list_frame,
-            width=28,
+            width=34,
             height=18,
             bg=btn_bg,
             fg=fg,
@@ -142,10 +154,11 @@ class ComplexProblemsDialog:
         )
         self._details_label.pack(fill=tk.X, anchor=tk.NW)
 
+        bind_wraplength(right, [self._name_label, self._type_label], pad=2 * pad, min_wrap=220)
         bind_wraplength(
-            right,
-            [self._name_label, self._type_label, self._details_label],
-            pad=2 * pad,
+            self._details_scroll.viewport,
+            self._details_label,
+            pad=3 * pad,
             min_wrap=220,
         )
 
@@ -159,23 +172,27 @@ class ComplexProblemsDialog:
             self._problem_listbox.selection_set(0)
             self._on_problem_select(None)
 
+        ttk.Separator(main_frame).pack(fill=tk.X, pady=(pad * 2, pad))
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(pady=(pad * 2, 0))
-        self._open_btn = ttk.Button(
-            btn_frame,
-            text="Open Selected",
-            command=self._on_open,
-        )
-        self._open_btn.pack(side=tk.LEFT, padx=(0, pad))
+        btn_frame.pack(fill=tk.X)
+        actions = ttk.Frame(btn_frame)
+        actions.pack(side=tk.RIGHT)
         btn_close = ttk.Button(
-            btn_frame,
+            actions,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=self.win.destroy,
         )
         btn_close.pack(side=tk.LEFT)
+        self._open_btn = ttk.Button(
+            actions,
+            text="Open Selected",
+            style="Primary.TButton",
+            command=self._on_open,
+        )
+        self._open_btn.pack(side=tk.LEFT, padx=(pad, 0))
 
-        setup_arrow_enter_navigation([[self._open_btn, btn_close]])
+        setup_arrow_enter_navigation([[btn_close, self._open_btn]])
         self._problem_listbox.focus_set()
 
     def _get_selected_problem_id(self) -> str | None:

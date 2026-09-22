@@ -17,6 +17,8 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     make_labeled_spinbox,
@@ -27,9 +29,8 @@ from complex_problems.membrane_2d.solver import solve_membrane_2d
 from config import get_env_from_schema
 from frontend.performance_guard import assess_membrane_request, confirm_performance_advisory
 from frontend.theme import get_contrast_foreground, get_font
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _BOUNDARY_OPTIONS = ("fixed", "periodic")
 _INTEGRATOR_OPTIONS = ("verlet", "rk45")
@@ -68,53 +69,45 @@ class Membrane2DDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("2D Nonlinear Membrane")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=980, min_height=760, padding=32, resizable=True)
-        self.win.minsize(920, 700)
+        self._shell.finish(AdvancedDialogSize(900, 740, 660, 500))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="2D Nonlinear Membrane", style="Title.TLabel").pack(
-            anchor=tk.W, pady=(0, pad)
-        )
-        ttk.Label(
-            body,
-            text=(
-                "Simulate a rectangular membrane lattice with fixed or periodic boundaries.\n"
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="2D Nonlinear Membrane",
+            description=(
+                "Simulate a rectangular membrane lattice with fixed or periodic boundaries. "
                 "Start from the linear Laplacian model, then add nonlinear terms as needed."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="membrane_2d",
             pad=pad,
             wraplength=780,
         )
 
-        row = ttk.Frame(body)
+        system = ttk.LabelFrame(body, text="Membrane and grid", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._nx_var = tk.StringVar(value="32")
         self._ny_var = tk.StringVar(value="32")
-        make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=8, to=2048, width=7)
+        self._initial_focus = make_labeled_spinbox(
+            row, "Nₓ", self._nx_var, from_=8, to=2048, width=7
+        )
         make_labeled_spinbox(row, "Nᵧ", self._ny_var, from_=8, to=2048, width=7)
         ToolTip(row, "Grid size along x and y (integers).")
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._boundary_var = tk.StringVar(value="fixed")
         self._integrator_var = tk.StringVar(value="verlet")
@@ -126,7 +119,7 @@ class Membrane2DDialog:
             "RK45 is provided for comparison.",
         )
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._mass_var = tk.StringVar(value="1.0")
         self._k_var = tk.StringVar(value="1.0")
@@ -138,7 +131,9 @@ class Membrane2DDialog:
         select_bg = get_env_from_schema("UI_BUTTON_FG")
         select_fg = get_contrast_foreground(select_bg)
 
-        row = ttk.Frame(body)
+        nonlinear = ttk.LabelFrame(body, text="Nonlinear restoring terms", padding=pad)
+        nonlinear.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(nonlinear)
         row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(row, text="Optional nonlinear terms:").pack(side=tk.LEFT, padx=(0, pad))
         self._optional_terms_listbox = tk.Listbox(
@@ -169,18 +164,20 @@ class Membrane2DDialog:
         self._high_coeff_var = tk.StringVar(value="0.0")
         self._high_power_var = tk.StringVar(value="5")
 
-        self._alpha_frame = ttk.Frame(body)
+        self._alpha_frame = ttk.Frame(nonlinear)
         make_labeled_entry(self._alpha_frame, "α coefficient", self._alpha_var, width=10)
-        self._beta_frame = ttk.Frame(body)
+        self._beta_frame = ttk.Frame(nonlinear)
         make_labeled_entry(self._beta_frame, "β coefficient", self._beta_var, width=10)
-        self._high_frame = ttk.Frame(body)
+        self._high_frame = ttk.Frame(nonlinear)
         make_labeled_entry(self._high_frame, "cₚ coefficient", self._high_coeff_var, width=10)
         make_labeled_entry(self._high_frame, "Power p", self._high_power_var, width=8)
         ToolTip(
             self._high_frame,
             "Higher-order contribution uses cₚ·sign(Δu)·|Δu|ᵖ with integer p ≥ 2.",
         )
-        row = ttk.Frame(body)
+        integration = ttk.LabelFrame(body, text="Integration", padding=pad)
+        integration.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(integration)
         row.pack(fill=tk.X, pady=pad // 2)
         self._t_min_var = tk.StringVar(value="0.0")
         self._t_max_var = tk.StringVar(value="20.0")
@@ -189,10 +186,9 @@ class Membrane2DDialog:
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
         make_labeled_entry(row, "Δt", self._dt_var, width=8)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial state", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        initial = ttk.LabelFrame(body, text="Initial conditions", padding=pad)
+        initial.pack(fill=tk.X)
+        row = ttk.Frame(initial)
         row.pack(fill=tk.X, pady=pad // 2)
         self._ic_shape_var = tk.StringVar(value="gaussian")
         shape_combo = make_labeled_combo(row, "Shape", self._ic_shape_var, _IC_SHAPES, width=12)
@@ -202,14 +198,14 @@ class Membrane2DDialog:
         make_labeled_entry(row, "Amplitude", self._amp_var, width=8)
         make_labeled_entry(row, "σ", self._sigma_var, width=8)
 
-        self._mode_row = ttk.Frame(body)
+        self._mode_row = ttk.Frame(initial)
         self._mode_row.pack(fill=tk.X, pady=pad // 2)
         self._mode_x_var = tk.StringVar(value="1")
         self._mode_y_var = tk.StringVar(value="1")
         make_labeled_entry(self._mode_row, "Mode nₓ", self._mode_x_var, width=6)
         make_labeled_entry(self._mode_row, "Mode nᵧ", self._mode_y_var, width=6)
 
-        self._custom_row = ttk.Frame(body)
+        self._custom_row = ttk.Frame(initial)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(self._custom_row, text="u₀(x,y) =").pack(side=tk.LEFT, padx=(0, 4))
         self._custom_expr_var = tk.StringVar(value="exp(-((x-0.5)**2 + (y-0.5)**2)/0.02)")
@@ -222,7 +218,7 @@ class Membrane2DDialog:
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ToolTip(self._custom_entry, "Custom displacement expression using x and y in [0,1].")
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(initial)
         row.pack(fill=tk.X, pady=pad // 2)
         self._center_x_var = tk.StringVar(value="0.5")
         self._center_y_var = tk.StringVar(value="0.5")
@@ -231,53 +227,44 @@ class Membrane2DDialog:
         make_labeled_entry(row, "Center y₀", self._center_y_var, width=8)
         make_labeled_entry(row, "Random seed", self._seed_var, width=8)
 
-        self._btn_row = ttk.Frame(body)
-        self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(self._btn_row, text="Solve", command=self._on_solve).pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
-        ttk.Button(
-            self._btn_row,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        ).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
         self._update_optional_terms_visibility()
         self._update_ic_visibility()
-
-        scroll.bind_new_children()
 
     def _update_optional_terms_visibility(self) -> None:
         selected = {
             self._optional_terms_listbox.get(i) for i in self._optional_terms_listbox.curselection()
         }
         if _TERM_ALPHA in selected:
-            self._alpha_frame.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._alpha_frame.pack(fill=tk.X, pady=4)
         else:
             self._alpha_frame.pack_forget()
 
         if _TERM_BETA in selected:
-            self._beta_frame.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._beta_frame.pack(fill=tk.X, pady=4)
         else:
             self._beta_frame.pack_forget()
 
         if _TERM_HIGH in selected:
-            self._high_frame.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._high_frame.pack(fill=tk.X, pady=4)
         else:
             self._high_frame.pack_forget()
+        self._shell.refresh()
 
     def _update_ic_visibility(self) -> None:
         shape = self._ic_shape_var.get()
         if shape == "mode":
-            self._mode_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._mode_row.pack(fill=tk.X, pady=4)
         else:
             self._mode_row.pack_forget()
 
         if shape == "custom":
-            self._custom_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._custom_row.pack(fill=tk.X, pady=4)
         else:
             self._custom_row.pack_forget()
+        self._shell.refresh()
 
     def _collect_inputs(self) -> dict[str, object]:
         nx = parse_positive_int(self._nx_var.get(), name="Nₓ", min_value=8)

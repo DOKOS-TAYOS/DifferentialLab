@@ -10,7 +10,11 @@ from typing import cast
 import numpy as np
 
 from complex_problems.common import add_how_to_config_section
-from complex_problems.common.dialog_ui import run_solver_dialog
+from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
+    run_solver_dialog,
+)
 from complex_problems.gravitational_n_body.model import (
     NBodyState,
     figure_eight_state,
@@ -24,9 +28,8 @@ from complex_problems.gravitational_n_body.result_dialog import GravitationalNBo
 from complex_problems.gravitational_n_body.solver import solve_n_body
 from config.constants import SOLVER_METHODS
 from frontend.performance_guard import PerformanceAdvisory, confirm_performance_advisory
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 
 def parse_n_body_state_text(
@@ -97,6 +100,16 @@ def assess_n_body_request(*, n_bodies: int, n_points: int) -> PerformanceAdvisor
     )
 
 
+def n_body_control_visibility(mode: str, preset: str) -> tuple[bool, bool, bool]:
+    """Return visibility for general, random-cluster, and rotating-ring controls."""
+    general = mode == "General N-body"
+    return (
+        general,
+        general and preset == "Random bound cluster",
+        general and preset == "Rotating ring",
+    )
+
+
 class GravitationalNBodyDialog:
     """Configuration UI for curated three-body and general N-body states."""
 
@@ -113,29 +126,30 @@ class GravitationalNBodyDialog:
         self.win = tk.Toplevel(parent)
         self.win.title("Gravitational N-Body Dynamics")
         self._build_ui()
-        fit_and_center(self.win, min_width=980, min_height=740, padding=40, resizable=True)
-        self.win.minsize(820, 620)
+        self._shell.finish(AdvancedDialogSize(960, 760, 700, 540))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
-        outer = ttk.Frame(self.win, padding=10)
-        outer.pack(fill=tk.BOTH, expand=True)
-        self._scroll = ScrollableFrame(outer)
-        self._scroll.pack(fill=tk.BOTH, expand=True)
-        inner = self._scroll.inner
-        ttk.Label(inner, text="Gravitational N-Body Dynamics", style="Title.TLabel").pack(
-            anchor=tk.W
+        pad = 8
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Gravitational N-Body Dynamics",
+            description=(
+                "Classical Newtonian point-mass gravity in self-consistent user-selected units. "
+                "Positive epsilon uses Plummer softening."
+            ),
+            pad=pad,
         )
-        ttk.Label(
-            inner,
-            text="Classical Newtonian point-mass gravity in self-consistent user-selected units. Positive epsilon uses Plummer softening.",
-            style="Small.TLabel",
-            wraplength=820,
-        ).pack(anchor=tk.W, pady=(4, 10))
+        self._scroll = self._shell.scroll
+        inner = self._shell.body
+        add_how_to_config_section(inner, self._scroll, problem_id="gravitational_n_body", pad=pad)
         self._mode_var = tk.StringVar(value="Three-body")
         self._dimension_var = tk.StringVar(value="2D")
         self._preset_var = tk.StringVar(value=self._THREE_PRESETS[0])
-        row = ttk.Frame(inner)
+        system = ttk.LabelFrame(inner, text="System", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=4)
         ttk.Label(row, text="Mode:").pack(side=tk.LEFT)
         mode = ttk.Combobox(
@@ -146,6 +160,7 @@ class GravitationalNBodyDialog:
             width=18,
         )
         mode.pack(side=tk.LEFT, padx=5)
+        self._initial_focus = mode
         mode.bind("<<ComboboxSelected>>", self._on_mode_change)
         ttk.Label(row, text="Dimension:").pack(side=tk.LEFT, padx=(18, 0))
         dimension = ttk.Combobox(
@@ -153,22 +168,7 @@ class GravitationalNBodyDialog:
         )
         dimension.pack(side=tk.LEFT, padx=5)
         dimension.bind("<<ComboboxSelected>>", lambda _event: self._apply_selected_preset())
-        ttk.Label(row, text="Preset:").pack(side=tk.LEFT, padx=(18, 0))
-        self._preset_combo = ttk.Combobox(
-            row,
-            textvariable=self._preset_var,
-            values=self._THREE_PRESETS,
-            state="readonly",
-            width=28,
-        )
-        self._preset_combo.pack(side=tk.LEFT, padx=5)
-        self._preset_combo.bind(
-            "<<ComboboxSelected>>", lambda _event: self._apply_selected_preset()
-        )
-        add_how_to_config_section(
-            inner, self._scroll, problem_id="gravitational_n_body", pad=8, wraplength=820
-        )
-        physics = ttk.Frame(inner)
+        physics = ttk.Frame(system)
         physics.pack(fill=tk.X, pady=4)
         self._g_var, self._epsilon_var = tk.StringVar(value="1"), tk.StringVar(value="0")
         self._add_entry(
@@ -183,16 +183,33 @@ class GravitationalNBodyDialog:
             self._epsilon_var,
             "epsilon > 0 uses Plummer-softened gravity; epsilon = 0 is exact point gravity.",
         )
+
+        initial = ttk.LabelFrame(inner, text="Initial configuration", padding=pad)
+        initial.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(initial)
+        row.pack(fill=tk.X, pady=4)
+        ttk.Label(row, text="Preset:").pack(side=tk.LEFT)
+        self._preset_combo = ttk.Combobox(
+            row,
+            textvariable=self._preset_var,
+            values=self._THREE_PRESETS,
+            state="readonly",
+            width=28,
+        )
+        self._preset_combo.pack(side=tk.LEFT, padx=5)
+        self._preset_combo.bind("<<ComboboxSelected>>", self._on_preset_change)
+        ttk.Button(
+            row,
+            text="Generate / apply preset",
+            style="Secondary.TButton",
+            command=self._apply_selected_preset,
+        ).pack(side=tk.LEFT, padx=(pad, 0))
+
         self._n_var, self._seed_var = tk.StringVar(value="8"), tk.StringVar(value="1234")
-        general = ttk.Frame(inner)
-        general.pack(fill=tk.X, pady=4)
-        self._general_frame = general
-        self._add_entry(general, "N", self._n_var, "General mode supports 2 through 100 bodies.")
+        self._general_frame = ttk.Frame(initial)
+        self._general_frame.pack(fill=tk.X, pady=4)
         self._add_entry(
-            general,
-            "Random seed",
-            self._seed_var,
-            "Same random parameters and seed produce the same cluster.",
+            self._general_frame, "N", self._n_var, "General mode supports 2 through 100 bodies."
         )
         (
             self._position_scale_var,
@@ -207,33 +224,54 @@ class GravitationalNBodyDialog:
             tk.StringVar(value="1"),
             tk.StringVar(value="1"),
         )
-        generator = ttk.Frame(inner)
-        generator.pack(fill=tk.X, pady=4)
-        self._generator_frame = generator
+        self._random_frame = ttk.Frame(initial)
+        self._random_frame.pack(fill=tk.X, pady=4)
+        random_row = ttk.Frame(self._random_frame)
+        random_row.pack(fill=tk.X, pady=2)
         self._add_entry(
-            generator, "Position scale", self._position_scale_var, "Random-cluster spatial scale."
+            random_row,
+            "Random seed",
+            self._seed_var,
+            "Same random parameters and seed produce the same cluster.",
         )
         self._add_entry(
-            generator, "Mass range", self._mass_min_var, "Lower random mass; upper mass is next."
+            random_row,
+            "Position scale",
+            self._position_scale_var,
+            "Random-cluster spatial scale.",
         )
-        self._add_entry(generator, "to", self._mass_max_var, "Upper random mass.")
+        random_row = ttk.Frame(self._random_frame)
+        random_row.pack(fill=tk.X, pady=2)
         self._add_entry(
-            generator,
+            random_row,
+            "Mass range",
+            self._mass_min_var,
+            "Lower random mass; upper mass is next.",
+        )
+        self._add_entry(random_row, "to", self._mass_max_var, "Upper random mass.")
+        random_row = ttk.Frame(self._random_frame)
+        random_row.pack(fill=tk.X, pady=2)
+        self._add_entry(
+            random_row,
             "Target virial 2K/|U|",
             self._virial_var,
             "Initial kinetic-energy target for random clusters.",
         )
+        self._ring_frame = ttk.Frame(initial)
+        self._ring_frame.pack(fill=tk.X, pady=4)
         self._add_entry(
-            generator,
+            self._ring_frame,
             "Ring radius",
             self._ring_radius_var,
             "Radius used by the coherent equal-mass ring.",
         )
-        state = ttk.LabelFrame(inner, text="Editable state (comma-separated; one body per row)")
-        state.pack(fill=tk.BOTH, expand=False, pady=8)
+        state = ttk.LabelFrame(
+            inner, text="Body state (comma-separated; one body per row)", padding=pad
+        )
+        state.pack(fill=tk.BOTH, expand=False, pady=(0, pad))
         self._masses_var = tk.StringVar()
         ttk.Label(state, text="Masses:").grid(row=0, column=0, sticky="nw", padx=5, pady=5)
-        ttk.Entry(state, textvariable=self._masses_var, width=82).grid(
+        ttk.Entry(state, textvariable=self._masses_var, width=48).grid(
             row=0, column=1, sticky="ew", padx=5, pady=5
         )
         self._positions_text, self._velocities_text = (
@@ -245,36 +283,38 @@ class GravitationalNBodyDialog:
         ttk.Label(state, text="Velocities:").grid(row=2, column=0, sticky="nw", padx=5, pady=5)
         self._velocities_text.grid(row=2, column=1, sticky="ew", padx=5, pady=5)
         state.columnconfigure(1, weight=1)
-        integration = ttk.Frame(inner)
-        integration.pack(fill=tk.X, pady=4)
+        integration = ttk.LabelFrame(inner, text="Integration", padding=pad)
+        integration.pack(fill=tk.X)
         self._t_min_var, self._t_max_var, self._n_points_var, self._method_var = (
             tk.StringVar(value="0"),
             tk.StringVar(value="6.33"),
             tk.StringVar(value="600"),
             tk.StringVar(value="DOP853"),
         )
-        self._add_entry(integration, "t start", self._t_min_var, "Start time.")
-        self._add_entry(integration, "t end", self._t_max_var, "End time.")
+        integration_row = ttk.Frame(integration)
+        integration_row.pack(fill=tk.X, pady=2)
+        self._add_entry(integration_row, "t start", self._t_min_var, "Start time.")
+        self._add_entry(integration_row, "t end", self._t_max_var, "End time.")
+        integration_row = ttk.Frame(integration)
+        integration_row.pack(fill=tk.X, pady=2)
         self._add_entry(
-            integration, "Output samples", self._n_points_var, "Number of sampled output frames."
+            integration_row,
+            "Output samples",
+            self._n_points_var,
+            "Number of sampled output frames.",
         )
-        ttk.Label(integration, text="Solver:").pack(side=tk.LEFT, padx=(8, 3))
+        ttk.Label(integration_row, text="Solver:").pack(side=tk.LEFT, padx=(8, 3))
         ttk.Combobox(
-            integration,
+            integration_row,
             textvariable=self._method_var,
             values=SOLVER_METHODS,
             state="readonly",
             width=9,
         ).pack(side=tk.LEFT)
-        buttons = ttk.Frame(inner)
-        buttons.pack(fill=tk.X, pady=12)
-        ttk.Button(
-            buttons, text="Generate / apply preset", command=self._apply_selected_preset
-        ).pack(side=tk.LEFT)
-        ttk.Button(buttons, text="Solve", command=self._on_solve).pack(side=tk.LEFT, padx=6)
-        ttk.Button(buttons, text="Close", command=self.win.destroy).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
+        self._update_generator_visibility()
         self._apply_selected_preset()
-        self._scroll.bind_new_children()
 
     def _add_entry(
         self, parent: ttk.Frame, label: str, variable: tk.StringVar, tooltip: str
@@ -290,13 +330,28 @@ class GravitationalNBodyDialog:
             values=self._GENERAL_PRESETS if general else self._THREE_PRESETS
         )
         self._preset_var.set((self._GENERAL_PRESETS if general else self._THREE_PRESETS)[0])
-        self._general_frame.pack_forget() if not general else self._general_frame.pack(
-            fill=tk.X, pady=4
-        )
-        self._generator_frame.pack_forget() if not general else self._generator_frame.pack(
-            fill=tk.X, pady=4
-        )
+        self._update_generator_visibility()
         self._apply_selected_preset()
+
+    def _on_preset_change(self, _event: tk.Event | None = None) -> None:
+        """Update preset-specific generators and apply the selected state."""
+        self._update_generator_visibility()
+        self._apply_selected_preset()
+
+    def _update_generator_visibility(self) -> None:
+        """Show only generator controls meaningful for the active preset."""
+        general, random_controls, ring_controls = n_body_control_visibility(
+            self._mode_var.get(), self._preset_var.get()
+        )
+        for frame in (self._general_frame, self._random_frame, self._ring_frame):
+            frame.pack_forget()
+        if general:
+            self._general_frame.pack(fill=tk.X, pady=4)
+        if random_controls:
+            self._random_frame.pack(fill=tk.X, pady=4)
+        if ring_controls:
+            self._ring_frame.pack(fill=tk.X, pady=4)
+        self._shell.refresh()
 
     def _selected_state(self) -> NBodyState | None:
         dimension = 2 if self._dimension_var.get() == "2D" else 3
