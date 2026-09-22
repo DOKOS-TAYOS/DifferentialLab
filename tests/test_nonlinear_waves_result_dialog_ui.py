@@ -443,12 +443,11 @@ def test_kdv_reference_mode_only_supports_kdv_soliton_profiles(
 def test_kdv_selector_contract_defaults_to_no_optional_overlays() -> None:
     dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
     selection = MagicMock()
-    selection.curselection.return_value = (0, 1)
-    selection.get.side_effect = lambda index: ("Soliton 1", "Soliton 2")[index]
+    selection.selected_labels.return_value = ("Soliton 1", "Soliton 2")
     dialog._anim_selection = selection
     assert dialog._selected_animation_labels() == ("Soliton 1", "Soliton 2")
 
-    selection.curselection.return_value = ()
+    selection.selected_labels.return_value = ()
     assert dialog._selected_animation_labels() == ()
 
 
