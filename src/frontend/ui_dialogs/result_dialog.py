@@ -820,6 +820,24 @@ class ResultDialog:
                 )
             return
 
+        if indent > 0 and isinstance(value, (list, tuple, np.ndarray)):
+            block = ttk.Frame(parent)
+            block.pack(fill=tk.X, padx=(indent * 12, 0), pady=2)
+            label_widget = ttk.Label(block, text=label, anchor=tk.NW, style="Small.TLabel")
+            label_widget.pack(fill=tk.X, anchor=tk.W)
+            value_widget = ttk.Label(
+                block,
+                text=_format_display_value(value),
+                style="Small.TLabel",
+                anchor=tk.NW,
+                justify=tk.LEFT,
+            )
+            value_widget.pack(fill=tk.X, anchor=tk.W, padx=(12, 0))
+            bind_wraplength(block, value_widget, pad=12, min_wrap=80)
+            if help_text and label in help_text:
+                ToolTip(label_widget, help_text[label])
+            return
+
         row = ttk.Frame(parent)
         row.pack(fill=tk.X, padx=(indent * 12, 0), pady=2)
         row.columnconfigure(1, weight=1)
