@@ -525,9 +525,7 @@ class FPUTResultDialog:
 
         def render(_event: object | None = None) -> None:
             reset_embedded_animation(frame, canvas[0])
-            figure = create_modal_energy_figure(
-                result, selected_modes, self._modal_scale_var.get()
-            )
+            figure = create_modal_energy_figure(result, selected_modes, self._modal_scale_var.get())
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
 
