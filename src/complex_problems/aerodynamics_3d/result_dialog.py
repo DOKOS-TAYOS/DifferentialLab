@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from complex_problems.aerodynamics_3d.model import vorticity_periodic
+from complex_problems.aerodynamics_3d.model import obstacle_surface_mesh, vorticity_periodic
 from complex_problems.aerodynamics_3d.solver import Aerodynamics3DResult
 from complex_problems.common.result_dialog_ui import (
     AdvancedResultShell,
@@ -25,7 +25,11 @@ from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.window_utils import make_modal
-from plotting import create_solution_plot, export_animated_figure_to_mp4
+from plotting import (
+    create_image_animation_plot,
+    create_solution_plot,
+    export_animated_figure_to_mp4,
+)
 from plotting.animation_metadata import attach_animation_metadata
 from utils import get_logger
 
@@ -33,6 +37,9 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 logger = get_logger(__name__)
+
+_FLOW_DISPLAYS = ("Velocity perturbation", "Velocity vectors", "Vorticity vectors")
+_SLICE_FIELDS = ("Vorticity magnitude", "Speed", "Pressure", "u", "v", "w")
 
 
 def derived_speed(u: np.ndarray, v: np.ndarray, w: np.ndarray) -> np.ndarray:
@@ -74,10 +81,10 @@ def trace_streamline_3d(
     max_steps: int = 300,
     speed_epsilon: float = 1.0e-8,
 ) -> np.ndarray:
-    """Trace one deterministic 3D streamline with fixed-step RK4.
+    """Trace one streamline with RK4 using a normalized tangent field.
 
-    Coordinates are represented as ``(x, y, z)`` for callers while the
-    interpolators use the stored ``(z, y, x)`` array order.
+    The integration step is a physical arclength, so multiplying a positive
+    velocity field by a constant does not change the streamline geometry.
     """
     if not 0 <= frame < len(result.t):
         raise ValueError("frame is outside the saved result history.")
@@ -98,7 +105,8 @@ def trace_streamline_3d(
     lower = np.array([result.x[0], result.y[0], result.z[0]], dtype=float)
     upper = np.array([result.x[-1], result.y[-1], result.z[-1]], dtype=float)
 
-    def velocity(point: np.ndarray) -> np.ndarray | None:
+    def tangent(point: np.ndarray) -> np.ndarray | None:
+        """Interpolate, validate, and normalize one RK stage."""
         if np.any(point < lower) or np.any(point > upper):
             return None
         values = np.array(
@@ -107,23 +115,30 @@ def trace_streamline_3d(
         )
         if not np.all(np.isfinite(values)):
             return None
-        return values
+        magnitude = float(np.linalg.norm(values))
+        if not np.isfinite(magnitude) or magnitude <= speed_epsilon:
+            return None
+        return values / magnitude
 
     points = [np.asarray(seed, dtype=float)]
     for _ in range(max_steps):
         point = points[-1]
-        if velocity(point) is None or _point_is_obstacle(result, point):
+        if _point_is_obstacle(result, point):
             break
-        k1 = velocity(point)
-        if k1 is None or np.linalg.norm(k1) <= speed_epsilon:
+        k1 = tangent(point)
+        if k1 is None:
             break
-        k2 = velocity(point + 0.5 * step * k1)
-        k3 = velocity(point + 0.5 * step * (k2 if k2 is not None else k1))
-        k4 = velocity(point + step * (k3 if k3 is not None else k1))
-        if k2 is None or k3 is None or k4 is None:
+        k2 = tangent(point + 0.5 * step * k1)
+        if k2 is None:
+            break
+        k3 = tangent(point + 0.5 * step * k2)
+        if k3 is None:
+            break
+        k4 = tangent(point + step * k3)
+        if k4 is None:
             break
         next_point = point + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0
-        if velocity(next_point) is None or _point_is_obstacle(result, next_point):
+        if tangent(next_point) is None or _point_is_obstacle(result, next_point):
             break
         points.append(next_point)
     return np.asarray(points, dtype=float)
@@ -148,40 +163,158 @@ def make_streamline_seeds(
     return [(x_seed, float(y_value), float(z_value)) for z_value in zs for y_value in ys]
 
 
+@dataclass(frozen=True)
+class StreamlineAnimationCache:
+    """Cached streamline polylines for every saved solver frame."""
+
+    seed_density: int
+    lines_by_frame: tuple[tuple[np.ndarray, ...], ...]
+
+    @property
+    def frames(self) -> tuple[tuple[np.ndarray, ...], ...]:
+        """Expose frame lines with a concise name for callers and tests."""
+        return self.lines_by_frame
+
+    @property
+    def frame_count(self) -> int:
+        """Return the deterministic number of cached animation frames."""
+        return len(self.lines_by_frame)
+
+
+def build_streamline_cache(
+    result: Aerodynamics3DResult, density: int = 4
+) -> StreamlineAnimationCache:
+    """Trace and cache all streamline frames from an existing result only."""
+    seeds = make_streamline_seeds(result, density)
+    frames = tuple(
+        tuple(trace_streamline_3d(seed, result=result, frame=frame) for seed in seeds)
+        for frame in range(len(result.t))
+    )
+    return StreamlineAnimationCache(seed_density=int(density), lines_by_frame=frames)
+
+
+def slice_index_count(result: Aerodynamics3DResult, plane: str) -> int:
+    """Return the valid number of slice indexes for one plane."""
+    counts = {"XY": len(result.z), "XZ": len(result.y), "YZ": len(result.x)}
+    try:
+        return counts[plane.upper()]
+    except KeyError as exc:
+        raise ValueError("plane must be XY, XZ, or YZ") from exc
+
+
+def slice_center_index(result: Aerodynamics3DResult, plane: str) -> int:
+    """Return the central valid index for one slice plane."""
+    return slice_index_count(result, plane) // 2
+
+
+def _slice_data(
+    result: Aerodynamics3DResult, data: np.ndarray, *, plane: str, index: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, str]:
+    """Select one physical-coordinate 2D slice."""
+    plane_name = plane.upper()
+    selected = max(0, min(int(index), slice_index_count(result, plane_name) - 1))
+    if plane_name == "XY":
+        return (
+            result.x,
+            result.y,
+            data[selected],
+            float(result.z[selected]),
+            f"z = {result.z[selected]:.4g}",
+        )
+    if plane_name == "XZ":
+        return (
+            result.x,
+            result.z,
+            data[:, selected, :],
+            float(result.y[selected]),
+            f"y = {result.y[selected]:.4g}",
+        )
+    return (
+        result.y,
+        result.z,
+        data[:, :, selected],
+        float(result.x[selected]),
+        f"x = {result.x[selected]:.4g}",
+    )
+
+
 def slice_field(
     result: Aerodynamics3DResult, *, frame: int, plane: str, index: int, field: str
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
     """Return one physical-coordinate slice for the selected plane and field."""
-    plane_name = plane.upper()
-    max_index = {"XY": len(result.z), "XZ": len(result.y), "YZ": len(result.x)}.get(plane_name)
-    if max_index is None:
-        raise ValueError("plane must be XY, XZ, or YZ")
-    selected = max(0, min(int(index), max_index - 1))
-    speed = derived_speed(result.u[frame], result.v[frame], result.w[frame])
-    _, _, _, vorticity_magnitude = derived_vorticity(
-        result.u[frame],
-        result.v[frame],
-        result.w[frame],
-        dx=float(result.x[1] - result.x[0]),
-        dy=float(result.y[1] - result.y[0]),
-        dz=float(result.z[1] - result.z[0]),
-    )
-    values = {
-        "Speed": speed,
-        "Vorticity magnitude": vorticity_magnitude,
-        "Pressure": result.pressure[frame],
-        "u": result.u[frame],
-        "v": result.v[frame],
-        "w": result.w[frame],
-    }
-    if field not in values:
+    if not 0 <= frame < len(result.t):
+        raise ValueError("frame is outside the saved result history.")
+    if field == "Speed":
+        data = derived_speed(result.u[frame], result.v[frame], result.w[frame])
+    elif field == "Vorticity magnitude":
+        _, _, _, data = derived_vorticity(
+            result.u[frame],
+            result.v[frame],
+            result.w[frame],
+            dx=float(result.x[1] - result.x[0]),
+            dy=float(result.y[1] - result.y[0]),
+            dz=float(result.z[1] - result.z[0]),
+        )
+    elif field in {"Pressure", "u", "v", "w"}:
+        data = {"Pressure": result.pressure, "u": result.u, "v": result.v, "w": result.w}[field][
+            frame
+        ]
+    else:
         raise ValueError(f"Unknown slice field '{field}'.")
-    data = values[field]
-    if plane_name == "XY":
-        return result.x, result.y, data[selected], f"z = {result.z[selected]:.4g}"
-    if plane_name == "XZ":
-        return result.x, result.z, data[:, selected, :], f"y = {result.y[selected]:.4g}"
-    return result.y, result.z, data[:, :, selected], f"x = {result.x[selected]:.4g}"
+    x_axis, y_axis, values, _, coordinate = _slice_data(result, data, plane=plane, index=index)
+    return x_axis, y_axis, values, coordinate
+
+
+@dataclass(frozen=True)
+class SliceAnimationPayload:
+    """One cached 2D time history prepared for a single slice selector."""
+
+    t: np.ndarray
+    x_axis: np.ndarray
+    y_axis: np.ndarray
+    frames: np.ndarray
+    plane: str
+    index: int
+    field: str
+    coordinate: float
+    coordinate_label: str
+
+
+def prepare_slice_history(
+    result: Aerodynamics3DResult, *, plane: str, index: int, field: str
+) -> SliceAnimationPayload:
+    """Prepare only the requested 2D history, deriving fields frame by frame."""
+    plane_name = plane.upper()
+    selected = max(0, min(int(index), slice_index_count(result, plane_name) - 1))
+    slices: list[np.ndarray] = []
+    x_axis: np.ndarray | None = None
+    y_axis: np.ndarray | None = None
+    coordinate = 0.0
+    coordinate_label = ""
+    for frame in range(len(result.t)):
+        x_axis, y_axis, values, coordinate_label = slice_field(
+            result, frame=frame, plane=plane_name, index=selected, field=field
+        )
+        slices.append(np.asarray(values, dtype=float))
+        if plane_name == "XY":
+            coordinate = float(result.z[selected])
+        elif plane_name == "XZ":
+            coordinate = float(result.y[selected])
+        else:
+            coordinate = float(result.x[selected])
+    if x_axis is None or y_axis is None:
+        raise ValueError("The result history must contain at least one frame.")
+    return SliceAnimationPayload(
+        t=result.t,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        frames=np.stack(slices),
+        plane=plane_name,
+        index=selected,
+        field=field,
+        coordinate=coordinate,
+        coordinate_label=coordinate_label,
+    )
 
 
 @dataclass(frozen=True)
@@ -191,20 +324,51 @@ class _FlowPayload:
     result: Aerodynamics3DResult
     display: str
     arrow_density: int
+    magnitude_scale: float
 
 
-def _boundary_mask(mask: np.ndarray) -> np.ndarray:
-    """Return obstacle cells adjacent to at least one fluid cell."""
-    return mask & (
-        ~(
-            np.roll(mask, 1, axis=0)
-            & np.roll(mask, -1, axis=0)
-            & np.roll(mask, 1, axis=1)
-            & np.roll(mask, -1, axis=1)
-            & np.roll(mask, 1, axis=2)
-            & np.roll(mask, -1, axis=2)
+@dataclass(frozen=True)
+class _StreamlinePayload:
+    """Cached streamlines shared by the embedded view and MP4 export."""
+
+    result: Aerodynamics3DResult
+    cache: StreamlineAnimationCache
+
+
+def _obstacle_kwargs(result: Aerodynamics3DResult) -> dict[str, Any]:
+    """Read continuous obstacle parameters from solver metadata."""
+    metadata = result.metadata
+    return {
+        "shape": metadata.get("obstacle_shape", "sphere"),
+        "center_x": float(metadata.get("obstacle_center_x", result.x[len(result.x) // 2])),
+        "center_y": float(metadata.get("obstacle_center_y", result.y[len(result.y) // 2])),
+        "center_z": float(metadata.get("obstacle_center_z", result.z[len(result.z) // 2])),
+        "diameter": float(metadata.get("obstacle_diameter", 0.4)),
+        "size_x": float(metadata.get("obstacle_size_x", 0.7)),
+        "size_y": float(metadata.get("obstacle_size_y", 0.4)),
+        "size_z": float(metadata.get("obstacle_size_z", 0.4)),
+        "chord": float(metadata.get("obstacle_chord", 0.8)),
+        "span": float(metadata.get("obstacle_span", 0.8)),
+        "thickness_ratio": float(metadata.get("obstacle_thickness_ratio", 0.12)),
+        "attack_deg": float(metadata.get("obstacle_attack_deg", 0.0)),
+    }
+
+
+def _draw_obstacle_surface(axis: Any, result: Aerodynamics3DResult) -> None:
+    """Draw the analytical continuous obstacle surface."""
+    for surface_x, surface_y, surface_z in obstacle_surface_mesh(
+        **_obstacle_kwargs(result), resolution=28
+    ):
+        axis.plot_surface(
+            surface_x,
+            surface_y,
+            surface_z,
+            color="#65717f",
+            alpha=0.68,
+            linewidth=0.0,
+            antialiased=True,
+            shade=True,
         )
-    )
 
 
 def _decimated_indices(
@@ -220,51 +384,91 @@ def _decimated_indices(
     )
 
 
+def flow_vector_components(
+    result: Aerodynamics3DResult, *, frame: int, display: str
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the selected visualization-only vector field for one frame."""
+    if display == "Velocity perturbation":
+        u_inf = float(result.metadata.get("u_inf", 0.0))
+        return result.u[frame] - u_inf, result.v[frame], result.w[frame]
+    if display == "Velocity vectors":
+        return result.u[frame], result.v[frame], result.w[frame]
+    if display == "Vorticity vectors":
+        return derived_vorticity(
+            result.u[frame],
+            result.v[frame],
+            result.w[frame],
+            dx=float(result.x[1] - result.x[0]),
+            dy=float(result.y[1] - result.y[0]),
+            dz=float(result.z[1] - result.z[0]),
+        )[:3]
+    raise ValueError(f"Unknown flow display '{display}'.")
+
+
+def _flow_scale(result: Aerodynamics3DResult, display: str) -> float:
+    """Compute one stable magnitude scale for a flow display mode."""
+    if display == "Velocity vectors":
+        return max(float(np.max(result.max_speed)), 1.0e-12)
+    maximum = 0.0
+    for frame in range(len(result.t)):
+        components = flow_vector_components(result, frame=frame, display=display)
+        maximum = max(maximum, float(np.max(derived_speed(*components))))
+    return max(maximum, 1.0e-12)
+
+
 def _create_flow_figure(payload: _FlowPayload) -> Figure:
     """Build an animated 3D vector view from cached result arrays."""
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
 
     result = payload.result
     figure = plt.figure()
     axis: Any = figure.add_subplot(111, projection="3d")
-    boundary = _boundary_mask(result.obstacle_mask)
     indices = _decimated_indices(
         result.obstacle_mask.shape, target=max(300, payload.arrow_density * 250)
     )
     zz, yy, xx = indices
     fluid = ~result.obstacle_mask[zz, yy, xx]
     xs, ys, zs = result.x[xx][fluid], result.y[yy][fluid], result.z[zz][fluid]
-    norm_max = max(float(np.max(result.max_speed)), 1.0e-12)
+    cmap = LinearSegmentedColormap.from_list(
+        "aero_vectors", ("#14253d", "#1f4e79", "#2c7fb8", "#66c2a5")
+    )
 
     def draw(frame: int) -> None:
         elevation, azimuth = axis.elev, axis.azim
         axis.clear()
-        if np.any(boundary):
-            bz, by, bx = np.where(boundary)
-            axis.scatter(result.x[bx], result.y[by], result.z[bz], c="dimgray", s=8, alpha=0.7)
-        u = result.u[frame][zz, yy, xx][fluid]
-        v = result.v[frame][zz, yy, xx][fluid]
-        w = result.w[frame][zz, yy, xx][fluid]
-        if payload.display == "Vorticity vectors":
-            wx, wy, wz, _ = derived_vorticity(
-                result.u[frame],
-                result.v[frame],
-                result.w[frame],
-                dx=float(result.x[1] - result.x[0]),
-                dy=float(result.y[1] - result.y[0]),
-                dz=float(result.z[1] - result.z[0]),
-            )
-            u, v, w = wx[zz, yy, xx][fluid], wy[zz, yy, xx][fluid], wz[zz, yy, xx][fluid]
-        colors = plt.cm.viridis(np.clip(derived_speed(u, v, w) / norm_max, 0.0, 1.0))
+        _draw_obstacle_surface(axis, result)
+        u, v, w = flow_vector_components(result, frame=frame, display=payload.display)
+        u, v, w = u[zz, yy, xx][fluid], v[zz, yy, xx][fluid], w[zz, yy, xx][fluid]
+        magnitude = derived_speed(u, v, w)
+        valid = np.isfinite(magnitude) & (magnitude > 1.0e-12)
+        directions = [np.zeros_like(component) for component in (u, v, w)]
+        for direction, component in zip(directions, (u, v, w)):
+            np.divide(component, magnitude, out=direction, where=valid)
+        colors = cmap(0.05 + 0.75 * np.clip(magnitude / payload.magnitude_scale, 0.0, 1.0))
         axis.quiver(
-            xs, ys, zs, u, v, w, colors=colors, length=0.12, normalize=False, linewidth=0.55
+            xs[valid],
+            ys[valid],
+            zs[valid],
+            directions[0][valid],
+            directions[1][valid],
+            directions[2][valid],
+            colors=colors[valid],
+            length=0.14,
+            normalize=False,
+            linewidth=0.9,
+            alpha=0.86,
         )
         axis.set_xlim(result.x[0], result.x[-1])
         axis.set_ylim(result.y[0], result.y[-1])
         axis.set_zlim(result.z[0], result.z[-1])
+        axis.set_box_aspect(
+            (result.x[-1] - result.x[0], result.y[-1] - result.y[0], result.z[-1] - result.z[0])
+        )
         axis.set_xlabel("x")
         axis.set_ylabel("y")
         axis.set_zlabel("z")
+        axis.grid(False)
         axis.set_title(f"{payload.display} (t={result.t[frame]:.3g})")
         axis.view_init(elev=elevation, azim=azimuth)
 
@@ -274,7 +478,69 @@ def _create_flow_figure(payload: _FlowPayload) -> Figure:
         draw(max(0, min(frame, len(result.t) - 1)))
         figure.canvas.draw_idle()
 
-    return attach_animation_metadata(figure, update=update, n_points=len(result.t))
+    return attach_animation_metadata(
+        figure,
+        update=update,
+        n_points=len(result.t),
+        frame_label="t",
+        frame_coordinates=result.t,
+    )
+
+
+def _create_streamline_figure(payload: _StreamlinePayload) -> Figure:
+    """Build a 3D animation from already cached streamline polylines."""
+    import matplotlib.pyplot as plt
+
+    result = payload.result
+    cache = payload.cache
+    figure = plt.figure()
+    axis: Any = figure.add_subplot(111, projection="3d")
+    _draw_obstacle_surface(axis, result)
+    line_artists: list[Any] = []
+
+    def draw_lines(frame: int) -> None:
+        line_artists.clear()
+        for line in cache.lines_by_frame[frame]:
+            if len(line) > 1:
+                (artist,) = axis.plot(
+                    line[:, 0],
+                    line[:, 1],
+                    line[:, 2],
+                    color="#1f4e79",
+                    linewidth=1.8,
+                    alpha=0.92,
+                )
+                line_artists.append(artist)
+
+    draw_lines(0)
+    axis.set_xlim(result.x[0], result.x[-1])
+    axis.set_ylim(result.y[0], result.y[-1])
+    axis.set_zlim(result.z[0], result.z[-1])
+    axis.set_box_aspect(
+        (result.x[-1] - result.x[0], result.y[-1] - result.y[0], result.z[-1] - result.z[0])
+    )
+    axis.set_xlabel("x")
+    axis.set_ylabel("y")
+    axis.set_zlabel("z")
+    axis.grid(False)
+    axis.set_title(f"3D streamlines (t={result.t[0]:.3g})")
+    figure.tight_layout()
+
+    def update(frame: int) -> None:
+        index = max(0, min(frame, cache.frame_count - 1))
+        for artist in line_artists:
+            artist.remove()
+        draw_lines(index)
+        axis.set_title(f"3D streamlines (t={result.t[index]:.3g})")
+        figure.canvas.draw_idle()
+
+    return attach_animation_metadata(
+        figure,
+        update=update,
+        n_points=cache.frame_count,
+        frame_label="t",
+        frame_coordinates=result.t,
+    )
 
 
 def _line_limits(values: np.ndarray) -> tuple[float, float]:
@@ -293,9 +559,13 @@ class Aerodynamics3DResultDialog:
     def __init__(self, parent: tk.Tk | tk.Toplevel, *, result: Aerodynamics3DResult) -> None:
         self.parent = parent
         self._result = result
+        self._flow_scale_cache: dict[str, float] = {}
+        self._streamline_cache: dict[int, StreamlineAnimationCache] = {}
+        self._slice_cache: dict[tuple[str, int, str], SliceAnimationPayload] = {}
+        self._canvases: dict[str, object | None] = {}
+        self._stream_initialized = False
         self.win = tk.Toplevel(parent)
         self.win.title("Aerodynamics 3D Results")
-        self._canvases: dict[str, object | None] = {}
         self._build_ui()
         self._shell.finish(AdvancedResultSize(1460, 940, 980, 650))
         make_modal(self.win, parent)
@@ -329,19 +599,31 @@ class Aerodynamics3DResultDialog:
         for label, builder in tabs:
             tab = ttk.Frame(notebook)
             notebook.add(tab, text=label)
-            builder(tab)
+            if label == "3D Streamlines":
+                self._stream_tab = tab
+            else:
+                builder(tab)
+        notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
+    def _on_tab_changed(self, _event: object) -> None:
+        if (
+            not self._stream_initialized
+            and self._shell.notebook.tab("current", "text") == "3D Streamlines"
+        ):
+            self._stream_initialized = True
+            self._build_streamlines_tab(self._stream_tab)
 
     def _build_flow_tab(self, parent: ttk.Frame) -> None:
         controls = make_view_controls(parent)
         group = controls.add_group(requested_width=260)
-        self._flow_display = tk.StringVar(value="Velocity vectors")
+        self._flow_display = tk.StringVar(value="Velocity perturbation")
         ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             group,
             textvariable=self._flow_display,
-            values=("Velocity vectors", "Vorticity vectors"),
+            values=_FLOW_DISPLAYS,
             state="readonly",
-            width=19,
+            width=22,
             font=get_font(),
         )
         combo.pack(side=tk.LEFT)
@@ -350,16 +632,17 @@ class Aerodynamics3DResultDialog:
         ttk.Label(group, text="Arrow density:", style="Small.TLabel").pack(
             side=tk.LEFT, padx=(0, 4)
         )
-        ttk.Combobox(
+        density_combo = ttk.Combobox(
             group,
             textvariable=self._flow_density,
             values=("2", "3", "4", "5", "6"),
             state="readonly",
             width=5,
             font=get_font(),
-        ).pack(side=tk.LEFT)
+        )
+        density_combo.pack(side=tk.LEFT)
         combo.bind("<<ComboboxSelected>>", lambda _event: self._update_flow())
-        self._flow_density.trace_add("write", lambda *_args: self._update_flow())
+        density_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_flow())
         frame = ttk.Frame(parent)
         frame.pack(fill=tk.BOTH, expand=True)
         self._flow_frame = frame
@@ -367,32 +650,26 @@ class Aerodynamics3DResultDialog:
 
     def _update_flow(self) -> None:
         reset_embedded_animation(self._flow_frame, self._canvas("flow"))
+        display = self._flow_display.get()
+        if display not in self._flow_scale_cache:
+            self._flow_scale_cache[display] = _flow_scale(self._result, display)
         payload = _FlowPayload(
-            self._result, self._flow_display.get(), int(self._flow_density.get())
+            self._result,
+            display,
+            int(self._flow_density.get()),
+            self._flow_scale_cache[display],
         )
         canvas = embed_animation_plot_in_tk(
             _create_flow_figure(payload),
             self._flow_frame,
-            on_export_mp4=lambda duration: self._export(payload, duration),
+            on_export_mp4=lambda duration: self._export_flow(payload, duration),
         )
         self._set_canvas("flow", canvas)
 
     def _build_streamlines_tab(self, parent: ttk.Frame) -> None:
         controls = make_view_controls(parent)
-        frame_var = tk.StringVar(value="0")
         density_var = tk.StringVar(value="4")
-        group = controls.add_group(requested_width=200)
-        ttk.Label(group, text="Frame:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        frame_combo = ttk.Combobox(
-            group,
-            textvariable=frame_var,
-            values=tuple(str(i) for i in range(len(self._result.t))),
-            state="readonly",
-            width=7,
-            font=get_font(),
-        )
-        frame_combo.pack(side=tk.LEFT)
-        group = controls.add_group(requested_width=180)
+        group = controls.add_group(requested_width=205)
         ttk.Label(group, text="Seed density:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         density_combo = ttk.Combobox(
             group,
@@ -403,49 +680,77 @@ class Aerodynamics3DResultDialog:
             font=get_font(),
         )
         density_combo.pack(side=tk.LEFT)
+        self._stream_density = density_var
+        self._stream_build_button = ttk.Button(
+            controls.add_group(requested_width=240),
+            text="Build streamline animation",
+            command=lambda: self._request_streamline_build(int(density_var.get()), ask=False),
+        )
+        self._stream_build_button.pack(side=tk.LEFT)
+        self._stream_status = ttk.Label(parent, text="", style="Small.TLabel")
+        self._stream_status.pack(fill=tk.X, padx=8, pady=(0, 4))
         target = ttk.Frame(parent)
         target.pack(fill=tk.BOTH, expand=True)
         self._stream_frame = target
 
-        def redraw(_event: object | None = None) -> None:
-            reset_embedded_animation(target, self._canvas("streamlines"))
-            figure = self._streamline_figure(int(frame_var.get()), int(density_var.get()))
-            self._set_canvas("streamlines", embed_plot_in_tk(figure, target))
+        def density_changed(_event: object) -> None:
+            self._request_streamline_build(int(density_var.get()), ask=True)
 
-        frame_combo.bind("<<ComboboxSelected>>", redraw)
-        density_combo.bind("<<ComboboxSelected>>", redraw)
-        redraw()
+        density_combo.bind("<<ComboboxSelected>>", density_changed)
+        self._request_streamline_build(4, ask=True)
 
-    def _streamline_figure(self, frame: int, density: int) -> Figure:
-        import matplotlib.pyplot as plt
-
-        figure = plt.figure()
-        axis: Any = figure.add_subplot(111, projection="3d")
-        mask = _boundary_mask(self._result.obstacle_mask)
-        if np.any(mask):
-            iz, iy, ix = np.where(mask)
-            axis.scatter(
-                self._result.x[ix], self._result.y[iy], self._result.z[iz], c="dimgray", s=8
+    def _request_streamline_build(self, density: int, *, ask: bool) -> None:
+        if density in self._streamline_cache:
+            self._show_streamline_cache(self._streamline_cache[density])
+            return
+        if ask and not messagebox.askyesno(
+            "Build streamline animation?",
+            "DifferentialLab needs to trace the streamline set for all saved frames.\n\n"
+            "This may take some time. The result will be cached for this Results window.\n\n"
+            "Build it now?",
+            parent=self.win,
+        ):
+            self._stream_status.configure(
+                text="Streamline animation not built. Use Build streamline animation when ready."
             )
-        for seed in make_streamline_seeds(self._result, density):
-            line = trace_streamline_3d(seed, result=self._result, frame=frame)
-            if len(line) > 1:
-                axis.plot(line[:, 0], line[:, 1], line[:, 2], linewidth=1.2)
-        axis.set_xlim(self._result.x[0], self._result.x[-1])
-        axis.set_ylim(self._result.y[0], self._result.y[-1])
-        axis.set_zlim(self._result.z[0], self._result.z[-1])
-        axis.set_xlabel("x")
-        axis.set_ylabel("y")
-        axis.set_zlabel("z")
-        axis.set_title(f"3D streamlines (t={self._result.t[frame]:.3g})")
-        figure.tight_layout()
-        return figure
+            return
+        self._build_streamline_cache(density)
+
+    def _build_streamline_cache(self, density: int) -> None:
+        self._stream_build_button.configure(state=tk.DISABLED)
+        self._stream_status.configure(text="Tracing streamlines for all saved frames…")
+        self.win.configure(cursor="watch")
+        self.win.update_idletasks()
+        try:
+            cache = build_streamline_cache(self._result, density)
+            self._streamline_cache[density] = cache
+            self._show_streamline_cache(cache)
+        except Exception as exc:
+            logger.error("Streamline animation cache failed: %s", exc, exc_info=True)
+            self._stream_status.configure(text="Streamline animation could not be built.")
+            messagebox.showerror("Streamline animation", str(exc), parent=self.win)
+        finally:
+            self.win.configure(cursor="")
+            self._stream_build_button.configure(state=tk.NORMAL)
+
+    def _show_streamline_cache(self, cache: StreamlineAnimationCache) -> None:
+        reset_embedded_animation(self._stream_frame, self._canvas("streamlines"))
+        self._stream_status.configure(
+            text=f"Cached {cache.frame_count} frames at seed density {cache.seed_density}."
+        )
+        payload = _StreamlinePayload(self._result, cache)
+        canvas = embed_animation_plot_in_tk(
+            _create_streamline_figure(payload),
+            self._stream_frame,
+            on_export_mp4=lambda duration: self._export_streamlines(payload, duration),
+        )
+        self._set_canvas("streamlines", canvas)
 
     def _build_slices_tab(self, parent: ttk.Frame) -> None:
         controls = make_view_controls(parent)
         self._slice_plane = tk.StringVar(value="XY")
         self._slice_field = tk.StringVar(value="Vorticity magnitude")
-        self._slice_index = tk.StringVar(value=str(len(self._result.z) // 2))
+        self._slice_index = tk.StringVar(value=str(slice_center_index(self._result, "XY")))
         group = controls.add_group(requested_width=150)
         ttk.Label(group, text="Plane:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         plane_combo = ttk.Combobox(
@@ -464,57 +769,66 @@ class Aerodynamics3DResultDialog:
         index_combo = ttk.Combobox(
             group,
             textvariable=self._slice_index,
-            values=tuple(
-                str(i)
-                for i in range(max(len(self._result.x), len(self._result.y), len(self._result.z)))
-            ),
+            values=tuple(str(i) for i in range(slice_index_count(self._result, "XY"))),
             state="readonly",
             width=6,
             font=get_font(),
         )
         index_combo.pack(side=tk.LEFT)
+        self._slice_index_combo = index_combo
         group = controls.add_group(requested_width=250)
         ttk.Label(group, text="Field:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         field_combo = ttk.Combobox(
             group,
             textvariable=self._slice_field,
-            values=("Vorticity magnitude", "Speed", "Pressure", "u", "v", "w"),
+            values=_SLICE_FIELDS,
             state="readonly",
             width=18,
             font=get_font(),
         )
         field_combo.pack(side=tk.LEFT)
+        self._slice_coordinate = ttk.Label(parent, text="", style="Small.TLabel")
+        self._slice_coordinate.pack(fill=tk.X, padx=8, pady=(0, 4))
         target = ttk.Frame(parent)
         target.pack(fill=tk.BOTH, expand=True)
         self._slice_frame = target
 
         def redraw(_event: object | None = None) -> None:
+            plane = self._slice_plane.get()
+            index = int(self._slice_index.get())
+            field = self._slice_field.get()
+            key = (plane, index, field)
+            payload = self._slice_cache.get(key)
+            if payload is None:
+                payload = prepare_slice_history(self._result, plane=plane, index=index, field=field)
+                self._slice_cache[key] = payload
+            self._slice_coordinate.configure(
+                text=f"Physical slice coordinate: {payload.coordinate_label}"
+            )
             reset_embedded_animation(target, self._canvas("slices"))
-            x_axis, y_axis, values, coordinate = slice_field(
-                self._result,
-                frame=0,
-                plane=self._slice_plane.get(),
-                index=int(self._slice_index.get()),
-                field=self._slice_field.get(),
+            figure = create_image_animation_plot(
+                payload.t,
+                payload.frames,
+                title=f"{payload.field} ({payload.coordinate_label})",
+                xlabel=plane[0].lower(),
+                ylabel=plane[1].lower(),
+                x_coordinates=payload.x_axis,
+                y_coordinates=payload.y_axis,
+                symmetric_color_range=payload.field not in {"Speed", "Pressure"},
             )
-            import matplotlib.pyplot as plt
+            self._set_canvas("slices", embed_animation_plot_in_tk(figure, target))
 
-            figure, axis = plt.subplots()
-            image = axis.imshow(
-                values,
-                origin="lower",
-                aspect="auto",
-                extent=(x_axis[0], x_axis[-1], y_axis[0], y_axis[-1]),
+        def plane_changed(_event: object) -> None:
+            plane = self._slice_plane.get()
+            index_combo.configure(
+                values=tuple(str(i) for i in range(slice_index_count(self._result, plane)))
             )
-            figure.colorbar(image, ax=axis, label=self._slice_field.get())
-            axis.set_xlabel(self._slice_plane.get()[0].lower())
-            axis.set_ylabel(self._slice_plane.get()[1].lower())
-            axis.set_title(f"{self._slice_field.get()} ({coordinate})")
-            figure.tight_layout()
-            self._set_canvas("slices", embed_plot_in_tk(figure, target))
+            self._slice_index.set(str(slice_center_index(self._result, plane)))
+            redraw()
 
-        for combo in (plane_combo, index_combo, field_combo):
-            combo.bind("<<ComboboxSelected>>", redraw)
+        plane_combo.bind("<<ComboboxSelected>>", plane_changed)
+        index_combo.bind("<<ComboboxSelected>>", redraw)
+        field_combo.bind("<<ComboboxSelected>>", redraw)
         redraw()
 
     def _build_forces_tab(self, parent: ttk.Frame) -> None:
@@ -556,10 +870,20 @@ class Aerodynamics3DResultDialog:
         self._canvases[name] = canvas
         setattr(self, f"_canvas_{name}", canvas)
 
-    def _export(self, payload: _FlowPayload, duration_seconds: float) -> None:
-        default_path = (
-            get_output_dir() / f"{generate_output_basename(prefix='aerodynamics_3d')}.mp4"
+    def _export_flow(self, payload: _FlowPayload, duration_seconds: float) -> None:
+        self._export_figure(
+            _create_flow_figure(payload), duration_seconds, prefix="aerodynamics_3d_flow"
         )
+
+    def _export_streamlines(self, payload: _StreamlinePayload, duration_seconds: float) -> None:
+        self._export_figure(
+            _create_streamline_figure(payload),
+            duration_seconds,
+            prefix="aerodynamics_3d_streamlines",
+        )
+
+    def _export_figure(self, figure: Figure, duration_seconds: float, *, prefix: str) -> None:
+        default_path = get_output_dir() / f"{generate_output_basename(prefix=prefix)}.mp4"
         filepath_str = filedialog.asksaveasfilename(
             parent=self.win,
             defaultextension=".mp4",
@@ -571,7 +895,7 @@ class Aerodynamics3DResultDialog:
             return
         try:
             export_animated_figure_to_mp4(
-                _create_flow_figure(payload), Path(filepath_str), duration_seconds=duration_seconds
+                figure, Path(filepath_str), duration_seconds=duration_seconds
             )
             messagebox.showinfo(
                 "Animation export saved",
@@ -581,10 +905,10 @@ class Aerodynamics3DResultDialog:
         except RuntimeError as exc:
             logger.warning("MP4 export failed (ffmpeg): %s", exc)
             messagebox.showerror(
-                "Animation export was not saved",
+                "Animation was not saved",
                 str(exc) + "\n\nInstall ffmpeg and ensure it is in your PATH.",
                 parent=self.win,
             )
         except Exception as exc:
             logger.error("MP4 export failed: %s", exc, exc_info=True)
-            messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
+            messagebox.showerror("Animation was not saved", str(exc), parent=self.win)

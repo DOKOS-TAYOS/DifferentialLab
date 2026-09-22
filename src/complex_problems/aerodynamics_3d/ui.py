@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import cast
 
+from complex_problems.aerodynamics_3d.model import validate_obstacle_fits_domain
 from complex_problems.aerodynamics_3d.solver import solve_aerodynamics_3d
 from complex_problems.common import (
     add_how_to_config_section,
@@ -213,6 +214,23 @@ class Aerodynamics3DDialog:
                 self._thickness_var.get(), name="Thickness ratio"
             )
             values["obstacle_attack_deg"] = parse_float(self._wing_attack_var.get(), name="Attack")
+        validate_obstacle_fits_domain(
+            shape=cast(str, values["obstacle_shape"]),
+            center_x=cast(float, values["obstacle_center_x"]),
+            center_y=cast(float, values["obstacle_center_y"]),
+            center_z=cast(float, values["obstacle_center_z"]),
+            lx=cast(float, values["lx"]),
+            ly=cast(float, values["ly"]),
+            lz=cast(float, values["lz"]),
+            diameter=cast(float, values.get("obstacle_diameter", 0.4)),
+            size_x=cast(float, values.get("obstacle_size_x", 0.7)),
+            size_y=cast(float, values.get("obstacle_size_y", 0.4)),
+            size_z=cast(float, values.get("obstacle_size_z", 0.4)),
+            chord=cast(float, values.get("obstacle_chord", 0.8)),
+            span=cast(float, values.get("obstacle_span", 0.8)),
+            thickness_ratio=cast(float, values.get("obstacle_thickness_ratio", 0.12)),
+            attack_deg=cast(float, values.get("obstacle_attack_deg", 0.0)),
+        )
         return values
 
     def _confirm_heavy_request(self, params: dict[str, object], window: tk.Toplevel) -> bool:

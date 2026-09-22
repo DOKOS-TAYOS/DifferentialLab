@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
-from complex_problems.aerodynamics_3d.result_dialog import slice_field, trace_streamline_3d
+from complex_problems.aerodynamics_3d.result_dialog import (
+    build_streamline_cache,
+    prepare_slice_history,
+    slice_center_index,
+    slice_field,
+    slice_index_count,
+    trace_streamline_3d,
+)
 from complex_problems.aerodynamics_3d.solver import Aerodynamics3DResult
 
 
@@ -33,8 +42,12 @@ def _uniform_result() -> Aerodynamics3DResult:
 
 def test_uniform_positive_x_streamline_is_straight() -> None:
     result = _uniform_result()
-    line = trace_streamline_3d((0.2, 0.8, 0.8), result=result, step_size=0.1, max_steps=10)
+    slow = replace(result, u=result.u * 0.2)
+    fast = replace(result, u=result.u * 5.0)
+    line = trace_streamline_3d((0.2, 0.8, 0.8), result=slow, step_size=0.1, max_steps=10)
+    fast_line = trace_streamline_3d((0.2, 0.8, 0.8), result=fast, step_size=0.1, max_steps=10)
     assert len(line) > 3
+    np.testing.assert_allclose(line, fast_line, atol=1.0e-12)
     np.testing.assert_allclose(line[:, 1], line[0, 1], atol=1.0e-12)
     np.testing.assert_allclose(line[:, 2], line[0, 2], atol=1.0e-12)
     assert np.all(np.diff(line[:, 0]) > 0)
@@ -50,3 +63,47 @@ def test_slice_helper_returns_requested_physical_coordinate() -> None:
     assert values.shape == (len(result.y), len(result.x))
     assert coordinate.startswith("z =")
     np.testing.assert_allclose(values, 1.0)
+
+
+def test_slice_selectors_and_prepared_history_are_plane_specific() -> None:
+    result = _uniform_result()
+    result = replace(
+        result,
+        t=np.array([0.0, 0.5, 1.0]),
+        u=np.repeat(result.u, 3, axis=0),
+        v=np.repeat(result.v, 3, axis=0),
+        w=np.repeat(result.w, 3, axis=0),
+        pressure=np.repeat(result.pressure, 3, axis=0),
+        drag_coeff=np.zeros(3),
+        lift_coeff=np.zeros(3),
+        side_force_coeff=np.zeros(3),
+        divergence_l2=np.zeros(3),
+        max_speed=np.ones(3),
+    )
+    assert slice_index_count(result, "XY") == len(result.z)
+    assert slice_index_count(result, "XZ") == len(result.y)
+    assert slice_index_count(result, "YZ") == len(result.x)
+    assert slice_center_index(result, "XZ") == len(result.y) // 2
+    payload = prepare_slice_history(
+        result,
+        plane="XZ",
+        index=slice_center_index(result, "XZ"),
+        field="Speed",
+    )
+    assert payload.frames.shape == (len(result.t), len(result.z), len(result.x))
+    assert payload.coordinate == result.y[len(result.y) // 2]
+
+
+def test_streamline_cache_has_one_entry_per_saved_frame() -> None:
+    result = _uniform_result()
+    result = replace(
+        result,
+        t=np.array([0.0, 0.5, 1.0]),
+        u=np.repeat(result.u, 3, axis=0),
+        v=np.repeat(result.v, 3, axis=0),
+        w=np.repeat(result.w, 3, axis=0),
+    )
+    cache = build_streamline_cache(result, density=2)
+    assert cache.seed_density == 2
+    assert cache.frame_count == len(result.t)
+    assert len(cache.frames) == len(result.t)

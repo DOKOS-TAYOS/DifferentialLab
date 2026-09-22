@@ -15,6 +15,7 @@ from complex_problems.aerodynamics_3d.model import (
     ddz_periodic,
     laplacian_periodic,
     spectral_divergence_l2,
+    validate_obstacle_fits_domain,
 )
 from utils import get_logger
 
@@ -151,6 +152,7 @@ def solve_aerodynamics_3d(
     """Solve incompressible flow in a periodic Cartesian box with penalization."""
     if approximation not in _APPROXIMATIONS:
         raise ValueError(f"approximation must be one of {sorted(_APPROXIMATIONS)}")
+    obstacle_shape = obstacle_shape.strip().lower()
     if obstacle_shape not in _SHAPES:
         raise ValueError(f"obstacle_shape must be one of {sorted(_SHAPES)}")
     if t_max <= 0 or dt <= 0:
@@ -159,6 +161,24 @@ def solve_aerodynamics_3d(
         raise ValueError("sample_every must be >= 1.")
     if rho <= 0 or nu <= 0 or u_inf <= 0 or penalization <= 0:
         raise ValueError("rho, nu, u_inf, and penalization must be positive.")
+
+    validate_obstacle_fits_domain(
+        shape=obstacle_shape,
+        center_x=obstacle_center_x,
+        center_y=obstacle_center_y,
+        center_z=obstacle_center_z,
+        lx=lx,
+        ly=ly,
+        lz=lz,
+        diameter=obstacle_diameter,
+        size_x=obstacle_size_x,
+        size_y=obstacle_size_y,
+        size_z=obstacle_size_z,
+        chord=obstacle_chord,
+        span=obstacle_span,
+        thickness_ratio=obstacle_thickness_ratio,
+        attack_deg=obstacle_attack_deg,
+    )
 
     x, y, z, X, Y, Z, dx, dy, dz = build_periodic_domain(nx=nx, ny=ny, nz=nz, lx=lx, ly=ly, lz=lz)
     obstacle_mask, reference_area, reference_length = build_obstacle_mask(
@@ -262,9 +282,6 @@ def solve_aerodynamics_3d(
         u_star = u + dt * (-conv_u + nu * lap_u + pen_u + drive_x)
         v_star = v + dt * (-conv_v + nu * lap_v + pen_v)
         w_star = w + dt * (-conv_w + nu * lap_w + pen_w)
-        u_star[obstacle_mask] = 0.0
-        v_star[obstacle_mask] = 0.0
-        w_star[obstacle_mask] = 0.0
         u, v, w, pressure = project_velocity_fft(
             u_star, v_star, w_star, dt=dt, kx=kx, ky=ky, kz=kz, k2=k2
         )

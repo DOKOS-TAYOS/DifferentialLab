@@ -58,6 +58,47 @@ def test_attack_angle_changes_a_non_axisymmetric_mask() -> None:
     assert not np.array_equal(mask_zero, mask_rotated)
 
 
+def test_obstacle_boundary_validation_accepts_center_and_rejects_crossing() -> None:
+    model.validate_obstacle_fits_domain(
+        shape="sphere",
+        center_x=2.0,
+        center_y=1.0,
+        center_z=1.0,
+        lx=4.0,
+        ly=2.0,
+        lz=2.0,
+        diameter=0.4,
+    )
+    with np.testing.assert_raises_regex(ValueError, "fully inside the periodic box"):
+        model.validate_obstacle_fits_domain(
+            shape="sphere",
+            center_x=0.1,
+            center_y=1.0,
+            center_z=1.0,
+            lx=4.0,
+            ly=2.0,
+            lz=2.0,
+            diameter=0.4,
+        )
+
+
+def test_rotated_box_boundary_validation_uses_world_aligned_extent() -> None:
+    with np.testing.assert_raises_regex(ValueError, "fully inside the periodic box"):
+        model.validate_obstacle_fits_domain(
+            shape="box",
+            center_x=0.45,
+            center_y=1.0,
+            center_z=1.0,
+            lx=4.0,
+            ly=2.0,
+            lz=2.0,
+            size_x=1.0,
+            size_y=0.4,
+            size_z=0.4,
+            attack_deg=45.0,
+        )
+
+
 def test_fft_projection_removes_nontrivial_spectral_divergence() -> None:
     nx, ny, nz = 12, 10, 8
     dx, dy, dz = 4.0 / nx, 2.0 / ny, 2.0 / nz
@@ -131,3 +172,24 @@ def test_short_stokes_and_nonlinear_runs_store_only_core_volumes() -> None:
         )
         assert not hasattr(result, "speed")
         assert not hasattr(result, "vorticity")
+
+
+def test_penalization_timescale_changes_solved_obstacle_state() -> None:
+    common = dict(
+        approximation="stokes",
+        nx=10,
+        ny=10,
+        nz=10,
+        lx=2.0,
+        ly=2.0,
+        lz=2.0,
+        t_max=0.02,
+        dt=0.001,
+        sample_every=20,
+        nu=0.03,
+        obstacle_diameter=0.5,
+    )
+    fast = solve_aerodynamics_3d(**common, penalization=0.002)
+    slow = solve_aerodynamics_3d(**common, penalization=0.02)
+    obstacle = fast.obstacle_mask
+    assert np.max(np.abs(fast.u[-1][obstacle] - slow.u[-1][obstacle])) > 1.0e-5
