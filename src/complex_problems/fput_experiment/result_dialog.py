@@ -401,7 +401,7 @@ class FPUTResultDialog:
         combo = ttk.Combobox(
             group,
             textvariable=variable,
-            values=("displacement", "strain"),
+            values=("strain", "displacement"),
             state="readonly",
             width=16,
         )
