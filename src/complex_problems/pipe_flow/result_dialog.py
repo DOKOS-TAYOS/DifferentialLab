@@ -276,31 +276,31 @@ class PipeFlowResultDialog:
             nb.add(tab_anim, text="Animation")
             self._build_anim_tab(tab_anim)
 
-        tab_geom = ttk.Frame(nb)
-        nb.add(tab_geom, text="Geometry")
-        self._build_geometry_tab(tab_geom)
+        tab_u = ttk.Frame(nb)
+        nb.add(tab_u, text="Velocity")
+        self._build_velocity_tab(tab_u)
 
         tab_p = ttk.Frame(nb)
         nb.add(tab_p, text="Pressure")
         self._build_pressure_tab(tab_p)
 
-        tab_u = ttk.Frame(nb)
-        nb.add(tab_u, text="Velocity")
-        self._build_velocity_tab(tab_u)
-
         tab_q = ttk.Frame(nb)
         nb.add(tab_q, text="Flow Diagnostics")
         self._build_quality_tab(tab_q)
 
+        tab_geom = ttk.Frame(nb)
+        nb.add(tab_geom, text="Geometry")
+        self._build_geometry_tab(tab_geom)
+
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
         group = ctrl.add_group(requested_width=190)
-        self._anim_view_var = tk.StringVar(value="pressure")
+        self._anim_view_var = tk.StringVar(value="velocity")
         ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             group,
             textvariable=self._anim_view_var,
-            values=("pressure", "velocity", "reynolds"),
+            values=("velocity", "pressure", "reynolds"),
             state="readonly",
             width=12,
             font=get_font(),
