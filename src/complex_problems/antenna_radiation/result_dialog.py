@@ -9,10 +9,14 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 from complex_problems.antenna_radiation.solver import AntennaRadiationResult
-from complex_problems.common.result_dialog_ui import close_embedded_figures
-from config import get_env_from_schema
+from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
+    close_embedded_figures,
+    format_result_summary,
+)
 from frontend.plot_embed import embed_plot_in_tk
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import create_contour_plot, create_solution_plot
 
 if TYPE_CHECKING:
@@ -73,7 +77,6 @@ class AntennaRadiationResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("Antenna Radiation Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._map_canvas = None
         self._cut_canvas = None
@@ -82,9 +85,7 @@ class AntennaRadiationResultDialog:
         self._field_canvas = None
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1380, height=920, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(1080, 720)
+        self._shell.finish(AdvancedResultSize(1380, 920))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -101,53 +102,48 @@ class AntennaRadiationResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
-
         mag = self._result.magnitudes
-        info_txt = (
-            f"Dmax: {mag['directivity_max_db']:+.2f} dBi   "
-            f"Gmax: {mag['gain_max_db']:+.2f} dBi   "
-            f"BW(-3dB): {mag['beamwidth_deg']:.2f} deg   "
-            f"Max E(rms): {mag['max_e_rms_vpm']:.3g} V/m"
-        )
-        far_field_note = (
-            "Far field: OK"
+        far_field = (
+            "satisfied"
             if self._result.metadata.get("is_far_field", False)
-            else f"Far field: NOT OK (Rmin={mag['far_field_min_m']:.3g} m)"
+            else f"not satisfied (minimum R = {mag['far_field_min_m']:.3g} m)"
         )
-        ttk.Label(top, text=info_txt, style="Small.TLabel").pack(anchor=tk.W, pady=(0, 2))
-        ttk.Label(top, text=far_field_note, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
-
-        nb = ttk.Notebook(top)
-        nb.pack(fill=tk.BOTH, expand=True)
+        summary = format_result_summary(
+            (
+                ("Dmax", f"{mag['directivity_max_db']:+.2f} dBi"),
+                ("Gmax", f"{mag['gain_max_db']:+.2f} dBi"),
+                ("−3 dB beamwidth", f"{mag['beamwidth_deg']:.2f}°"),
+                ("Maximum E(rms)", f"{mag['max_e_rms_vpm']:.3g} V/m"),
+                ("Far-field criterion", far_field),
+            )
+        )
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Antenna Radiation Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
 
         tab_map = ttk.Frame(nb)
-        nb.add(tab_map, text="  Angular Gain Map  ")
+        nb.add(tab_map, text="Angular Gain Map")
         self._build_map_tab(tab_map)
 
         tab_cut = ttk.Frame(nb)
-        nb.add(tab_cut, text="  Theta Cut  ")
+        nb.add(tab_cut, text="Theta Cut")
         self._build_theta_cut_tab(tab_cut)
 
         tab_phi = ttk.Frame(nb)
-        nb.add(tab_phi, text="  Phi Cut  ")
+        nb.add(tab_phi, text="Phi Cut")
         self._build_phi_cut_tab(tab_phi)
 
         tab_3d = ttk.Frame(nb)
-        nb.add(tab_3d, text="  3D Pattern  ")
+        nb.add(tab_3d, text="3D Pattern")
         self._build_3d_tab(tab_3d)
 
         tab_field = ttk.Frame(nb)
-        nb.add(tab_field, text="  Field Strength  ")
+        nb.add(tab_field, text="Field Strength")
         self._build_field_tab(tab_field)
-
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
 
     def _build_map_tab(self, parent: ttk.Frame) -> None:
         fig = create_contour_plot(

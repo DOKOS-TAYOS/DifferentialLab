@@ -11,10 +11,17 @@ from typing import TYPE_CHECKING, Callable, Literal, cast
 import numpy as np
 from numpy.typing import ArrayLike
 
+from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
+    close_embedded_figure,
+    make_view_controls,
+    reset_embedded_animation,
+)
 from complex_problems.fput_experiment.model import bond_strain
 from complex_problems.fput_experiment.solver import FPUTResult, FPUTSweepResult
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -142,14 +149,13 @@ def format_fput_summary(result: FPUTResult) -> str:
     return "\n".join(
         (
             f"Model: {result.model}; coefficient: {result.coefficient:.6g}; "
-            f"integrator: {metadata['integrator']}",
-            f"requested dt: {metadata['requested_dt']:.6g}; "
-            f"integration steps: {metadata['number_of_integration_steps']}; "
-            f"saved frames: {result.t.size}",
-            f"first recurrence: {first_time}; fidelity: {first_fidelity}; "
+            f"integrator: {metadata['integrator']}; requested dt: {metadata['requested_dt']:.6g}",
+            f"Integration steps: {metadata['number_of_integration_steps']}; "
+            f"saved frames: {result.t.size}; first recurrence: {first_time}; "
+            f"fidelity: {first_fidelity}; "
             f"accepted peaks: {summary['number_of_recurrence_peaks']}",
-            f"initial H: {initial_hamiltonian}; final H: {final_hamiltonian}; "
-            f"max |ΔH|: {absolute_drift}",
+            f"Initial H: {initial_hamiltonian}; final H: {final_hamiltonian}; "
+            f"max |ΔH|: {absolute_drift}; "
             f"max relative |ΔH|: {relative_drift}; max |H - ΣEₖ - Vnl|: {identity_error}",
         )
     )
@@ -293,24 +299,19 @@ class FPUTResultDialog:
         self._phase_index_var = tk.StringVar(value="1")
         self._mode_selection_var = tk.StringVar(value="1, 2, 3")
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1200, height=800, max_width_ratio=0.96, resizable=True)
+        self._shell.finish(AdvancedResultSize(1200, 800))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
         """Destroy all embedded figures before closing the result window."""
-        from matplotlib import pyplot as plt
-
         for canvas in self._canvases:
-            figure = getattr(canvas, "figure", None)
-            if figure is not None:
-                plt.close(figure)
+            close_embedded_figure(canvas)
         self.win.destroy()
 
     def _add_plot(self, notebook: ttk.Notebook, title: str, figure: Figure) -> None:
         """Add a canvas-bearing tab and keep a handle for deterministic cleanup."""
         frame = ttk.Frame(notebook)
-        notebook.add(frame, text=f"  {title}  ")
+        notebook.add(frame, text=title)
         self._canvases.append(embed_plot_in_tk(figure, frame))
 
     def _build_ui(self) -> None:
@@ -319,11 +320,13 @@ class FPUTResultDialog:
             if isinstance(self.result, FPUTSweepResult)
             else format_fput_summary(self.result)
         )
-        ttk.Label(
-            self.win, text=summary_text, justify=tk.LEFT, style="Small.TLabel", padding=(12, 8)
-        ).pack(fill=tk.X)
-        notebook = ttk.Notebook(self.win)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="FPUT Results",
+            summary=summary_text,
+            close_command=self._on_close,
+        )
+        notebook = self._shell.notebook
         if isinstance(self.result, FPUTSweepResult):
             self._build_sweep(notebook)
             return
@@ -379,9 +382,8 @@ class FPUTResultDialog:
     ) -> None:
         """Build a cached displacement/strain display with no solver callback."""
         tab = ttk.Frame(notebook)
-        notebook.add(tab, text=f"  {title}  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=6, pady=6)
+        notebook.add(tab, text=title)
+        controls = make_view_controls(tab)
         ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
             controls,
@@ -396,8 +398,6 @@ class FPUTResultDialog:
         canvas: list[object | None] = [None]
 
         def update(_event: object | None = None) -> None:
-            from complex_problems.common.result_dialog_ui import reset_embedded_animation
-
             reset_embedded_animation(plot_frame, canvas[0])
             figure = cast("Figure", builder(variable.get()))
             canvas[0] = embed_plot_in_tk(figure, plot_frame)
@@ -425,9 +425,8 @@ class FPUTResultDialog:
     def _build_animation_tab(self, notebook: ttk.Notebook) -> None:
         """Embed selectable cached displacement/strain animation with matching MP4 export."""
         tab = ttk.Frame(notebook)
-        notebook.add(tab, text="  Lattice Animation  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=6, pady=6)
+        notebook.add(tab, text="Lattice Animation")
+        controls = make_view_controls(tab)
         ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
             controls,
@@ -444,8 +443,6 @@ class FPUTResultDialog:
 
     def _update_animation(self) -> None:
         """Replace the animation using the existing result, never the numerical solver."""
-        from complex_problems.common.result_dialog_ui import reset_embedded_animation
-
         if not isinstance(self.result, FPUTResult) or self._animation_plot_frame is None:
             return
         reset_embedded_animation(self._animation_plot_frame, self._animation_canvas)
@@ -483,9 +480,8 @@ class FPUTResultDialog:
     def _build_modal_tab(self, notebook: ttk.Notebook) -> None:
         """Provide selected cached modal curves and a selectable all-mode heatmap scale."""
         tab = ttk.Frame(notebook)
-        notebook.add(tab, text="  Modal Energies  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=6, pady=6)
+        notebook.add(tab, text="Modal Energies")
+        controls = make_view_controls(tab)
         ttk.Label(controls, text="Modes (1..N):").pack(side=tk.LEFT)
         ttk.Entry(controls, textvariable=self._mode_selection_var, width=14).pack(
             side=tk.LEFT, padx=5
@@ -504,8 +500,6 @@ class FPUTResultDialog:
         canvas: list[object | None] = [None]
 
         def update(_event: object | None = None) -> None:
-            from complex_problems.common.result_dialog_ui import reset_embedded_animation
-
             reset_embedded_animation(frame, canvas[0])
             assert isinstance(self.result, FPUTResult)
             try:
@@ -527,9 +521,8 @@ class FPUTResultDialog:
         """Provide particle or normal-mode phase portraits from cached coordinates."""
         assert isinstance(self.result, FPUTResult)
         tab = ttk.Frame(notebook)
-        notebook.add(tab, text="  Phase Space  ")
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=6, pady=6)
+        notebook.add(tab, text="Phase Space")
+        controls = make_view_controls(tab)
         kind = ttk.Combobox(
             controls,
             textvariable=self._phase_kind_var,
@@ -552,8 +545,6 @@ class FPUTResultDialog:
         canvas: list[object | None] = [None]
 
         def update(_event: object | None = None) -> None:
-            from complex_problems.common.result_dialog_ui import reset_embedded_animation
-
             reset_embedded_animation(frame, canvas[0])
             assert isinstance(self.result, FPUTResult)
             try:

@@ -11,14 +11,18 @@ from typing import TYPE_CHECKING, Literal, cast
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.schrodinger_td.solver import SchrodingerTDResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import (
     create_contour_plot,
     create_image_animation_plot,
@@ -201,7 +205,6 @@ class SchrodingerTDResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("Schrodinger Time Evolution Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
         self._st_canvas = None
@@ -210,9 +213,7 @@ class SchrodingerTDResultDialog:
         self._extra_canvas = None
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1400, height=920, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(1120, 720)
+        self._shell.finish(AdvancedResultSize(1400, 920))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -223,26 +224,33 @@ class SchrodingerTDResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
-
-        drift_text = ", ".join(f"{k}: {v:+.3e}" for k, v in self._result.magnitudes.items())
-        ttk.Label(top, text=drift_text, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
-
-        nb = ttk.Notebook(top)
-        nb.pack(fill=tk.BOTH, expand=True)
+        magnitudes = self._result.magnitudes
+        summary = format_result_summary(
+            (
+                ("Dimension", f"{self._result.dimension}D"),
+                ("Boundary", str(self._result.metadata.get("boundary", "unknown"))),
+                ("Relative norm drift", f"{magnitudes['norm_drift_rel']:+.3e}"),
+                ("Maximum density", f"{magnitudes['max_density']:.3e}"),
+            )
+        )
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Schrödinger Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
 
         tab_anim = ttk.Frame(nb)
-        nb.add(tab_anim, text="  Animation  ")
+        nb.add(tab_anim, text="Animation")
         self._build_animation_tab(tab_anim)
 
         tab_st = ttk.Frame(nb)
-        nb.add(tab_st, text="  Density Maps  ")
+        nb.add(tab_st, text="Density Maps")
         self._build_space_tab(tab_st)
 
         tab_spec = ttk.Frame(nb)
-        nb.add(tab_spec, text="  Spectrum  ")
+        nb.add(tab_spec, text="Spectrum")
         if self._result.dimension == 1:
             self._build_spectrum_tab(tab_spec)
         else:
@@ -251,18 +259,12 @@ class SchrodingerTDResultDialog:
             nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
         tab_inv = ttk.Frame(nb)
-        nb.add(tab_inv, text="  Expectations  ")
+        nb.add(tab_inv, text="Expectations")
         self._build_invariants_tab(tab_inv)
 
         tab_extra = ttk.Frame(nb)
-        nb.add(tab_extra, text="  Potential / Surface  ")
+        nb.add(tab_extra, text="Potential / Surface")
         self._build_extra_tab(tab_extra)
-
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
 
     def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
         """Initialize the deferred 2D Spectrum tab on its first selection."""
@@ -275,8 +277,7 @@ class SchrodingerTDResultDialog:
             self._spectrum_tab_initialized = True
 
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
-        ctrl = ttk.Frame(parent)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = make_view_controls(parent)
         if self._result.dimension == 1:
             options = ("Density", "Real", "Imag")
         else:

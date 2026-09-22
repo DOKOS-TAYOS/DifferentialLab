@@ -12,13 +12,17 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.gravitational_n_body.solver import NBodyResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting.animation_metadata import attach_animation_metadata
 from plotting.plot_utils import export_animated_figure_to_mp4
 
@@ -281,9 +285,7 @@ class GravitationalNBodyResultDialog:
         self._anim_canvas = self._trajectory_canvas = self._phase_canvas = None
         self._energy_canvas = self._diagnostics_canvas = self._separation_canvas = None
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, 1400, 900, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(1000, 650)
+        self._shell.finish(AdvancedResultSize(1400, 900))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -301,15 +303,28 @@ class GravitationalNBodyResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        outer = ttk.Frame(self.win, padding=int(get_env_from_schema("UI_PADDING")))
-        outer.pack(fill=tk.BOTH, expand=True)
-        summary = ", ".join(
-            f"{key.replace('_', ' ')}: {value:.3e}"
-            for key, value in self._result.magnitudes.items()
+        labels = {
+            "max_relative_total_energy_drift": "Maximum relative total-energy drift",
+            "max_linear_momentum_drift": "Maximum linear-momentum drift",
+            "max_angular_momentum_drift": "Maximum angular-momentum drift",
+            "max_com_displacement_from_uniform_motion": (
+                "Maximum COM displacement from uniform motion"
+            ),
+            "minimum_pair_separation": "Minimum pair separation",
+        }
+        summary = format_result_summary(
+            tuple(
+                (labels.get(key, key.replace("_", " ").capitalize()), f"{value:.3e}")
+                for key, value in self._result.magnitudes.items()
+            )
         )
-        ttk.Label(outer, text=summary, style="Small.TLabel", wraplength=1200).pack(anchor=tk.W)
-        notebook = ttk.Notebook(outer)
-        notebook.pack(fill=tk.BOTH, expand=True, pady=6)
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Gravitational N-Body Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        notebook = self._shell.notebook
         for title, build in (
             ("Orbit Animation", self._build_orbit_tab),
             ("Trajectories", self._build_trajectory_tab),
@@ -319,7 +334,7 @@ class GravitationalNBodyResultDialog:
             ("Separations", self._build_separations_tab),
         ):
             tab = ttk.Frame(notebook)
-            notebook.add(tab, text=f"  {title}  ")
+            notebook.add(tab, text=title)
             build(tab)
 
     def _replace(self, frame: ttk.Frame, figure: Figure, attribute: str) -> None:
@@ -330,8 +345,7 @@ class GravitationalNBodyResultDialog:
         )
 
     def _build_orbit_tab(self, tab: ttk.Frame) -> None:
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=5, pady=5)
+        controls = make_view_controls(tab)
         ttk.Label(controls, text="Reference frame:").pack(side=tk.LEFT)
         self._orbit_frame_var = tk.StringVar(value="Inertial")
         combo = ttk.Combobox(
@@ -380,9 +394,9 @@ class GravitationalNBodyResultDialog:
             messagebox.showerror("Animation export was not saved", str(exc), parent=self.win)
 
     def _build_trajectory_tab(self, tab: ttk.Frame) -> None:
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=5, pady=5)
+        controls = make_view_controls(tab)
         self._trajectory_frame_var = tk.StringVar(value="Inertial")
+        ttk.Label(controls, text="Reference frame:").pack(side=tk.LEFT)
         ttk.Combobox(
             controls,
             textvariable=self._trajectory_frame_var,
@@ -407,9 +421,9 @@ class GravitationalNBodyResultDialog:
         )
 
     def _build_phase_tab(self, tab: ttk.Frame) -> None:
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=5, pady=5)
+        controls = make_view_controls(tab)
         self._phase_body_var = tk.StringVar(value="1")
+        ttk.Label(controls, text="Body:").pack(side=tk.LEFT)
         ttk.Combobox(
             controls,
             textvariable=self._phase_body_var,
@@ -465,10 +479,10 @@ class GravitationalNBodyResultDialog:
         self._replace(frame, fig, "_diagnostics_canvas")
 
     def _build_separations_tab(self, tab: ttk.Frame) -> None:
-        controls = ttk.Frame(tab)
-        controls.pack(fill=tk.X, padx=5, pady=5)
+        controls = make_view_controls(tab)
         bodies = [str(index + 1) for index in range(self._result.masses.size)]
         self._pair_a_var, self._pair_b_var = tk.StringVar(value="1"), tk.StringVar(value="2")
+        ttk.Label(controls, text="Pair:").pack(side=tk.LEFT)
         ttk.Combobox(
             controls, textvariable=self._pair_a_var, values=bodies, state="readonly", width=8
         ).pack(side=tk.LEFT)

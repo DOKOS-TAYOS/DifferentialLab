@@ -11,15 +11,19 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.membrane_2d.model import compute_fft_power_history_2d
 from complex_problems.membrane_2d.solver import Membrane2DResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import (
     create_contour_plot,
     create_energy_evolution_plot,
@@ -84,7 +88,6 @@ class Membrane2DResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("2D Nonlinear Membrane Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
         self._st_canvas = None
@@ -94,9 +97,7 @@ class Membrane2DResultDialog:
         self._spectrum_power_history = result.spectrum_power_history
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1400, height=900, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(1100, 700)
+        self._shell.finish(AdvancedResultSize(1400, 900))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -113,52 +114,44 @@ class Membrane2DResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
-
-        info = ttk.Frame(top)
-        info.pack(fill=tk.X, pady=(0, pad))
         drift = self._result.magnitudes.get("energy_drift_rel", 0.0)
         max_u = self._result.magnitudes.get("max_displacement", 0.0)
-        ttk.Label(
-            info,
-            text=f"Energy drift: {drift:+.3e}   |   Max |u|: {max_u:.4g}",
-            style="Small.TLabel",
-        ).pack(side=tk.LEFT)
-
-        notebook = ttk.Notebook(top)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        summary = format_result_summary(
+            (
+                ("Relative energy drift", f"{drift:+.3e}"),
+                ("Maximum |u|", f"{max_u:.4g}"),
+            )
+        )
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Membrane 2D Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        notebook = self._shell.notebook
 
         tab_anim = ttk.Frame(notebook)
-        notebook.add(tab_anim, text="  Animation  ")
+        notebook.add(tab_anim, text="Animation")
         self._build_animation_tab(tab_anim)
 
         tab_st = ttk.Frame(notebook)
-        notebook.add(tab_st, text="  Centerline Map  ")
+        notebook.add(tab_st, text="Centerline Map")
         self._build_space_time_tab(tab_st)
 
         tab_surface = ttk.Frame(notebook)
-        notebook.add(tab_surface, text="  Surface 3D  ")
+        notebook.add(tab_surface, text="Surface 3D")
         self._build_surface_tab(tab_surface)
 
         tab_energy = ttk.Frame(notebook)
-        notebook.add(tab_energy, text="  Energy  ")
+        notebook.add(tab_energy, text="Energy")
         self._build_energy_tab(tab_energy)
 
         tab_spec = ttk.Frame(notebook)
-        notebook.add(tab_spec, text="  Spectrum  ")
+        notebook.add(tab_spec, text="Spectrum")
         self._build_spectrum_tab(tab_spec)
 
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
-
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
-        ctrl = ttk.Frame(parent)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = make_view_controls(parent)
         ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_field_var = tk.StringVar(value="2D Field")
         combo = ttk.Combobox(

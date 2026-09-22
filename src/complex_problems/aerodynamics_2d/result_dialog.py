@@ -12,13 +12,17 @@ import numpy as np
 
 from complex_problems.aerodynamics_2d.solver import Aerodynamics2DResult
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import (
     create_image_animation_plot,
     create_solution_plot,
@@ -244,16 +248,13 @@ class Aerodynamics2DResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("2D Aerodynamics Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._anim_canvas = None
         self._map_canvas = None
         self._coef_canvas = None
         self._stream_canvas = None
         self._profile_canvas = None
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1420, height=930, max_width_ratio=0.96, resizable=True)
-        self.win.minsize(1120, 740)
+        self._shell.finish(AdvancedResultSize(1420, 930))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -264,43 +265,40 @@ class Aerodynamics2DResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
         mag = self._result.magnitudes
-        info = (
-            f"Re: {mag['reynolds']:.1f}   "
-            f"Cd(mean tail): {mag['mean_cd_tail']:+.3e}   "
-            f"Cl(rms): {mag['rms_cl']:.3e}   "
-            f"max|div|: {mag['max_divergence_l2']:.3e}"
+        summary = format_result_summary(
+            (
+                ("Reynolds number", f"{mag['reynolds']:.1f}"),
+                ("Mean tail Cd", f"{mag['mean_cd_tail']:+.3e}"),
+                ("RMS Cl", f"{mag['rms_cl']:.3e}"),
+                ("Maximum L2 divergence", f"{mag['max_divergence_l2']:.3e}"),
+            )
         )
-        ttk.Label(top, text=info, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
-        nb = ttk.Notebook(top)
-        nb.pack(fill=tk.BOTH, expand=True)
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Aerodynamics 2D Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
         tab_anim = ttk.Frame(nb)
-        nb.add(tab_anim, text="  Animation  ")
+        nb.add(tab_anim, text="Animation")
         self._build_anim_tab(tab_anim)
         tab_map = ttk.Frame(nb)
-        nb.add(tab_map, text="  Field Map  ")
+        nb.add(tab_map, text="Field Map")
         self._build_map_tab(tab_map)
         tab_coef = ttk.Frame(nb)
-        nb.add(tab_coef, text="  Drag / Lift  ")
+        nb.add(tab_coef, text="Drag / Lift")
         self._build_coeff_tab(tab_coef)
         tab_stream = ttk.Frame(nb)
-        nb.add(tab_stream, text="  Streamlines  ")
+        nb.add(tab_stream, text="Streamlines")
         self._build_stream_tab(tab_stream)
         tab_profile = ttk.Frame(nb)
-        nb.add(tab_profile, text="  Centerline Profiles  ")
+        nb.add(tab_profile, text="Centerline Profiles")
         self._build_profile_tab(tab_profile)
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
 
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
-        ctrl = ttk.Frame(parent)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = make_view_controls(parent)
         self._view_var = tk.StringVar(value="speed")
         ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
