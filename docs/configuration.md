@@ -22,8 +22,9 @@ key remains available in each control's tooltip. Colour settings have an editabl
 preview; selecting it opens the system colour chooser.
 
 `Restore Defaults` repopulates the current form but does not write `.env`.
-Choose `Save & Restart` to validate and save the form, then restart the app so
-the changed settings are applied.
+Choose `Save & Restart` to write the form values and restart the app. On startup,
+values are validated against `ENV_SCHEMA`; invalid values fall back to schema defaults
+and are logged.
 
 ## UI Settings
 
