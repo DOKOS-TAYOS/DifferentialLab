@@ -631,7 +631,7 @@ def _create_flow_figure(payload: _FlowPayload) -> Figure:
             minimum=minimum_length,
             maximum=maximum_length,
         )
-        visible = valid & (relative > 1.0e-6)
+        visible = valid
         axis.quiver(
             xs[visible],
             ys[visible],
