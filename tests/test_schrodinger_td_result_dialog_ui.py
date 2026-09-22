@@ -207,3 +207,32 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
 
     assert "ffmpeg" in show_error.call_args.args[1].lower()
     plt.close("all")
+
+
+
+def test_result_tabs_are_dimension_specific_and_visual_first() -> None:
+    for dimension, expected in (
+        (1, ["Animation", "Density Maps", "Spectrum", "Expectations", "Potential"]),
+        (2, ["Animation", "Density Surface", "Density Maps", "Spectrum", "Expectations"]),
+    ):
+        result = _make_result(dimension)
+        result.magnitudes = {"norm_drift_rel": 0.0, "max_density": 1.0}
+        result.metadata = {}
+        dialog = object.__new__(result_dialog.SchrodingerTDResultDialog)
+        dialog.win = MagicMock()
+        dialog._result = result
+        notebook = MagicMock()
+        shell = MagicMock(notebook=notebook)
+
+        with (
+            patch.object(result_dialog, "AdvancedResultShell", return_value=shell),
+            patch.object(result_dialog.ttk, "Frame", side_effect=lambda _parent: MagicMock()),
+            patch.object(dialog, "_build_animation_tab"),
+            patch.object(dialog, "_build_space_tab"),
+            patch.object(dialog, "_build_spectrum_tab"),
+            patch.object(dialog, "_build_invariants_tab"),
+            patch.object(dialog, "_build_extra_tab"),
+        ):
+            dialog._build_ui()
+
+        assert [call.kwargs["text"] for call in notebook.add.call_args_list] == expected
