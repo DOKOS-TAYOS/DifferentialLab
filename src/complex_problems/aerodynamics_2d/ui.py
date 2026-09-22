@@ -14,6 +14,8 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     make_labeled_spinbox,
@@ -21,9 +23,8 @@ from complex_problems.common.dialog_ui import (
 )
 from config import get_env_from_schema
 from frontend.performance_guard import assess_aerodynamics_request, confirm_performance_advisory
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _APPROX = ("nonlinear_ns", "stokes")
 _SHAPES = ("cylinder", "ellipse", "rectangle", "naca0012")
@@ -36,50 +37,48 @@ class Aerodynamics2DDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Aerodynamics 2D")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=1040, min_height=780, padding=32, resizable=True)
-        self.win.minsize(940, 700)
+        self._shell.finish(AdvancedDialogSize(960, 760, 680, 520))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="Aerodynamics 2D", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(
-            body,
-            text=(
-                "Simulate incompressible flow around immersed bodies with FFT projection.\n"
-                "Choose the full nonlinear Navier-Stokes model or a Stokes approximation."
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Aerodynamics 2D",
+            description=(
+                "Simulate incompressible flow around immersed bodies with FFT projection. "
+                "Choose the full nonlinear Navier–Stokes model or a Stokes approximation."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="aerodynamics_2d",
             pad=pad,
             wraplength=800,
         )
 
-        row = ttk.Frame(body)
+        model = ttk.LabelFrame(body, text="Model", padding=pad)
+        model.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(model)
         row.pack(fill=tk.X, pady=pad // 2)
         self._approx_var = tk.StringVar(value="nonlinear_ns")
         self._shape_var = tk.StringVar(value="cylinder")
-        make_labeled_combo(row, "Approximation", self._approx_var, _APPROX, width=13)
-        make_labeled_combo(row, "Obstacle shape", self._shape_var, _SHAPES, width=12)
+        self._initial_focus = make_labeled_combo(
+            row, "Approximation", self._approx_var, _APPROX, width=13
+        )
+        row = ttk.Frame(model)
+        row.pack(fill=tk.X, pady=pad // 2)
+        make_labeled_combo(row, "Obstacle shape", self._shape_var, _SHAPES, width=14)
 
-        row = ttk.Frame(body)
+        domain = ttk.LabelFrame(body, text="Domain and grid", padding=pad)
+        domain.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(domain)
         row.pack(fill=tk.X, pady=pad // 2)
         self._nx_var = tk.StringVar(value="96")
         self._ny_var = tk.StringVar(value="64")
@@ -87,10 +86,12 @@ class Aerodynamics2DDialog:
         self._ly_var = tk.StringVar(value="2.0")
         make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=16, to=8192, width=8)
         make_labeled_spinbox(row, "Nᵧ", self._ny_var, from_=16, to=8192, width=8)
+        row = ttk.Frame(domain)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "Lₓ", self._lx_var, width=8)
         make_labeled_entry(row, "Lᵧ", self._ly_var, width=8)
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(domain)
         row.pack(fill=tk.X, pady=pad // 2)
         self._t_max_var = tk.StringVar(value="2.0")
         self._dt_var = tk.StringVar(value="0.002")
@@ -100,7 +101,9 @@ class Aerodynamics2DDialog:
         make_labeled_entry(row, "Sample every", self._sample_every_var, width=10)
         ToolTip(row, "Lower Δt and/or Sample every values store more animation frames.")
 
-        row = ttk.Frame(body)
+        physics = ttk.LabelFrame(body, text="Flow properties", padding=pad)
+        physics.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(physics)
         row.pack(fill=tk.X, pady=pad // 2)
         self._rho_var = tk.StringVar(value="1.0")
         self._nu_var = tk.StringVar(value="0.01")
@@ -108,13 +111,14 @@ class Aerodynamics2DDialog:
         self._penal_var = tk.StringVar(value="0.005")
         make_labeled_entry(row, "ρ", self._rho_var, width=8)
         make_labeled_entry(row, "ν", self._nu_var, width=8)
+        row = ttk.Frame(physics)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "U∞", self._u_inf_var, width=8)
         make_labeled_entry(row, "Penalization", self._penal_var, width=10)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Obstacle geometry", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        geometry = ttk.LabelFrame(body, text="Obstacle geometry", padding=pad)
+        geometry.pack(fill=tk.X)
+        row = ttk.Frame(geometry)
         row.pack(fill=tk.X, pady=pad // 2)
         self._center_x_var = tk.StringVar(value="1.3")
         self._center_y_var = tk.StringVar(value="1.0")
@@ -123,22 +127,20 @@ class Aerodynamics2DDialog:
         self._attack_deg_var = tk.StringVar(value="0.0")
         make_labeled_entry(row, "Center x", self._center_x_var, width=8)
         make_labeled_entry(row, "Center y", self._center_y_var, width=8)
+        row = ttk.Frame(geometry)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "Size x", self._size_x_var, width=8)
         make_labeled_entry(row, "Size y", self._size_y_var, width=8)
+        row = ttk.Frame(geometry)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "Attack (deg)", self._attack_deg_var, width=10)
         ToolTip(
             row,
             "For naca0012: size x = chord, size y = thickness ratio (e.g. 0.12).",
         )
 
-        btn_row = ttk.Frame(body)
-        btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(btn_row, text="Solve", command=self._on_solve).pack(side=tk.LEFT, padx=(0, pad))
-        ttk.Button(btn_row, text="Close", style="Cancel.TButton", command=self.win.destroy).pack(
-            side=tk.LEFT
-        )
-
-        scroll.bind_new_children()
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
     def _collect_inputs(self) -> dict[str, object]:
         nx = parse_positive_int(self._nx_var.get(), name="Nₓ", min_value=16)

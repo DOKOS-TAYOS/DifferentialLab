@@ -15,6 +15,8 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     make_labeled_spinbox,
@@ -24,9 +26,8 @@ from complex_problems.schrodinger_td.solver import solve_schrodinger_td
 from config import get_env_from_schema
 from frontend.performance_guard import assess_schrodinger_request, confirm_performance_advisory
 from frontend.theme import get_font
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _DIMENSIONS = ("1D", "2D")
 _BOUNDARIES = ("periodic", "absorbing")
@@ -42,6 +43,18 @@ _POTENTIALS = (
 _PACKETS = ("gaussian", "superposition", "custom")
 
 
+def schrodinger_visible_groups(
+    *, potential: str, packet: str, dimension: str, boundary: str
+) -> frozenset[str]:
+    """Return the conditional control groups relevant to a TDSE configuration."""
+    groups = {f"potential:{potential}", f"packet:{packet}"}
+    if dimension == "2D":
+        groups.add("dimension:2d")
+    if boundary == "absorbing":
+        groups.add("boundary:absorbing")
+    return frozenset(groups)
+
+
 class SchrodingerTDDialog:
     """Configuration dialog for TDSE in 1D and 2D."""
 
@@ -49,52 +62,46 @@ class SchrodingerTDDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Schrodinger Time Evolution (1D/2D)")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=1040, min_height=780, padding=32, resizable=True)
-        self.win.minsize(960, 700)
+        self._shell.finish(AdvancedDialogSize(940, 760, 680, 520))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="Schrodinger Time Evolution", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(
-            body,
-            text=(
-                "Use a split-operator spectral solver for TDSE in 1D or 2D.\n"
-                "Periodic boundaries are useful for conservation checks; absorbing edges "
-                "model open-domain behavior."
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Schrödinger Time Evolution",
+            description=(
+                "Use a split-operator spectral solver for TDSE in 1D or 2D. "
+                "Periodic boundaries support conservation checks; absorbing edges model "
+                "open-domain behavior."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="schrodinger_td",
             pad=pad,
             wraplength=800,
         )
 
-        row = ttk.Frame(body)
+        domain = ttk.LabelFrame(body, text="Domain and grid", padding=pad)
+        domain.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(domain)
         row.pack(fill=tk.X, pady=pad // 2)
         self._dimension_var = tk.StringVar(value="1D")
         self._boundary_var = tk.StringVar(value="periodic")
         dim_combo = make_labeled_combo(row, "Dimension", self._dimension_var, _DIMENSIONS, width=8)
+        self._initial_focus = dim_combo
         bnd_combo = make_labeled_combo(row, "Boundary", self._boundary_var, _BOUNDARIES, width=10)
         dim_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
         bnd_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(domain)
         row.pack(fill=tk.X, pady=pad // 2)
         self._x_min_var = tk.StringVar(value="-12.0")
         self._x_max_var = tk.StringVar(value="12.0")
@@ -103,7 +110,7 @@ class SchrodingerTDDialog:
         make_labeled_entry(row, "xₘₐₓ", self._x_max_var, width=10)
         make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=32, to=16384, width=8)
 
-        self._y_domain_row = ttk.Frame(body)
+        self._y_domain_row = ttk.Frame(domain)
         self._y_domain_row.pack(fill=tk.X, pady=pad // 2)
         self._y_min_var = tk.StringVar(value="-12.0")
         self._y_max_var = tk.StringVar(value="12.0")
@@ -112,7 +119,9 @@ class SchrodingerTDDialog:
         make_labeled_entry(self._y_domain_row, "yₘₐₓ", self._y_max_var, width=10)
         make_labeled_spinbox(self._y_domain_row, "Nᵧ", self._ny_var, from_=32, to=16384, width=8)
 
-        row = ttk.Frame(body)
+        integration = ttk.LabelFrame(body, text="Time evolution", padding=pad)
+        integration.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(integration)
         row.pack(fill=tk.X, pady=pad // 2)
         self._t_min_var = tk.StringVar(value="0.0")
         self._t_max_var = tk.StringVar(value="8.0")
@@ -121,14 +130,14 @@ class SchrodingerTDDialog:
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=10)
         make_labeled_entry(row, "Δt", self._dt_var, width=10)
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(integration)
         row.pack(fill=tk.X, pady=pad // 2)
         self._hbar_var = tk.StringVar(value="1.0")
         self._mass_var = tk.StringVar(value="1.0")
         make_labeled_entry(row, "ħ", self._hbar_var, width=10)
         make_labeled_entry(row, "Mass m", self._mass_var, width=10)
 
-        self._absorb_row = ttk.Frame(body)
+        self._absorb_row = ttk.Frame(integration)
         self._absorb_row.pack(fill=tk.X, pady=pad // 2)
         self._absorb_ratio_var = tk.StringVar(value="0.10")
         self._absorb_strength_var = tk.StringVar(value="1.0")
@@ -139,10 +148,9 @@ class SchrodingerTDDialog:
             "Only used for absorbing boundaries. Ratio should be between 0 and 0.49.",
         )
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Potential", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        potential = ttk.LabelFrame(body, text="Potential", padding=pad)
+        potential.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(potential)
         row.pack(fill=tk.X, pady=pad // 2)
         self._potential_var = tk.StringVar(value="free")
         pot_combo = make_labeled_combo(row, "Type", self._potential_var, _POTENTIALS, width=14)
@@ -152,27 +160,35 @@ class SchrodingerTDDialog:
             "free, harmonic, square_well, barrier, double_well, lattice, or custom expression.",
         )
 
-        row = ttk.Frame(body)
-        row.pack(fill=tk.X, pady=pad // 2)
         self._omega_var = tk.StringVar(value="1.0")
         self._v0_var = tk.StringVar(value="5.0")
         self._width_var = tk.StringVar(value="2.0")
         self._barrier_sigma_var = tk.StringVar(value="0.4")
-        make_labeled_entry(row, "ω", self._omega_var, width=8)
-        make_labeled_entry(row, "V₀", self._v0_var, width=8)
-        make_labeled_entry(row, "Width", self._width_var, width=8)
-        make_labeled_entry(row, "Barrier σ", self._barrier_sigma_var, width=9)
-
-        row = ttk.Frame(body)
-        row.pack(fill=tk.X, pady=pad // 2)
         self._lattice_k_var = tk.StringVar(value="2.0")
         self._a_dw_var = tk.StringVar(value="1.0")
         self._b_dw_var = tk.StringVar(value="1.0")
-        make_labeled_entry(row, "Lattice k", self._lattice_k_var, width=8)
-        make_labeled_entry(row, "a (double-well)", self._a_dw_var, width=12)
-        make_labeled_entry(row, "b (double-well)", self._b_dw_var, width=12)
+        self._potential_rows: dict[str, ttk.Frame] = {}
+        self._potential_rows["harmonic"] = ttk.Frame(potential)
+        make_labeled_entry(self._potential_rows["harmonic"], "ω", self._omega_var, width=8)
+        self._potential_rows["square_well"] = ttk.Frame(potential)
+        make_labeled_entry(self._potential_rows["square_well"], "V₀", self._v0_var, width=8)
+        make_labeled_entry(self._potential_rows["square_well"], "Width", self._width_var, width=8)
+        self._potential_rows["barrier"] = ttk.Frame(potential)
+        make_labeled_entry(self._potential_rows["barrier"], "V₀", self._v0_var, width=8)
+        make_labeled_entry(
+            self._potential_rows["barrier"], "Barrier σ", self._barrier_sigma_var, width=9
+        )
+        self._potential_rows["double_well"] = ttk.Frame(potential)
+        make_labeled_entry(self._potential_rows["double_well"], "a", self._a_dw_var, width=10)
+        make_labeled_entry(self._potential_rows["double_well"], "b", self._b_dw_var, width=10)
+        self._potential_rows["lattice"] = ttk.Frame(potential)
+        make_labeled_entry(self._potential_rows["lattice"], "V₀", self._v0_var, width=8)
+        make_labeled_entry(
+            self._potential_rows["lattice"], "Lattice k", self._lattice_k_var, width=8
+        )
 
-        self._custom_potential_row = ttk.Frame(body)
+        self._custom_potential_row = ttk.Frame(potential)
+        self._potential_rows["custom"] = self._custom_potential_row
         self._custom_potential_row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(self._custom_potential_row, text="V_custom =").pack(side=tk.LEFT, padx=(0, 4))
         self._custom_potential_var = tk.StringVar(value="0.5*(x**2 + y**2)")
@@ -184,16 +200,16 @@ class SchrodingerTDDialog:
         )
         self._custom_potential_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial wave packet", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        packet = ttk.LabelFrame(body, text="Initial wave packet", padding=pad)
+        packet.pack(fill=tk.X)
+        row = ttk.Frame(packet)
         row.pack(fill=tk.X, pady=pad // 2)
         self._packet_var = tk.StringVar(value="gaussian")
         packet_combo = make_labeled_combo(row, "Type", self._packet_var, _PACKETS, width=14)
         packet_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
-        row = ttk.Frame(body)
+        self._packet_shape_row = ttk.Frame(packet)
+        row = self._packet_shape_row
         row.pack(fill=tk.X, pady=pad // 2)
         self._sigma_var = tk.StringVar(value="0.8")
         self._x0_var = tk.StringVar(value="-3.0")
@@ -201,17 +217,24 @@ class SchrodingerTDDialog:
         self._separation_var = tk.StringVar(value="2.0")
         make_labeled_entry(row, "σ", self._sigma_var, width=8)
         make_labeled_entry(row, "x₀", self._x0_var, width=8)
-        make_labeled_entry(row, "k₀x", self._k0x_var, width=8)
-        make_labeled_entry(row, "Separation", self._separation_var, width=9)
+        self._separation_frame = ttk.Frame(row)
+        self._separation_frame.pack(side=tk.LEFT)
+        make_labeled_entry(self._separation_frame, "Separation", self._separation_var, width=9)
 
-        self._packet_y_row = ttk.Frame(body)
+        self._packet_momentum_row = ttk.Frame(packet)
+        self._packet_momentum_row.pack(fill=tk.X, pady=pad // 2)
+        make_labeled_entry(self._packet_momentum_row, "k₀x", self._k0x_var, width=8)
+
+        self._packet_y_row = ttk.Frame(packet)
         self._packet_y_row.pack(fill=tk.X, pady=pad // 2)
         self._y0_var = tk.StringVar(value="0.0")
         self._k0y_var = tk.StringVar(value="0.0")
-        make_labeled_entry(self._packet_y_row, "y₀", self._y0_var, width=8)
+        self._packet_y_position_frame = ttk.Frame(self._packet_y_row)
+        self._packet_y_position_frame.pack(side=tk.LEFT)
+        make_labeled_entry(self._packet_y_position_frame, "y₀", self._y0_var, width=8)
         make_labeled_entry(self._packet_y_row, "k₀y", self._k0y_var, width=8)
 
-        self._custom_packet_row = ttk.Frame(body)
+        self._custom_packet_row = ttk.Frame(packet)
         self._custom_packet_row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(self._custom_packet_row, text="ψ_custom amplitude =").pack(
             side=tk.LEFT, padx=(0, 4)
@@ -229,45 +252,58 @@ class SchrodingerTDDialog:
             "Custom real amplitude profile. Momentum comes from k0x and k0y.",
         )
 
-        self._btn_row = ttk.Frame(body)
-        self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(self._btn_row, text="Solve", command=self._on_solve).pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
-        ttk.Button(
-            self._btn_row,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        ).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
         self._update_visibility()
 
-        scroll.bind_new_children()
-
     def _update_visibility(self) -> None:
-        is_2d = self._dimension_var.get() == "2D"
-        if is_2d:
-            self._y_domain_row.pack(fill=tk.X, pady=4, before=self._btn_row)
-            self._packet_y_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+        groups = schrodinger_visible_groups(
+            potential=self._potential_var.get(),
+            packet=self._packet_var.get(),
+            dimension=self._dimension_var.get(),
+            boundary=self._boundary_var.get(),
+        )
+        if "dimension:2d" in groups:
+            self._y_domain_row.pack(fill=tk.X, pady=4)
+            self._packet_y_row.pack(fill=tk.X, pady=4)
         else:
             self._y_domain_row.pack_forget()
             self._packet_y_row.pack_forget()
 
-        if self._boundary_var.get() == "absorbing":
-            self._absorb_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+        if "boundary:absorbing" in groups:
+            self._absorb_row.pack(fill=tk.X, pady=4)
         else:
             self._absorb_row.pack_forget()
 
-        if self._potential_var.get() == "custom":
-            self._custom_potential_row.pack(fill=tk.X, pady=4, before=self._btn_row)
-        else:
-            self._custom_potential_row.pack_forget()
+        for row in self._potential_rows.values():
+            row.pack_forget()
+        potential_row = self._potential_rows.get(self._potential_var.get())
+        if potential_row is not None:
+            potential_row.pack(fill=tk.X, pady=4)
 
-        if self._packet_var.get() == "custom":
-            self._custom_packet_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+        if "packet:custom" in groups:
+            self._packet_shape_row.pack_forget()
+            self._packet_y_position_frame.pack_forget()
+            self._custom_packet_row.pack(
+                fill=tk.X,
+                pady=4,
+                before=self._packet_momentum_row,
+            )
         else:
             self._custom_packet_row.pack_forget()
+            self._packet_shape_row.pack(
+                fill=tk.X,
+                pady=4,
+                before=self._packet_momentum_row,
+            )
+            y_momentum_label = self._packet_y_row.winfo_children()[-2]
+            self._packet_y_position_frame.pack(side=tk.LEFT, before=y_momentum_label)
+        if "packet:superposition" in groups:
+            self._separation_frame.pack(side=tk.LEFT)
+        else:
+            self._separation_frame.pack_forget()
+        self._shell.refresh()
 
     def _collect_inputs(self) -> dict[str, object]:
         dimension = 2 if self._dimension_var.get() == "2D" else 1

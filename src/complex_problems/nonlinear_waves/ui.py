@@ -15,6 +15,8 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     make_labeled_spinbox,
@@ -24,9 +26,8 @@ from complex_problems.nonlinear_waves.solver import solve_nonlinear_waves
 from config import get_env_from_schema
 from frontend.performance_guard import assess_nonlinear_waves_request, confirm_performance_advisory
 from frontend.theme import get_font
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _MODELS = ("nlse", "kdv")
 _NLSE_PROFILES = ("Sech", "Gaussian", "Pulse", "Custom")
@@ -67,50 +68,44 @@ class NonlinearWavesDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Nonlinear Waves (NLSE + KdV)")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=980, min_height=760, padding=32, resizable=True)
-        self.win.minsize(920, 700)
+        self._shell.finish(AdvancedDialogSize(900, 740, 660, 500))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="Nonlinear Waves", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(
-            body,
-            text=(
-                "Choose NLSE for complex envelopes or KdV for real dispersive waves.\n"
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Nonlinear Waves",
+            description=(
+                "Choose NLSE for complex envelopes or KdV for real dispersive waves. "
                 "Both solvers use periodic pseudo-spectral methods."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="nonlinear_waves",
             pad=pad,
             wraplength=780,
         )
 
-        row = ttk.Frame(body)
+        system = ttk.LabelFrame(body, text="Model and domain", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._model_var = tk.StringVar(value="nlse")
         self._last_model = "nlse"
         model_combo = make_labeled_combo(row, "Model", self._model_var, _MODELS, width=10)
+        self._initial_focus = model_combo
         model_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_model_visibility())
         ToolTip(model_combo, "NLSE: split-step Fourier. KdV: pseudo-spectral ETDRK4.")
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad // 2)
         self._x_min_var = tk.StringVar(value="-20.0")
         self._x_max_var = tk.StringVar(value="20.0")
@@ -119,7 +114,9 @@ class NonlinearWavesDialog:
         make_labeled_entry(row, "xₘₐₓ", self._x_max_var, width=10)
         make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=64, to=32768, width=9)
 
-        row = ttk.Frame(body)
+        integration = ttk.LabelFrame(body, text="Integration", padding=pad)
+        integration.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(integration)
         row.pack(fill=tk.X, pady=pad // 2)
         self._t_min_var = tk.StringVar(value="0.0")
         self._t_max_var = tk.StringVar(value="8.0")
@@ -128,10 +125,9 @@ class NonlinearWavesDialog:
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=10)
         make_labeled_entry(row, "Δt", self._dt_var, width=10)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Initial profile", style="Small.TLabel").pack(anchor=tk.W)
-
-        self._profile_row = ttk.Frame(body)
+        initial = ttk.LabelFrame(body, text="Initial conditions", padding=pad)
+        initial.pack(fill=tk.X, pady=(0, pad))
+        self._profile_row = ttk.Frame(initial)
         self._profile_row.pack(fill=tk.X, pady=pad // 2)
         self._profile_var = tk.StringVar(value="Sech")
         self._profile_combo = make_labeled_combo(
@@ -141,7 +137,7 @@ class NonlinearWavesDialog:
             "<<ComboboxSelected>>", lambda _e: self._update_profile_visibility()
         )
 
-        self._profile_params_row = ttk.Frame(body)
+        self._profile_params_row = ttk.Frame(initial)
         self._profile_params_row.pack(fill=tk.X, pady=pad // 2)
         self._amp_var = tk.StringVar(value="1.0")
         self._sigma_var = tk.StringVar(value="1.0")
@@ -152,7 +148,7 @@ class NonlinearWavesDialog:
         make_labeled_entry(self._sigma_frame, "σ", self._sigma_var, width=8)
         make_labeled_entry(self._profile_params_row, "Center x₀", self._center_var, width=9)
 
-        self._train_row = ttk.Frame(body)
+        self._train_row = ttk.Frame(initial)
         self._train_n_var = tk.StringVar(value="2")
         self._train_amplitudes_var = tk.StringVar(value="1.2, 0.5")
         self._train_centers_var = tk.StringVar(value="-8.0, -2.0")
@@ -165,7 +161,7 @@ class NonlinearWavesDialog:
             "not an exact N-soliton solution. Different amplitudes have different speeds.",
         )
 
-        self._custom_row = ttk.Frame(body)
+        self._custom_row = ttk.Frame(initial)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(self._custom_row, text="u₀(x) =").pack(side=tk.LEFT, padx=(0, 4))
         self._custom_expr_var = tk.StringVar(value="exp(-x**2)")
@@ -178,10 +174,9 @@ class NonlinearWavesDialog:
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ToolTip(self._custom_entry, "Custom initial profile as an expression in x.")
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Equation parameters", style="Small.TLabel").pack(anchor=tk.W)
-
-        self._nlse_row = ttk.Frame(body)
+        equation = ttk.LabelFrame(body, text="Equation parameters", padding=pad)
+        equation.pack(fill=tk.X)
+        self._nlse_row = ttk.Frame(equation)
         self._nlse_row.pack(fill=tk.X, pady=pad // 2)
         self._beta2_var = tk.StringVar(value="1.0")
         self._gamma_var = tk.StringVar(value="1.0")
@@ -190,7 +185,7 @@ class NonlinearWavesDialog:
         make_labeled_entry(self._nlse_row, "γ", self._gamma_var, width=8)
         make_labeled_entry(self._nlse_row, "Phase k₀", self._phase_k_var, width=9)
 
-        self._kdv_row = ttk.Frame(body)
+        self._kdv_row = ttk.Frame(equation)
         self._kdv_row.pack(fill=tk.X, pady=pad // 2)
         self._c_var = tk.StringVar(value="0.0")
         self._alpha_var = tk.StringVar(value="6.0")
@@ -199,34 +194,24 @@ class NonlinearWavesDialog:
         make_labeled_entry(self._kdv_row, "α", self._alpha_var, width=8)
         make_labeled_entry(self._kdv_row, "β", self._beta_disp_var, width=8)
 
-        self._btn_row = ttk.Frame(body)
-        self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(self._btn_row, text="Solve", command=self._on_solve).pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
-        ttk.Button(
-            self._btn_row,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        ).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
         self._update_profile_visibility()
         self._update_model_visibility()
-        scroll.bind_new_children()
 
     def _update_profile_visibility(self) -> None:
         profile = self._profile_var.get()
         if profile == "Custom":
-            self._custom_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._custom_row.pack(fill=tk.X, pady=4)
         else:
             self._custom_row.pack_forget()
         if profile == "Separated soliton train":
             self._profile_params_row.pack_forget()
-            self._train_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._train_row.pack(fill=tk.X, pady=4)
         else:
             self._train_row.pack_forget()
-            self._profile_params_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._profile_params_row.pack(fill=tk.X, pady=4)
         if profile == "Single soliton":
             self._sigma_frame.pack_forget()
             ToolTip(
@@ -236,6 +221,7 @@ class NonlinearWavesDialog:
             )
         else:
             self._sigma_frame.pack(side=tk.LEFT)
+        self._shell.refresh()
 
     def _update_model_visibility(self) -> None:
         model = self._model_var.get()
@@ -248,10 +234,10 @@ class NonlinearWavesDialog:
         self._profile_combo.configure(values=profiles)
         self._profile_var.set(current_profile if current_profile in profiles else "Sech")
         if self._model_var.get() == "nlse":
-            self._nlse_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._nlse_row.pack(fill=tk.X, pady=4)
             self._kdv_row.pack_forget()
         else:
-            self._kdv_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._kdv_row.pack(fill=tk.X, pady=4)
             self._nlse_row.pack_forget()
         self._last_model = model
         self._update_profile_visibility()

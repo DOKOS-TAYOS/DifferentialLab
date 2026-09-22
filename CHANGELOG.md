@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Standardized all nine Advanced setup dialogs with consistent headers, scientific sections, and fixed neutral/primary action footers.
+- Made Advanced setup forms screen-aware and vertically scrollable at narrower or shorter window sizes.
+- Added progressive disclosure for existing FPUT study modes, N-body generators, and Schrödinger potential and initial-state settings.
 - Redesigned every Custom equation-family editor into a responsive definition/reference workspace.
 - Added a shared, keyboard-accessible SymbolPalette with literal insertion into the last active editor.
 - Replaced Function Transform's copy-only Unicode reference with direct function/parameter insertion.

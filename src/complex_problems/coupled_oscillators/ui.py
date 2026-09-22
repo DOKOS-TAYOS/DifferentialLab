@@ -11,7 +11,11 @@ from typing import TypeAlias, cast
 import numpy as np
 
 from complex_problems.common import add_how_to_config_section
-from complex_problems.common.dialog_ui import run_solver_dialog
+from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
+    run_solver_dialog,
+)
 from complex_problems.coupled_oscillators.result_dialog import CoupledOscillatorsResultDialog
 from complex_problems.coupled_oscillators.solver import solve_coupled_oscillators
 from config import DEFAULT_SOLVER_METHOD, get_env_from_schema
@@ -103,51 +107,37 @@ class CoupledOscillatorsDialog:
         self.win = tk.Toplevel(parent)
         self.win.title("Coupled Harmonic Oscillators")
 
-        bg: str = get_env_from_schema("UI_BACKGROUND")
-        self.win.configure(bg=bg)
-
         self._build_ui()
-        fit_and_center(
-            self.win,
-            min_width=1000,
-            min_height=750,
-            padding=48,
-            resizable=True,
-        )
-        self.win.minsize(1000, 750)
+        self._shell.finish(AdvancedDialogSize(960, 760, 700, 520))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
         logger.info("Coupled oscillators dialog opened")
 
     def _build_ui(self) -> None:
         """Construct the dialog layout."""
         pad: int = get_env_from_schema("UI_PADDING")
 
-        main_frame = ttk.Frame(self.win, padding=pad * 2)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        self._scroll = ScrollableFrame(main_frame)
-        self._scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        self._scroll.pack(fill=tk.BOTH, expand=True)
-        inner = self._scroll.inner
-        inner.configure(padding=pad)
-
-        ttk.Label(inner, text="Coupled Harmonic Oscillators", style="Title.TLabel").pack(
-            anchor=tk.W,
-            pady=(0, pad),
-        )
-        intro = ttk.Label(
-            inner,
-            text=(
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Coupled Harmonic Oscillators",
+            description=(
                 "Configure a chain of masses and springs, optional nonlinear terms, "
                 "and initial energy in oscillator or mode coordinates."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
+            pad=pad,
         )
-        intro.pack(anchor=tk.W, pady=(0, pad))
-        bind_wraplength(inner, intro, pad=2 * pad, min_wrap=240)
+        self._scroll = self._shell.scroll
+        inner = self._shell.body
+        add_how_to_config_section(
+            inner,
+            self._scroll,
+            problem_id="coupled_oscillators",
+            pad=pad,
+        )
 
-        row = ttk.Frame(inner)
+        system = ttk.LabelFrame(inner, text="System", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Number of oscillators:").pack(side=tk.LEFT, padx=(0, pad))
         self._n_var = tk.StringVar(value="32")
@@ -160,18 +150,11 @@ class CoupledOscillatorsDialog:
             font=get_font(),
         )
         n_spin.pack(side=tk.LEFT)
+        self._initial_focus = n_spin
         ToolTip(n_spin, "Number of oscillators in the chain (2–100).")
 
-        add_how_to_config_section(
-            inner,
-            self._scroll,
-            problem_id="coupled_oscillators",
-            pad=pad,
-            wraplength=840,
-        )
-
         # Mass and k in same row (auto-detect: constant, list, or function)
-        row = ttk.Frame(inner)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Mass:").pack(side=tk.LEFT, padx=(0, pad))
         self._mass_entry_var = tk.StringVar(value="1.0")
@@ -187,7 +170,7 @@ class CoupledOscillatorsDialog:
         )
 
         # Boundary
-        row = ttk.Frame(inner)
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Boundary:").pack(side=tk.LEFT, padx=(0, pad))
         self._boundary_var = tk.StringVar(value="Fixed ends")
@@ -203,7 +186,9 @@ class CoupledOscillatorsDialog:
         ToolTip(boundary_combo, "Fixed ends: x₋₁=xₙ=0. Periodic: chain forms a ring.")
 
         # Coupling types (multi-select Listbox + Equations button)
-        row = ttk.Frame(inner)
+        interaction = ttk.LabelFrame(inner, text="Interaction", padding=pad)
+        interaction.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(interaction)
         row.pack(fill=tk.X, pady=pad)
         ttk.Label(row, text="Coupling types:").pack(side=tk.LEFT, padx=(0, pad))
         btn_bg = get_env_from_schema("UI_BUTTON_BG")
@@ -237,24 +222,25 @@ class CoupledOscillatorsDialog:
         ttk.Button(
             row,
             text="Equation Help",
+            style="Secondary.TButton",
             command=self._show_coupling_equations,
         ).pack(side=tk.LEFT)
         self._coupling_listbox.bind("<<ListboxSelect>>", self._on_coupling_selection_change)
 
         # Long-range params: one row per selected neighbor (only its own k)
-        self._k_2nn_frame = ttk.Frame(inner)
+        self._k_2nn_frame = ttk.Frame(interaction)
         ttk.Label(self._k_2nn_frame, text="k₂ (2nd neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_2nn_var = tk.StringVar(value="25")
         ttk.Entry(self._k_2nn_frame, textvariable=self._k_2nn_var, width=6, font=get_font()).pack(
             side=tk.LEFT
         )
-        self._k_3nn_frame = ttk.Frame(inner)
+        self._k_3nn_frame = ttk.Frame(interaction)
         ttk.Label(self._k_3nn_frame, text="k₃ (3rd neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_3nn_var = tk.StringVar(value="15")
         ttk.Entry(self._k_3nn_frame, textvariable=self._k_3nn_var, width=6, font=get_font()).pack(
             side=tk.LEFT
         )
-        self._k_4nn_frame = ttk.Frame(inner)
+        self._k_4nn_frame = ttk.Frame(interaction)
         ttk.Label(self._k_4nn_frame, text="k₄ (4th neighbor):").pack(side=tk.LEFT, padx=(0, pad))
         self._k_4nn_var = tk.StringVar(value="10")
         ttk.Entry(self._k_4nn_frame, textvariable=self._k_4nn_var, width=6, font=get_font()).pack(
@@ -262,7 +248,7 @@ class CoupledOscillatorsDialog:
         )
 
         # Nonlinear params: one row per selected (only its own ε)
-        self._fput_alpha_frame = ttk.Frame(inner)
+        self._fput_alpha_frame = ttk.Frame(interaction)
         ttk.Label(self._fput_alpha_frame, text="α (FPUT-α):").pack(side=tk.LEFT, padx=(0, pad))
         self._fput_alpha_var = tk.StringVar(value="0.25")
         ttk.Entry(
@@ -271,7 +257,7 @@ class CoupledOscillatorsDialog:
             width=6,
             font=get_font(),
         ).pack(side=tk.LEFT)
-        self._cubic_frame = ttk.Frame(inner)
+        self._cubic_frame = ttk.Frame(interaction)
         ttk.Label(self._cubic_frame, text="ε₃ (cubic):").pack(side=tk.LEFT, padx=(0, pad))
         self._nonlinear_coeff_var = tk.StringVar(value="80")
         ttk.Entry(
@@ -280,7 +266,7 @@ class CoupledOscillatorsDialog:
             width=6,
             font=get_font(),
         ).pack(side=tk.LEFT)
-        self._quartic_frame = ttk.Frame(inner)
+        self._quartic_frame = ttk.Frame(interaction)
         ttk.Label(self._quartic_frame, text="ε₄ (quartic):").pack(side=tk.LEFT, padx=(0, pad))
         self._nonlinear_quartic_var = tk.StringVar(value="150")
         ttk.Entry(
@@ -289,7 +275,7 @@ class CoupledOscillatorsDialog:
             width=6,
             font=get_font(),
         ).pack(side=tk.LEFT)
-        self._quintic_frame = ttk.Frame(inner)
+        self._quintic_frame = ttk.Frame(interaction)
         ttk.Label(self._quintic_frame, text="ε₅ (quintic):").pack(side=tk.LEFT, padx=(0, pad))
         self._nonlinear_quintic_var = tk.StringVar(value="5")
         ttk.Entry(
@@ -300,7 +286,7 @@ class CoupledOscillatorsDialog:
         ).pack(side=tk.LEFT)
 
         # External force params (shown only when "External force" is selected)
-        self._external_params_frame = ttk.Frame(inner)
+        self._external_params_frame = ttk.Frame(interaction)
         self._external_params_frame.pack(fill=tk.X, pady=pad)
         row_ext = ttk.Frame(self._external_params_frame)
         row_ext.pack(fill=tk.X)
@@ -322,7 +308,9 @@ class CoupledOscillatorsDialog:
         ).pack(side=tk.LEFT)
 
         # Domain (store ref for packing extra params before it)
-        self._domain_row = ttk.Frame(inner)
+        integration = ttk.LabelFrame(inner, text="Integration", padding=pad)
+        integration.pack(fill=tk.X, pady=(0, pad))
+        self._domain_row = ttk.Frame(integration)
         self._domain_row.pack(fill=tk.X, pady=pad)
         row = self._domain_row
         ttk.Label(row, text="Time domain:").pack(side=tk.LEFT, padx=(0, pad))
@@ -336,7 +324,7 @@ class CoupledOscillatorsDialog:
         ToolTip(row, "Integration time interval [tₘᵢₙ, tₘₐₓ].")
 
         # Resolution points and solver method
-        row_res = ttk.Frame(inner)
+        row_res = ttk.Frame(integration)
         row_res.pack(fill=tk.X, pady=pad)
         ttk.Label(row_res, text="Sample points:").pack(side=tk.LEFT, padx=(0, pad))
         default_n_points = max(2000, int(get_env_from_schema("SOLVER_NUM_POINTS")))
@@ -360,8 +348,8 @@ class CoupledOscillatorsDialog:
         self._update_extra_params_visibility()
 
         # Initial conditions: Oscillators or Modes
-        ic_frame = ttk.Frame(inner)
-        ic_frame.pack(fill=tk.X, pady=pad)
+        ic_frame = ttk.LabelFrame(inner, text="Initial conditions", padding=pad)
+        ic_frame.pack(fill=tk.X)
         ic_row1 = ttk.Frame(ic_frame)
         ic_row1.pack(fill=tk.X)
         ttk.Label(ic_row1, text="Initial state in:").pack(side=tk.LEFT, padx=(0, pad))
@@ -411,26 +399,8 @@ class CoupledOscillatorsDialog:
 
         self._n_var.trace_add("write", lambda *a: self._on_n_change())
 
-        # Solve button
-        btn_frame = ttk.Frame(inner)
-        btn_frame.pack(fill=tk.X, pady=pad * 2)
-
-        btn_solve = ttk.Button(
-            btn_frame,
-            text="Solve",
-            command=self._on_solve,
-        )
-        btn_solve.pack(side=tk.LEFT, padx=(0, pad))
-
-        btn_close = ttk.Button(
-            btn_frame,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        )
-        btn_close.pack(side=tk.LEFT)
-
-        self._scroll.bind_new_children()
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
     def _on_ic_space_change(self, _event: tk.Event | None = None) -> None:
         """Update labels when Oscillators/Modes selection changes."""
@@ -473,7 +443,7 @@ class CoupledOscillatorsDialog:
         ):
             if label in selected:
                 if not frame.winfo_manager():
-                    frame.pack(fill=tk.X, pady=pad, before=self._domain_row)
+                    frame.pack(fill=tk.X, pady=pad)
             else:
                 frame.pack_forget()
         # Show only the ε field for each selected nonlinear
@@ -485,15 +455,15 @@ class CoupledOscillatorsDialog:
         ):
             if label in selected:
                 if not frame.winfo_manager():
-                    frame.pack(fill=tk.X, pady=pad, before=self._domain_row)
+                    frame.pack(fill=tk.X, pady=pad)
             else:
                 frame.pack_forget()
         if "External force" in selected:
             if not self._external_params_frame.winfo_manager():
-                self._external_params_frame.pack(fill=tk.X, pady=pad, before=self._domain_row)
+                self._external_params_frame.pack(fill=tk.X, pady=pad)
         else:
             self._external_params_frame.pack_forget()
-        self._scroll.refresh_scroll_region()
+        self._shell.refresh()
 
     def _show_coupling_equations(self) -> None:
         """Show equations for each coupling type in a formatted help window."""
@@ -533,7 +503,7 @@ class CoupledOscillatorsDialog:
         ttk.Button(
             btn_frame,
             text="Close",
-            style="Cancel.TButton",
+            style="Secondary.TButton",
             command=dlg.destroy,
         ).pack(side=tk.RIGHT)
 

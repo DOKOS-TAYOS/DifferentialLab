@@ -8,6 +8,7 @@ from tkinter import ttk
 from complex_problems.problem_docs import get_problem_doc
 from frontend.ui_dialogs.collapsible_section import CollapsibleSection
 from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
+from frontend.window_utils import bind_wraplength
 
 
 def _build_doc_text(problem_id: str) -> str:
@@ -52,5 +53,6 @@ def add_how_to_config_section(
         justify=tk.LEFT,
         wraplength=wraplength,
     )
-    lbl.pack(anchor=tk.W)
+    lbl.pack(fill=tk.X, anchor=tk.W)
+    bind_wraplength(scroll.viewport, lbl, pad=pad * 3, min_wrap=240)
     scroll.bind_new_children()

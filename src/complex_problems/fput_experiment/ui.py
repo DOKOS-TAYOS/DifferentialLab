@@ -8,8 +8,15 @@ from typing import cast
 
 import numpy as np
 
-from complex_problems.common import parse_float, parse_positive_float, parse_positive_int
+from complex_problems.common import (
+    add_how_to_config_section,
+    parse_float,
+    parse_positive_float,
+    parse_positive_int,
+)
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     run_solver_dialog,
@@ -25,7 +32,7 @@ from complex_problems.fput_experiment.model import (
 from complex_problems.fput_experiment.solver import solve_fput, solve_fput_recurrence_scaling
 from config import get_env_from_schema
 from frontend.performance_guard import assess_fput_request, confirm_performance_advisory
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _STUDY_MODES = ("Single simulation", "Recurrence scaling")
 _INITIAL_STATES = (
@@ -57,6 +64,12 @@ def preset_study_transition(study: str, preset_model: FPUTModel) -> tuple[str, F
     return study, "alpha" if study == "Recurrence scaling" else preset_model
 
 
+def fput_study_visibility(study: str) -> tuple[bool, bool]:
+    """Return visibility for single-simulation and recurrence-scaling controls."""
+    scaling = study == "Recurrence scaling"
+    return not scaling, scaling
+
+
 class FPUTExperimentDialog:
     """Compact editor for simulations and sequential recurrence scaling studies."""
 
@@ -64,36 +77,46 @@ class FPUTExperimentDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Fermi-Pasta-Ulam-Tsingou Experiment")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=860, min_height=680, padding=24, resizable=True)
+        self._shell.finish(AdvancedDialogSize(880, 720, 650, 500))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
-        root = ttk.Frame(self.win, padding=18)
-        root.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(root, text="Fermi-Pasta-Ulam-Tsingou Experiment", style="Title.TLabel").pack(
-            anchor=tk.W
-        )
-        ttk.Label(
-            root,
-            text=(
+        pad = int(get_env_from_schema("UI_PADDING"))
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Fermi-Pasta-Ulam-Tsingou Experiment",
+            description=(
                 "Velocity Verlet is recommended for long-time recurrence; "
                 "RK4 reproduces the historical implementation."
             ),
-            style="Small.TLabel",
-            wraplength=800,
-        ).pack(anchor=tk.W, pady=(4, 12))
+            pad=pad,
+        )
+        root = self._shell.body
+        add_how_to_config_section(
+            root,
+            self._shell.scroll,
+            problem_id="fput_experiment",
+            pad=pad,
+        )
         self._preset_var = tk.StringVar(value="Interactive alpha recurrence")
         self._study_var = tk.StringVar(value=_STUDY_MODES[0])
         self._model_var = tk.StringVar(value="alpha")
         self._state_var = tk.StringVar(value=_INITIAL_STATES[0])
-        row = ttk.Frame(root)
+        experiment = ttk.LabelFrame(root, text="Experiment", padding=pad)
+        experiment.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(experiment)
         row.pack(fill=tk.X, pady=3)
         preset = make_labeled_combo(row, "Preset", self._preset_var, tuple(FPUT_PRESETS), width=32)
+        self._initial_focus = preset
+        row = ttk.Frame(experiment)
+        row.pack(fill=tk.X, pady=3)
         make_labeled_combo(row, "Study", self._study_var, _STUDY_MODES, width=20)
         preset.bind("<<ComboboxSelected>>", lambda _event: self._apply_preset())
-        row = ttk.Frame(root)
+        system = ttk.LabelFrame(root, text="System", padding=pad)
+        system.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(system)
         row.pack(fill=tk.X, pady=3)
         self._n_var, self._coefficient_var, self._amplitude_var, self._mode_var = (
             tk.StringVar(value=value) for value in ("16", "0.25", "1", "1")
@@ -107,30 +130,24 @@ class FPUTExperimentDialog:
         ttk.Entry(row, textvariable=self._coefficient_var, width=10).pack(
             side=tk.LEFT, padx=(0, 10)
         )
+        row = ttk.Frame(system)
+        row.pack(fill=tk.X, pady=3)
         make_labeled_entry(row, "Amplitude", self._amplitude_var, width=10)
         make_labeled_entry(row, "Mode", self._mode_var, width=7)
-        row = ttk.Frame(root)
-        row.pack(fill=tk.X, pady=3)
-        self._t_end_var, self._dt_var, self._sample_var = (
-            tk.StringVar(value=value) for value in ("2200", "0.02", "20")
-        )
-        self._integrator_var = tk.StringVar(value="verlet")
-        make_labeled_entry(row, "t end", self._t_end_var, width=10)
-        make_labeled_entry(row, "dt", self._dt_var, width=10)
-        make_labeled_entry(row, "Sample every", self._sample_var, width=10)
-        make_labeled_combo(row, "Integrator", self._integrator_var, ("verlet", "rk4"), width=12)
-        row = ttk.Frame(root)
+        self._single_frame = ttk.LabelFrame(root, text="Initial conditions", padding=pad)
+        self._single_frame.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(self._single_frame)
         row.pack(fill=tk.X, pady=3)
         state = make_labeled_combo(row, "Initial state", self._state_var, _INITIAL_STATES, width=28)
         state.bind("<<ComboboxSelected>>", lambda _event: self._update_state_hint())
-        self._study_var.trace_add("write", self._update_study_mode)
+
         self._state_hint = ttk.Label(
-            root,
+            self._single_frame,
             text="Single-mode displacement x_j = A sin(mπj/(N+1)); velocities are zero.",
             style="Small.TLabel",
         )
-        self._state_hint.pack(anchor=tk.W, pady=3)
-        self._state_options_frame = ttk.Frame(root)
+        self._state_hint.pack(fill=tk.X, anchor=tk.W, pady=3)
+        self._state_options_frame = ttk.Frame(self._single_frame)
         self._state_options_frame.pack(fill=tk.X)
         self._custom_x_var, self._custom_v_var, self._custom_q_var, self._custom_p_var = (
             tk.StringVar() for _ in range(4)
@@ -138,17 +155,13 @@ class FPUTExperimentDialog:
         self._custom_frame = ttk.Frame(self._state_options_frame)
         self._custom_frame.pack(fill=tk.X, pady=3)
         self._custom_first_label = ttk.Label(self._custom_frame, text="x values")
-        self._custom_first_label.pack(side=tk.LEFT, padx=(0, 4))
-        self._custom_first_entry = ttk.Entry(
-            self._custom_frame, textvariable=self._custom_x_var, width=42
-        )
-        self._custom_first_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self._custom_first_label.pack(anchor=tk.W)
+        self._custom_first_entry = ttk.Entry(self._custom_frame, textvariable=self._custom_x_var)
+        self._custom_first_entry.pack(fill=tk.X, pady=(0, 4))
         self._custom_second_label = ttk.Label(self._custom_frame, text="v values")
-        self._custom_second_label.pack(side=tk.LEFT, padx=(0, 4))
-        self._custom_second_entry = ttk.Entry(
-            self._custom_frame, textvariable=self._custom_v_var, width=42
-        )
-        self._custom_second_entry.pack(side=tk.LEFT, padx=(0, 10))
+        self._custom_second_label.pack(anchor=tk.W)
+        self._custom_second_entry = ttk.Entry(self._custom_frame, textvariable=self._custom_v_var)
+        self._custom_second_entry.pack(fill=tk.X)
         self._legacy_frame = ttk.Frame(self._state_options_frame)
         self._legacy_frame.pack(fill=tk.X, pady=3)
         self._legacy_width_var = tk.StringVar(value="0.5")
@@ -161,21 +174,42 @@ class FPUTExperimentDialog:
         make_labeled_entry(
             self._legacy_frame, "Second center", self._legacy_second_center_var, width=10
         )
+
+        integration = ttk.LabelFrame(root, text="Integration", padding=pad)
+        integration.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(integration)
+        row.pack(fill=tk.X, pady=3)
+        self._t_end_var, self._dt_var, self._sample_var = (
+            tk.StringVar(value=value) for value in ("2200", "0.02", "20")
+        )
+        self._integrator_var = tk.StringVar(value="verlet")
+        make_labeled_entry(row, "t end", self._t_end_var, width=10)
+        make_labeled_entry(row, "dt", self._dt_var, width=10)
+        make_labeled_entry(row, "Sample every", self._sample_var, width=10)
+        self._integrator_frame = ttk.Frame(integration)
+        self._integrator_frame.pack(fill=tk.X, pady=3)
+        make_labeled_combo(
+            self._integrator_frame,
+            "Integrator",
+            self._integrator_var,
+            ("verlet", "rk4"),
+            width=12,
+        )
+        self._study_var.trace_add("write", self._update_study_mode)
         self._sweep_var = tk.StringVar(value="N")
         self._sweep_values_var = tk.StringVar(value="8, 12, 16")
-        row = ttk.Frame(root)
+        self._scaling_frame = ttk.LabelFrame(root, text="Recurrence scaling", padding=pad)
+        self._scaling_frame.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(self._scaling_frame)
         row.pack(fill=tk.X, pady=3)
         make_labeled_combo(
             row, "Scaling variable", self._sweep_var, ("N", "alpha", "amplitude"), width=12
         )
         make_labeled_entry(row, "Values (3--8)", self._sweep_values_var, width=30)
-        row = ttk.Frame(root)
-        row.pack(fill=tk.X, pady=(14, 0))
-        ttk.Button(row, text="Run", command=self._on_solve).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(row, text="Close", style="Cancel.TButton", command=self.win.destroy).pack(
-            side=tk.LEFT
-        )
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Run", self._on_solve, primary=True)
         self._apply_preset()
+        self._update_study_mode()
 
     def _apply_preset(self) -> None:
         """Populate ordinary editable controls from the selected preset."""
@@ -233,17 +267,33 @@ class FPUTExperimentDialog:
             self._custom_frame.pack(fill=tk.X, pady=3)
         if legacy:
             self._legacy_frame.pack(fill=tk.X, pady=3)
+        self._shell.refresh()
 
     def _update_study_mode(self, *_args: object) -> None:
         """Make the alpha-only scaling interpretation visible and unambiguous."""
-        scaling = self._study_var.get() == "Recurrence scaling"
+        single_visible, scaling = fput_study_visibility(self._study_var.get())
+        if single_visible:
+            self._single_frame.pack(
+                fill=tk.X,
+                pady=(0, self._shell.pad),
+                before=self._scaling_frame,
+            )
+            self._integrator_frame.pack(fill=tk.X, pady=3)
+        else:
+            self._single_frame.pack_forget()
+            self._integrator_frame.pack_forget()
+        if scaling:
+            self._scaling_frame.pack(fill=tk.X, pady=(0, self._shell.pad))
+        else:
+            self._scaling_frame.pack_forget()
         if scaling:
             self._model_var.set("alpha")
             self._model_combo.configure(state="disabled")
-            self._coefficient_label.configure(text="alpha (scaling uses alpha-FPUT)")
+            self._coefficient_label.configure(text="α (alpha-FPUT)")
         else:
             self._model_combo.configure(state="readonly")
             self._coefficient_label.configure(text="α / β")
+        self._shell.refresh()
 
     def _collect_single(self) -> dict[str, object]:
         n = parse_positive_int(self._n_var.get(), name="N", min_value=2)

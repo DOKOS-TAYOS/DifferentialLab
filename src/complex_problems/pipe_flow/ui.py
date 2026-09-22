@@ -15,6 +15,8 @@ from complex_problems.common import (
     parse_positive_int,
 )
 from complex_problems.common.dialog_ui import (
+    AdvancedDialogShell,
+    AdvancedDialogSize,
     make_labeled_combo,
     make_labeled_entry,
     make_labeled_spinbox,
@@ -24,9 +26,8 @@ from complex_problems.pipe_flow.solver import solve_pipe_flow
 from config import get_env_from_schema
 from frontend.performance_guard import assess_pipe_flow_request, confirm_performance_advisory
 from frontend.theme import get_font
-from frontend.ui_dialogs.scrollable_frame import ScrollableFrame
 from frontend.ui_dialogs.tooltip import ToolTip
-from frontend.window_utils import fit_and_center, make_modal
+from frontend.window_utils import make_modal
 
 _MODELS = ("steady", "transient")
 _PROFILES = ("constant", "converging", "diverging", "sinusoidal", "custom")
@@ -40,47 +41,41 @@ class PipeFlowDialog:
         self.parent = parent
         self.win = tk.Toplevel(parent)
         self.win.title("Pipe Flow")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
         self._build_ui()
-        fit_and_center(self.win, min_width=1080, min_height=820, padding=32, resizable=True)
-        self.win.minsize(940, 720)
+        self._shell.finish(AdvancedDialogSize(940, 760, 680, 520))
         make_modal(self.win, parent)
+        self._initial_focus.focus_set()
 
     def _build_ui(self) -> None:
         pad = int(get_env_from_schema("UI_PADDING"))
-        root = ttk.Frame(self.win, padding=pad * 2)
-        root.pack(fill=tk.BOTH, expand=True)
-        scroll = ScrollableFrame(root)
-        scroll.apply_bg(get_env_from_schema("UI_BACKGROUND"))
-        scroll.pack(fill=tk.BOTH, expand=True)
-        body = scroll.inner
-        body.configure(padding=pad)
-
-        ttk.Label(body, text="Pipe Flow", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(
-            body,
-            text=(
-                "Use steady Darcy-Weisbach flow or a transient pressure-wave model.\n"
+        self._shell = AdvancedDialogShell(
+            self.win,
+            title="Pipe Flow",
+            description=(
+                "Use steady Darcy–Weisbach flow or a transient pressure-wave model. "
                 "Define pipe geometry, friction correlation, fluid properties, and pressure inputs."
             ),
-            style="Small.TLabel",
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, pady=(0, pad))
+            pad=pad,
+        )
+        body = self._shell.body
 
         add_how_to_config_section(
             body,
-            scroll,
+            self._shell.scroll,
             problem_id="pipe_flow",
             pad=pad,
             wraplength=820,
         )
 
-        row = ttk.Frame(body)
+        formulation = ttk.LabelFrame(body, text="Formulation", padding=pad)
+        formulation.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(formulation)
         row.pack(fill=tk.X, pady=pad // 2)
         self._model_var = tk.StringVar(value="steady")
         self._profile_var = tk.StringVar(value="constant")
         self._friction_var = tk.StringVar(value="auto")
         model_combo = make_labeled_combo(row, "Model", self._model_var, _MODELS, width=10)
+        self._initial_focus = model_combo
         profile_combo = make_labeled_combo(
             row,
             "Profile",
@@ -92,17 +87,16 @@ class PipeFlowDialog:
         model_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
         profile_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_visibility())
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(formulation)
         row.pack(fill=tk.X, pady=pad // 2)
         self._length_var = tk.StringVar(value="20.0")
         self._nx_var = tk.StringVar(value="256")
         make_labeled_entry(row, "Length L", self._length_var, width=10)
         make_labeled_spinbox(row, "Nₓ", self._nx_var, from_=16, to=32768, width=8)
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Geometry", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        geometry = ttk.LabelFrame(body, text="Geometry", padding=pad)
+        geometry.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(geometry)
         row.pack(fill=tk.X, pady=pad // 2)
         self._d_in_var = tk.StringVar(value="0.08")
         self._d_out_var = tk.StringVar(value="0.05")
@@ -111,14 +105,14 @@ class PipeFlowDialog:
         make_labeled_entry(row, "dₒᵤₜ (m)", self._d_out_var, width=8)
         make_labeled_entry(row, "d₀ (m)", self._d0_var, width=8)
 
-        row = ttk.Frame(body)
+        row = ttk.Frame(geometry)
         row.pack(fill=tk.X, pady=pad // 2)
         self._amp_var = tk.StringVar(value="0.20")
         self._waves_var = tk.StringVar(value="2.0")
         make_labeled_entry(row, "Sin amplitude", self._amp_var, width=10)
         make_labeled_entry(row, "Sin waves", self._waves_var, width=8)
 
-        self._custom_row = ttk.Frame(body)
+        self._custom_row = ttk.Frame(geometry)
         self._custom_row.pack(fill=tk.X, pady=pad // 2)
         ttk.Label(self._custom_row, text="D(x) =").pack(side=tk.LEFT, padx=(0, 4))
         self._custom_expr_var = tk.StringVar(value="0.06 + 0.005*sin(2*pi*x/20)")
@@ -131,10 +125,9 @@ class PipeFlowDialog:
         self._custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         ToolTip(self._custom_entry, "Custom diameter expression in meters; variable x.")
 
-        ttk.Separator(body).pack(fill=tk.X, pady=pad)
-        ttk.Label(body, text="Fluid", style="Small.TLabel").pack(anchor=tk.W)
-
-        row = ttk.Frame(body)
+        fluid = ttk.LabelFrame(body, text="Fluid properties", padding=pad)
+        fluid.pack(fill=tk.X, pady=(0, pad))
+        row = ttk.Frame(fluid)
         row.pack(fill=tk.X, pady=pad // 2)
         self._rho_var = tk.StringVar(value="1000")
         self._mu_var = tk.StringVar(value="0.001")
@@ -143,13 +136,8 @@ class PipeFlowDialog:
         make_labeled_entry(row, "μ (Pa·s)", self._mu_var, width=10)
         make_labeled_entry(row, "Roughness (m)", self._rough_var, width=10)
 
-        self._steady_frame = ttk.Frame(body)
+        self._steady_frame = ttk.LabelFrame(body, text="Steady pressure boundary", padding=pad)
         self._steady_frame.pack(fill=tk.X, pady=pad)
-        ttk.Label(
-            self._steady_frame,
-            text="Steady pressure boundary",
-            style="Small.TLabel",
-        ).pack(anchor=tk.W)
         row = ttk.Frame(self._steady_frame)
         row.pack(fill=tk.X, pady=pad // 2)
         self._p_in_var = tk.StringVar(value="200000")
@@ -157,11 +145,8 @@ class PipeFlowDialog:
         make_labeled_entry(row, "pᵢₙ (Pa)", self._p_in_var, width=10)
         make_labeled_entry(row, "pₒᵤₜ (Pa)", self._p_out_var, width=10)
 
-        self._transient_frame = ttk.Frame(body)
+        self._transient_frame = ttk.LabelFrame(body, text="Transient forcing", padding=pad)
         self._transient_frame.pack(fill=tk.X, pady=pad)
-        ttk.Label(self._transient_frame, text="Transient forcing", style="Small.TLabel").pack(
-            anchor=tk.W
-        )
 
         row = ttk.Frame(self._transient_frame)
         row.pack(fill=tk.X, pady=pad // 2)
@@ -171,6 +156,8 @@ class PipeFlowDialog:
         self._wave_speed_var = tk.StringVar(value="200")
         make_labeled_entry(row, "p_base (Pa)", self._p_base_var, width=10)
         make_labeled_entry(row, "p_amp (Pa)", self._p_amp_var, width=10)
+        row = ttk.Frame(self._transient_frame)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "p_freq (Hz)", self._p_freq_var, width=9)
         make_labeled_entry(row, "Wave c (m/s)", self._wave_speed_var, width=10)
 
@@ -182,37 +169,29 @@ class PipeFlowDialog:
         self._sample_every_var = tk.StringVar(value="10")
         make_labeled_entry(row, "Damping", self._damping_var, width=8)
         make_labeled_entry(row, "tₘₐₓ", self._t_max_var, width=8)
+        row = ttk.Frame(self._transient_frame)
+        row.pack(fill=tk.X, pady=pad // 2)
         make_labeled_entry(row, "Δt", self._dt_var, width=8)
         make_labeled_entry(row, "Sample every", self._sample_every_var, width=10)
 
-        self._btn_row = ttk.Frame(body)
-        self._btn_row.pack(fill=tk.X, pady=(pad * 2, 0))
-        ttk.Button(self._btn_row, text="Solve", command=self._on_solve).pack(
-            side=tk.LEFT, padx=(0, pad)
-        )
-        ttk.Button(
-            self._btn_row,
-            text="Close",
-            style="Cancel.TButton",
-            command=self.win.destroy,
-        ).pack(side=tk.LEFT)
+        self._shell.add_footer_button("Close", self.win.destroy)
+        self._shell.add_footer_button("Solve", self._on_solve, primary=True)
 
         self._update_visibility()
 
-        scroll.bind_new_children()
-
     def _update_visibility(self) -> None:
         if self._profile_var.get() == "custom":
-            self._custom_row.pack(fill=tk.X, pady=4, before=self._btn_row)
+            self._custom_row.pack(fill=tk.X, pady=4)
         else:
             self._custom_row.pack_forget()
 
         if self._model_var.get() == "steady":
-            self._steady_frame.pack(fill=tk.X, pady=8, before=self._btn_row)
+            self._steady_frame.pack(fill=tk.X, pady=8)
             self._transient_frame.pack_forget()
         else:
-            self._transient_frame.pack(fill=tk.X, pady=8, before=self._btn_row)
+            self._transient_frame.pack(fill=tk.X, pady=8)
             self._steady_frame.pack_forget()
+        self._shell.refresh()
 
     def _collect_inputs(self) -> dict[str, object]:
         model_type = self._model_var.get()
