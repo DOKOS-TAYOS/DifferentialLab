@@ -284,15 +284,15 @@ class Aerodynamics2DResultDialog:
         tab_anim = ttk.Frame(nb)
         nb.add(tab_anim, text="Animation")
         self._build_anim_tab(tab_anim)
+        tab_stream = ttk.Frame(nb)
+        nb.add(tab_stream, text="Streamlines")
+        self._build_stream_tab(tab_stream)
         tab_map = ttk.Frame(nb)
         nb.add(tab_map, text="Field Map")
         self._build_map_tab(tab_map)
         tab_coef = ttk.Frame(nb)
         nb.add(tab_coef, text="Drag / Lift")
         self._build_coeff_tab(tab_coef)
-        tab_stream = ttk.Frame(nb)
-        nb.add(tab_stream, text="Streamlines")
-        self._build_stream_tab(tab_stream)
         tab_profile = ttk.Frame(nb)
         nb.add(tab_profile, text="Centerline Profiles")
         self._build_profile_tab(tab_profile)
@@ -300,12 +300,12 @@ class Aerodynamics2DResultDialog:
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
         group = ctrl.add_group(requested_width=190)
-        self._view_var = tk.StringVar(value="speed")
+        self._view_var = tk.StringVar(value="vorticity")
         ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
             group,
             textvariable=self._view_var,
-            values=("speed", "vorticity", "pressure"),
+            values=("vorticity", "speed", "pressure"),
             state="readonly",
             width=12,
             font=get_font(),
