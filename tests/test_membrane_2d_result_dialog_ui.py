@@ -139,3 +139,31 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
 
     assert "ffmpeg" in show_error.call_args.args[1].lower()
     plt.close("all")
+
+
+
+def test_result_tabs_prioritize_visual_membrane_views() -> None:
+    dialog = object.__new__(result_dialog.Membrane2DResultDialog)
+    dialog.win = MagicMock()
+    dialog._result = SimpleNamespace(magnitudes={})
+    notebook = MagicMock()
+    shell = MagicMock(notebook=notebook)
+
+    with (
+        patch.object(result_dialog, "AdvancedResultShell", return_value=shell),
+        patch.object(result_dialog.ttk, "Frame", side_effect=lambda _parent: MagicMock()),
+        patch.object(dialog, "_build_animation_tab"),
+        patch.object(dialog, "_build_surface_tab"),
+        patch.object(dialog, "_build_spectrum_tab"),
+        patch.object(dialog, "_build_space_time_tab"),
+        patch.object(dialog, "_build_energy_tab"),
+    ):
+        dialog._build_ui()
+
+    assert [call.kwargs["text"] for call in notebook.add.call_args_list] == [
+        "Animation",
+        "Surface 3D",
+        "Spectrum",
+        "Centerline Map",
+        "Energy",
+    ]
