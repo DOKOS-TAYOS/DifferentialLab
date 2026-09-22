@@ -303,7 +303,7 @@ class FPUTResultDialog:
         self._canvases: list[object] = []
         self._animation_canvas: object | None = None
         self._animation_plot_frame: ttk.Frame | None = None
-        self._representation_var = tk.StringVar(value="strain")
+        self._representation_var = tk.StringVar(value="displacement")
         self._space_representation_var = tk.StringVar(value="strain")
         self._surface_representation_var = tk.StringVar(value="strain")
         self._modal_scale_var = tk.StringVar(value="Linear")
@@ -343,15 +343,15 @@ class FPUTResultDialog:
             self._build_sweep(notebook)
             return
         result = self.result
-        self._add_plot(notebook, "Overview / Recurrence", create_recurrence_figure(result))
         self._build_animation_tab(notebook)
+        self._add_plot(notebook, "Overview / Recurrence", create_recurrence_figure(result))
+        self._build_modal_tab(notebook)
         self._build_representation_tab(
             notebook, "Space-Time", self._space_representation_var, self._space_time_figure
         )
         self._build_representation_tab(
             notebook, "3D Surface", self._surface_representation_var, self._surface_figure
         )
-        self._build_modal_tab(notebook)
         self._build_phase_tab(notebook)
         self._add_plot(notebook, "Hamiltonian", create_hamiltonian_figure(result))
         self._add_plot(
@@ -553,7 +553,7 @@ class FPUTResultDialog:
         kind = ttk.Combobox(
             kind_group,
             textvariable=self._phase_kind_var,
-            values=("Particle", "Normal mode"),
+            values=("Normal mode", "Particle"),
             state="readonly",
             width=14,
         )
