@@ -814,7 +814,7 @@ class Aerodynamics3DResultDialog:
                 ylabel=plane[1].lower(),
                 x_coordinates=payload.x_axis,
                 y_coordinates=payload.y_axis,
-                symmetric_color_range=payload.field not in {"Speed", "Pressure"},
+                symmetric_color_range=payload.field in {"u", "v", "w"},
             )
             self._set_canvas("slices", embed_animation_plot_in_tk(figure, target))
 
