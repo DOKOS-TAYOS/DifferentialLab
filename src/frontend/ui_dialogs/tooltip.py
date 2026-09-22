@@ -60,6 +60,17 @@ class ToolTip:
         except (AttributeError, tk.TclError):
             return "unknown"
 
+    def _dismiss_other_tooltip(self) -> None:
+        """Ensure this window never displays more than one contextual tooltip."""
+        try:
+            toplevel = self.widget.winfo_toplevel()
+        except (AttributeError, tk.TclError):
+            return
+        active = getattr(toplevel, "_active_tooltip", None)
+        if isinstance(active, ToolTip) and active is not self:
+            active._cancel_pending()
+            active._hide()
+
     def _mark_keyboard_modality(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         """Record keyboard activity without changing the focused tooltip."""
         try:
@@ -97,6 +108,9 @@ class ToolTip:
         self._id_after = None
 
     def _on_enter(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+        self._mark_pointer_modality(_event)
+        self._has_focus = False
+        self._dismiss_other_tooltip()
         self._pointer_inside = True
         self._schedule()
 
@@ -126,6 +140,12 @@ class ToolTip:
             return
         if not self.text or not self.text.strip():
             return
+
+        self._dismiss_other_tooltip()
+        try:
+            toplevel = self.widget.winfo_toplevel()
+        except (AttributeError, tk.TclError):
+            toplevel = None
 
         x = self.widget.winfo_rootx() + 20
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
@@ -159,6 +179,8 @@ class ToolTip:
         )
         label.pack()
         self._tipwindow = tw
+        if toplevel is not None:
+            setattr(toplevel, "_active_tooltip", self)
 
     def _on_destroy(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         self._cancel_pending()
@@ -171,3 +193,9 @@ class ToolTip:
             except tk.TclError:
                 pass
             self._tipwindow = None
+        try:
+            toplevel = self.widget.winfo_toplevel()
+        except (AttributeError, tk.TclError):
+            return
+        if getattr(toplevel, "_active_tooltip", None) is self:
+            setattr(toplevel, "_active_tooltip", None)
