@@ -96,6 +96,7 @@ Run `pyright` when it is installed in your environment.
 Docs verification:
 
 ```bash
+pip install -e ".[docs]"
 python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
