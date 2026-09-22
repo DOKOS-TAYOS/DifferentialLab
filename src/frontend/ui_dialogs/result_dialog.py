@@ -98,6 +98,22 @@ def responsive_control_rows(
     return tuple(tuple(row) for row in rows)
 
 
+def responsive_control_grid(
+    rows: Sequence[Sequence[int]],
+) -> tuple[tuple[tuple[int, int, int], ...], ...]:
+    """Map responsive rows to shared grid columns without cross-row displacement."""
+    if not rows:
+        return ()
+    slot_count = math.lcm(*(len(row) for row in rows))
+    layout: list[tuple[tuple[int, int, int], ...]] = []
+    for row in rows:
+        span = slot_count // len(row)
+        layout.append(
+            tuple((group_index, column_index * span, span) for column_index, group_index in enumerate(row))
+        )
+    return tuple(layout)
+
+
 def normalized_series_selection(
     selected: Iterable[int],
     *,
@@ -224,18 +240,17 @@ class _ViewControls(ttk.LabelFrame):
         widths = [group.winfo_reqwidth() for group in visible_groups]
         available = max(1, self.winfo_width() - 24)
         rows = responsive_control_rows(available, widths)
-        slot_count = math.lcm(*(len(row) for row in rows))
-        for row_index, row in enumerate(rows):
-            span = slot_count // len(row)
-            for column_index, group_index in enumerate(row):
+        grid_rows = responsive_control_grid(rows)
+        for row_index, row in enumerate(grid_rows):
+            for column_index, (group_index, grid_column, columnspan) in enumerate(row):
                 group = visible_groups[group_index]
                 group.grid(
                     row=row_index,
-                    column=column_index * span,
-                    columnspan=span,
+                    column=grid_column,
+                    columnspan=columnspan,
                     sticky=tk.W,
                     padx=(0, _CONTROL_GAP if column_index < len(row) - 1 else 0),
-                    pady=(0, 4 if row_index < len(rows) - 1 else 0),
+                    pady=(0, 4 if row_index < len(grid_rows) - 1 else 0),
                 )
 
 
