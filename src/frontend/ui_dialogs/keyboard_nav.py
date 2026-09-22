@@ -35,8 +35,16 @@ def setup_arrow_enter_navigation(
         if w is not None:
             w.focus_set()
 
+    def _mark_keyboard_modality(widget: Any) -> None:
+        """Record keyboard intent before an arrow binding consumes the event."""
+        try:
+            setattr(widget.winfo_toplevel(), "_tooltip_modality", "keyboard")
+        except (AttributeError, tk.TclError):
+            pass
+
     def _move(event: tk.Event, dr: int, dc: int) -> str:  # type: ignore[type-arg]
         current = event.widget
+        _mark_keyboard_modality(current)
         for (r, c), w in grid.items():
             if w is current:
                 nr, nc = r + dr, c + dc
