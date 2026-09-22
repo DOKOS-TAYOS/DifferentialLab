@@ -182,7 +182,12 @@ class MainMenu:
         )
         setup_arrow_enter_navigation([[self.btn_info, self.btn_config, self.btn_quit]])
 
-        def _focus_boundary(_event: object, target: ttk.Button) -> str:
+        def _focus_boundary(event: object, target: ttk.Button) -> str:
+            widget = getattr(event, "widget", None)
+            try:
+                setattr(widget.winfo_toplevel(), "_tooltip_modality", "keyboard")
+            except (AttributeError, tk.TclError):
+                pass
             target.focus_set()
             return "break"
 
