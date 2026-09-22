@@ -125,6 +125,10 @@ class AntennaRadiationResultDialog:
         )
         nb = self._shell.notebook
 
+        tab_3d = ttk.Frame(nb)
+        nb.add(tab_3d, text="3D Pattern")
+        self._build_3d_tab(tab_3d)
+
         tab_map = ttk.Frame(nb)
         nb.add(tab_map, text="Angular Gain Map")
         self._build_map_tab(tab_map)
@@ -136,10 +140,6 @@ class AntennaRadiationResultDialog:
         tab_phi = ttk.Frame(nb)
         nb.add(tab_phi, text="Phi Cut")
         self._build_phi_cut_tab(tab_phi)
-
-        tab_3d = ttk.Frame(nb)
-        nb.add(tab_3d, text="3D Pattern")
-        self._build_3d_tab(tab_3d)
 
         tab_field = ttk.Frame(nb)
         nb.add(tab_field, text="Field Strength")
