@@ -56,20 +56,18 @@ def derived_vorticity(
     return (*omega, magnitude)
 
 
-def _interpolators(
+def _velocity_interpolator(
     result: Aerodynamics3DResult, frame: int
-) -> tuple[RegularGridInterpolator, RegularGridInterpolator, RegularGridInterpolator]:
-    """Create linear interpolators for one saved velocity frame."""
+) -> RegularGridInterpolator:
+    """Create one vector-valued interpolator for a saved velocity frame."""
     axes = (result.z, result.y, result.x)
-    return tuple(
-        RegularGridInterpolator(
-            axes,
-            field[frame],
-            bounds_error=False,
-            fill_value=np.nan,
-        )
-        for field in (result.u, result.v, result.w)
-    )  # type: ignore[return-value]
+    values = np.stack((result.u[frame], result.v[frame], result.w[frame]), axis=-1)
+    return RegularGridInterpolator(
+        axes,
+        values,
+        bounds_error=False,
+        fill_value=np.nan,
+    )
 
 
 def trace_streamline_3d(
@@ -80,6 +78,7 @@ def trace_streamline_3d(
     step_size: float | None = None,
     max_steps: int = 300,
     speed_epsilon: float = 1.0e-8,
+    _interpolator: RegularGridInterpolator | None = None,
 ) -> np.ndarray:
     """Trace one streamline with RK4 using a normalized tangent field.
 
@@ -101,7 +100,7 @@ def trace_streamline_3d(
     )
     if step <= 0:
         raise ValueError("step_size must be positive.")
-    interpolators = _interpolators(result, frame)
+    interpolator = _interpolator or _velocity_interpolator(result, frame)
     lower = np.array([result.x[0], result.y[0], result.z[0]], dtype=float)
     upper = np.array([result.x[-1], result.y[-1], result.z[-1]], dtype=float)
 
@@ -109,8 +108,8 @@ def trace_streamline_3d(
         """Interpolate, validate, and normalize one RK stage."""
         if np.any(point < lower) or np.any(point > upper):
             return None
-        values = np.array(
-            [interpolator((point[2], point[1], point[0]))[()] for interpolator in interpolators],
+        values = np.asarray(
+            interpolator((point[2], point[1], point[0])),
             dtype=float,
         )
         if not np.all(np.isfinite(values)):
@@ -138,17 +137,28 @@ def trace_streamline_3d(
         if k4 is None:
             break
         next_point = point + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0
-        if tangent(next_point) is None or _point_is_obstacle(result, next_point):
+        if np.any(next_point < lower) or np.any(next_point > upper):
+            break
+        if _point_is_obstacle(result, next_point):
             break
         points.append(next_point)
     return np.asarray(points, dtype=float)
 
 
+def _nearest_uniform_index(values: np.ndarray, coordinate: float) -> int:
+    """Return the nearest index on a uniformly spaced coordinate axis."""
+    if len(values) < 2:
+        return 0
+    spacing = float(values[1] - values[0])
+    index = int(np.rint((coordinate - float(values[0])) / spacing))
+    return max(0, min(index, len(values) - 1))
+
+
 def _point_is_obstacle(result: Aerodynamics3DResult, point: np.ndarray) -> bool:
-    """Check a point against the nearest stored obstacle cell."""
-    ix = int(np.argmin(np.abs(result.x - point[0])))
-    iy = int(np.argmin(np.abs(result.y - point[1])))
-    iz = int(np.argmin(np.abs(result.z - point[2])))
+    """Check a point against the nearest stored obstacle cell in O(1)."""
+    ix = _nearest_uniform_index(result.x, float(point[0]))
+    iy = _nearest_uniform_index(result.y, float(point[1]))
+    iz = _nearest_uniform_index(result.z, float(point[2]))
     return bool(result.obstacle_mask[iz, iy, ix])
 
 
@@ -184,13 +194,26 @@ class StreamlineAnimationCache:
 def build_streamline_cache(
     result: Aerodynamics3DResult, density: int = 4
 ) -> StreamlineAnimationCache:
-    """Trace and cache all streamline frames from an existing result only."""
+    """Trace and cache all streamline frames while reusing one interpolator per frame."""
     seeds = make_streamline_seeds(result, density)
-    frames = tuple(
-        tuple(trace_streamline_3d(seed, result=result, frame=frame) for seed in seeds)
-        for frame in range(len(result.t))
+    frames: list[tuple[np.ndarray, ...]] = []
+    for frame in range(len(result.t)):
+        interpolator = _velocity_interpolator(result, frame)
+        frames.append(
+            tuple(
+                trace_streamline_3d(
+                    seed,
+                    result=result,
+                    frame=frame,
+                    _interpolator=interpolator,
+                )
+                for seed in seeds
+            )
+        )
+    return StreamlineAnimationCache(
+        seed_density=int(density),
+        lines_by_frame=tuple(frames),
     )
-    return StreamlineAnimationCache(seed_density=int(density), lines_by_frame=frames)
 
 
 def slice_index_count(result: Aerodynamics3DResult, plane: str) -> int:
@@ -405,6 +428,31 @@ def flow_vector_components(
     raise ValueError(f"Unknown flow display '{display}'.")
 
 
+def _arrow_length_bounds(result: Aerodynamics3DResult) -> tuple[float, float]:
+    """Return fixed visual arrow-length bounds for one result domain."""
+    spans = (
+        float(result.x[-1] - result.x[0]),
+        float(result.y[-1] - result.y[0]),
+        float(result.z[-1] - result.z[0]),
+    )
+    reference = max(min(spans), 1.0e-12)
+    return 0.02 * reference, 0.08 * reference
+
+
+def _scaled_arrow_lengths(
+    magnitude: np.ndarray,
+    magnitude_scale: float,
+    *,
+    minimum: float,
+    maximum: float,
+    bias: float = 15.0,
+) -> np.ndarray:
+    """Map relative magnitudes logarithmically into fixed visual bounds."""
+    relative = np.clip(magnitude / max(float(magnitude_scale), 1.0e-12), 0.0, 1.0)
+    normalized = np.log1p(bias * relative) / np.log1p(bias)
+    return minimum + (maximum - minimum) * normalized
+
+
 def _flow_scale(result: Aerodynamics3DResult, display: str) -> float:
     """Compute one stable magnitude scale for a flow display mode."""
     if display == "Velocity vectors":
@@ -447,16 +495,23 @@ def _create_flow_figure(payload: _FlowPayload) -> Figure:
             np.divide(component, magnitude, out=direction, where=valid)
         relative = np.clip(magnitude / payload.magnitude_scale, 0.0, 1.0)
         colors = cmap(0.05 + 0.75 * relative)
-        length_scale = np.log1p(15.0 * relative) / np.log1p(15.0)
+        minimum_length, maximum_length = _arrow_length_bounds(result)
+        arrow_lengths = _scaled_arrow_lengths(
+            magnitude,
+            payload.magnitude_scale,
+            minimum=minimum_length,
+            maximum=maximum_length,
+        )
+        visible = valid & (relative > 1.0e-6)
         axis.quiver(
-            xs[valid],
-            ys[valid],
-            zs[valid],
-            directions[0][valid] * length_scale[valid],
-            directions[1][valid] * length_scale[valid],
-            directions[2][valid] * length_scale[valid],
-            colors=colors[valid],
-            length=0.16,
+            xs[visible],
+            ys[visible],
+            zs[visible],
+            directions[0][visible] * arrow_lengths[visible],
+            directions[1][visible] * arrow_lengths[visible],
+            directions[2][visible] * arrow_lengths[visible],
+            colors=colors[visible],
+            length=1.0,
             normalize=False,
             linewidth=0.9,
             alpha=0.86,
