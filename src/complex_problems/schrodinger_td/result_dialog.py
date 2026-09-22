@@ -245,6 +245,11 @@ class SchrodingerTDResultDialog:
         nb.add(tab_anim, text="Animation")
         self._build_animation_tab(tab_anim)
 
+        if self._result.dimension == 2:
+            tab_extra = ttk.Frame(nb)
+            nb.add(tab_extra, text="Density Surface")
+            self._build_extra_tab(tab_extra)
+
         tab_st = ttk.Frame(nb)
         nb.add(tab_st, text="Density Maps")
         self._build_space_tab(tab_st)
@@ -262,9 +267,10 @@ class SchrodingerTDResultDialog:
         nb.add(tab_inv, text="Expectations")
         self._build_invariants_tab(tab_inv)
 
-        tab_extra = ttk.Frame(nb)
-        nb.add(tab_extra, text="Potential / Surface")
-        self._build_extra_tab(tab_extra)
+        if self._result.dimension == 1:
+            tab_extra = ttk.Frame(nb)
+            nb.add(tab_extra, text="Potential")
+            self._build_extra_tab(tab_extra)
 
     def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
         """Initialize the deferred 2D Spectrum tab on its first selection."""
