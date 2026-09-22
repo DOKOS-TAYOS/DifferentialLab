@@ -292,7 +292,6 @@ def test_transient_animation_wires_export_for_each_selected_field() -> None:
         assert callable(captured["on_export_mp4"])
 
 
-
 def test_transient_result_tabs_prioritize_animation_and_velocity() -> None:
     dialog = object.__new__(result_dialog.PipeFlowResultDialog)
     dialog.win = MagicMock()
