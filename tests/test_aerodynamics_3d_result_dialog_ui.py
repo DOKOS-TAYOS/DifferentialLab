@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from unittest.mock import patch
 
 import numpy as np
 
+import complex_problems.aerodynamics_3d.result_dialog as result_dialog
 from complex_problems.aerodynamics_3d.result_dialog import (
+    _scaled_arrow_lengths,
     build_streamline_cache,
     prepare_slice_history,
     slice_center_index,
@@ -107,3 +110,39 @@ def test_streamline_cache_has_one_entry_per_saved_frame() -> None:
     assert cache.seed_density == 2
     assert cache.frame_count == len(result.t)
     assert len(cache.frames) == len(result.t)
+
+
+
+def test_streamline_cache_reuses_one_velocity_interpolator_per_frame() -> None:
+    result = _uniform_result()
+    result = replace(
+        result,
+        t=np.array([0.0, 0.5, 1.0]),
+        u=np.repeat(result.u, 3, axis=0),
+        v=np.repeat(result.v, 3, axis=0),
+        w=np.repeat(result.w, 3, axis=0),
+    )
+    with patch.object(
+        result_dialog,
+        "_velocity_interpolator",
+        wraps=result_dialog._velocity_interpolator,
+    ) as interpolator_factory:
+        cache = build_streamline_cache(result, density=2)
+
+    assert cache.frame_count == len(result.t)
+    assert interpolator_factory.call_count == len(result.t)
+
+
+def test_log_scaled_arrow_lengths_stay_within_fixed_bounds() -> None:
+    magnitude = np.array([1.0e-6, 0.1, 0.5, 1.0, 5.0])
+    lengths = _scaled_arrow_lengths(
+        magnitude,
+        1.0,
+        minimum=0.04,
+        maximum=0.16,
+    )
+
+    assert np.all(np.diff(lengths) >= 0.0)
+    assert lengths[0] >= 0.04
+    assert lengths[-1] == 0.16
+    assert np.all(lengths <= 0.16)
