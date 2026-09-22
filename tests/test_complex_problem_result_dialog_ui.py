@@ -16,6 +16,21 @@ def _load_result_dialog_ui_module() -> Any:
         pytest.fail(f"result_dialog_ui module not yet implemented: {exc}")
 
 
+def test_responsive_view_control_rows_preserve_groups() -> None:
+    ui = _load_result_dialog_ui_module()
+    assert ui.layout_view_control_groups(600, (120, 160, 180)) == ((0, 1, 2),)
+    assert ui.layout_view_control_groups(300, (120, 160, 180)) == ((0, 1), (2,))
+    assert ui.layout_view_control_groups(300, (420, 80)) == ((0,), (1,))
+
+
+def test_multi_selector_selection_rules_are_deterministic() -> None:
+    ui = _load_result_dialog_ui_module()
+    assert ui.layout_view_control_groups(300, (180, 80, 180)) == ((0, 1), (2,))
+    assert ui.normalize_multi_selector_indexes(5, (3, 1, 3), allow_empty=True) == (1, 3)
+    assert ui.normalize_multi_selector_indexes(5, (), allow_empty=True) == ()
+    assert ui.normalize_multi_selector_indexes(5, (), allow_empty=False) == (0,)
+
+
 class _FakeFigure:
     pass
 

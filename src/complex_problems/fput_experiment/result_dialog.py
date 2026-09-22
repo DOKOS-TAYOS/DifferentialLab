@@ -384,9 +384,10 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text=title)
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
+        group = controls.add_group(requested_width=220)
+        ttk.Label(group, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
-            controls,
+            group,
             textvariable=variable,
             values=("displacement", "strain"),
             state="readonly",
@@ -427,9 +428,10 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Lattice Animation")
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
+        group = controls.add_group(requested_width=220)
+        ttk.Label(group, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
-            controls,
+            group,
             textvariable=self._representation_var,
             values=("displacement", "strain"),
             state="readonly",
@@ -482,13 +484,16 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Modal Energies")
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Modes (1..N):").pack(side=tk.LEFT)
-        ttk.Entry(controls, textvariable=self._mode_selection_var, width=14).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Label(controls, text="Heatmap scale:").pack(side=tk.LEFT)
+        mode_group = controls.add_group(requested_width=280)
+        ttk.Label(mode_group, text="Modes (1..N):").pack(side=tk.LEFT)
+        mode_entry = ttk.Entry(mode_group, textvariable=self._mode_selection_var, width=14)
+        mode_entry.pack(side=tk.LEFT, padx=5)
+        update_button = ttk.Button(mode_group, text="Update")
+        update_button.pack(side=tk.LEFT, padx=(0, 8))
+        scale_group = controls.add_group(requested_width=190)
+        ttk.Label(scale_group, text="Heatmap scale:").pack(side=tk.LEFT)
         scale = ttk.Combobox(
-            controls,
+            scale_group,
             textvariable=self._modal_scale_var,
             values=("Linear", "log10 normalized"),
             state="readonly",
@@ -513,8 +518,9 @@ class FPUTResultDialog:
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
 
+        update_button.configure(command=update)
+        mode_entry.bind("<Return>", update)
         scale.bind("<<ComboboxSelected>>", update)
-        self._mode_selection_var.trace_add("write", lambda *_args: update())
         update()
 
     def _build_phase_tab(self, notebook: ttk.Notebook) -> None:
@@ -523,23 +529,27 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Phase Space")
         controls = make_view_controls(tab)
+        kind_group = controls.add_group(requested_width=150)
         kind = ttk.Combobox(
-            controls,
+            kind_group,
             textvariable=self._phase_kind_var,
             values=("Particle", "Normal mode"),
             state="readonly",
             width=14,
         )
         kind.pack(side=tk.LEFT)
-        ttk.Label(controls, text="Index (1..N):").pack(side=tk.LEFT, padx=(12, 4))
+        index_group = controls.add_group(requested_width=170)
+        ttk.Label(index_group, text="Index (1..N):").pack(side=tk.LEFT, padx=(0, 4))
         index = ttk.Spinbox(
-            controls,
+            index_group,
             from_=1,
             to=self.result.displacement.shape[1],
             textvariable=self._phase_index_var,
             width=6,
         )
         index.pack(side=tk.LEFT)
+        update_button = ttk.Button(index_group, text="Update")
+        update_button.pack(side=tk.LEFT, padx=(6, 0))
         frame = ttk.Frame(tab)
         frame.pack(fill=tk.BOTH, expand=True)
         canvas: list[object | None] = [None]
@@ -574,7 +584,8 @@ class FPUTResultDialog:
             self._canvases.append(canvas[0])
 
         kind.bind("<<ComboboxSelected>>", update)
-        self._phase_index_var.trace_add("write", lambda *_args: update())
+        update_button.configure(command=update)
+        index.bind("<Return>", update)
         update()
 
     def _heatmap(

@@ -278,14 +278,15 @@ class SchrodingerTDResultDialog:
 
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
+        group = ctrl.add_group(requested_width=190)
         if self._result.dimension == 1:
             options = ("Density", "Real", "Imag")
         else:
             options = ("Density", "Phase")
         self._anim_view_var = tk.StringVar(value=options[0])
-        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
-            ctrl,
+            group,
             textvariable=self._anim_view_var,
             values=list(options),
             state="readonly",

@@ -152,10 +152,11 @@ class Membrane2DResultDialog:
 
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
-        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        group = ctrl.add_group(requested_width=190)
+        ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_field_var = tk.StringVar(value="2D Field")
         combo = ttk.Combobox(
-            ctrl,
+            group,
             textvariable=self._anim_field_var,
             values=("2D Field", "2D Velocity", "3D Surface", "Spectrum"),
             state="readonly",

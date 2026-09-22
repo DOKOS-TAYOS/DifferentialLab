@@ -452,28 +452,7 @@ def test_kdv_selector_contract_defaults_to_no_optional_overlays() -> None:
     assert dialog._selected_animation_labels() == ()
 
 
-def test_kdv_selector_uses_extended_mode_and_compact_unselected_list() -> None:
-    created: dict[str, object] = {}
-
-    class _Listbox:
-        def __init__(self, _parent: object, **kwargs: object) -> None:
-            created.update(kwargs)
-
-        def insert(self, _index: object, _label: str) -> None:
-            pass
-
-        def pack(self, **_kwargs: object) -> None:
-            pass
-
-        def bind(self, *_args: object) -> None:
-            pass
-
-        def configure(self, **_kwargs: object) -> None:
-            pass
-
-        def yview(self, *_args: object) -> None:
-            pass
-
+def test_kdv_selector_uses_shared_multi_selector() -> None:
     dialog = object.__new__(result_dialog.NonlinearWavesResultDialog)
     dialog.win = object()
     dialog._result = SimpleNamespace(
@@ -483,17 +462,15 @@ def test_kdv_selector_uses_extended_mode_and_compact_unselected_list() -> None:
     dialog._update_anim = MagicMock()
     dialog._tracked_soliton_centers = None
     with (
-        patch.object(result_dialog.tk, "Listbox", _Listbox),
         patch.object(result_dialog.tk, "BooleanVar", return_value=MagicMock(get=lambda: False)),
         patch.object(result_dialog.ttk, "Checkbutton", return_value=MagicMock(pack=MagicMock())),
-        patch.object(result_dialog.ttk, "Scrollbar", return_value=MagicMock(pack=MagicMock())),
         patch.object(result_dialog, "ToolTip"),
         patch.object(result_dialog, "get_font", return_value=None),
+        patch.object(result_dialog.AdvancedMultiSelector, "__init__", return_value=None),
+        patch.object(result_dialog.AdvancedMultiSelector, "pack"),
     ):
         dialog._build_anim_tab(MagicMock())
 
-    assert created["selectmode"] == result_dialog.tk.EXTENDED
-    assert created["height"] <= 3
     assert dialog._anim_selection_labels == [
         "Soliton 1",
         "Soliton 2",
