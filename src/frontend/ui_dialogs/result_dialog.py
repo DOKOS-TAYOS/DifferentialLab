@@ -109,7 +109,10 @@ def responsive_control_grid(
     for row in rows:
         span = slot_count // len(row)
         layout.append(
-            tuple((group_index, column_index * span, span) for column_index, group_index in enumerate(row))
+            tuple(
+                (group_index, column_index * span, span)
+                for column_index, group_index in enumerate(row)
+            )
         )
     return tuple(layout)
 
