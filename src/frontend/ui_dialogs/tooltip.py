@@ -31,11 +31,53 @@ class ToolTip:
         self._pointer_inside = False
         self._has_focus = False
 
+        self._bind_input_modality()
+
         widget.bind("<Enter>", self._on_enter, add="+")
         widget.bind("<Leave>", self._on_leave, add="+")
+        widget.bind("<ButtonPress>", self._on_button_press, add="+")
         widget.bind("<FocusIn>", self._on_focus_in, add="+")
         widget.bind("<FocusOut>", self._on_focus_out, add="+")
         widget.bind("<Destroy>", self._on_destroy, add="+")
+
+    def _bind_input_modality(self) -> None:
+        """Track keyboard versus pointer intent once per containing window."""
+        try:
+            toplevel = self.widget.winfo_toplevel()
+        except (AttributeError, tk.TclError):
+            return
+        if getattr(toplevel, "_tooltip_modality_bound", False):
+            return
+        setattr(toplevel, "_tooltip_modality", "unknown")
+        setattr(toplevel, "_tooltip_modality_bound", True)
+        toplevel.bind("<KeyPress>", self._mark_keyboard_modality, add="+")
+        toplevel.bind("<ButtonPress>", self._mark_pointer_modality, add="+")
+
+    def _input_modality(self) -> str:
+        """Return the current input modality for this tooltip's window."""
+        try:
+            return str(getattr(self.widget.winfo_toplevel(), "_tooltip_modality", "unknown"))
+        except (AttributeError, tk.TclError):
+            return "unknown"
+
+    def _mark_keyboard_modality(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+        """Record keyboard activity without changing the focused tooltip."""
+        try:
+            setattr(self.widget.winfo_toplevel(), "_tooltip_modality", "keyboard")
+        except (AttributeError, tk.TclError):
+            pass
+
+    def _mark_pointer_modality(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+        """Record pointer activity for subsequent focus changes."""
+        try:
+            setattr(self.widget.winfo_toplevel(), "_tooltip_modality", "pointer")
+        except (AttributeError, tk.TclError):
+            pass
+
+    def _on_button_press(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+        """Make a click-owned focus transition unable to keep a tooltip alive."""
+        self._mark_pointer_modality(_event)
+        self._has_focus = False
 
     def _schedule(self) -> None:
         if self._id_after:
@@ -65,8 +107,12 @@ class ToolTip:
             self._hide()
 
     def _on_focus_in(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
-        self._has_focus = True
-        self._schedule()
+        self._has_focus = self._input_modality() == "keyboard"
+        if self._has_focus:
+            self._schedule()
+        elif not self._pointer_inside:
+            self._cancel_pending()
+            self._hide()
 
     def _on_focus_out(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
         self._has_focus = False

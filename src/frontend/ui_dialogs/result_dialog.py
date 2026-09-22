@@ -215,23 +215,24 @@ class _ViewControls(ttk.LabelFrame):
     def _layout_groups(self) -> None:
         self._layout_after_id = None
         visible_groups = [group for group in self._groups if group not in self._hidden_groups]
-        if not visible_groups:
-            return
         for group in self._groups:
             group.place_forget()
+            group.grid_forget()
+        if not visible_groups:
+            return
         widths = [group.winfo_reqwidth() for group in visible_groups]
-        available = max(1, self.winfo_width() - 20)
+        available = max(1, self.winfo_width() - 24)
         rows = responsive_control_rows(available, widths)
-        y_position = 4
-        for row in rows:
-            x_position = 0
-            row_height = max(visible_groups[group_index].winfo_reqheight() for group_index in row)
-            for group_index in row:
+        for row_index, row in enumerate(rows):
+            for column_index, group_index in enumerate(row):
                 group = visible_groups[group_index]
-                group.place(x=x_position, y=y_position)
-                x_position += group.winfo_reqwidth() + _CONTROL_GAP
-            y_position += row_height + 6
-        self.configure(height=y_position + 28)
+                group.grid(
+                    row=row_index,
+                    column=column_index,
+                    sticky=tk.W,
+                    padx=(0, _CONTROL_GAP if column_index < len(row) - 1 else 0),
+                    pady=(0, 4 if row_index < len(rows) - 1 else 0),
+                )
 
 
 class _SeriesSelector(ttk.Frame):
@@ -281,11 +282,11 @@ class _SeriesSelector(ttk.Frame):
             checkbutton.grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 8), pady=1)
         if len(self._labels) > 1:
             ttk.Button(self, text="Select all", command=self.select_all, takefocus=True).grid(
-                row=(len(self._labels) - 1) // 3 + 1,
-                column=0,
-                columnspan=3,
+                row=(len(self._labels) - 1) // 3,
+                column=3,
                 sticky="w",
-                pady=(3, 0),
+                padx=(2, 0),
+                pady=1,
             )
 
     def _build_compact_menu(self) -> None:
@@ -582,8 +583,8 @@ class ResultDialog:
         """Set the dialog geometry before the initial plot canvas is embedded."""
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        win_w = int(screen_w * 0.94)
-        win_h = min(int(screen_h * 0.88), 920)
+        win_w = min(int(screen_w * 0.90), 1500)
+        win_h = min(int(screen_h * 0.88), 900)
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
         min_w, min_h = calculate_screen_aware_minsize(

@@ -909,15 +909,23 @@ class ParametersDialog:
             self._event_controls_frame = None
             return
 
-        self._event_frame = ttk.LabelFrame(parent, text="Event", padding=pad)
+        self._event_frame = ttk.LabelFrame(parent, text="Event detection (optional)", padding=pad)
         self._event_frame.pack(fill=tk.X, pady=(0, pad))
         self.event_enabled_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             self._event_frame,
-            text="Detect an event",
+            text="Enable event detection",
             variable=self.event_enabled_var,
             command=self._on_event_enabled_change,
         ).pack(anchor=tk.W)
+        description = ttk.Label(
+            self._event_frame,
+            text="Detect when an expression crosses zero during integration.",
+            style="Small.TLabel",
+            justify=tk.LEFT,
+        )
+        description.pack(anchor=tk.W, fill=tk.X, pady=(2, pad // 2))
+        bind_wraplength(self._event_frame, description, pad=2 * pad, min_wrap=180)
 
         self._event_controls_frame = ttk.Frame(self._event_frame)
         self._event_controls_frame.columnconfigure(1, weight=1)
@@ -936,6 +944,14 @@ class ParametersDialog:
             font=get_font(),
         )
         expression_entry.grid(row=0, column=1, sticky=tk.EW, pady=(pad, 2))
+        expression_help = ttk.Label(
+            self._event_controls_frame,
+            text="Example: f[0] - 1 triggers when f[0] reaches 1.",
+            style="Small.TLabel",
+            justify=tk.LEFT,
+        )
+        expression_help.grid(row=1, column=1, sticky=tk.W, pady=(0, 4))
+        bind_wraplength(self._event_controls_frame, expression_help, pad=2 * pad, min_wrap=180)
         ToolTip(
             expression_entry,
             "A safe expression in x and the ODE state, for example f[0] - 1. "
@@ -944,7 +960,7 @@ class ParametersDialog:
 
         self.event_direction_var = tk.StringVar(value="0")
         ttk.Label(self._event_controls_frame, text="Direction").grid(
-            row=1,
+            row=2,
             column=0,
             sticky=tk.W,
             padx=(0, pad),
@@ -957,14 +973,19 @@ class ParametersDialog:
             state="readonly",
             width=5,
             font=get_font(),
-        ).grid(row=1, column=1, sticky=tk.W, pady=2)
+        ).grid(row=2, column=1, sticky=tk.W, pady=2)
+        ttk.Label(
+            self._event_controls_frame,
+            text="-1: falling   0: any   1: rising",
+            style="Small.TLabel",
+        ).grid(row=3, column=1, sticky=tk.W, pady=(0, 2))
 
         self.event_terminal_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             self._event_controls_frame,
             text="Stop integration at event",
             variable=self.event_terminal_var,
-        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
+        ).grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
         self._on_event_enabled_change()
 
     def _build_statistics_section(self, parent: ttk.Frame, pad: int) -> ttk.LabelFrame:

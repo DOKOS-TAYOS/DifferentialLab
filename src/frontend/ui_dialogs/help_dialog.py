@@ -166,6 +166,13 @@ _CONFIGURATION = (
     "effect immediately."
 )
 
+_EVENT_DETECTION = (
+    "Optional ODE event detection watches an expression during integration and reports when it "
+    "crosses zero. For example, f[0] - 1 triggers when f[0] reaches 1. Direction -1 means "
+    "falling, 0 means any crossing, and 1 means rising. Enable Stop integration at event when "
+    "the solver should stop at the detected crossing."
+)
+
 
 def _solver_methods_text() -> str:
     lines: list[str] = []
@@ -198,6 +205,7 @@ _SECTIONS: list[tuple[str, str]] = [
     ("Available Statistics", _statistics_text()),
     ("Exports and Files", _OUTPUT_FILES),
     ("Settings", _CONFIGURATION),
+    ("ODE Event Detection", _EVENT_DETECTION),
     ("Keyboard Shortcuts", _KEYBOARD_SHORTCUTS),
 ]
 
