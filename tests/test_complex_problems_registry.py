@@ -17,6 +17,7 @@ def test_registry_contains_expected_plugins() -> None:
     assert "schrodinger_td" in descriptors
     assert "antenna_radiation" in descriptors
     assert "aerodynamics_2d" in descriptors
+    assert "aerodynamics_3d" in descriptors
     assert "pipe_flow" in descriptors
     assert "gravitational_n_body" in descriptors
     assert "fput_experiment" in descriptors
@@ -65,6 +66,13 @@ def test_open_problem_dialog_dispatches_to_aerodynamics_2d() -> None:
     parent = object()
     with patch("complex_problems.aerodynamics_2d.problem.PROBLEM.open_dialog") as mock_open:
         open_problem_dialog("aerodynamics_2d", parent)  # type: ignore[arg-type]
+    mock_open.assert_called_once_with(parent)
+
+
+def test_open_problem_dialog_dispatches_to_aerodynamics_3d() -> None:
+    parent = object()
+    with patch("complex_problems.aerodynamics_3d.problem.PROBLEM.open_dialog") as mock_open:
+        open_problem_dialog("aerodynamics_3d", parent)  # type: ignore[arg-type]
     mock_open.assert_called_once_with(parent)
 
 

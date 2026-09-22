@@ -149,6 +149,29 @@ _DOCS: dict[str, ProblemDoc] = {
             "Streamlines and centerline diagnostic profiles.",
         ),
     ),
+    "aerodynamics_3d": ProblemDoc(
+        problem_type="Incompressible 3D structured-grid flow around obstacles",
+        extended_description=(
+            "Lightweight incompressible flow solver on a periodic Cartesian domain with "
+            "immersed/Brinkman-style penalization. It is an educational/scientific "
+            "structured-grid solver, not an industrial CFD replacement."
+        ),
+        equation_summary="∂u/∂t + (u·∇)u = −∇p + ν∇²u + fₚₑₙ + f_drive,   ∇·u = 0",
+        config_options_summary=(
+            "Choose nonlinear Navier–Stokes or the Stokes approximation.",
+            "Set a periodic Cartesian Nx × Ny × Nz domain, time step, and saved-frame cadence.",
+            "Configure density, viscosity, mean-flow speed, and penalization strength.",
+            "Select a sphere, ellipsoid, box, or finite-span NACA 0012 wing with "
+            "shape-specific dimensions.",
+        ),
+        visualizations_summary=(
+            "Animated 3D velocity or vorticity vectors with an obstacle boundary.",
+            "RK4-traced 3D streamlines from a selected saved frame.",
+            "Responsive XY, XZ, and YZ slices for speed, vorticity, pressure, or "
+            "velocity components.",
+            "Cd/Cl/Cs force histories and factual divergence/speed diagnostics.",
+        ),
+    ),
     "pipe_flow": ProblemDoc(
         problem_type="1D steady/transient hydraulic modeling",
         extended_description=(

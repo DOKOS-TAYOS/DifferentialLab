@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added the **Aerodynamics 3D** Advanced Problem: a lightweight incompressible periodic
+  Cartesian structured-grid solver with 3D Fourier projection, immersed/penalized sphere,
+  ellipsoid, box, and finite-span NACA 0012 wing obstacles, cached visual result views,
+  Cd/Cl/Cs histories, and shared volumetric-history performance guardrails.
+- Corrected 3D Brinkman penalization, rejected obstacles crossing the periodic box, normalized
+  streamline integration, and upgraded 3D flow, streamline, and slice result views to cached,
+  stable-scale animations with continuous analytical obstacle surfaces.
 - Reordered Advanced Results tabs and display defaults so the most representative visual views appear first, while diagnostics and conservation views remain secondary.
 - Polished tooltip input-modality handling, clarified optional ODE event detection, improved narrow-window text wrapping, and refined Standard Results sizing and responsive control layout.
 - Modernized Advanced result view controls with responsive grouped layouts, accessible multi-item selectors, immediate readonly-selector updates, and explicit updates for editable FPUT inputs.

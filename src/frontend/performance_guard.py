@@ -316,6 +316,31 @@ def assess_aerodynamics_request(
     )
 
 
+def assess_aerodynamics_3d_request(
+    *,
+    nx: int,
+    ny: int,
+    nz: int,
+    t_max: float,
+    dt: float,
+    sample_every: int,
+) -> PerformanceAdvisory | None:
+    """Assess retained 3D velocity/pressure history before GUI execution."""
+    if t_max <= 0 or dt <= 0 or sample_every < 1:
+        return None
+    n_steps = int(math.ceil(t_max / dt))
+    n_samples = len(range(0, n_steps + 1, sample_every))
+    if n_steps % sample_every != 0:
+        n_samples += 1
+    return assess_time_history_request(
+        label="3D aerodynamics",
+        frames=n_samples,
+        points_per_frame=max(1, nx * ny * nz),
+        array_count=4,
+        bytes_per_value=8,
+    )
+
+
 def assess_fput_request(
     *,
     n_particles: int,
