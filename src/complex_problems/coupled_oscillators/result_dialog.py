@@ -130,7 +130,7 @@ class _AnimationViewPayload:
 class CoupledOscillatorsResultDialog:
     """Result window for coupled harmonic oscillators.
 
-    Shows tabs: Energy, Energy per mode, Animation, Heatmap, 3D Surface.
+    Shows visual-first tabs for animation, structure, modal energy, surfaces, and energy.
     Phase 1: Animation tab only. Phase 3 adds the rest.
 
     Args:
@@ -189,14 +189,51 @@ class CoupledOscillatorsResultDialog:
         )
         nb = self._shell.notebook
 
-        # Tab 1: Energy evolution
-        energy_tab = ttk.Frame(nb)
-        nb.add(energy_tab, text="Energy")
-        self._energy_plot_frame = ttk.Frame(energy_tab)
-        self._energy_plot_frame.pack(fill=tk.BOTH, expand=True)
-        self._update_energy_plot()
+        # Tab 1: Animation
+        anim_tab = ttk.Frame(nb)
+        nb.add(anim_tab, text="Animation")
+        anim_ctrl = make_view_controls(anim_tab)
+        anim_group = anim_ctrl.add_group(requested_width=190)
+        ttk.Label(anim_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        self._anim_view_var = tk.StringVar(value="Oscillators")
+        anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
+        view_combo = ttk.Combobox(
+            anim_group,
+            textvariable=self._anim_view_var,
+            values=anim_values,
+            state="readonly",
+            width=12,
+            font=get_font(),
+        )
+        view_combo.pack(side=tk.LEFT, padx=(0, 8))
+        view_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_animation())
+        self._anim_plot_frame = ttk.Frame(anim_tab)
+        self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
+        self._update_animation()
 
-        # Tab 2: Energy per mode
+        # Tab 2: Space-time heatmap
+        heatmap_tab = ttk.Frame(nb)
+        nb.add(heatmap_tab, text="Space-Time Heatmap")
+        hm_ctrl = make_view_controls(heatmap_tab)
+        hm_group = hm_ctrl.add_group(requested_width=190)
+        ttk.Label(hm_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        self._hm_view_var = tk.StringVar(value="Modes" if self._result.has_modes else "Oscillators")
+        hm_values = ["Modes", "Oscillators"] if self._result.has_modes else ["Oscillators"]
+        hm_view_combo = ttk.Combobox(
+            hm_group,
+            textvariable=self._hm_view_var,
+            values=hm_values,
+            state="readonly",
+            width=12,
+            font=get_font(),
+        )
+        hm_view_combo.pack(side=tk.LEFT, padx=(0, 8))
+        hm_view_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_heatmap())
+        self._hm_plot_frame = ttk.Frame(heatmap_tab)
+        self._hm_plot_frame.pack(fill=tk.BOTH, expand=True)
+        self._update_heatmap()
+
+        # Tab 3: Energy per mode or oscillator
         energy_mode_tab = ttk.Frame(nb)
         nb.add(energy_mode_tab, text="Energy by Mode/Oscillator")
         em_ctrl = make_view_controls(energy_mode_tab)
@@ -229,51 +266,7 @@ class CoupledOscillatorsResultDialog:
         self._em_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_energy_mode()
 
-        # Tab 3: Animation
-        anim_tab = ttk.Frame(nb)
-        nb.add(anim_tab, text="Animation")
-        anim_ctrl = make_view_controls(anim_tab)
-        anim_group = anim_ctrl.add_group(requested_width=190)
-        ttk.Label(anim_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
-        self._anim_view_var = tk.StringVar(value="Oscillators")
-        anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
-        view_combo = ttk.Combobox(
-            anim_group,
-            textvariable=self._anim_view_var,
-            values=anim_values,
-            state="readonly",
-            width=12,
-            font=get_font(),
-        )
-        view_combo.pack(side=tk.LEFT, padx=(0, 8))
-        view_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_animation())
-        self._anim_plot_frame = ttk.Frame(anim_tab)
-        self._anim_plot_frame.pack(fill=tk.BOTH, expand=True)
-        self._update_animation()
-
-        # Tab 4: Heatmap 2D
-        heatmap_tab = ttk.Frame(nb)
-        nb.add(heatmap_tab, text="Space-Time Heatmap")
-        hm_ctrl = make_view_controls(heatmap_tab)
-        hm_group = hm_ctrl.add_group(requested_width=190)
-        ttk.Label(hm_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
-        self._hm_view_var = tk.StringVar(value="Oscillators")
-        hm_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
-        hm_view_combo = ttk.Combobox(
-            hm_group,
-            textvariable=self._hm_view_var,
-            values=hm_values,
-            state="readonly",
-            width=12,
-            font=get_font(),
-        )
-        hm_view_combo.pack(side=tk.LEFT, padx=(0, 8))
-        hm_view_combo.bind("<<ComboboxSelected>>", lambda _e: self._update_heatmap())
-        self._hm_plot_frame = ttk.Frame(heatmap_tab)
-        self._hm_plot_frame.pack(fill=tk.BOTH, expand=True)
-        self._update_heatmap()
-
-        # Tab 5: Surface 3D
+        # Tab 4: Surface 3D
         surf_tab = ttk.Frame(nb)
         nb.add(surf_tab, text="Surface 3D")
         surf_ctrl = make_view_controls(surf_tab)
@@ -294,6 +287,13 @@ class CoupledOscillatorsResultDialog:
         self._surf_plot_frame = ttk.Frame(surf_tab)
         self._surf_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_surface()
+
+        # Tab 5: Energy evolution
+        energy_tab = ttk.Frame(nb)
+        nb.add(energy_tab, text="Energy")
+        self._energy_plot_frame = ttk.Frame(energy_tab)
+        self._energy_plot_frame.pack(fill=tk.BOTH, expand=True)
+        self._update_energy_plot()
 
     def _update_animation(self) -> None:
         """Regenerate the animation tab."""

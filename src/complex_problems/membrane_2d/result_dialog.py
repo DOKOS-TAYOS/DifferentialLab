@@ -134,31 +134,31 @@ class Membrane2DResultDialog:
         notebook.add(tab_anim, text="Animation")
         self._build_animation_tab(tab_anim)
 
-        tab_st = ttk.Frame(notebook)
-        notebook.add(tab_st, text="Centerline Map")
-        self._build_space_time_tab(tab_st)
-
         tab_surface = ttk.Frame(notebook)
         notebook.add(tab_surface, text="Surface 3D")
         self._build_surface_tab(tab_surface)
-
-        tab_energy = ttk.Frame(notebook)
-        notebook.add(tab_energy, text="Energy")
-        self._build_energy_tab(tab_energy)
 
         tab_spec = ttk.Frame(notebook)
         notebook.add(tab_spec, text="Spectrum")
         self._build_spectrum_tab(tab_spec)
 
+        tab_st = ttk.Frame(notebook)
+        notebook.add(tab_st, text="Centerline Map")
+        self._build_space_time_tab(tab_st)
+
+        tab_energy = ttk.Frame(notebook)
+        notebook.add(tab_energy, text="Energy")
+        self._build_energy_tab(tab_energy)
+
     def _build_animation_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
         group = ctrl.add_group(requested_width=190)
         ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        self._anim_field_var = tk.StringVar(value="2D Field")
+        self._anim_field_var = tk.StringVar(value="3D Surface")
         combo = ttk.Combobox(
             group,
             textvariable=self._anim_field_var,
-            values=("2D Field", "2D Velocity", "3D Surface", "Spectrum"),
+            values=("3D Surface", "2D Field", "2D Velocity", "Spectrum"),
             state="readonly",
             width=14,
             font=get_font(),

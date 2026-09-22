@@ -209,7 +209,12 @@ def test_steady_result_dialog_does_not_add_animation_tab() -> None:
         dialog._build_ui()
 
     build_animation.assert_not_called()
-    assert notebook.add.call_count == 4
+    assert [call.kwargs["text"] for call in notebook.add.call_args_list] == [
+        "Velocity",
+        "Pressure",
+        "Flow Diagnostics",
+        "Geometry",
+    ]
 
 
 def test_result_dialog_keeps_transient_maps_and_diagnostics() -> None:
@@ -285,3 +290,32 @@ def test_transient_animation_wires_export_for_each_selected_field() -> None:
         ):
             dialog._update_animation()
         assert callable(captured["on_export_mp4"])
+
+
+def test_transient_result_tabs_prioritize_animation_and_velocity() -> None:
+    dialog = object.__new__(result_dialog.PipeFlowResultDialog)
+    dialog.win = MagicMock()
+    dialog._result = _transient_result()
+    notebook = MagicMock()
+    shell = MagicMock(notebook=notebook)
+
+    with (
+        patch.object(result_dialog, "AdvancedResultShell", return_value=shell),
+        patch.object(result_dialog, "format_result_summary", return_value="summary"),
+        patch.object(result_dialog, "_format_result_summary", return_value="summary"),
+        patch.object(result_dialog.ttk, "Frame", side_effect=lambda _parent: MagicMock()),
+        patch.object(dialog, "_build_anim_tab"),
+        patch.object(dialog, "_build_velocity_tab"),
+        patch.object(dialog, "_build_pressure_tab"),
+        patch.object(dialog, "_build_quality_tab"),
+        patch.object(dialog, "_build_geometry_tab"),
+    ):
+        dialog._build_ui()
+
+    assert [call.kwargs["text"] for call in notebook.add.call_args_list] == [
+        "Animation",
+        "Velocity",
+        "Pressure",
+        "Flow Diagnostics",
+        "Geometry",
+    ]
