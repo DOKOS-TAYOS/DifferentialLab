@@ -63,7 +63,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 - Safe expression parsing with AST validation
 - Unified `f[...]` notation (`f[0]`, `f[1]`, `f[i,k]`)
 - Interactive result dialogs with derivative/component selection and dynamic redraw
-- CSV, JSON, and static figure exports, plus MP4 export for every interactive animation result view
+- CSV and JSON data exports, static figure export through the Matplotlib toolbar, and MP4 export from animated views
 - Environment-backed configuration through `.env` and the in-app `Settings` dialog
 - Rotating application logs with optional console output
 
@@ -184,10 +184,7 @@ differential-lab
 To build docs locally:
 
 ```bash
-pip install -e ".[docs]"
-cd docs
-make html      # Linux/macOS
-make.bat html  # Windows
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 Output directory: `docs/_build/html/`.

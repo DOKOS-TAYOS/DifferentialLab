@@ -8,7 +8,8 @@ workflows. The current repository includes:
 - scalar ODE solving
 - vector ODE systems
 - difference and recurrence equations
-- 2D PDE workflows
+- scalar elliptic 2D and 3D PDE workflows
+- linear strongly elliptic Vector PDE systems in 2D
 - function transforms
 - specialized `complex_problems` plugins
 - Sphinx-generated API documentation
@@ -17,7 +18,7 @@ workflows. The current repository includes:
 
 - Python: `>=3.12`
 - Predefined equation catalog: [`src/config/equations/`](../src/config/equations/)
-- Complex problem plugins: 7 registered modules
+- Advanced Problems: 10 registered, lazily loaded plugins
 - Configuration source of truth: `src/config/env.py`
 - Main entry point: `src/main_program.py`
 

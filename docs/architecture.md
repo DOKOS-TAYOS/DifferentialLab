@@ -44,12 +44,18 @@ docs/
 
 ```text
 EquationDialog
-  -> ParametersDialog
+  -> SolveSession -> ParametersDialog
   -> run_solver_pipeline
   -> validation + parser + solver dispatch
   -> statistics + metadata
   -> ResultDialog
 ```
+
+`frontend.ui_dialogs.solve_session` owns the UI-only state between Equation and
+Configuration. It keeps family-specific browser/custom-editor state and
+configuration snapshots, so Equation -> Configuration navigation retains input;
+Results -> `Modify setup` returns to the compatible Configuration state rather
+than reconstructing it from scratch.
 
 The key design goal is to keep the general solver stack independent from
 UI-specific behavior. Plot generation is deferred to result dialogs so users can
@@ -141,6 +147,11 @@ Core pieces:
 - `problem_docs.py`: structured help metadata shown in plugin dialogs
 - `common/`: shared helpers for plugin modules
 
+The shared Advanced Problem infrastructure in `complex_problems/common/` covers
+dialog layout, validation, expression handling, documentation panels, background
+execution, and result-dialog/animation cleanup. Plugins should reuse it instead
+of duplicating UI shells or lifecycle logic.
+
 Plugin contract:
 
 - `problem.py` exposes `PROBLEM` with descriptor and `open_dialog(parent)`
@@ -186,7 +197,15 @@ If file logging cannot start, the logger falls back to console output.
 - Solver input is validated before dispatch.
 - Solver failures are converted into user-facing dialog errors where possible.
 - Long-running plugin solvers use background helpers and loading dialogs.
+- `frontend.performance_guard` estimates dense output, sparse PDE grids,
+  volumetric histories, and selected Advanced Problem workloads before a GUI run;
+  it advises or requests confirmation but does not change numerical settings.
 - Export paths are centralized through `config.paths`.
+
+Standard Results owns CSV/JSON data export actions and delegates static-figure
+export to the Matplotlib toolbar. Animated views expose MP4 only where their
+plot payload supports it. Advanced-result derived caches (for example 3D slices
+and streamlines) remain in result dialogs rather than solver result objects.
 
 ## Quality Tooling
 

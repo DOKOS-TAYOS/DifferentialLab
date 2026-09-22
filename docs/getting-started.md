@@ -125,18 +125,17 @@ differential-lab
 ## First Run Checklist
 
 1. Open `Solve Equation`.
-2. Run a predefined equation to confirm the solver and result dialog work.
-3. Open `Settings` and save your preferred UI/plot defaults.
-4. Confirm `output/` receives CSV, JSON, plot, or animation exports.
-5. Optionally open `Advanced Problems` and run one module with default parameters.
+2. Use the searchable predefined-equation browser, select an equation, and choose `Continue`.
+3. Review the retained Configuration form, then choose `Solve`.
+4. Inspect the Results workspace summary, metrics, diagnostics, and available visualization controls.
+5. Use the fixed footer's CSV or JSON action, the Matplotlib toolbar for a static figure, or MP4 only from an animated view.
+6. Open `Settings` and save your preferred UI/plot defaults.
+7. Optionally open `Advanced Problems` and run one module with default parameters.
 
 ## Build Docs Locally
 
 ```bash
-pip install -e ".[docs]"
-cd docs
-make html      # Linux/macOS
-make.bat html  # Windows
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 Open `docs/_build/html/index.html`.

@@ -55,10 +55,11 @@ logs/run.log
 
 ## Complex problem runs too slowly
 
-- Reduce grid size (`nx`, `ny`) and simulation horizon (`t_max`).
-- Increase output sampling interval where available.
-- Start from defaults and scale up incrementally.
-- For animation-heavy results, reduce stored frames before increasing resolution.
+- Start from the module defaults or a lower resolution before scaling up.
+- For 2D models, reduce `nx` and `ny`; for Aerodynamics 3D, reduce `nx`, `ny`, and `nz`.
+- Shorten `t_max` and increase the saved-output interval where available; large volumetric histories consume memory quickly.
+- Build the Aerodynamics 3D streamline cache only when needed: it traces every saved frame and remains cached for that Results window.
+- Treat animation and MP4 export as additional work, especially for long histories or volumetric views.
 
 ## Numerical blow-up or NaNs
 
@@ -84,19 +85,17 @@ logs/run.log
 ## Sphinx docs build errors
 
 - Install docs extras: `pip install -e ".[docs]"`.
-- Build from the `docs/` directory.
+- Build from the repository root.
 - Remove stale `docs/_build/` if needed and rebuild.
 
 Windows:
 
 ```bat
-cd docs
-make.bat html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 Linux/macOS:
 
 ```bash
-cd docs
-make html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```

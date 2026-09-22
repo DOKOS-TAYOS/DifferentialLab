@@ -27,7 +27,10 @@ The standard solver path currently supports:
 - Vector ODE
 - Vector PDE
 
-You can use the predefined YAML catalog or write custom expressions.
+Use the searchable predefined-equation browser or one of the Custom equation
+editors. The browser retains its search, category, and selection while you move
+through the standard workflow. Custom editors share a SymbolPalette: choosing a
+symbol inserts it literally at the last active supported editor.
 The current catalog has 125 entries:
 
 | Type | Entries |
@@ -61,6 +64,10 @@ For custom expressions:
 
 Typical safe math functions are available (`sin`, `cos`, `exp`, `log`, `sqrt`, etc.).
 
+Select `Continue` to open Configuration. Going back to Equation retains the
+selection and raw editor values; Configuration also retains a compatible form
+snapshot for each selected equation.
+
 ### 3. Configure numeric parameters
 
 Common settings include:
@@ -71,7 +78,9 @@ Common settings include:
 - statistics to compute
 - PDE operator and visualization mode
 
-For an initial-value ODE, the optional **IVP Event** panel accepts a safe scalar
+Configuration forms adapt to the equation family and window size. Optional
+controls use progressive disclosure; for example, expand **IVP Event** only for
+an initial-value ODE. That panel accepts a safe scalar
 expression in `x` and the current state, such as `f[0] - 1`. A zero marks an
 event. **Stop at event** makes it terminal, while direction `-1`, `0`, or `1`
 selects decreasing, either, or increasing zero crossings. Events are not applied
@@ -322,23 +331,37 @@ positive component count retain component and magnitude views.
 
 ### 4. Solve and inspect
 
+Choose `Solve` to run the configured equation. The resizable Results workspace
+keeps a factual run summary, computed metrics, detected events where applicable,
+and collapsible solver diagnostics separate from its visualization area. Controls
+can change the current derivative, component, slice, or display without
+re-solving, but available views depend on the result type.
+
+Choose `Modify setup` to return to the retained Configuration state, adjust it,
+and solve again.
+
 Result dialogs include:
 
 - metadata and solver quality information
 - selected statistics
 - interactive plots/tabs
 - derivative, component, or axis selection without re-solving
-- export options for data and figures
+- fixed-footer CSV and JSON data actions
+- static figure export through the Matplotlib toolbar
+- MP4 export from animated views that provide it
 
 ## Function Transform Workflow
 
 In `Function Transform`:
 
-1. Provide an `f(x)` expression and domain.
-2. Select transform type.
-3. Tune transform-specific parameters when shown.
-4. Switch between curve view and coefficient view.
-5. Export transformed data and plots.
+1. Provide an editable `f(x)` expression, optional parameters, and domain; the
+   SymbolPalette can insert directly into the last active field.
+2. Select a transform and tune transform-specific parameters when shown.
+3. Choose the curve or coefficient display.
+4. Press `Update`. Changes to the function, domain, transform, or display stay
+   pending until this explicit action recomputes the view.
+5. Use `Export CSV...` for the displayed data or the Matplotlib toolbar for a
+   static figure.
 
 Available transform types:
 
@@ -369,7 +392,10 @@ Current modules are:
 - `schrodinger_td`
 - `antenna_radiation`
 - `aerodynamics_2d`
+- `aerodynamics_3d`
 - `pipe_flow`
+- `gravitational_n_body`
+- `fput_experiment`
 
 Most plugin dialogs include a collapsed `How to configure` section with:
 
@@ -395,13 +421,12 @@ Common outputs:
 
 Use `Settings` in the main menu to edit environment-backed settings.
 
-Categories include:
+Settings has four user-facing groups: `Appearance`, `Plots`, `Solver Defaults`,
+and `Advanced`. Colour fields show an editable preview and open the system colour
+chooser. Technical `.env` key names remain available as tooltips.
 
-- UI colors, fonts, padding, and tooltips
-- plot style, fonts, phase-space markers, contour/surface style, and animation
-- solver defaults and tolerances
-- logging and update checks
-
-Saving from the dialog restarts the app so settings apply cleanly.
+`Restore Defaults` updates the form only; nothing is written until you choose
+`Save & Restart`. `Save & Restart` validates and writes the settings, then
+restarts the application so the values take effect cleanly.
 
 See [Configuration Reference](configuration.md) for the current key list.
