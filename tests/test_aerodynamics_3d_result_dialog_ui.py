@@ -9,6 +9,7 @@ import numpy as np
 
 import complex_problems.aerodynamics_3d.result_dialog as result_dialog
 from complex_problems.aerodynamics_3d.result_dialog import (
+    _flow_magnitude_range,
     _scaled_arrow_lengths,
     build_streamline_cache,
     prepare_slice_history,
@@ -112,7 +113,6 @@ def test_streamline_cache_has_one_entry_per_saved_frame() -> None:
     assert len(cache.frames) == len(result.t)
 
 
-
 def test_streamline_cache_reuses_one_velocity_interpolator_per_frame() -> None:
     result = _uniform_result()
     result = replace(
@@ -133,16 +133,39 @@ def test_streamline_cache_reuses_one_velocity_interpolator_per_frame() -> None:
     assert interpolator_factory.call_count == len(result.t)
 
 
-def test_log_scaled_arrow_lengths_stay_within_fixed_bounds() -> None:
-    magnitude = np.array([1.0e-6, 0.1, 0.5, 1.0, 5.0])
+def test_log_scaled_arrow_lengths_use_global_minimum_and_maximum() -> None:
+    magnitude = np.array([0.1, 0.2, 0.5, 1.0])
     lengths = _scaled_arrow_lengths(
         magnitude,
+        0.1,
         1.0,
         minimum=0.04,
         maximum=0.16,
     )
 
     assert np.all(np.diff(lengths) >= 0.0)
-    assert lengths[0] >= 0.04
+    assert lengths[0] == 0.04
     assert lengths[-1] == 0.16
     assert np.all(lengths <= 0.16)
+
+
+def test_flow_magnitude_range_spans_all_saved_frames() -> None:
+    result = _uniform_result()
+    result = replace(
+        result,
+        t=np.array([0.0, 1.0]),
+        u=np.concatenate((result.u * 0.2, result.u * 5.0), axis=0),
+        v=np.repeat(result.v, 2, axis=0),
+        w=np.repeat(result.w, 2, axis=0),
+        pressure=np.repeat(result.pressure, 2, axis=0),
+        drag_coeff=np.zeros(2),
+        lift_coeff=np.zeros(2),
+        side_force_coeff=np.zeros(2),
+        divergence_l2=np.zeros(2),
+        max_speed=np.array([0.2, 5.0]),
+    )
+
+    minimum, maximum = _flow_magnitude_range(result, "Velocity vectors", 4)
+
+    assert minimum == 0.2
+    assert maximum == 5.0
