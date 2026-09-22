@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tkinter as tk
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -223,12 +224,15 @@ class _ViewControls(ttk.LabelFrame):
         widths = [group.winfo_reqwidth() for group in visible_groups]
         available = max(1, self.winfo_width() - 24)
         rows = responsive_control_rows(available, widths)
+        slot_count = math.lcm(*(len(row) for row in rows))
         for row_index, row in enumerate(rows):
+            span = slot_count // len(row)
             for column_index, group_index in enumerate(row):
                 group = visible_groups[group_index]
                 group.grid(
                     row=row_index,
-                    column=column_index,
+                    column=column_index * span,
+                    columnspan=span,
                     sticky=tk.W,
                     padx=(0, _CONTROL_GAP if column_index < len(row) - 1 else 0),
                     pady=(0, 4 if row_index < len(rows) - 1 else 0),
@@ -1204,6 +1208,8 @@ class ResultDialog:
             xlabel=disp_xlabel,
             ylabel=disp_ylabel,
         )
+        if fig.axes:
+            fig.axes[0].title.set_wrap(True)
         self._replace_plot(self._phase_plot_frame, fig, "_phase_canvas")
 
     # ── Vector ODE ───────────────────────────────────────────────────
