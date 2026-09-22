@@ -426,7 +426,7 @@ and `Advanced`. Colour fields show an editable preview and open the system colou
 chooser. Technical `.env` key names remain available as tooltips.
 
 `Restore Defaults` updates the form only; nothing is written until you choose
-`Save & Restart`. `Save & Restart` validates and writes the settings, then
-restarts the application so the values take effect cleanly.
+`Save & Restart`. `Save & Restart` writes the settings and restarts the application;
+startup validation then applies the schema rules and falls back to defaults for invalid values.
 
 See [Configuration Reference](configuration.md) for the current key list.
