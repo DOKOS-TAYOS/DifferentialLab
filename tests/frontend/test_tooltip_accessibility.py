@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
+from frontend.ui_dialogs.keyboard_nav import setup_arrow_enter_navigation
 from frontend.ui_dialogs.tooltip import ToolTip
 
 
@@ -13,6 +15,7 @@ class _FakeWidget:
         self.after_calls: list[tuple[int, Any]] = []
         self.cancelled: list[str] = []
         self.toplevel = toplevel or _FakeToplevel()
+        self.focused = False
 
     def bind(self, sequence: str, callback: Any, add: str | None = None) -> None:
         self.bindings[sequence] = (callback, add)
@@ -26,6 +29,9 @@ class _FakeWidget:
 
     def winfo_toplevel(self) -> _FakeToplevel:
         return self.toplevel
+
+    def focus_set(self) -> None:
+        self.focused = True
 
 
 class _FakeToplevel:
@@ -136,3 +142,18 @@ def test_pointer_entry_dismisses_keyboard_tooltip_from_another_control() -> None
     assert pointer_tooltip._has_focus is False
     assert pointer_tooltip._pointer_inside is True
     assert len(pointer_widget.after_calls) == 1
+
+
+def test_consumed_arrow_navigation_marks_keyboard_modality_before_focus_change() -> None:
+    toplevel = _FakeToplevel()
+    first = _FakeWidget(toplevel)
+    second = _FakeWidget(toplevel)
+    setup_arrow_enter_navigation([[first, second]])  # type: ignore[list-item]
+
+    callback = first.bindings["<Right>"][0]
+    assert callable(callback)
+    result = callback(SimpleNamespace(widget=first))
+
+    assert result == "break"
+    assert getattr(toplevel, "_tooltip_modality", None) == "keyboard"
+    assert second.focused is True
