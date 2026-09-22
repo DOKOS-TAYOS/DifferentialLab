@@ -328,10 +328,10 @@ class GravitationalNBodyResultDialog:
         for title, build in (
             ("Orbit Animation", self._build_orbit_tab),
             ("Trajectories", self._build_trajectory_tab),
+            ("Separations", self._build_separations_tab),
             ("Phase Space", self._build_phase_tab),
             ("Energy", self._build_energy_tab),
             ("Conserved Quantities / Diagnostics", self._build_diagnostics_tab),
-            ("Separations", self._build_separations_tab),
         ):
             tab = ttk.Frame(notebook)
             notebook.add(tab, text=title)
