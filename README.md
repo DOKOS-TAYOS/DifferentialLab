@@ -9,7 +9,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](license.md)
-[![Status](https://img.shields.io/badge/status-Beta-orange.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
+[![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen.svg?style=for-the-badge)](https://github.com/DOKOS-TAYOS/DifferentialLab)
 [![CI](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml/badge.svg)](https://github.com/DOKOS-TAYOS/DifferentialLab/actions/workflows/python-app.yml)
 
 [Documentation](docs/index.md) |
@@ -30,7 +30,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
   - 12 2D PDE examples
   - 4 scalar 3D PDE examples
   - 1 coupled Vector PDE example
-- Advanced Problems: 9 registered, lazily loaded plugins
+- Advanced Problems: 10 registered, lazily loaded plugins
 - Quality tooling: `pytest`, `ruff`, and a repo-local `pyright` configuration
 - Documentation: Sphinx + MyST under `docs/`
 
@@ -76,7 +76,7 @@ vector 2D PDEs, function transforms, and specialized scientific simulation workf
 
 ## Advanced Problems
 
-`Advanced Problems` is a nine-plugin subsystem. Internally, its Python package
+`Advanced Problems` is a ten-plugin subsystem. Internally, its Python package
 is named `complex_problems`; each plugin provides its own configuration dialog,
 solver, structured result, and result dialog.
 
@@ -99,6 +99,7 @@ Current modules:
 - `schrodinger_td`: 1D/2D time-dependent Schrodinger solver
 - `antenna_radiation`: far-field patterns and antenna metrics
 - `aerodynamics_2d`: 2D incompressible obstacle-flow approximations
+- `aerodynamics_3d`: incompressible 3D structured-grid flow in a periodic Cartesian domain with immersed/penalized obstacles and 3D vector, streamline, and slice visualization
 - `pipe_flow`: steady and transient 1D pipe-flow models
 - `gravitational_n_body`: softened Newtonian N-body dynamics and orbit diagnostics
 - `fput_experiment`: dedicated Fermi-Pasta-Ulam-Tsingou recurrence and strain studies
