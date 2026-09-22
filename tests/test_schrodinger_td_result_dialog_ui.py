@@ -209,7 +209,6 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
     plt.close("all")
 
 
-
 def test_result_tabs_are_dimension_specific_and_visual_first() -> None:
     for dimension, expected in (
         (1, ["Animation", "Density Maps", "Spectrum", "Expectations", "Potential"]),
