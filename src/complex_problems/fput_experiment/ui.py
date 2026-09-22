@@ -209,6 +209,7 @@ class FPUTExperimentDialog:
         self._shell.add_footer_button("Close", self.win.destroy)
         self._shell.add_footer_button("Run", self._on_solve, primary=True)
         self._apply_preset()
+        self._update_study_mode()
 
     def _apply_preset(self) -> None:
         """Populate ordinary editable controls from the selected preset."""
