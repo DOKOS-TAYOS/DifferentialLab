@@ -43,8 +43,8 @@ _ABOUT = (
     "\u2022 Function transforms — Fourier (FFT), Laplace, Taylor series, "
     "Hilbert, and Z-transform\n"
     "\u2022 Advanced Problems \u2014 ten specialized scientific simulation workflows\n\n"
-    "Under the hood the application relies on SciPy's solve_ivp integrator "
-    "for ODEs and finite-difference discretisation for PDEs.\n\n"
+    "Under the hood the application uses SciPy IVP/BVP integrators for ODE workflows "
+    "and finite-difference discretisation for PDEs.\n\n"
     "Tip: hover over a supported control or move keyboard focus to it to see a "
     "short contextual tooltip."
 )
