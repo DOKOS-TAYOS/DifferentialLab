@@ -258,6 +258,7 @@ def test_n_body_close_cleans_every_canvas_attribute() -> None:
     "module_name",
     (
         "complex_problems.aerodynamics_2d.result_dialog",
+        "complex_problems.aerodynamics_3d.result_dialog",
         "complex_problems.antenna_radiation.result_dialog",
         "complex_problems.coupled_oscillators.result_dialog",
         "complex_problems.fput_experiment.result_dialog",

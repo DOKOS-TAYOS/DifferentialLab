@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from frontend.performance_guard import (
     PerformanceAdvisory,
+    assess_aerodynamics_3d_request,
     assess_membrane_request,
     assess_parameters_dialog_request,
     assess_pde_3d_request,
@@ -106,6 +107,23 @@ def test_small_membrane_history_has_no_advisory() -> None:
         )
         is None
     )
+
+
+def test_default_aerodynamics_3d_history_has_no_advisory() -> None:
+    assert (
+        assess_aerodynamics_3d_request(nx=48, ny=32, nz=32, t_max=1.0, dt=0.002, sample_every=10)
+        is None
+    )
+
+
+def test_huge_aerodynamics_3d_history_requires_confirmation() -> None:
+    advisory = assess_aerodynamics_3d_request(
+        nx=100, ny=100, nz=100, t_max=2.0, dt=0.002, sample_every=2
+    )
+    assert advisory is not None
+    assert advisory.severity == "confirm"
+    assert advisory.title == "Large 3D aerodynamics history"
+    assert "4 array(s)" in advisory.message
 
 
 def test_confirm_performance_advisory_uses_warning_and_confirmation_dialogs() -> None:

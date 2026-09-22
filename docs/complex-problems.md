@@ -1,6 +1,6 @@
 # Advanced Problems Guide
 
-`Advanced Problems` is a nine-plugin subsystem where each problem contributes a
+`Advanced Problems` is a ten-plugin subsystem where each problem contributes a
 specialized UI, solver, and result dialog.
 
 ## Gravitational N-Body Dynamics
@@ -68,6 +68,7 @@ Plugins are registered lazily in `src/complex_problems/problem_registry.py`.
 | `schrodinger_td` | Schrodinger TD (1D/2D) | Split-operator spectral time-dependent Schrodinger solver with configurable potentials and packet states | density/phase animation, momentum spectrum, expectations, invariant curves |
 | `antenna_radiation` | Antenna Radiation | Far-field patterns for dipole, loop, patch-like aperture, and uniform linear array models | gain/directivity maps, polar cuts, 3D pattern, field metrics |
 | `aerodynamics_2d` | Aerodynamics 2D | 2D incompressible flow around obstacles using projection/Stokes-style approximations | speed/vorticity/pressure views, drag/lift curves, streamlines |
+| `aerodynamics_3d` | Aerodynamics 3D | Incompressible 3D structured-grid flow in a periodic Cartesian domain with immersed/penalized obstacles; lightweight educational/scientific scope, not industrial CFD | 3D vectors, 3D streamlines, XY/XZ/YZ slices, Cd/Cl/Cs and diagnostics |
 | `pipe_flow` | Pipe Flow | Steady Darcy-Weisbach and transient 1D pressure-wave pipe-flow models | pressure/velocity profiles, geometry plots, Reynolds/friction metrics, transient maps |
 | `gravitational_n_body` | Gravitational N-Body Dynamics | Softened Newtonian multi-body systems and curated orbit studies | orbit animation, COM diagnostics, energy and angular-momentum drift |
 | `fput_experiment` | Fermi-Pasta-Ulam-Tsingou Experiment | Fixed-end alpha/beta FPUT chains | recurrence, modal energy, strain, Hamiltonian drift, scaling fits |
