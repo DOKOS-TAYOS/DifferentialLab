@@ -193,15 +193,13 @@ def test_steady_result_dialog_does_not_add_animation_tab() -> None:
     dialog = object.__new__(result_dialog.PipeFlowResultDialog)
     dialog.win = MagicMock()
     dialog._result = _default_result()
-    frames = [MagicMock() for _ in range(6)]
+    frames = [MagicMock() for _ in range(4)]
     notebook = MagicMock()
+    shell = MagicMock(notebook=notebook)
 
     with (
-        patch.object(result_dialog, "get_env_from_schema", return_value=4),
+        patch.object(result_dialog, "AdvancedResultShell", return_value=shell),
         patch.object(result_dialog.ttk, "Frame", side_effect=frames),
-        patch.object(result_dialog.ttk, "Label", return_value=MagicMock()),
-        patch.object(result_dialog.ttk, "Notebook", return_value=notebook),
-        patch.object(result_dialog.ttk, "Button", return_value=MagicMock()),
         patch.object(dialog, "_build_anim_tab") as build_animation,
         patch.object(dialog, "_build_geometry_tab"),
         patch.object(dialog, "_build_pressure_tab"),

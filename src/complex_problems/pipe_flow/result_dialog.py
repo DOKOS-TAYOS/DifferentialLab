@@ -10,14 +10,18 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.pipe_flow.solver import PipeFlowResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import create_contour_plot, export_animated_figure_to_mp4
 from plotting.animation_metadata import attach_animation_metadata
 from utils import get_logger
@@ -228,7 +232,6 @@ class PipeFlowResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("Pipe Flow Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
         self._geometry_canvas = None
@@ -237,9 +240,7 @@ class PipeFlowResultDialog:
         self._quality_canvas = None
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1360, height=900, max_width_ratio=0.95, resizable=True)
-        self.win.minsize(1060, 700)
+        self._shell.finish(AdvancedResultSize(1360, 900))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -256,46 +257,43 @@ class PipeFlowResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
-
-        info = _format_result_summary(self._result)
-        ttk.Label(top, text=info, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
-
-        nb = ttk.Notebook(top)
-        nb.pack(fill=tk.BOTH, expand=True)
+        summary = format_result_summary(
+            (
+                ("Mode", self._result.model_type.capitalize()),
+                ("Run summary", _format_result_summary(self._result)),
+            )
+        )
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Pipe Flow Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
 
         if self._result.model_type == "transient":
             tab_anim = ttk.Frame(nb)
-            nb.add(tab_anim, text="  Animation  ")
+            nb.add(tab_anim, text="Animation")
             self._build_anim_tab(tab_anim)
 
         tab_geom = ttk.Frame(nb)
-        nb.add(tab_geom, text="  Geometry  ")
+        nb.add(tab_geom, text="Geometry")
         self._build_geometry_tab(tab_geom)
 
         tab_p = ttk.Frame(nb)
-        nb.add(tab_p, text="  Pressure  ")
+        nb.add(tab_p, text="Pressure")
         self._build_pressure_tab(tab_p)
 
         tab_u = ttk.Frame(nb)
-        nb.add(tab_u, text="  Velocity  ")
+        nb.add(tab_u, text="Velocity")
         self._build_velocity_tab(tab_u)
 
         tab_q = ttk.Frame(nb)
-        nb.add(tab_q, text="  Flow Diagnostics  ")
+        nb.add(tab_q, text="Flow Diagnostics")
         self._build_quality_tab(tab_q)
 
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
-
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
-        ctrl = ttk.Frame(parent)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = make_view_controls(parent)
         self._anim_view_var = tk.StringVar(value="pressure")
         ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(

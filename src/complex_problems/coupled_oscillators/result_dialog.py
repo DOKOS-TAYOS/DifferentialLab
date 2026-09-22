@@ -14,14 +14,18 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
 from config import generate_output_basename, get_env_from_schema, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
-from frontend.theme import get_contrast_foreground, get_font
-from frontend.window_utils import center_window, make_modal
+from frontend.theme import get_font, get_select_colors
+from frontend.window_utils import make_modal
 from plotting import (
     create_contour_plot,
     create_energy_evolution_plot,
@@ -145,9 +149,6 @@ class CoupledOscillatorsResultDialog:
         self.win = tk.Toplevel(parent)
         self.win.title("Coupled Harmonic Oscillator Results")
 
-        bg: str = get_env_from_schema("UI_BACKGROUND")
-        self.win.configure(bg=bg)
-
         self._energy_canvas = None
         self._em_canvas = None
         self._anim_canvas = None
@@ -155,14 +156,7 @@ class CoupledOscillatorsResultDialog:
         self._surf_canvas = None
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-
-        screen_w = self.win.winfo_screenwidth()
-        screen_h = self.win.winfo_screenheight()
-        win_w = int(screen_w * 0.96)
-        win_h = min(int(screen_h * 0.92), 1100)
-        center_window(self.win, win_w, win_h, max_width_ratio=0.98, resizable=True)
-        self.win.minsize(1200, 700)
+        self._shell.finish(AdvancedResultSize(1420, 900))
         make_modal(self.win, parent)
         logger.info("Coupled oscillators result dialog displayed")
 
@@ -176,38 +170,35 @@ class CoupledOscillatorsResultDialog:
 
     def _build_ui(self) -> None:
         """Construct the dialog layout."""
-        pad: int = get_env_from_schema("UI_PADDING")
-
-        btn_frame = ttk.Frame(self.win)
-        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=pad, pady=pad)
-        ttk.Button(
-            btn_frame,
-            text="Close",
-            style="Cancel.TButton",
-            command=self._on_close,
-        ).pack()
-
-        content = ttk.Frame(self.win)
-        content.pack(fill=tk.BOTH, expand=True, padx=pad, pady=pad)
-        content.columnconfigure(1, weight=1)
-        content.rowconfigure(0, weight=1)
-
-        # Right: notebook with tabs
-        nb = ttk.Notebook(content)
-        nb.grid(row=0, column=1, sticky="nsew")
+        metadata = self._result.metadata
+        coupling_types = ", ".join(str(value) for value in metadata.get("coupling_types", ()))
+        summary = format_result_summary(
+            (
+                ("Oscillators", self._result.n_oscillators),
+                ("Boundary", str(metadata.get("boundary", "unknown")).capitalize()),
+                ("Couplings", coupling_types or "unspecified"),
+                ("Integrator", metadata.get("method", "unknown")),
+            )
+        )
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Coupled Oscillators Results",
+            summary=summary,
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
 
         # Tab 1: Energy evolution
         energy_tab = ttk.Frame(nb)
-        nb.add(energy_tab, text="  Energy  ")
+        nb.add(energy_tab, text="Energy")
         self._energy_plot_frame = ttk.Frame(energy_tab)
         self._energy_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_energy_plot()
 
         # Tab 2: Energy per mode
         energy_mode_tab = ttk.Frame(nb)
-        nb.add(energy_mode_tab, text="  Energy by Mode/Oscillator  ")
-        em_ctrl = ttk.Frame(energy_mode_tab)
-        em_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        nb.add(energy_mode_tab, text="Energy by Mode/Oscillator")
+        em_ctrl = make_view_controls(energy_mode_tab)
         ttk.Label(em_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._em_view_var = tk.StringVar(value="Modes" if self._result.has_modes else "Oscillators")
         em_values = ["Modes", "Oscillators"] if self._result.has_modes else ["Oscillators"]
@@ -225,8 +216,7 @@ class CoupledOscillatorsResultDialog:
         n = self._result.n_oscillators
         btn_bg = get_env_from_schema("UI_BUTTON_BG")
         fg = get_env_from_schema("UI_FOREGROUND")
-        select_bg = get_env_from_schema("UI_BUTTON_FG")
-        select_fg = get_contrast_foreground(select_bg)
+        select_bg, select_fg = get_select_colors(element_bg=btn_bg, text_fg=fg)
         self._em_listbox = tk.Listbox(
             em_ctrl,
             selectmode=tk.EXTENDED,
@@ -253,9 +243,8 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 3: Animation
         anim_tab = ttk.Frame(nb)
-        nb.add(anim_tab, text="  Animation  ")
-        anim_ctrl = ttk.Frame(anim_tab)
-        anim_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        nb.add(anim_tab, text="Animation")
+        anim_ctrl = make_view_controls(anim_tab)
         ttk.Label(anim_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_view_var = tk.StringVar(value="Oscillators")
         anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
@@ -275,9 +264,8 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 4: Heatmap 2D
         heatmap_tab = ttk.Frame(nb)
-        nb.add(heatmap_tab, text="  Space-Time Heatmap  ")
-        hm_ctrl = ttk.Frame(heatmap_tab)
-        hm_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        nb.add(heatmap_tab, text="Space-Time Heatmap")
+        hm_ctrl = make_view_controls(heatmap_tab)
         ttk.Label(hm_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._hm_view_var = tk.StringVar(value="Oscillators")
         hm_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
@@ -297,9 +285,8 @@ class CoupledOscillatorsResultDialog:
 
         # Tab 5: Surface 3D
         surf_tab = ttk.Frame(nb)
-        nb.add(surf_tab, text="  Surface 3D  ")
-        surf_ctrl = ttk.Frame(surf_tab)
-        surf_ctrl.pack(fill=tk.X, padx=4, pady=4)
+        nb.add(surf_tab, text="Surface 3D")
+        surf_ctrl = make_view_controls(surf_tab)
         ttk.Label(surf_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._surf_view_var = tk.StringVar(value="Oscillators")
         surf_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]

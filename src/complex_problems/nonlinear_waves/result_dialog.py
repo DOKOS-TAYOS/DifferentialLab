@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedResultShell,
+    AdvancedResultSize,
     close_embedded_figures,
+    format_result_summary,
+    make_view_controls,
     reset_embedded_animation,
 )
 from complex_problems.nonlinear_waves.soliton_tracking import (
@@ -20,11 +24,11 @@ from complex_problems.nonlinear_waves.soliton_tracking import (
     track_kdv_soliton_centers,
 )
 from complex_problems.nonlinear_waves.solver import NonlinearWavesResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, embed_plot_in_tk
 from frontend.theme import get_font
 from frontend.ui_dialogs import ToolTip
-from frontend.window_utils import center_window, make_modal
+from frontend.window_utils import make_modal
 from plotting import (
     create_contour_plot,
     create_solution_plot,
@@ -308,7 +312,6 @@ class NonlinearWavesResultDialog:
         self._result = result
         self.win = tk.Toplevel(parent)
         self.win.title("Nonlinear Waves Results")
-        self.win.configure(bg=get_env_from_schema("UI_BACKGROUND"))
 
         self._anim_canvas = None
         self._st_canvas = None
@@ -318,9 +321,7 @@ class NonlinearWavesResultDialog:
         self._tracked_soliton_centers: TrackedSolitonCenters | None = None
 
         self._build_ui()
-        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
-        center_window(self.win, width=1300, height=880, max_width_ratio=0.95, resizable=True)
-        self.win.minsize(1100, 700)
+        self._shell.finish(AdvancedResultSize(1300, 880))
         make_modal(self.win, parent)
 
     def _on_close(self) -> None:
@@ -331,53 +332,62 @@ class NonlinearWavesResultDialog:
         self.win.destroy()
 
     def _build_ui(self) -> None:
-        pad = int(get_env_from_schema("UI_PADDING"))
-        top = ttk.Frame(self.win, padding=pad)
-        top.pack(fill=tk.BOTH, expand=True)
-
-        drift_text = ", ".join(f"{k}: {v:+.3e}" for k, v in self._result.magnitudes.items())
-        ttk.Label(top, text=drift_text, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
+        magnitudes = self._result.magnitudes
+        if self._result.model_type == "kdv":
+            metric_items: tuple[tuple[str, object], ...] = (
+                ("Model", "KdV"),
+                ("Relative mass drift", f"{magnitudes['mass_drift_rel']:+.3e}"),
+                ("Maximum amplitude", f"{magnitudes['max_amplitude']:.3e}"),
+            )
+        else:
+            metric_items = (
+                ("Model", "NLSE"),
+                ("Relative norm drift", f"{magnitudes['norm_drift_rel']:+.3e}"),
+                ("Maximum intensity", f"{magnitudes['max_intensity']:.3e}"),
+            )
+        summary_lines = [format_result_summary(metric_items)]
         if self._result.model_type == "kdv" and "soliton_count" in self._result.metadata:
             metadata = self._result.metadata
-            summary = (
-                f"Solitons: N={metadata['soliton_count']} | "
-                f"A={metadata['soliton_amplitudes']} | "
-                f"x0={metadata['soliton_centers']} | "
-                f"v={metadata['soliton_speeds']}"
+            summary_lines.append(
+                format_result_summary(
+                    (
+                        ("Solitons", metadata["soliton_count"]),
+                        ("Amplitudes", metadata["soliton_amplitudes"]),
+                        ("Initial centers", metadata["soliton_centers"]),
+                        ("Speeds", metadata["soliton_speeds"]),
+                    )
+                )
             )
-            ttk.Label(top, text=summary, style="Small.TLabel").pack(anchor=tk.W, pady=(0, pad))
-
-        nb = ttk.Notebook(top)
-        nb.pack(fill=tk.BOTH, expand=True)
+        self._shell = AdvancedResultShell(
+            self.win,
+            title="Nonlinear Waves Results",
+            summary="\n".join(summary_lines),
+            close_command=self._on_close,
+        )
+        nb = self._shell.notebook
 
         tab_anim = ttk.Frame(nb)
-        nb.add(tab_anim, text="  Profile Animation  ")
+        nb.add(tab_anim, text="Profile Animation")
         self._build_anim_tab(tab_anim)
 
         tab_st = ttk.Frame(nb)
-        nb.add(tab_st, text="  Space-Time Map  ")
+        nb.add(tab_st, text="Space-Time Map")
         self._build_spacetime_tab(tab_st)
 
         if self._result.phase is not None:
             tab_phase = ttk.Frame(nb)
-            nb.add(tab_phase, text="  Phase  ")
+            nb.add(tab_phase, text="Phase")
             self._build_phase_tab(tab_phase)
 
         tab_spec = ttk.Frame(nb)
-        nb.add(tab_spec, text="  Spectrum  ")
+        nb.add(tab_spec, text="Spectrum")
         self._spectrum_tab = tab_spec
         self._spectrum_tab_initialized = False
         nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab_changed)
 
         tab_inv = ttk.Frame(nb)
-        nb.add(tab_inv, text="  Invariants  ")
+        nb.add(tab_inv, text="Invariants")
         self._build_invariants_tab(tab_inv)
-
-        btn_frame = ttk.Frame(self.win, padding=(pad, 0, pad, pad))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Close", style="Cancel.TButton", command=self._on_close).pack(
-            side=tk.RIGHT
-        )
 
     def _on_notebook_tab_changed(self, event: tk.Event[tk.Misc]) -> None:
         """Initialize the deferred Spectrum tab on its first selection."""
@@ -390,8 +400,7 @@ class NonlinearWavesResultDialog:
             self._spectrum_tab_initialized = True
 
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
-        ctrl = ttk.Frame(parent)
-        ctrl.pack(fill=tk.X, padx=4, pady=4)
+        ctrl = make_view_controls(parent)
 
         self._kdv_reference_mode = self._is_kdv_soliton_result()
         if self._kdv_reference_mode:
