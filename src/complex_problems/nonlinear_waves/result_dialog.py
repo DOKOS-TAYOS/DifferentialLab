@@ -472,11 +472,7 @@ class NonlinearWavesResultDialog:
 
     def _selected_animation_labels(self) -> tuple[str, ...]:
         """Read selected optional tracked-soliton overlays."""
-        if isinstance(self._anim_selection, AdvancedMultiSelector):
-            return self._anim_selection.selected_labels()
-        return tuple(
-            self._anim_selection.get(index) for index in self._anim_selection.curselection()
-        )
+        return self._anim_selection.selected_labels()
 
     def _get_tracked_soliton_centers(self) -> TrackedSolitonCenters:
         """Compute and cache fixed-shape fitted centers for this result once."""
