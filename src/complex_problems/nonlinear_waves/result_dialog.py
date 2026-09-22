@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedMultiSelector,
     AdvancedResultShell,
     AdvancedResultSize,
     close_embedded_figures,
@@ -406,32 +407,25 @@ class NonlinearWavesResultDialog:
         if self._kdv_reference_mode:
             count = int(self._result.metadata["soliton_count"])
             self._anim_selection_labels = [f"Soliton {index + 1}" for index in range(count)]
-            ttk.Label(ctrl, text="Numerical u: always shown", style="Small.TLabel").pack(
+            info_group = ctrl.add_group(requested_width=180)
+            ttk.Label(info_group, text="Numerical u: always shown", style="Small.TLabel").pack(
                 side=tk.LEFT, padx=(0, 12)
             )
-            ttk.Label(ctrl, text="Add solitons:", style="Small.TLabel").pack(
+            selection_group = ctrl.add_group(requested_width=min(360, max(180, count * 86)))
+            ttk.Label(selection_group, text="Add solitons:", style="Small.TLabel").pack(
                 side=tk.LEFT, padx=(0, 4)
             )
-            self._anim_selection = tk.Listbox(
-                ctrl,
-                selectmode=tk.EXTENDED,
-                exportselection=False,
-                height=min(len(self._anim_selection_labels), 3),
-                width=12,
-                font=get_font(),
+            self._anim_selection = AdvancedMultiSelector(
+                selection_group,
+                self._anim_selection_labels,
+                allow_empty=True,
+                command=self._update_anim,
             )
-            for label in self._anim_selection_labels:
-                self._anim_selection.insert(tk.END, label)
             self._anim_selection.pack(side=tk.LEFT, padx=(0, 8))
-            if count > 3:
-                scrollbar = ttk.Scrollbar(
-                    ctrl, orient=tk.VERTICAL, command=self._anim_selection.yview
-                )
-                self._anim_selection.configure(yscrollcommand=scrollbar.set)
-                scrollbar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
             self._show_interaction_residual = tk.BooleanVar(value=False)
+            residual_group = ctrl.add_group(requested_width=180)
             residual_checkbox = ttk.Checkbutton(
-                ctrl,
+                residual_group,
                 text="Interaction residual",
                 variable=self._show_interaction_residual,
                 command=self._update_anim,
@@ -444,15 +438,18 @@ class NonlinearWavesResultDialog:
                 "pre/post-interaction observations. Residual = numerical u - sum of tracked "
                 "profiles.",
             )
-            self._anim_selection.bind("<<ListboxSelect>>", lambda _e: self._update_anim())
+
         else:
+            display_group = ctrl.add_group(requested_width=190)
             options = (
                 ["Field"] if self._result.model_type == "kdv" else ["Intensity", "Real", "Imag"]
             )
             self._anim_view_var = tk.StringVar(value=options[0])
-            ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+            ttk.Label(display_group, text="Display:", style="Small.TLabel").pack(
+                side=tk.LEFT, padx=(0, 4)
+            )
             combo = ttk.Combobox(
-                ctrl,
+                display_group,
                 textvariable=self._anim_view_var,
                 values=options,
                 state="readonly",
@@ -475,9 +472,7 @@ class NonlinearWavesResultDialog:
 
     def _selected_animation_labels(self) -> tuple[str, ...]:
         """Read selected optional tracked-soliton overlays."""
-        return tuple(
-            self._anim_selection.get(index) for index in self._anim_selection.curselection()
-        )
+        return self._anim_selection.selected_labels()
 
     def _get_tracked_soliton_centers(self) -> TrackedSolitonCenters:
         """Compute and cache fixed-shape fitted centers for this result once."""

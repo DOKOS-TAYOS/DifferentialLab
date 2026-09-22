@@ -130,6 +130,18 @@ def fundamental_cycles_to_time(cycles: ArrayLike, n_particles: int) -> np.ndarra
     return float(time) if np.ndim(cycles) == 0 else time
 
 
+def normalize_fput_mode_selection(text: str, n_modes: int) -> tuple[int, ...]:
+    """Parse the editable modal selection using the established fallback rules."""
+    if n_modes <= 0:
+        return ()
+    try:
+        modes = [int(value.strip()) for value in text.split(",")]
+    except ValueError:
+        modes = [1, 2, 3]
+    valid_modes = tuple(mode for mode in modes if 1 <= mode <= n_modes)
+    return valid_modes or (1,)
+
+
 def _format_value(value: float | int | None) -> str:
     """Format cached scalar diagnostics without exposing Python None values."""
     return "not detected" if value is None else f"{value:.6g}"
@@ -384,9 +396,10 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text=title)
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
+        group = controls.add_group(requested_width=220)
+        ttk.Label(group, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
-            controls,
+            group,
             textvariable=variable,
             values=("displacement", "strain"),
             state="readonly",
@@ -427,9 +440,10 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Lattice Animation")
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Display:").pack(side=tk.LEFT)
+        group = controls.add_group(requested_width=220)
+        ttk.Label(group, text="Display:").pack(side=tk.LEFT)
         combo = ttk.Combobox(
-            controls,
+            group,
             textvariable=self._representation_var,
             values=("displacement", "strain"),
             state="readonly",
@@ -482,13 +496,16 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Modal Energies")
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Modes (1..N):").pack(side=tk.LEFT)
-        ttk.Entry(controls, textvariable=self._mode_selection_var, width=14).pack(
-            side=tk.LEFT, padx=5
-        )
-        ttk.Label(controls, text="Heatmap scale:").pack(side=tk.LEFT)
+        mode_group = controls.add_group(requested_width=280)
+        ttk.Label(mode_group, text="Modes (1..N):").pack(side=tk.LEFT)
+        mode_entry = ttk.Entry(mode_group, textvariable=self._mode_selection_var, width=14)
+        mode_entry.pack(side=tk.LEFT, padx=5)
+        update_button = ttk.Button(mode_group, text="Update")
+        update_button.pack(side=tk.LEFT, padx=(0, 8))
+        scale_group = controls.add_group(requested_width=190)
+        ttk.Label(scale_group, text="Heatmap scale:").pack(side=tk.LEFT)
         scale = ttk.Combobox(
-            controls,
+            scale_group,
             textvariable=self._modal_scale_var,
             values=("Linear", "log10 normalized"),
             state="readonly",
@@ -498,24 +515,33 @@ class FPUTResultDialog:
         frame = ttk.Frame(tab)
         frame.pack(fill=tk.BOTH, expand=True)
         canvas: list[object | None] = [None]
+        result = self.result
+        assert isinstance(result, FPUTResult)
+        selected_modes = list(
+            normalize_fput_mode_selection(
+                self._mode_selection_var.get(), result.modal_energy.shape[1]
+            )
+        )
 
-        def update(_event: object | None = None) -> None:
+        def render(_event: object | None = None) -> None:
             reset_embedded_animation(frame, canvas[0])
-            assert isinstance(self.result, FPUTResult)
-            try:
-                modes = [int(value.strip()) for value in self._mode_selection_var.get().split(",")]
-            except ValueError:
-                modes = [1, 2, 3]
-            modes = [mode for mode in modes if 1 <= mode <= self.result.modal_energy.shape[1]] or [
-                1
-            ]
-            figure = create_modal_energy_figure(self.result, modes, self._modal_scale_var.get())
+            figure = create_modal_energy_figure(result, selected_modes, self._modal_scale_var.get())
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
 
-        scale.bind("<<ComboboxSelected>>", update)
-        self._mode_selection_var.trace_add("write", lambda *_args: update())
-        update()
+        def apply_mode_selection(_event: object | None = None) -> None:
+            nonlocal selected_modes
+            selected_modes = list(
+                normalize_fput_mode_selection(
+                    self._mode_selection_var.get(), result.modal_energy.shape[1]
+                )
+            )
+            render()
+
+        update_button.configure(command=apply_mode_selection)
+        mode_entry.bind("<Return>", apply_mode_selection)
+        scale.bind("<<ComboboxSelected>>", render)
+        render()
 
     def _build_phase_tab(self, notebook: ttk.Notebook) -> None:
         """Provide particle or normal-mode phase portraits from cached coordinates."""
@@ -523,23 +549,27 @@ class FPUTResultDialog:
         tab = ttk.Frame(notebook)
         notebook.add(tab, text="Phase Space")
         controls = make_view_controls(tab)
+        kind_group = controls.add_group(requested_width=150)
         kind = ttk.Combobox(
-            controls,
+            kind_group,
             textvariable=self._phase_kind_var,
             values=("Particle", "Normal mode"),
             state="readonly",
             width=14,
         )
         kind.pack(side=tk.LEFT)
-        ttk.Label(controls, text="Index (1..N):").pack(side=tk.LEFT, padx=(12, 4))
+        index_group = controls.add_group(requested_width=170)
+        ttk.Label(index_group, text="Index (1..N):").pack(side=tk.LEFT, padx=(0, 4))
         index = ttk.Spinbox(
-            controls,
+            index_group,
             from_=1,
             to=self.result.displacement.shape[1],
             textvariable=self._phase_index_var,
             width=6,
         )
         index.pack(side=tk.LEFT)
+        update_button = ttk.Button(index_group, text="Update")
+        update_button.pack(side=tk.LEFT, padx=(6, 0))
         frame = ttk.Frame(tab)
         frame.pack(fill=tk.BOTH, expand=True)
         canvas: list[object | None] = [None]
@@ -574,7 +604,8 @@ class FPUTResultDialog:
             self._canvases.append(canvas[0])
 
         kind.bind("<<ComboboxSelected>>", update)
-        self._phase_index_var.trace_add("write", lambda *_args: update())
+        update_button.configure(command=update)
+        index.bind("<Return>", update)
         update()
 
     def _heatmap(

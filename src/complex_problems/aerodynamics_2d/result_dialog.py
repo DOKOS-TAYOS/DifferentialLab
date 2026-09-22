@@ -299,10 +299,11 @@ class Aerodynamics2DResultDialog:
 
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
+        group = ctrl.add_group(requested_width=190)
         self._view_var = tk.StringVar(value="speed")
-        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
-            ctrl,
+            group,
             textvariable=self._view_var,
             values=("speed", "vorticity", "pressure"),
             state="readonly",

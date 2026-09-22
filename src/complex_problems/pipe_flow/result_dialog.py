@@ -294,10 +294,11 @@ class PipeFlowResultDialog:
 
     def _build_anim_tab(self, parent: ttk.Frame) -> None:
         ctrl = make_view_controls(parent)
+        group = ctrl.add_group(requested_width=190)
         self._anim_view_var = tk.StringVar(value="pressure")
-        ttk.Label(ctrl, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Label(group, text="Display:", style="Small.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         combo = ttk.Combobox(
-            ctrl,
+            group,
             textvariable=self._anim_view_var,
             values=("pressure", "velocity", "reynolds"),
             state="readonly",

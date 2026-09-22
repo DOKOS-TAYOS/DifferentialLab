@@ -346,10 +346,11 @@ class GravitationalNBodyResultDialog:
 
     def _build_orbit_tab(self, tab: ttk.Frame) -> None:
         controls = make_view_controls(tab)
-        ttk.Label(controls, text="Reference frame:").pack(side=tk.LEFT)
+        group = controls.add_group(requested_width=230)
+        ttk.Label(group, text="Reference frame:").pack(side=tk.LEFT)
         self._orbit_frame_var = tk.StringVar(value="Inertial")
         combo = ttk.Combobox(
-            controls,
+            group,
             textvariable=self._orbit_frame_var,
             values=("Inertial", "Center of mass"),
             state="readonly",
@@ -396,17 +397,17 @@ class GravitationalNBodyResultDialog:
     def _build_trajectory_tab(self, tab: ttk.Frame) -> None:
         controls = make_view_controls(tab)
         self._trajectory_frame_var = tk.StringVar(value="Inertial")
-        ttk.Label(controls, text="Reference frame:").pack(side=tk.LEFT)
-        ttk.Combobox(
-            controls,
+        group = controls.add_group(requested_width=230)
+        ttk.Label(group, text="Reference frame:").pack(side=tk.LEFT)
+        combo = ttk.Combobox(
+            group,
             textvariable=self._trajectory_frame_var,
             values=("Inertial", "Center of mass"),
             state="readonly",
             width=16,
-        ).pack(side=tk.LEFT)
-        ttk.Button(controls, text="Update", command=self._update_trajectory).pack(
-            side=tk.LEFT, padx=5
         )
+        combo.pack(side=tk.LEFT)
+        combo.bind("<<ComboboxSelected>>", lambda _event: self._update_trajectory())
         self._trajectory_plot_frame = ttk.Frame(tab)
         self._trajectory_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_trajectory()
@@ -423,15 +424,17 @@ class GravitationalNBodyResultDialog:
     def _build_phase_tab(self, tab: ttk.Frame) -> None:
         controls = make_view_controls(tab)
         self._phase_body_var = tk.StringVar(value="1")
-        ttk.Label(controls, text="Body:").pack(side=tk.LEFT)
-        ttk.Combobox(
-            controls,
+        group = controls.add_group(requested_width=130)
+        ttk.Label(group, text="Body:").pack(side=tk.LEFT)
+        combo = ttk.Combobox(
+            group,
             textvariable=self._phase_body_var,
             values=[str(index + 1) for index in range(self._result.masses.size)],
             state="readonly",
             width=8,
-        ).pack(side=tk.LEFT)
-        ttk.Button(controls, text="Update", command=self._update_phase).pack(side=tk.LEFT, padx=5)
+        )
+        combo.pack(side=tk.LEFT)
+        combo.bind("<<ComboboxSelected>>", lambda _event: self._update_phase())
         self._phase_plot_frame = ttk.Frame(tab)
         self._phase_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_phase()
@@ -482,16 +485,18 @@ class GravitationalNBodyResultDialog:
         controls = make_view_controls(tab)
         bodies = [str(index + 1) for index in range(self._result.masses.size)]
         self._pair_a_var, self._pair_b_var = tk.StringVar(value="1"), tk.StringVar(value="2")
-        ttk.Label(controls, text="Pair:").pack(side=tk.LEFT)
-        ttk.Combobox(
-            controls, textvariable=self._pair_a_var, values=bodies, state="readonly", width=8
-        ).pack(side=tk.LEFT)
-        ttk.Combobox(
-            controls, textvariable=self._pair_b_var, values=bodies, state="readonly", width=8
-        ).pack(side=tk.LEFT, padx=4)
-        ttk.Button(controls, text="Update pair", command=self._update_separations).pack(
-            side=tk.LEFT
+        group = controls.add_group(requested_width=220)
+        ttk.Label(group, text="Pair:").pack(side=tk.LEFT)
+        pair_a = ttk.Combobox(
+            group, textvariable=self._pair_a_var, values=bodies, state="readonly", width=8
         )
+        pair_a.pack(side=tk.LEFT)
+        pair_b = ttk.Combobox(
+            group, textvariable=self._pair_b_var, values=bodies, state="readonly", width=8
+        )
+        pair_b.pack(side=tk.LEFT, padx=4)
+        pair_a.bind("<<ComboboxSelected>>", lambda _event: self._update_separations())
+        pair_b.bind("<<ComboboxSelected>>", lambda _event: self._update_separations())
         self._separation_plot_frame = ttk.Frame(tab)
         self._separation_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_separations()

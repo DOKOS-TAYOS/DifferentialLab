@@ -28,6 +28,122 @@ class AdvancedResultSize:
     minimum_height: int = 650
 
 
+def layout_view_control_groups(
+    available_width: int,
+    requested_group_widths: Sequence[int],
+    *,
+    gap: int = 12,
+) -> tuple[tuple[int, ...], ...]:
+    """Return responsive rows while keeping each control group indivisible."""
+    if available_width <= 0:
+        return (tuple(range(len(requested_group_widths))),) if requested_group_widths else ()
+
+    rows: list[list[int]] = []
+    row: list[int] = []
+    row_width = 0
+    for index, requested_width in enumerate(requested_group_widths):
+        width = max(1, requested_width)
+        next_width = width if not row else row_width + gap + width
+        if row and next_width > available_width:
+            rows.append(row)
+            row = []
+            row_width = 0
+        row.append(index)
+        row_width = width if len(row) == 1 else row_width + gap + width
+    if row:
+        rows.append(row)
+    return tuple(tuple(current_row) for current_row in rows)
+
+
+def normalize_multi_selector_indexes(
+    item_count: int,
+    indexes: Sequence[int],
+    *,
+    allow_empty: bool,
+) -> tuple[int, ...]:
+    """Normalize selected indexes while preserving item order and empty policy."""
+    valid = {index for index in indexes if 0 <= index < item_count}
+    if not allow_empty and not valid and item_count:
+        valid.add(0)
+    return tuple(index for index in range(item_count) if index in valid)
+
+
+class AdvancedMultiSelector(ttk.Frame):
+    """Compact, keyboard-accessible multi-selection control for result views."""
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        labels: Sequence[str],
+        *,
+        selected_indexes: Sequence[int] = (),
+        allow_empty: bool = True,
+        command: Callable[[], object] | None = None,
+        compact_threshold: int = 8,
+    ) -> None:
+        super().__init__(parent)
+        self._labels = tuple(labels)
+        self._allow_empty = allow_empty
+        self._command = command
+        self._compact = len(self._labels) > compact_threshold
+        self._variables = [tk.BooleanVar(self, value=False) for _ in self._labels]
+        self._menu_button: ttk.Menubutton | None = None
+        self._menu: tk.Menu | None = None
+        if self._compact:
+            self._menu = tk.Menu(self, tearoff=False)
+            for label, variable in zip(self._labels, self._variables):
+                self._menu.add_checkbutton(
+                    label=label,
+                    variable=variable,
+                    command=self._on_change,
+                )
+            self._menu_button = ttk.Menubutton(self, text="Select items", menu=self._menu)
+            self._menu_button.pack(fill=tk.X)
+        else:
+            for label, variable in zip(self._labels, self._variables):
+                ttk.Checkbutton(
+                    self,
+                    text=label,
+                    variable=variable,
+                    command=self._on_change,
+                ).pack(anchor=tk.W)
+        self.set_selected_indexes(selected_indexes, notify=False)
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        """Return labels in their original, deterministic order."""
+        return self._labels
+
+    def selected_indexes(self) -> tuple[int, ...]:
+        """Return selected item indexes in original order."""
+        return tuple(index for index, variable in enumerate(self._variables) if variable.get())
+
+    def selected_labels(self) -> tuple[str, ...]:
+        """Return selected labels in original order."""
+        return tuple(self._labels[index] for index in self.selected_indexes())
+
+    def set_selected_indexes(self, indexes: Sequence[int], *, notify: bool = True) -> None:
+        """Set selected indexes, enforcing the configured empty-selection policy."""
+        normalized = normalize_multi_selector_indexes(
+            len(self._labels), indexes, allow_empty=self._allow_empty
+        )
+        for index, variable in enumerate(self._variables):
+            variable.set(index in normalized)
+        if notify:
+            self._notify()
+
+    def _on_change(self) -> None:
+        """Keep non-empty selectors valid after a checkbutton toggle."""
+        if not self._allow_empty and not self.selected_indexes() and self._variables:
+            self._variables[0].set(True)
+        self._notify()
+
+    def _notify(self) -> None:
+        """Notify the owner after a user-visible selection change."""
+        if self._command is not None:
+            self._command()
+
+
 def calculate_advanced_result_minsize(
     screen_width: int,
     screen_height: int,
@@ -134,9 +250,54 @@ class AdvancedResultShell:
         setup_arrow_enter_navigation([[self.close_button]])
 
 
-def make_view_controls(parent: ttk.Frame) -> ttk.LabelFrame:
-    """Create a compact, consistently labelled row for visual controls."""
-    controls = ttk.LabelFrame(parent, text="View controls", padding=(8, 4))
+class AdvancedViewControls(ttk.LabelFrame):
+    """Responsive container for indivisible label/control groups."""
+
+    def __init__(self, parent: ttk.Frame) -> None:
+        super().__init__(parent, text="View controls", padding=(8, 4))
+        self._groups: list[tuple[ttk.Frame, int]] = []
+        self._layout_after_id: str | None = None
+        self.bind("<Configure>", self._schedule_layout)
+        self.bind("<Destroy>", self._cancel_layout)
+
+    def add_group(self, *, requested_width: int = 0) -> ttk.Frame:
+        """Create and register one indivisible control group."""
+        group = ttk.Frame(self)
+        self._groups.append((group, requested_width))
+        self._schedule_layout()
+        return group
+
+    def _schedule_layout(self, _event: object | None = None) -> None:
+        """Debounce layout work until Tk has updated the container width."""
+        if self._layout_after_id is not None:
+            self.after_cancel(self._layout_after_id)
+        self._layout_after_id = self.after_idle(self._layout_groups)
+
+    def _cancel_layout(self, _event: object | None = None) -> None:
+        """Cancel pending callbacks before Tk destroys the widget."""
+        if self._layout_after_id is not None:
+            try:
+                self.after_cancel(self._layout_after_id)
+            except tk.TclError:
+                pass
+            self._layout_after_id = None
+
+    def _layout_groups(self) -> None:
+        """Place groups in rows according to their requested widths."""
+        self._layout_after_id = None
+        widths = [requested or group.winfo_reqwidth() for group, requested in self._groups]
+        rows = layout_view_control_groups(max(self.winfo_width() - 16, 1), widths)
+        for group, _requested in self._groups:
+            group.grid_forget()
+        for row_index, row in enumerate(rows):
+            for column_index, group_index in enumerate(row):
+                group = self._groups[group_index][0]
+                group.grid(row=row_index, column=column_index, padx=(0, 12), pady=2, sticky=tk.W)
+
+
+def make_view_controls(parent: ttk.Frame) -> AdvancedViewControls:
+    """Create a responsive, consistently labelled Advanced control container."""
+    controls = AdvancedViewControls(parent)
     controls.pack(fill=tk.X, padx=4, pady=4)
     return controls
 

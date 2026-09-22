@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 from complex_problems.common.result_dialog_ui import (
+    AdvancedMultiSelector,
     AdvancedResultShell,
     AdvancedResultSize,
     close_embedded_figures,
@@ -22,9 +23,9 @@ from complex_problems.common.result_dialog_ui import (
     reset_embedded_animation,
 )
 from complex_problems.coupled_oscillators.solver import CoupledOscillatorsResult
-from config import generate_output_basename, get_env_from_schema, get_output_dir
+from config import generate_output_basename, get_output_dir
 from frontend.plot_embed import embed_animation_plot_in_tk, replace_plot_in_tk
-from frontend.theme import get_font, get_select_colors
+from frontend.theme import get_font
 from frontend.window_utils import make_modal
 from plotting import (
     create_contour_plot,
@@ -199,11 +200,12 @@ class CoupledOscillatorsResultDialog:
         energy_mode_tab = ttk.Frame(nb)
         nb.add(energy_mode_tab, text="Energy by Mode/Oscillator")
         em_ctrl = make_view_controls(energy_mode_tab)
-        ttk.Label(em_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        display_group = em_ctrl.add_group(requested_width=190)
+        ttk.Label(display_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._em_view_var = tk.StringVar(value="Modes" if self._result.has_modes else "Oscillators")
         em_values = ["Modes", "Oscillators"] if self._result.has_modes else ["Oscillators"]
         em_view_combo = ttk.Combobox(
-            em_ctrl,
+            display_group,
             textvariable=self._em_view_var,
             values=em_values,
             state="readonly",
@@ -212,31 +214,17 @@ class CoupledOscillatorsResultDialog:
         )
         em_view_combo.pack(side=tk.LEFT, padx=(0, 8))
         em_view_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_em_view_change())
-        ttk.Label(em_ctrl, text="Select:").pack(side=tk.LEFT, padx=(16, 4))
         n = self._result.n_oscillators
-        btn_bg = get_env_from_schema("UI_BUTTON_BG")
-        fg = get_env_from_schema("UI_FOREGROUND")
-        select_bg, select_fg = get_select_colors(element_bg=btn_bg, text_fg=fg)
-        self._em_listbox = tk.Listbox(
-            em_ctrl,
-            selectmode=tk.EXTENDED,
-            height=6,
-            width=14,
-            bg=btn_bg,
-            fg=fg,
-            selectbackground=select_bg,
-            selectforeground=select_fg,
-            font=get_font(),
-            exportselection=False,
+        select_group = em_ctrl.add_group(requested_width=min(360, max(180, n * 86)))
+        ttk.Label(select_group, text="Select:").pack(side=tk.LEFT, padx=(0, 4))
+        self._em_selector = AdvancedMultiSelector(
+            select_group,
+            self._energy_mode_labels(self._em_view_var.get()),
+            selected_indexes=range(min(3, n)),
+            allow_empty=False,
+            command=self._update_energy_mode,
         )
-        lbl_prefix = "Mode" if self._result.has_modes else "Oscillator"
-        for i in range(n):
-            # Physics convention: Mode 1 = fundamental, Mode 2 = second harmonic, etc.
-            label = f"{lbl_prefix} {i + 1}" if self._result.has_modes else f"{lbl_prefix} {i}"
-            self._em_listbox.insert(tk.END, label)
-        self._em_listbox.selection_set(0, min(2, n - 1))
-        self._em_listbox.pack(side=tk.LEFT, padx=(0, 4))
-        self._em_listbox.bind("<<ListboxSelect>>", lambda _e: self._update_energy_mode())
+        self._em_selector.pack(side=tk.LEFT)
         self._em_plot_frame = ttk.Frame(energy_mode_tab)
         self._em_plot_frame.pack(fill=tk.BOTH, expand=True)
         self._update_energy_mode()
@@ -245,11 +233,12 @@ class CoupledOscillatorsResultDialog:
         anim_tab = ttk.Frame(nb)
         nb.add(anim_tab, text="Animation")
         anim_ctrl = make_view_controls(anim_tab)
-        ttk.Label(anim_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        anim_group = anim_ctrl.add_group(requested_width=190)
+        ttk.Label(anim_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._anim_view_var = tk.StringVar(value="Oscillators")
         anim_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         view_combo = ttk.Combobox(
-            anim_ctrl,
+            anim_group,
             textvariable=self._anim_view_var,
             values=anim_values,
             state="readonly",
@@ -266,11 +255,12 @@ class CoupledOscillatorsResultDialog:
         heatmap_tab = ttk.Frame(nb)
         nb.add(heatmap_tab, text="Space-Time Heatmap")
         hm_ctrl = make_view_controls(heatmap_tab)
-        ttk.Label(hm_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        hm_group = hm_ctrl.add_group(requested_width=190)
+        ttk.Label(hm_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._hm_view_var = tk.StringVar(value="Oscillators")
         hm_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         hm_view_combo = ttk.Combobox(
-            hm_ctrl,
+            hm_group,
             textvariable=self._hm_view_var,
             values=hm_values,
             state="readonly",
@@ -287,11 +277,12 @@ class CoupledOscillatorsResultDialog:
         surf_tab = ttk.Frame(nb)
         nb.add(surf_tab, text="Surface 3D")
         surf_ctrl = make_view_controls(surf_tab)
-        ttk.Label(surf_ctrl, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
+        surf_group = surf_ctrl.add_group(requested_width=190)
+        ttk.Label(surf_group, text="Display:").pack(side=tk.LEFT, padx=(0, 4))
         self._surf_view_var = tk.StringVar(value="Oscillators")
         surf_values = ["Oscillators", "Modes"] if self._result.has_modes else ["Oscillators"]
         surf_view_combo = ttk.Combobox(
-            surf_ctrl,
+            surf_group,
             textvariable=self._surf_view_var,
             values=surf_values,
             state="readonly",
@@ -455,9 +446,7 @@ class CoupledOscillatorsResultDialog:
         r = self._result
         n = r.n_oscillators
         view = self._em_view_var.get()
-        selected = list(self._em_listbox.curselection())
-        if not selected:
-            selected = [0]
+        selected = list(self._em_selector.selected_indexes())
 
         if view == "Modes" and r.has_modes:
             E_modes = _compute_energy_per_mode(r.y, n, r.M_modes, r.omega_modes, r.masses)
@@ -506,16 +495,23 @@ class CoupledOscillatorsResultDialog:
         self._replace_plot(self._em_plot_frame, fig, "_em_canvas")
 
     def _on_em_view_change(self) -> None:
-        """Rebuild energy-mode listbox labels when view changes."""
-        n = self._result.n_oscillators
-        view = self._em_view_var.get()
-        self._em_listbox.delete(0, tk.END)
-        prefix = "Mode" if view == "Modes" else "Oscillator"
-        for i in range(n):
-            label = f"{prefix} {i + 1}" if view == "Modes" else f"{prefix} {i}"
-            self._em_listbox.insert(tk.END, label)
-        self._em_listbox.selection_set(0, min(2, n - 1))
+        """Rebuild energy selector labels when view changes."""
+        self._em_selector.destroy()
+        self._em_selector = AdvancedMultiSelector(
+            self._em_selector.master,
+            self._energy_mode_labels(self._em_view_var.get()),
+            selected_indexes=range(min(3, self._result.n_oscillators)),
+            allow_empty=False,
+            command=self._update_energy_mode,
+        )
+        self._em_selector.pack(side=tk.LEFT)
         self._update_energy_mode()
+
+    def _energy_mode_labels(self, view: str) -> tuple[str, ...]:
+        """Return established 1-based mode and 0-based oscillator labels."""
+        if view == "Modes":
+            return tuple(f"Mode {index + 1}" for index in range(self._result.n_oscillators))
+        return tuple(f"Oscillator {index}" for index in range(self._result.n_oscillators))
 
     def _get_amplitude_data(
         self, view_var: tk.StringVar

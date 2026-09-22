@@ -24,6 +24,7 @@ from complex_problems.fput_experiment.result_dialog import (
     format_fput_summary,
     fundamental_angular_frequency,
     fundamental_cycles_to_time,
+    normalize_fput_mode_selection,
     prepare_fput_animation_payload,
     time_to_fundamental_cycles,
 )
@@ -186,6 +187,14 @@ def test_fundamental_cycle_transform_round_trips_and_uses_fixed_end_frequency() 
     time = np.array([0.0, 1.5, 7.0])
     cycles = time_to_fundamental_cycles(time, 3)
     np.testing.assert_allclose(fundamental_cycles_to_time(cycles, 3), time)
+
+
+def test_fput_mode_selection_parser_preserves_existing_fallback_contract() -> None:
+    """Editable mode input keeps its historical filtering and fallback behavior."""
+    assert normalize_fput_mode_selection("2, 4", 5) == (2, 4)
+    assert normalize_fput_mode_selection("invalid", 5) == (1, 2, 3)
+    assert normalize_fput_mode_selection("4, 9", 5) == (4,)
+    assert normalize_fput_mode_selection("9", 5) == (1,)
 
 
 @pytest.mark.parametrize(
