@@ -141,7 +141,6 @@ def test_mp4_export_cancel_success_and_ffmpeg_error_are_user_facing() -> None:
     plt.close("all")
 
 
-
 def test_result_tabs_prioritize_visual_membrane_views() -> None:
     dialog = object.__new__(result_dialog.Membrane2DResultDialog)
     dialog.win = MagicMock()
