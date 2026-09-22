@@ -445,16 +445,18 @@ def _create_flow_figure(payload: _FlowPayload) -> Figure:
         directions = [np.zeros_like(component) for component in (u, v, w)]
         for direction, component in zip(directions, (u, v, w)):
             np.divide(component, magnitude, out=direction, where=valid)
-        colors = cmap(0.05 + 0.75 * np.clip(magnitude / payload.magnitude_scale, 0.0, 1.0))
+        relative = np.clip(magnitude / payload.magnitude_scale, 0.0, 1.0)
+        colors = cmap(0.05 + 0.75 * relative)
+        length_scale = np.log1p(15.0 * relative) / np.log1p(15.0)
         axis.quiver(
             xs[valid],
             ys[valid],
             zs[valid],
-            directions[0][valid],
-            directions[1][valid],
-            directions[2][valid],
+            directions[0][valid] * length_scale[valid],
+            directions[1][valid] * length_scale[valid],
+            directions[2][valid] * length_scale[valid],
             colors=colors[valid],
-            length=0.14,
+            length=0.16,
             normalize=False,
             linewidth=0.9,
             alpha=0.86,
