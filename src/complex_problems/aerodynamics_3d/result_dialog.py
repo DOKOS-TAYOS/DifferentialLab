@@ -56,9 +56,7 @@ def derived_vorticity(
     return (*omega, magnitude)
 
 
-def _velocity_interpolator(
-    result: Aerodynamics3DResult, frame: int
-) -> RegularGridInterpolator:
+def _velocity_interpolator(result: Aerodynamics3DResult, frame: int) -> RegularGridInterpolator:
     """Create one vector-valued interpolator for a saved velocity frame."""
     axes = (result.z, result.y, result.x)
     values = np.stack((result.u[frame], result.v[frame], result.w[frame]), axis=-1)
