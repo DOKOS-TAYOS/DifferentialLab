@@ -164,7 +164,7 @@ def bind_wraplength(
         frame: The frame whose width determines the wraplength.
         label_or_labels: Single label widget or list of labels to update.
         pad: Padding in pixels to subtract from frame width.
-        min_wrap: Minimum wraplength in pixels.
+        min_wrap: Preferred minimum wraplength when the viewport can accommodate it.
         debounce_ms: Debounce delay for Configure events (0 = no debounce).
     """
     labels = [label_or_labels] if isinstance(label_or_labels, tk.Widget) else list(label_or_labels)
@@ -172,7 +172,8 @@ def bind_wraplength(
     def _update(event: object | None = None) -> None:
         w = frame.winfo_width()
         if w > 100:
-            wrap = calculate_wraplength(w, pad, min_wrap)
+            available = max(1, w - pad)
+            wrap = min(calculate_wraplength(w, pad, min_wrap), available)
             for lbl in labels:
                 if lbl.winfo_exists():
                     cast(Any, lbl).configure(wraplength=wrap)

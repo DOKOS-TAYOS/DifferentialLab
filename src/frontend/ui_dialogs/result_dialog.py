@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tkinter as tk
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -95,6 +96,25 @@ def responsive_control_rows(
     if current:
         rows.append(current)
     return tuple(tuple(row) for row in rows)
+
+
+def responsive_control_grid(
+    rows: Sequence[Sequence[int]],
+) -> tuple[tuple[tuple[int, int, int], ...], ...]:
+    """Map responsive rows to shared grid columns without cross-row displacement."""
+    if not rows:
+        return ()
+    slot_count = math.lcm(*(len(row) for row in rows))
+    layout: list[tuple[tuple[int, int, int], ...]] = []
+    for row in rows:
+        span = slot_count // len(row)
+        layout.append(
+            tuple(
+                (group_index, column_index * span, span)
+                for column_index, group_index in enumerate(row)
+            )
+        )
+    return tuple(layout)
 
 
 def normalized_series_selection(
@@ -215,23 +235,26 @@ class _ViewControls(ttk.LabelFrame):
     def _layout_groups(self) -> None:
         self._layout_after_id = None
         visible_groups = [group for group in self._groups if group not in self._hidden_groups]
-        if not visible_groups:
-            return
         for group in self._groups:
             group.place_forget()
+            group.grid_forget()
+        if not visible_groups:
+            return
         widths = [group.winfo_reqwidth() for group in visible_groups]
-        available = max(1, self.winfo_width() - 20)
+        available = max(1, self.winfo_width() - 24)
         rows = responsive_control_rows(available, widths)
-        y_position = 4
-        for row in rows:
-            x_position = 0
-            row_height = max(visible_groups[group_index].winfo_reqheight() for group_index in row)
-            for group_index in row:
+        grid_rows = responsive_control_grid(rows)
+        for row_index, row in enumerate(grid_rows):
+            for column_index, (group_index, grid_column, columnspan) in enumerate(row):
                 group = visible_groups[group_index]
-                group.place(x=x_position, y=y_position)
-                x_position += group.winfo_reqwidth() + _CONTROL_GAP
-            y_position += row_height + 6
-        self.configure(height=y_position + 28)
+                group.grid(
+                    row=row_index,
+                    column=grid_column,
+                    columnspan=columnspan,
+                    sticky=tk.W,
+                    padx=(0, _CONTROL_GAP if column_index < len(row) - 1 else 0),
+                    pady=(0, 4 if row_index < len(grid_rows) - 1 else 0),
+                )
 
 
 class _SeriesSelector(ttk.Frame):
@@ -281,11 +304,11 @@ class _SeriesSelector(ttk.Frame):
             checkbutton.grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 8), pady=1)
         if len(self._labels) > 1:
             ttk.Button(self, text="Select all", command=self.select_all, takefocus=True).grid(
-                row=(len(self._labels) - 1) // 3 + 1,
-                column=0,
-                columnspan=3,
+                row=(len(self._labels) - 1) // 3,
+                column=3,
                 sticky="w",
-                pady=(3, 0),
+                padx=(2, 0),
+                pady=1,
             )
 
     def _build_compact_menu(self) -> None:
@@ -582,8 +605,8 @@ class ResultDialog:
         """Set the dialog geometry before the initial plot canvas is embedded."""
         screen_w = self.win.winfo_screenwidth()
         screen_h = self.win.winfo_screenheight()
-        win_w = int(screen_w * 0.94)
-        win_h = min(int(screen_h * 0.88), 920)
+        win_w = min(int(screen_w * 0.90), 1500)
+        win_h = min(int(screen_h * 0.88), 900)
 
         center_window(self.win, win_w, win_h, max_width_ratio=0.96, resizable=True)
         min_w, min_h = calculate_screen_aware_minsize(
@@ -795,6 +818,24 @@ class ResultDialog:
                     indent=indent + 1,
                     help_text=nested_help or None,
                 )
+            return
+
+        if indent > 0 and isinstance(value, (list, tuple, np.ndarray)):
+            block = ttk.Frame(parent)
+            block.pack(fill=tk.X, padx=(indent * 12, 0), pady=2)
+            label_widget = ttk.Label(block, text=label, anchor=tk.NW, style="Small.TLabel")
+            label_widget.pack(fill=tk.X, anchor=tk.W)
+            value_widget = ttk.Label(
+                block,
+                text=_format_display_value(value),
+                style="Small.TLabel",
+                anchor=tk.NW,
+                justify=tk.LEFT,
+            )
+            value_widget.pack(fill=tk.X, anchor=tk.W, padx=(12, 0))
+            bind_wraplength(block, value_widget, pad=12, min_wrap=80)
+            if help_text and label in help_text:
+                ToolTip(label_widget, help_text[label])
             return
 
         row = ttk.Frame(parent)
@@ -1203,6 +1244,8 @@ class ResultDialog:
             xlabel=disp_xlabel,
             ylabel=disp_ylabel,
         )
+        if fig.axes:
+            fig.axes[0].title.set_wrap(True)
         self._replace_plot(self._phase_plot_frame, fig, "_phase_canvas")
 
     # ── Vector ODE ───────────────────────────────────────────────────

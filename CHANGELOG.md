@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Polished tooltip input-modality handling, clarified optional ODE event detection, improved narrow-window text wrapping, and refined Standard Results sizing and responsive control layout.
 - Modernized Advanced result view controls with responsive grouped layouts, accessible multi-item selectors, immediate readonly-selector updates, and explicit updates for editable FPUT inputs.
 - Standardized all nine Advanced result dialogs with a shared result shell, compact factual summaries, screen-aware sizing, and fixed neutral Close footers.
 - Standardized all nine Advanced setup dialogs with consistent headers, scientific sections, and fixed neutral/primary action footers.

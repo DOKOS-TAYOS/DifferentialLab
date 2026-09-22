@@ -177,7 +177,7 @@ def test_result_geometry_clamps_minimum_to_a_small_screen() -> None:
 
     center_window.assert_called_once_with(
         dialog.win,
-        752,
+        720,
         528,
         max_width_ratio=0.96,
         resizable=True,

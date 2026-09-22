@@ -13,6 +13,7 @@ from frontend.ui_dialogs.result_dialog import (
     normalized_series_selection,
     pde_3d_fixed_grid,
     pde_fixed_axis_label,
+    responsive_control_grid,
     responsive_control_rows,
 )
 from solver.notation import FNotation, generate_derivative_labels
@@ -107,6 +108,11 @@ def test_responsive_control_rows_reflow_without_splitting_groups() -> None:
     assert responsive_control_rows(700, widths) == ((0, 1, 2, 3),)
     assert responsive_control_rows(360, widths) == ((0, 1), (2, 3))
     assert responsive_control_rows(170, widths) == ((0,), (1,), (2,), (3,))
+
+
+def test_responsive_control_grid_prevents_wide_second_row_from_pushing_first_row() -> None:
+    rows = ((0, 1), (2,))
+    assert responsive_control_grid(rows) == (((0, 0, 1), (1, 1, 1)), ((2, 0, 2),))
 
 
 def test_pde_3d_fixed_grid_maps_planes_to_physical_coordinates() -> None:
