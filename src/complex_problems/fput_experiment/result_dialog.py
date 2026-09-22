@@ -515,17 +515,18 @@ class FPUTResultDialog:
         frame = ttk.Frame(tab)
         frame.pack(fill=tk.BOTH, expand=True)
         canvas: list[object | None] = [None]
-        assert isinstance(self.result, FPUTResult)
+        result = self.result
+        assert isinstance(result, FPUTResult)
         selected_modes = list(
             normalize_fput_mode_selection(
-                self._mode_selection_var.get(), self.result.modal_energy.shape[1]
+                self._mode_selection_var.get(), result.modal_energy.shape[1]
             )
         )
 
         def render(_event: object | None = None) -> None:
             reset_embedded_animation(frame, canvas[0])
             figure = create_modal_energy_figure(
-                self.result, selected_modes, self._modal_scale_var.get()
+                result, selected_modes, self._modal_scale_var.get()
             )
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
@@ -534,7 +535,7 @@ class FPUTResultDialog:
             nonlocal selected_modes
             selected_modes = list(
                 normalize_fput_mode_selection(
-                    self._mode_selection_var.get(), self.result.modal_energy.shape[1]
+                    self._mode_selection_var.get(), result.modal_energy.shape[1]
                 )
             )
             render()
