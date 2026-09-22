@@ -130,6 +130,18 @@ def fundamental_cycles_to_time(cycles: ArrayLike, n_particles: int) -> np.ndarra
     return float(time) if np.ndim(cycles) == 0 else time
 
 
+def normalize_fput_mode_selection(text: str, n_modes: int) -> tuple[int, ...]:
+    """Parse the editable modal selection using the established fallback rules."""
+    if n_modes <= 0:
+        return ()
+    try:
+        modes = [int(value.strip()) for value in text.split(",")]
+    except ValueError:
+        modes = [1, 2, 3]
+    valid_modes = tuple(mode for mode in modes if 1 <= mode <= n_modes)
+    return valid_modes or (1,)
+
+
 def _format_value(value: float | int | None) -> str:
     """Format cached scalar diagnostics without exposing Python None values."""
     return "not detected" if value is None else f"{value:.6g}"
@@ -503,25 +515,34 @@ class FPUTResultDialog:
         frame = ttk.Frame(tab)
         frame.pack(fill=tk.BOTH, expand=True)
         canvas: list[object | None] = [None]
+        assert isinstance(self.result, FPUTResult)
+        selected_modes = list(
+            normalize_fput_mode_selection(
+                self._mode_selection_var.get(), self.result.modal_energy.shape[1]
+            )
+        )
 
-        def update(_event: object | None = None) -> None:
+        def render(_event: object | None = None) -> None:
             reset_embedded_animation(frame, canvas[0])
-            assert isinstance(self.result, FPUTResult)
-            try:
-                modes = [int(value.strip()) for value in self._mode_selection_var.get().split(",")]
-            except ValueError:
-                modes = [1, 2, 3]
-            modes = [mode for mode in modes if 1 <= mode <= self.result.modal_energy.shape[1]] or [
-                1
-            ]
-            figure = create_modal_energy_figure(self.result, modes, self._modal_scale_var.get())
+            figure = create_modal_energy_figure(
+                self.result, selected_modes, self._modal_scale_var.get()
+            )
             canvas[0] = embed_plot_in_tk(figure, frame)
             self._canvases.append(canvas[0])
 
-        update_button.configure(command=update)
-        mode_entry.bind("<Return>", update)
-        scale.bind("<<ComboboxSelected>>", update)
-        update()
+        def apply_mode_selection(_event: object | None = None) -> None:
+            nonlocal selected_modes
+            selected_modes = list(
+                normalize_fput_mode_selection(
+                    self._mode_selection_var.get(), self.result.modal_energy.shape[1]
+                )
+            )
+            render()
+
+        update_button.configure(command=apply_mode_selection)
+        mode_entry.bind("<Return>", apply_mode_selection)
+        scale.bind("<<ComboboxSelected>>", render)
+        render()
 
     def _build_phase_tab(self, notebook: ttk.Notebook) -> None:
         """Provide particle or normal-mode phase portraits from cached coordinates."""
