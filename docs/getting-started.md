@@ -135,6 +135,7 @@ differential-lab
 ## Build Docs Locally
 
 ```bash
+pip install -e ".[docs]"
 python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
