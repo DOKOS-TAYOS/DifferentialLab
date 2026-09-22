@@ -184,10 +184,11 @@ class MainMenu:
 
         def _focus_boundary(event: object, target: ttk.Button) -> str:
             widget = getattr(event, "widget", None)
-            try:
-                setattr(widget.winfo_toplevel(), "_tooltip_modality", "keyboard")
-            except (AttributeError, tk.TclError):
-                pass
+            if widget is not None:
+                try:
+                    setattr(widget.winfo_toplevel(), "_tooltip_modality", "keyboard")
+                except (AttributeError, tk.TclError):
+                    pass
             target.focus_set()
             return "break"
 
