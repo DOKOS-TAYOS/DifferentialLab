@@ -157,7 +157,10 @@ Registered plugins:
 - `schrodinger_td`
 - `antenna_radiation`
 - `aerodynamics_2d`
+- `aerodynamics_3d`
 - `pipe_flow`
+- `gravitational_n_body`
+- `fput_experiment`
 
 ## Configuration Lifecycle
 

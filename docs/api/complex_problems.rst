@@ -168,6 +168,26 @@ aerodynamics_2d
 .. automodule:: complex_problems.aerodynamics_2d.result_dialog
    :members:
 
+aerodynamics_3d
+---------------
+
+.. automodule:: complex_problems.aerodynamics_3d
+
+.. automodule:: complex_problems.aerodynamics_3d.problem
+   :members:
+
+.. automodule:: complex_problems.aerodynamics_3d.model
+   :members:
+
+.. automodule:: complex_problems.aerodynamics_3d.solver
+   :members:
+
+.. automodule:: complex_problems.aerodynamics_3d.ui
+   :members:
+
+.. automodule:: complex_problems.aerodynamics_3d.result_dialog
+   :members:
+
 pipe_flow
 ---------
 

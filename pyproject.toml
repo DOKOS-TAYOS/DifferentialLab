@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "differential-lab"
-version = "0.7.0"
+version = "1.0.0"
 description = "Scientific numerical workflows for ODEs, boundary-value problems, difference equations, and scalar/vector PDEs, with a GUI."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["ode", "bvp", "pde", "difference-equations", "scientific-computing", "numerical-methods", "gui"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Scientific/Engineering :: Physics",
