@@ -172,7 +172,8 @@ def bind_wraplength(
     def _update(event: object | None = None) -> None:
         w = frame.winfo_width()
         if w > 100:
-            wrap = calculate_wraplength(w, pad, min_wrap)
+            available = max(1, w - pad)
+            wrap = min(calculate_wraplength(w, pad, min_wrap), available)
             for lbl in labels:
                 if lbl.winfo_exists():
                     cast(Any, lbl).configure(wraplength=wrap)
