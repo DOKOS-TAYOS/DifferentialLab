@@ -50,6 +50,18 @@ frontend.ui_dialogs.parameters_dialog
 .. automodule:: frontend.ui_dialogs.parameters_dialog
    :members:
 
+frontend.ui_dialogs.solve_session
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: frontend.ui_dialogs.solve_session
+   :members:
+
+frontend.ui_dialogs.symbol_palette
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: frontend.ui_dialogs.symbol_palette
+   :members:
+
 frontend.ui_dialogs.result_dialog
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

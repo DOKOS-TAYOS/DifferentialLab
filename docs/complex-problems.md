@@ -129,7 +129,8 @@ instantaneous decomposition. The optional diagnostic residual is
 - Increase grid resolution only after the model behaves as expected.
 - Keep time steps conservative for nonlinear or wave-dominated models.
 - For 2D models, tune both spatial resolution and output sampling cadence.
-- Large animations and high-resolution fields can become memory-heavy.
+- For Aerodynamics 3D, `nx`, `ny`, `nz`, and the saved-frame cadence multiply retained volumetric history; build its streamline cache only when needed.
+- Large animations, MP4 export, and high-resolution fields can become memory-heavy.
 
 ## Extending with New Plugins
 

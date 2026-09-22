@@ -53,6 +53,8 @@ pip install -e ".[docs]"
 - Prefer typed dataclasses for solver outputs.
 - Validate user input before solver invocation.
 - Reuse helpers in `complex_problems/common` instead of duplicating dialog logic.
+- Reuse `frontend.ui_dialogs.solve_session` for retained standard-workflow state
+  and `frontend.ui_dialogs.symbol_palette` for supported expression insertion.
 - Keep plugin defaults computationally reasonable for interactive use.
 - Keep public-facing docs aligned with `pyproject.toml`, `ENV_SCHEMA`, and the plugin registry.
 
@@ -108,21 +110,24 @@ pytest tests/test_nonlinear_waves_solver.py
 pytest tests/test_schrodinger_td_solver.py
 pytest tests/test_antenna_radiation_solver.py
 pytest tests/test_aerodynamics_2d_solver.py
+pytest tests/test_aerodynamics_3d.py
+pytest tests/test_gravitational_n_body.py
+pytest tests/test_fput_experiment.py
 pytest tests/test_pipe_flow_solver.py
+pytest tests/test_advanced_config_dialog_ui.py
+pytest tests/test_complex_problem_result_dialog_ui.py
 ```
 
 ## Documentation Workflow
 
 ```bash
-pip install -e ".[docs]"
-cd docs
-make html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 For Windows:
 
 ```bat
-make.bat html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 Documentation should be updated when a change affects:

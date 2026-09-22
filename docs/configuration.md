@@ -14,6 +14,18 @@ DifferentialLab reads configuration from `.env` in the project root.
 - `int` and `float`: parsed numerically, with range checks where defined
 - `str`: must be non-empty; some keys enforce a fixed option list
 
+## Settings Dialog
+
+The in-app `Settings` dialog presents the schema as four operational groups:
+`Appearance`, `Plots`, `Solver Defaults`, and `Advanced`. The technical `.env`
+key remains available in each control's tooltip. Colour settings have an editable
+preview; selecting it opens the system colour chooser.
+
+`Restore Defaults` repopulates the current form but does not write `.env`.
+Choose `Save & Restart` to write the form values and restart the app. On startup,
+values are validated against `ENV_SCHEMA`; invalid values fall back to schema defaults
+and are logged.
+
 ## UI Settings
 
 | Key | Type | Default | Description |

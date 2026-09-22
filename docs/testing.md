@@ -38,7 +38,12 @@ pytest tests/test_nonlinear_waves_solver.py
 pytest tests/test_schrodinger_td_solver.py
 pytest tests/test_antenna_radiation_solver.py
 pytest tests/test_aerodynamics_2d_solver.py
+pytest tests/test_aerodynamics_3d.py
+pytest tests/test_gravitational_n_body.py
+pytest tests/test_fput_experiment.py
 pytest tests/test_pipe_flow_solver.py
+pytest tests/test_advanced_config_dialog_ui.py
+pytest tests/test_complex_problem_result_dialog_ui.py
 ```
 
 Frontend and utilities:
@@ -92,13 +97,15 @@ Docs verification:
 
 ```bash
 pip install -e ".[docs]"
-cd docs
-make html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
 
 On Windows, use:
 
 ```bat
-cd docs
-make.bat html
+python -m sphinx -W --keep-going -b html docs docs/_build/html
 ```
+
+The GitHub Actions quality workflow checks Ruff linting and formatting, pytest,
+and Pyright. Packaging smoke checks and a warnings-as-errors Sphinx build are
+appropriate local release/documentation checks when those surfaces change.
