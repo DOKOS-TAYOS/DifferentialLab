@@ -8,11 +8,11 @@ from frontend.ui_dialogs.tooltip import ToolTip
 
 
 class _FakeWidget:
-    def __init__(self) -> None:
+    def __init__(self, toplevel: _FakeToplevel | None = None) -> None:
         self.bindings: dict[str, tuple[Any, str | None]] = {}
         self.after_calls: list[tuple[int, Any]] = []
         self.cancelled: list[str] = []
-        self.toplevel = _FakeToplevel()
+        self.toplevel = toplevel or _FakeToplevel()
 
     def bind(self, sequence: str, callback: Any, add: str | None = None) -> None:
         self.bindings[sequence] = (callback, add)
@@ -107,3 +107,32 @@ def test_pointer_click_clears_keyboard_focus_ownership() -> None:
 
     assert tooltip._has_focus is False
     assert tooltip._id_after is None
+
+
+class _FakeTipWindow:
+    def __init__(self) -> None:
+        self.destroyed = False
+
+    def destroy(self) -> None:
+        self.destroyed = True
+
+
+def test_pointer_entry_dismisses_keyboard_tooltip_from_another_control() -> None:
+    toplevel = _FakeToplevel()
+    keyboard_widget = _FakeWidget(toplevel)
+    pointer_widget = _FakeWidget(toplevel)
+    keyboard_tooltip = ToolTip(keyboard_widget, "Keyboard help", delay=25)  # type: ignore[arg-type]
+    pointer_tooltip = ToolTip(pointer_widget, "Pointer help", delay=25)  # type: ignore[arg-type]
+    tipwindow = _FakeTipWindow()
+    keyboard_tooltip._tipwindow = tipwindow  # type: ignore[assignment]
+    keyboard_tooltip._has_focus = True
+    setattr(toplevel, "_active_tooltip", keyboard_tooltip)
+
+    pointer_tooltip._on_enter(None)  # type: ignore[arg-type]
+
+    assert tipwindow.destroyed is True
+    assert keyboard_tooltip._tipwindow is None
+    assert getattr(toplevel, "_active_tooltip", None) is None
+    assert pointer_tooltip._has_focus is False
+    assert pointer_tooltip._pointer_inside is True
+    assert len(pointer_widget.after_calls) == 1
