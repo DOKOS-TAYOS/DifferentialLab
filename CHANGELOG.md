@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-25
+
 ### Changed
 
 - Set the default base UI font size to 13 and made Linux setup, run, and desktop
