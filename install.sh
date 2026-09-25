@@ -79,10 +79,15 @@ if [ -d "$REPO_NAME" ]; then
         chmod +x bin/setup.sh bin/run.sh
         ./bin/setup.sh
         PROJECT_DIR="$(pwd)"
-        source "$PROJECT_DIR/bin/linux_desktop.sh"
         chmod +x install.sh bin/setup.sh bin/run.sh
         if [ "$(uname -s)" = "Linux" ]; then
-            create_linux_launchers "$PROJECT_DIR"
+            DESKTOP_HELPER="$PROJECT_DIR/bin/linux_desktop.sh"
+            if [ -f "$DESKTOP_HELPER" ]; then
+                source "$DESKTOP_HELPER"
+                create_linux_launchers "$PROJECT_DIR"
+            else
+                echo "WARNING: Linux desktop helper not found, skipping launcher creation"
+            fi
         fi
         exit 0
     fi
@@ -111,10 +116,15 @@ chmod +x install.sh bin/setup.sh bin/run.sh
 ./bin/setup.sh
 
 PROJECT_DIR="$(pwd)"
-source "$PROJECT_DIR/bin/linux_desktop.sh"
 chmod +x install.sh bin/setup.sh bin/run.sh
 if [ "$(uname -s)" = "Linux" ]; then
-    create_linux_launchers "$PROJECT_DIR"
+    DESKTOP_HELPER="$PROJECT_DIR/bin/linux_desktop.sh"
+    if [ -f "$DESKTOP_HELPER" ]; then
+        source "$DESKTOP_HELPER"
+        create_linux_launchers "$PROJECT_DIR"
+    else
+        echo "WARNING: Linux desktop helper not found, skipping launcher creation"
+    fi
 fi
 
 echo ""
