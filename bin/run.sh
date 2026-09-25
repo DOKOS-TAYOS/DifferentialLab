@@ -13,17 +13,22 @@ if [ ! -d ".venv" ]; then
     exit 1
 fi
 
+ENTRY_POINT=".venv/bin/differential-lab"
+if [ ! -x "$ENTRY_POINT" ]; then
+    echo "ERROR: DifferentialLab entry point not found or not executable: $ENTRY_POINT"
+    echo "Please run bin/setup.sh first"
+    exit 1
+fi
+
 MODE="${1:---prod}"
 
 case "$MODE" in
     --dev|-d)
-        source .venv/bin/activate
-        python src/main_program.py
+        "$ENTRY_POINT"
         ;;
     --background|-b|--prod|-p)
-        source .venv/bin/activate
         mkdir -p logs
-        nohup python src/main_program.py >> logs/run.log 2>&1 &
+        nohup "$ENTRY_POINT" >> logs/run.log 2>&1 &
         PID="$!"
         echo "DifferentialLab started in background (PID: $PID)"
         echo "Logs: logs/run.log"

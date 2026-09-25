@@ -76,32 +76,18 @@ if [ -d "$REPO_NAME" ]; then
     else
         echo "       Using existing directory..."
         cd "$REPO_NAME"
-        chmod +x bin/setup.sh
+        chmod +x bin/setup.sh bin/run.sh
         ./bin/setup.sh
         PROJECT_DIR="$(pwd)"
-        DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
-        SHORTCUT="$DESKTOP/DifferentialLab.desktop"
-        ICON_PATH="$PROJECT_DIR/images/DifferentialLab_icon.ico"
-        if [ -d "$DESKTOP" ]; then
-            if [ -f "$ICON_PATH" ]; then
-                ICON_LINE="Icon=$ICON_PATH"
+        chmod +x install.sh bin/setup.sh bin/run.sh
+        if [ "$(uname -s)" = "Linux" ]; then
+            DESKTOP_HELPER="$PROJECT_DIR/bin/linux_desktop.sh"
+            if [ -f "$DESKTOP_HELPER" ]; then
+                source "$DESKTOP_HELPER"
+                create_linux_launchers "$PROJECT_DIR"
             else
-                ICON_LINE="Icon=utilities-terminal"
+                echo "WARNING: Linux desktop helper not found, skipping launcher creation"
             fi
-            cat > "$SHORTCUT" << EOF
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=DifferentialLab
-Comment=Launch DifferentialLab
-Exec=$PROJECT_DIR/bin/run.sh
-Path=$PROJECT_DIR
-$ICON_LINE
-Terminal=false
-EOF
-            chmod +x "$SHORTCUT"
-            echo ""
-            echo "Desktop shortcut created: $SHORTCUT"
         fi
         exit 0
     fi
@@ -126,38 +112,19 @@ echo ""
 echo "[3/4] Running setup..."
 echo ""
 
-chmod +x bin/setup.sh
+chmod +x install.sh bin/setup.sh bin/run.sh
 ./bin/setup.sh
 
-echo ""
-echo "[4/4] Creating desktop shortcut..."
-
 PROJECT_DIR="$(pwd)"
-DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
-SHORTCUT="$DESKTOP/DifferentialLab.desktop"
-ICON_PATH="$PROJECT_DIR/images/DifferentialLab_icon.ico"
-
-if [ -d "$DESKTOP" ]; then
-    if [ -f "$ICON_PATH" ]; then
-        ICON_LINE="Icon=$ICON_PATH"
+chmod +x install.sh bin/setup.sh bin/run.sh
+if [ "$(uname -s)" = "Linux" ]; then
+    DESKTOP_HELPER="$PROJECT_DIR/bin/linux_desktop.sh"
+    if [ -f "$DESKTOP_HELPER" ]; then
+        source "$DESKTOP_HELPER"
+        create_linux_launchers "$PROJECT_DIR"
     else
-        ICON_LINE="Icon=utilities-terminal"
+        echo "WARNING: Linux desktop helper not found, skipping launcher creation"
     fi
-    cat > "$SHORTCUT" << EOF
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=DifferentialLab
-Comment=Launch DifferentialLab
-Exec=$PROJECT_DIR/bin/run.sh
-Path=$PROJECT_DIR
-$ICON_LINE
-Terminal=false
-EOF
-    chmod +x "$SHORTCUT"
-    echo "       Desktop shortcut created: $SHORTCUT"
-else
-    echo "       WARNING: Desktop directory not found, skipping shortcut"
 fi
 
 echo ""
@@ -167,5 +134,5 @@ echo "===================================="
 echo ""
 echo "DifferentialLab has been cloned and set up."
 echo "You can now run the application from: $PROJECT_DIR"
-echo "Desktop shortcut: $SHORTCUT"
+echo "Application-menu launcher is available on Linux."
 echo ""
