@@ -37,7 +37,7 @@ and are logged.
 | `UI_BUTTON_FG` | `str` | `lime green` | Primary button text color. |
 | `UI_BUTTON_FG_CANCEL` | `str` | `red2` | Cancel/destructive button text color. |
 | `UI_BUTTON_FG_ACCENT2` | `str` | `yellow` | Secondary accent button text color. |
-| `UI_FONT_SIZE` | `int` | `16` | Base UI font size in points. |
+| `UI_FONT_SIZE` | `int` | `13` | Base UI font size in points. |
 | `UI_FONT_FAMILY` | `str` | `Bahnschrift` | UI font family. |
 | `UI_PADDING` | `int` | `8` | General spacing between UI elements. |
 
