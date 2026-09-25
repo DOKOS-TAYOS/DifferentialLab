@@ -130,17 +130,19 @@ else
     echo "       Virtual environment created"
 fi
 
-echo ""
-echo "[4/7] Activating virtual environment..."
-source .venv/bin/activate
+VENV_PYTHON=".venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "ERROR: Virtual environment Python not found or not executable: $VENV_PYTHON"
+    exit 1
+fi
 
 echo ""
-echo "[5/7] Upgrading pip..."
-python -m pip install --upgrade pip
+echo "[4/7] Upgrading pip..."
+"$VENV_PYTHON" -m pip install --upgrade pip
 
 echo ""
 echo "[6/7] Installing dependencies..."
-python -m pip install -e "$INSTALL_TARGET"
+"$VENV_PYTHON" -m pip install -e "$INSTALL_TARGET"
 
 echo ""
 echo "[7/7] Setting up environment file..."

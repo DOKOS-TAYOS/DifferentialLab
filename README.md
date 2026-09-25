@@ -140,10 +140,17 @@ bin\run.bat
 Linux/macOS:
 
 ```bash
-chmod +x bin/setup.sh bin/run.sh
 ./bin/setup.sh
 ./bin/run.sh
 ```
+
+The setup and run scripts use the project-local `.venv` directly, so you do not
+need to activate it first. Manual activation remains useful for development
+commands you run yourself. Running `./bin/run.sh` or `.venv/bin/differential-lab`
+keeps imports tied to the installed project environment and avoids mismatches
+from accidentally using the system Python. On Linux, `install.sh` adds an
+application-menu launcher and a Desktop launcher when the XDG Desktop directory
+exists.
 
 For development dependencies:
 
@@ -157,7 +164,8 @@ or on Linux/macOS:
 ./bin/setup.sh --dev
 ```
 
-Direct run from an activated environment:
+Manual run from an activated environment (activation is optional when using
+the project scripts above):
 
 ```bash
 python src/main_program.py

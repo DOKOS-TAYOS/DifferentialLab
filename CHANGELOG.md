@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Set the default base UI font size to 13 and made Linux setup, run, and desktop
+  launchers use the project virtual environment without requiring shell activation.
+- Added an XDG-aware Linux application-menu launcher and an optional Desktop
+  launcher when the user's Desktop directory exists.
 - Synchronized maintained user, developer, API, and in-app reference documentation with the published 1.0.0 implementation.
 
 ## [1.0.0] - 2026-09-22

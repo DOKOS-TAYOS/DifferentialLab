@@ -79,7 +79,7 @@ ENV_SCHEMA: list[dict[str, Any]] = [
     # --- ui: text / inputs ---
     {
         "key": "UI_FONT_SIZE",
-        "default": 16,
+        "default": 13,
         "cast_type": int,
         "min": 1,
         "description": "Base font size in points used across the UI.",

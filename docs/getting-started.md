@@ -15,7 +15,8 @@ create the environment yourself before installing the package.
 ### First-time clone and setup
 
 These scripts are intended for users who do not already have the repository.
-They clone the project, run setup, and create a desktop shortcut where possible.
+They clone the project and run setup. On Linux, they also add an application-menu
+launcher and a Desktop launcher when the XDG Desktop directory exists.
 
 Windows:
 
@@ -26,7 +27,6 @@ install.bat
 Linux/macOS:
 
 ```bash
-chmod +x install.sh
 ./install.sh
 ```
 
@@ -41,9 +41,13 @@ bin\setup.bat
 Linux/macOS:
 
 ```bash
-chmod +x bin/setup.sh
 ./bin/setup.sh
 ```
+
+The setup and run scripts use `.venv` directly, so manual activation is not
+required. You can still activate it for manual development commands. Using
+`./bin/run.sh` or `.venv/bin/differential-lab` also avoids import and dependency
+mismatches caused by running with the system Python.
 
 For development work, install the development extras:
 
@@ -110,7 +114,7 @@ bin\run.bat --background  :: Windows background mode, writes logs/run.log
 ./bin/run.sh --background  # Linux/macOS background mode
 ```
 
-Direct run from an activated environment:
+Manual run from an activated environment (activation is optional for the scripts):
 
 ```bash
 python src/main_program.py
